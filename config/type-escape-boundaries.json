@@ -184,11 +184,6 @@
         0,
         0
       ],
-      "client/src/pages/BaleProducts.tsx": [
-        7,
-        0,
-        0
-      ],
       "client/src/pages/BarcodeManager.tsx": [
         2,
         0,
@@ -206,11 +201,6 @@
       ],
       "client/src/pages/CompanyDataReset.tsx": [
         1,
-        0,
-        0
-      ],
-      "client/src/pages/ContainerDetail.tsx": [
-        20,
         0,
         0
       ],
@@ -529,11 +519,6 @@
         0,
         0
       ],
-      "client/src/pages/factory/BalesHistory.tsx": [
-        7,
-        0,
-        0
-      ],
       "client/src/pages/factory/CustomerLogosSettings.tsx": [
         2,
         0,
@@ -654,18 +639,8 @@
         0,
         0
       ],
-      "client/src/pages/factory/FactoryProformas.tsx": [
-        1,
-        0,
-        0
-      ],
       "client/src/pages/factory/FactoryShippingContainers.tsx": [
         3,
-        0,
-        0
-      ],
-      "client/src/pages/factory/FactoryStockAllocationV5.tsx": [
-        2,
         0,
         0
       ],
@@ -710,7 +685,7 @@
         0
       ],
       "client/src/pages/factory/WasteDispatch.tsx": [
-        10,
+        9,
         0,
         0
       ],
@@ -1970,7 +1945,7 @@
         0
       ],
       "server/chatService.ts": [
-        17,
+        3,
         0,
         0
       ],
@@ -2005,7 +1980,7 @@
         0
       ],
       "server/index.ts": [
-        3,
+        2,
         0,
         0
       ],
@@ -4003,10 +3978,65 @@
         0,
         2,
         0
+      ],
+      "client/src/pages/factory/factoryproformas/useFactoryProformasModel.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/baleshistory/useBalesHistoryModel.tsx": [
+        7,
+        0,
+        0
+      ],
+      "client/src/pages/baleproducts/useBaleProductsModel.tsx": [
+        7,
+        0,
+        0
+      ],
+      "client/src/pages/containerdetail/components/ContainerDetailErpView.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/containerdetail/components/ContainerDetailSpView.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/containerdetail/useContainerDetailModel.tsx": [
+        12,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorystockallocationv5/useFactoryStockAllocationV5Model.tsx": [
+        2,
+        0,
+        0
+      ],
+      "server/chat/earlyMultiSourceTransfer.ts": [
+        0,
+        0,
+        0
+      ],
+      "server/chat/voucherAndStockDrafts.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/chat/lookupDrafts.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/chat/stockTransferDrafts.ts": [
+        2,
+        0,
+        0
       ]
     }
   },
   "totals": {
-    "typeEscapeCeiling": 3230
+    "typeEscapeCeiling": 3174
   }
 }

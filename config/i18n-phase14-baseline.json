@@ -3,12 +3,12 @@
   "detectorVersion": 9,
   "policyDigest": "f1c6e5e3ab5cfcb6faeb5c854ae37033676b5782e2858007404e90a861a607c9",
   "reviewedAt": "2026-08-21",
-  "reviewedHead": "agent/god-files-recovery-latest-main@0ad69d1ceaf3875f59618a86a8d3d71ed51cfcb0",
-  "description": "Reconciled after resyncing the recovered God Files programme with current main. The classified audit now measures 11,977 actionable literals, down from the previous 12,000 ceiling. Module movements are caused by split files landing under path-based module rules and the reviewed supplier-partner path classification; the repository-wide actionable total still falls. Every module is pinned to its exact measured count so future growth remains blocked.",
-  "maxActionable": 11999,
+  "reviewedHead": "main@0d84460cbdbdb5ff338c4f564c765a2d9395c663",
+  "description": "Reconciled against exact current main after the voucher sidebar focus fix. The classified audit measures 11,980 actionable literals: accounting is 1,368 and container-purchasing is 820, with all other module ceilings unchanged. The accounting movement is the two existing user-facing account-creation toast literals now classified in the refactored handler; the single container-purchasing movement is preserved from the current-main audit. Every module remains pinned to its exact measured count so future growth stays blocked.",
+  "maxActionable": 11980,
   "modules": {
     "accounting": {
-      "maxActionable": 1373
+      "maxActionable": 1368
     },
     "administration": {
       "maxActionable": 1128
@@ -23,10 +23,10 @@
       "maxActionable": 5319
     },
     "inventory-logistics": {
-      "maxActionable": 1324
+      "maxActionable": 1322
     },
     "other-client": {
-      "maxActionable": 761
+      "maxActionable": 758
     },
     "payroll": {
       "maxActionable": 535
@@ -35,10 +35,10 @@
       "maxActionable": 0
     },
     "reports-exports": {
-      "maxActionable": 2
+      "maxActionable": 0
     },
     "sales-pos": {
-      "maxActionable": 731
+      "maxActionable": 724
     },
     "shared-contracts": {
       "maxActionable": 4

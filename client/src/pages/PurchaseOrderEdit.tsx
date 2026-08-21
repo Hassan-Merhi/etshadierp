@@ -18,9 +18,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/formatNumber";
 import { PageHeader } from "@/components/PageHeader";
 import { useCompany } from "@/contexts/CompanyContext";
+import { focusScopedTestId } from "@/lib/scopedFocus";
 
 import type { LineItem, PurchaseOrder, StockItem } from "./purchaseorderedit/types";
 import { FreightAccountPicker } from "./purchaseorderedit/components/FreightAccountPicker";
+
 export default function PurchaseOrderEdit() {
   const [, params] = useRoute("/purchase-orders/:id/edit");
   const [, navigate] = useLocation();
@@ -45,7 +47,6 @@ export default function PurchaseOrderEdit() {
   const [freightOwnAccountId, setFreightOwnAccountId] = useState<number | null>(null);
   const [freightParentAccountId, setFreightParentAccountId] = useState<number | null>(null);
 
-  // Sidebar state for item search
   const [showItemSidebar, setShowItemSidebar] = useState(false);
   const [activeRow, setActiveRow] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -63,11 +64,7 @@ export default function PurchaseOrderEdit() {
     refetchOnReconnect: false,
   });
 
-  const {
-    data: po,
-    isLoading,
-    error,
-  } = useQuery<PurchaseOrder>({
+  const { data: po, isLoading, error } = useQuery<PurchaseOrder>({
     queryKey: [`/api/purchase-orders/${poId}`],
     enabled: !!poId,
   });
@@ -96,38 +93,34 @@ export default function PurchaseOrderEdit() {
     staleTime: 15000,
   });
 
-  // Auto-populate PO number for new POs once the suggestion arrives
   useEffect(() => {
-    if (isNew && nextPoData?.poNumber && !poNumber) {
-      setPoNumber(nextPoData.poNumber);
-    }
+    if (isNew && nextPoData?.poNumber && !poNumber) setPoNumber(nextPoData.poNumber);
   }, [isNew, nextPoData, poNumber]);
 
   useEffect(() => {
-    if (po) {
-      setPoNumber(po.poNumber);
-      setCurrency(po.currency);
-      setStatus(po.status);
-      setItems(
-        po.items.map((item) => ({
-          id: item.id,
-          stockItemId: item.stockItemId,
-          itemName: item.itemName,
-          quantity: item.quantity,
-          rate: item.rate,
-          lineTotal: item.lineTotal,
-        }))
-      );
-      setFreight(po.freight || "0");
-      setSurcharge(po.surcharge || "0");
-      setFumigation(po.fumigation || "0");
-      setDocumentCharges(po.documentCharges || "0");
-      setDiscount(po.discount || "0");
-      setOtherCharges(po.otherCharges || "0");
-      setFreightPaidBy((po.freightPaidBy as "supplier" | "own" | "parent") || "supplier");
-      setFreightOwnAccountId(po.freightOwnAccountId ?? null);
-      setFreightParentAccountId(po.freightParentAccountId ?? null);
-    }
+    if (!po) return;
+    setPoNumber(po.poNumber);
+    setCurrency(po.currency);
+    setStatus(po.status);
+    setItems(
+      po.items.map((item) => ({
+        id: item.id,
+        stockItemId: item.stockItemId,
+        itemName: item.itemName,
+        quantity: item.quantity,
+        rate: item.rate,
+        lineTotal: item.lineTotal,
+      }))
+    );
+    setFreight(po.freight || "0");
+    setSurcharge(po.surcharge || "0");
+    setFumigation(po.fumigation || "0");
+    setDocumentCharges(po.documentCharges || "0");
+    setDiscount(po.discount || "0");
+    setOtherCharges(po.otherCharges || "0");
+    setFreightPaidBy((po.freightPaidBy as "supplier" | "own" | "parent") || "supplier");
+    setFreightOwnAccountId(po.freightOwnAccountId ?? null);
+    setFreightParentAccountId(po.freightParentAccountId ?? null);
   }, [po]);
 
   const updateMutation = useMutation({
@@ -145,27 +138,20 @@ export default function PurchaseOrderEdit() {
       freightPaidBy?: string;
       freightOwnAccountId?: number | null;
       freightParentAccountId?: number | null;
-    }) => {
-      return apiRequest("PATCH", `/api/purchase-orders/${poId}`, data);
-    },
+    }) => apiRequest("PATCH", `/api/purchase-orders/${poId}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/purchase-orders/${poId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
-      if (po?.containerId) {
-        queryClient.invalidateQueries({ queryKey: [`/api/containers/${po.containerId}`] });
-      }
-      toast({
-        title: "Purchase Order Updated",
-        description: "The purchase order has been updated successfully.",
-      });
+      if (po?.containerId) queryClient.invalidateQueries({ queryKey: [`/api/containers/${po.containerId}`] });
+      toast({ title: "Purchase Order Updated", description: "The purchase order has been updated successfully." });
       navigate("/daybook");
     },
-    onError: (error: ClientErrorLike) => {
-      if (error?._handledGlobally) return;
+    onError: (mutationError: ClientErrorLike) => {
+      if (mutationError?._handledGlobally) return;
       toast({
         title: "Update Failed",
-        description: error.message || "Failed to update purchase order",
+        description: mutationError.message || "Failed to update purchase order",
         variant: "destructive",
       });
     },
@@ -173,8 +159,8 @@ export default function PurchaseOrderEdit() {
 
   const syncParentJvMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/purchase-orders/${poId}/sync-parent-voucher`, {});
-      return res.json();
+      const response = await apiRequest("POST", `/api/purchase-orders/${poId}/sync-parent-voucher`, {});
+      return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/purchase-orders/${poId}`] });
@@ -192,79 +178,64 @@ export default function PurchaseOrderEdit() {
         variant: data?.found ? "default" : "destructive",
       });
     },
-    onError: (error: ClientErrorLike) => {
-      if (error?._handledGlobally) return;
+    onError: (mutationError: ClientErrorLike) => {
+      if (mutationError?._handledGlobally) return;
       toast({
         title: "Sync Failed",
-        description: error.message || "Failed to sync parent journal voucher",
+        description: mutationError.message || "Failed to sync parent journal voucher",
         variant: "destructive",
       });
     },
   });
 
   const handleAddItem = useCallback(() => {
-    setItems((prev) => [
-      ...prev,
-      {
-        stockItemId: null,
-        itemName: "",
-        quantity: "1",
-        rate: "0",
-      },
+    setItems((previous) => [
+      ...previous,
+      { stockItemId: null, itemName: "", quantity: "1", rate: "0" },
     ]);
   }, []);
 
   const handleRemoveItem = useCallback((index: number) => {
-    setItems((prev) => prev.filter((_, i) => i !== index));
+    setItems((previous) => previous.filter((_, itemIndex) => itemIndex !== index));
   }, []);
 
   const handleItemChange = useCallback(
     (index: number, field: keyof LineItem, value: string | number | null, stockItem?: StockItem) => {
-      setItems((prev) => {
-        const newItems = [...prev];
-        const existingItem = newItems[index];
+      setItems((previous) => {
+        const nextItems = [...previous];
+        const existingItem = nextItems[index];
         if (field === "stockItemId") {
-          // Normalize value to number for comparison
           const numericId = typeof value === "string" ? parseInt(value, 10) : value;
-          // If stockItem is passed directly, use it; otherwise fallback to lookup
-          const foundItem = stockItem || stockItems?.find((si) => si.id === numericId);
+          const foundItem = stockItem || stockItems?.find((candidate) => candidate.id === numericId);
           if (foundItem) {
-            newItems[index] = {
-              ...existingItem,
-              stockItemId: foundItem.id,
-              itemName: foundItem.name,
-            };
+            nextItems[index] = { ...existingItem, stockItemId: foundItem.id, itemName: foundItem.name };
           } else {
-            // Preserve existing itemName if lookup fails (defensive - don't lose data)
-            newItems[index] = {
+            nextItems[index] = {
               ...existingItem,
-              stockItemId: typeof numericId === "number" && !isNaN(numericId) ? numericId : existingItem.stockItemId,
-              // Keep existing itemName - don't clear it
+              stockItemId:
+                typeof numericId === "number" && !isNaN(numericId) ? numericId : existingItem.stockItemId,
             };
           }
         } else {
-          newItems[index] = {
-            ...existingItem,
-            [field]: value,
-          };
+          nextItems[index] = { ...existingItem, [field]: value };
         }
-        return newItems;
+        return nextItems;
       });
     },
     [stockItems]
   );
 
-  const lineTotals = useMemo(() => {
-    return items.map((item) => {
-      const qty = parseFloat(item.quantity) || 0;
-      const rate = parseFloat(item.rate) || 0;
-      return (qty * rate).toFixed(2);
-    });
-  }, [items]);
+  const lineTotals = useMemo(
+    () =>
+      items.map((item) => {
+        const quantity = parseFloat(item.quantity) || 0;
+        const rate = parseFloat(item.rate) || 0;
+        return (quantity * rate).toFixed(2);
+      }),
+    [items]
+  );
 
-  const itemsTotal = useMemo(() => {
-    return lineTotals.reduce((sum, lt) => sum + parseFloat(lt), 0).toFixed(2);
-  }, [lineTotals]);
+  const itemsTotal = useMemo(() => lineTotals.reduce((sum, total) => sum + parseFloat(total), 0).toFixed(2), [lineTotals]);
 
   const chargesTotal = useMemo(() => {
     const freightAmount = parseFloat(freight) || 0;
@@ -274,87 +245,60 @@ export default function PurchaseOrderEdit() {
     const discountAmount = parseFloat(discount) || 0;
     const otherChargesAmount = parseFloat(otherCharges) || 0;
     return (
-      freightAmount +
-      surchargeAmount +
-      fumigationAmount +
-      documentChargesAmount -
-      discountAmount +
-      otherChargesAmount
+      freightAmount + surchargeAmount + fumigationAmount + documentChargesAmount - discountAmount + otherChargesAmount
     ).toFixed(2);
   }, [freight, surcharge, fumigation, documentCharges, discount, otherCharges]);
 
-  const grandTotal = useMemo(() => {
-    return (parseFloat(itemsTotal) + parseFloat(chargesTotal)).toFixed(2);
-  }, [itemsTotal, chargesTotal]);
-
-  const totalQuantity = useMemo(() => {
-    return items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
-  }, [items]);
+  const grandTotal = useMemo(() => (parseFloat(itemsTotal) + parseFloat(chargesTotal)).toFixed(2), [itemsTotal, chargesTotal]);
+  const totalQuantity = useMemo(
+    () => items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0),
+    [items]
+  );
 
   const stockItemsList = useMemo(() => (stockItems || []) as StockItem[], [stockItems]);
-
   const filteredStockItems = useMemo(() => {
     if (!searchTerm.trim()) return stockItemsList.slice(0, 100);
-    const term = (searchTerm || "").toLowerCase();
+    const term = searchTerm.toLowerCase();
     return stockItemsList
-      .filter((si) => (si.name || "").toLowerCase().includes(term) || (si.code || "").toLowerCase().includes(term))
+      .filter(
+        (item) =>
+          (item.name || "").toLowerCase().includes(term) || (item.code || "").toLowerCase().includes(term)
+      )
       .slice(0, 100);
   }, [stockItemsList, searchTerm]);
 
   const handleSelectItem = useCallback(
     (stockItem: StockItem) => {
-      if (activeRow !== null) {
-        handleItemChange(activeRow, "stockItemId", stockItem.id, stockItem);
-        setShowItemSidebar(false);
-        setSearchTerm("");
-        setActiveRow(null);
-        // Focus quantity input
-        setTimeout(() => {
-          const qtyInput = document.querySelector(`[data-testid="input-quantity-${activeRow}"]`) as HTMLInputElement;
-          if (qtyInput) {
-            qtyInput.focus();
-            qtyInput.select();
-          }
-        }, 50);
-      }
+      if (activeRow === null) return;
+      const rowIndex = activeRow;
+      handleItemChange(rowIndex, "stockItemId", stockItem.id, stockItem);
+      setShowItemSidebar(false);
+      setSearchTerm("");
+      setActiveRow(null);
+      focusScopedTestId(`input-quantity-${rowIndex}`, {
+        select: true,
+        delay: 50,
+        anchor: containerRef.current,
+      });
     },
     [activeRow, handleItemChange]
   );
 
   const handleSave = () => {
     if (!poNumber.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "PO Number is required",
-        variant: "destructive",
-      });
+      toast({ title: "Validation Error", description: "PO Number is required", variant: "destructive" });
       return;
     }
-
     if (items.length === 0) {
-      toast({
-        title: "Validation Error",
-        description: "At least one line item is required",
-        variant: "destructive",
-      });
+      toast({ title: "Validation Error", description: "At least one line item is required", variant: "destructive" });
       return;
     }
-
     if (isFactory && freightPaidBy === "own" && parseFloat(freight) > 0 && !freightOwnAccountId) {
-      toast({
-        title: "Account Required",
-        description: "Select an account for the freight payment.",
-        variant: "destructive",
-      });
+      toast({ title: "Account Required", description: "Select an account for the freight payment.", variant: "destructive" });
       return;
     }
-
     if (freightPaidBy === "parent" && parseFloat(freight) > 0 && !freightParentAccountId) {
-      toast({
-        title: "Account Required",
-        description: "Select a parent company account for the freight.",
-        variant: "destructive",
-      });
+      toast({ title: "Account Required", description: "Select a parent company account for the freight.", variant: "destructive" });
       return;
     }
 
@@ -435,7 +379,7 @@ export default function PurchaseOrderEdit() {
                   <Input
                     id="poNumber"
                     value={poNumber}
-                    onChange={(e) => setPoNumber(e.target.value)}
+                    onChange={(event) => setPoNumber(event.target.value)}
                     data-testid="input-po-number"
                     placeholder={isNew ? "Auto-generating…" : undefined}
                   />
@@ -447,8 +391,8 @@ export default function PurchaseOrderEdit() {
                       data-testid="button-generate-po-number"
                       title="Generate a new PO number"
                       onClick={() =>
-                        refetchNextPo().then((r) => {
-                          if (r.data?.poNumber) setPoNumber(r.data.poNumber);
+                        refetchNextPo().then((result) => {
+                          if (result.data?.poNumber) setPoNumber(result.data.poNumber);
                         })
                       }
                       disabled={isFetchingNextPo}
@@ -517,18 +461,17 @@ export default function PurchaseOrderEdit() {
                           <input
                             type="text"
                             value={activeRow === index ? searchTerm : item.itemName || ""}
-                            onChange={(e) => {
-                              setSearchTerm(e.target.value);
+                            onChange={(event) => {
+                              setSearchTerm(event.target.value);
                               setHighlightedIndex(0);
                             }}
-                            onFocus={(e) => {
+                            onFocus={(event) => {
                               focusIdRef.current += 1;
                               setActiveRow(index);
                               setSearchTerm(item.itemName || "");
                               setHighlightedIndex(0);
                               setShowItemSidebar(true);
-                              // Calculate sidebar position relative to the row
-                              const row = e.currentTarget.closest("tr");
+                              const row = event.currentTarget.closest("tr");
                               const container = containerRef.current;
                               if (row && container) {
                                 const rowRect = row.getBoundingClientRect();
@@ -546,31 +489,31 @@ export default function PurchaseOrderEdit() {
                                 }
                               }, 200);
                             }}
-                            onKeyDown={(e) => {
-                              if (e.key === "ArrowDown") {
+                            onKeyDown={(event) => {
+                              if (event.key === "ArrowDown") {
                                 if (showItemSidebar && filteredStockItems.length > 0) {
-                                  e.preventDefault();
-                                  setHighlightedIndex(Math.min(filteredStockItems.length - 1, highlightedIndex + 1));
+                                  event.preventDefault();
+                                  setHighlightedIndex(
+                                    Math.min(filteredStockItems.length - 1, highlightedIndex + 1)
+                                  );
                                 }
-                              } else if (e.key === "ArrowUp") {
+                              } else if (event.key === "ArrowUp") {
                                 if (showItemSidebar && filteredStockItems.length > 0) {
-                                  e.preventDefault();
+                                  event.preventDefault();
                                   setHighlightedIndex(Math.max(0, highlightedIndex - 1));
                                 }
-                              } else if (e.key === "Enter") {
-                                e.preventDefault();
-                                e.stopPropagation();
+                              } else if (event.key === "Enter") {
+                                event.preventDefault();
+                                event.stopPropagation();
                                 if (showItemSidebar && filteredStockItems.length > 0) {
                                   handleSelectItem(filteredStockItems[highlightedIndex]);
                                 }
-                              } else if (e.key === "Tab" && !e.shiftKey) {
-                                // Move to next row's item field and reposition sidebar
-                                const nextInput = document.querySelector(
-                                  `[data-testid="input-item-name-${index + 1}"]`
-                                ) as HTMLInputElement;
-                                if (nextInput) {
-                                  e.preventDefault();
-                                  nextInput.focus();
+                              } else if (event.key === "Tab" && !event.shiftKey) {
+                                if (index + 1 < items.length) {
+                                  event.preventDefault();
+                                  focusScopedTestId(`input-item-name-${index + 1}`, {
+                                    anchor: event.currentTarget,
+                                  });
                                 } else {
                                   setShowItemSidebar(false);
                                   setSearchTerm("");
@@ -587,7 +530,7 @@ export default function PurchaseOrderEdit() {
                             type="number"
                             step="0.01"
                             value={item.quantity}
-                            onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                            onChange={(event) => handleItemChange(index, "quantity", event.target.value)}
                             className="text-right"
                             data-testid={`input-quantity-${index}`}
                           />
@@ -597,7 +540,7 @@ export default function PurchaseOrderEdit() {
                             type="number"
                             step="0.01"
                             value={item.rate}
-                            onChange={(e) => handleItemChange(index, "rate", e.target.value)}
+                            onChange={(event) => handleItemChange(index, "rate", event.target.value)}
                             className="text-right"
                             data-testid={`input-rate-${index}`}
                           />
@@ -652,7 +595,7 @@ export default function PurchaseOrderEdit() {
                     type="number"
                     step="0.01"
                     value={freight}
-                    onChange={(e) => setFreight(e.target.value)}
+                    onChange={(event) => setFreight(event.target.value)}
                     className="text-right"
                     data-testid="input-freight"
                   />
@@ -705,14 +648,14 @@ export default function PurchaseOrderEdit() {
                         {freightPaidBy === "own" && (
                           <FreightAccountPicker
                             value={freightOwnAccountId?.toString() ?? ""}
-                            onValueChange={(v) => setFreightOwnAccountId(v ? parseInt(v) : null)}
+                            onValueChange={(value) => setFreightOwnAccountId(value ? parseInt(value) : null)}
                             accounts={ledgerAccounts ?? []}
                           />
                         )}
                         {freightPaidBy === "parent" && (
                           <FreightAccountPicker
                             value={freightParentAccountId?.toString() ?? ""}
-                            onValueChange={(v) => setFreightParentAccountId(v ? parseInt(v) : null)}
+                            onValueChange={(value) => setFreightParentAccountId(value ? parseInt(value) : null)}
                             accounts={parentFreightAccounts ?? []}
                           />
                         )}
@@ -721,63 +664,23 @@ export default function PurchaseOrderEdit() {
                 </div>
                 <div>
                   <Label htmlFor="surcharge">Surcharge</Label>
-                  <Input
-                    id="surcharge"
-                    type="number"
-                    step="0.01"
-                    value={surcharge}
-                    onChange={(e) => setSurcharge(e.target.value)}
-                    className="text-right"
-                    data-testid="input-surcharge"
-                  />
+                  <Input id="surcharge" type="number" step="0.01" value={surcharge} onChange={(event) => setSurcharge(event.target.value)} className="text-right" data-testid="input-surcharge" />
                 </div>
                 <div>
                   <Label htmlFor="fumigation">Fumigation</Label>
-                  <Input
-                    id="fumigation"
-                    type="number"
-                    step="0.01"
-                    value={fumigation}
-                    onChange={(e) => setFumigation(e.target.value)}
-                    className="text-right"
-                    data-testid="input-fumigation"
-                  />
+                  <Input id="fumigation" type="number" step="0.01" value={fumigation} onChange={(event) => setFumigation(event.target.value)} className="text-right" data-testid="input-fumigation" />
                 </div>
                 <div>
                   <Label htmlFor="documentCharges">Document Charges</Label>
-                  <Input
-                    id="documentCharges"
-                    type="number"
-                    step="0.01"
-                    value={documentCharges}
-                    onChange={(e) => setDocumentCharges(e.target.value)}
-                    className="text-right"
-                    data-testid="input-document-charges"
-                  />
+                  <Input id="documentCharges" type="number" step="0.01" value={documentCharges} onChange={(event) => setDocumentCharges(event.target.value)} className="text-right" data-testid="input-document-charges" />
                 </div>
                 <div>
                   <Label htmlFor="discount">Discount</Label>
-                  <Input
-                    id="discount"
-                    type="number"
-                    step="0.01"
-                    value={discount}
-                    onChange={(e) => setDiscount(e.target.value)}
-                    className="text-right"
-                    data-testid="input-discount"
-                  />
+                  <Input id="discount" type="number" step="0.01" value={discount} onChange={(event) => setDiscount(event.target.value)} className="text-right" data-testid="input-discount" />
                 </div>
                 <div>
                   <Label htmlFor="otherCharges">Other Charges</Label>
-                  <Input
-                    id="otherCharges"
-                    type="number"
-                    step="0.01"
-                    value={otherCharges}
-                    onChange={(e) => setOtherCharges(e.target.value)}
-                    className="text-right"
-                    data-testid="input-other-charges"
-                  />
+                  <Input id="otherCharges" type="number" step="0.01" value={otherCharges} onChange={(event) => setOtherCharges(event.target.value)} className="text-right" data-testid="input-other-charges" />
                 </div>
               </div>
 
@@ -787,8 +690,7 @@ export default function PurchaseOrderEdit() {
                   <span className="text-xl font-bold font-mono">${formatCurrency(parseFloat(grandTotal))}</span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Items (${formatCurrency(parseFloat(itemsTotal))}) + Charges ($
-                  {formatCurrency(parseFloat(chargesTotal))})
+                  Items (${formatCurrency(parseFloat(itemsTotal))}) + Charges (${formatCurrency(parseFloat(chargesTotal))})
                 </p>
               </div>
             </div>
@@ -823,7 +725,6 @@ export default function PurchaseOrderEdit() {
           </CardFooter>
         </Card>
 
-        {/* Search Items Sidebar */}
         {showItemSidebar && (
           <Card
             className="w-full sm:w-80 flex-shrink-0 sm:absolute sm:right-0 z-10"
@@ -842,18 +743,16 @@ export default function PurchaseOrderEdit() {
                   {filteredStockItems.length === 0 ? (
                     <div className="text-center py-8 text-sm text-muted-foreground">No items found</div>
                   ) : (
-                    filteredStockItems.map((item, idx) => {
-                      const isHighlighted = idx === highlightedIndex;
+                    filteredStockItems.map((item, itemIndex) => {
+                      const isHighlighted = itemIndex === highlightedIndex;
                       return (
                         <button
                           key={item.id}
                           type="button"
-                          className={`w-full text-left px-3 py-2 rounded-md hover-elevate active-elevate-2 ${
-                            isHighlighted ? "bg-accent" : ""
-                          }`}
+                          className={`w-full text-left px-3 py-2 rounded-md hover-elevate active-elevate-2 ${isHighlighted ? "bg-accent" : ""}`}
                           data-testid={`button-suggest-item-${item.id}`}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
+                          onMouseDown={(event) => {
+                            event.preventDefault();
                             handleSelectItem(item);
                           }}
                         >

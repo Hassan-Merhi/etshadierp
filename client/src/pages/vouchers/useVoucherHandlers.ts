@@ -1,5 +1,6 @@
 import { getErrorDetails } from "@shared/errorUtils";
 import type { Account } from "@/components/AccountSidebar";
+import { focusScopedTestId } from "@/lib/scopedFocus";
 
 interface UseVoucherHandlersProps {
   form: any;
@@ -29,8 +30,8 @@ export function useVoucherHandlers({
   toast,
   setSelectedAccountId,
   setSelectedAccountType,
-  setSidebarSearchValue,
-  setSidebarHighlightedIndex,
+  setSidebarSearchValue: _setSidebarSearchValue,
+  setSidebarHighlightedIndex: _setSidebarHighlightedIndex,
 }: UseVoucherHandlersProps) {
   const handleSidebarAccountSelect = async (account: Account) => {
     const currentEntries = form.getValues("entries");
@@ -41,63 +42,34 @@ export function useVoucherHandlers({
       form.setValue(`entries.${activeRowIndex}.accountType`, account.type);
       form.setValue(`entries.${activeRowIndex}.accountId`, account.id);
       form.setValue(`entries.${activeRowIndex}.accountName`, account.name);
-      requestAnimationFrame(() => {
-        const amountInput = document.querySelector(
-          `[data-testid="input-amount-${activeRowIndex}"]`
-        ) as HTMLInputElement;
-        if (amountInput) {
-          amountInput.focus();
-          amountInput.select();
-        }
-      });
     } else {
-      const emptyEntryIndex = currentEntries.findIndex((e: any) => e.accountId === 0 || !e.accountName);
+      const emptyEntryIndex = currentEntries.findIndex((entry: any) => entry.accountId === 0 || !entry.accountName);
       if (emptyEntryIndex >= 0) {
         targetRowIndex = emptyEntryIndex;
         form.setValue(`entries.${emptyEntryIndex}.accountType`, account.type);
         form.setValue(`entries.${emptyEntryIndex}.accountId`, account.id);
         form.setValue(`entries.${emptyEntryIndex}.accountName`, account.name);
-        requestAnimationFrame(() => {
-          const amountInput = document.querySelector(
-            `[data-testid="input-amount-${emptyEntryIndex}"]`
-          ) as HTMLInputElement;
-          if (amountInput) {
-            amountInput.focus();
-            amountInput.select();
-          }
-        });
       } else {
         targetRowIndex = currentEntries.length;
         append({ accountType: account.type, accountId: account.id, accountName: account.name, amount: "" });
-        requestAnimationFrame(() => {
-          const amountInput = document.querySelector(
-            `[data-testid="input-amount-${targetRowIndex}"]`
-          ) as HTMLInputElement;
-          if (amountInput) {
-            amountInput.focus();
-            amountInput.select();
-          }
-        });
       }
     }
 
+    focusScopedTestId(`input-amount-${targetRowIndex}`, { select: true });
     setSelectedAccountId(account.id);
     setSelectedAccountType(account.type);
     setActiveRowIndex(targetRowIndex);
   };
 
-  const handleAmountCommit = async (rowIndex: number) => {
-    if (rowIndex === activeRowIndex) {
-      setSelectedAccountId(null);
-      setSelectedAccountType(null);
-      setActiveRowIndex(null);
-      setSidebarSearchValue("");
-      setSidebarHighlightedIndex(0);
-      requestAnimationFrame(() => {
-        const searchInput = document.querySelector('[data-testid="input-search-account"]') as HTMLInputElement;
-        if (searchInput) searchInput.focus();
-      });
-    }
+  const handleAmountCommit = async (_rowIndex: number) => {
+    // Do not clear the active row or account search on amount commit/blur.
+    // The amount input blurs naturally when the user clicks either the row account
+    // field or the right-side account search. Clearing search state here raced the
+    // new input event, erased what the user had just typed, and reset the sidebar
+    // back to the full account list. Enter/Tab already move focus themselves, and
+    // the next row's onFocus updates activeRowIndex, so no forced refocus is needed.
+    setSelectedAccountId(null);
+    setSelectedAccountType(null);
   };
 
   const handleAutoCreateAccount = async (name: string): Promise<Account | null> => {
@@ -105,7 +77,7 @@ export function useVoucherHandlers({
     setIsAutoCreating(true);
     try {
       const normalizedName = name.trim().toLowerCase();
-      const existingAccount = sidebarAccounts.find((acc) => acc.name.toLowerCase() === normalizedName);
+      const existingAccount = sidebarAccounts.find((account) => account.name.toLowerCase() === normalizedName);
       if (existingAccount) return existingAccount;
 
       const payload = { name: name.trim(), accountType: "Indirect Expense", companyId: selectedCompany.id };

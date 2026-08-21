@@ -35,54 +35,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { writeFile, ExcelJS } from "@/lib/excelHelper";
-import { format, parseISO, startOfDay, startOfMonth, startOfYear, addDays } from "date-fns";
+import { format, parseISO, startOfDay, startOfMonth, startOfYear } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { formatNumber } from "@/lib/formatNumber";
 import { ErrorState } from "@/components/ui/page-state";
 
 import type { DailySummary, GroupingType, ProfitFilter, SalesReportItem } from "./salesreportlegacy/types";
+import { useSalesReportDateKeyboard } from "./salesreportlegacy/useSalesReportDateKeyboard";
+import { exportSalesReportExcel } from "./salesreportlegacy/exportExcel";
 export default function SalesReport() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("today"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
 
-  // Keyboard date navigation: "-" = back 1 day, "+" or "=" = forward 1 day
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const tag = target?.tagName?.toLowerCase();
-      if (tag === "textarea") return;
-      if (tag === "input") {
-        const inputType = (target as HTMLInputElement).type || "text";
-        if (["text", "number", "email", "password", "search", "tel", "url"].includes(inputType)) return;
-      }
-      if (tag === "select") return;
-      if (hasAnyOpenDialog()) return;
-
-      const dateFmt = "yyyy-MM-dd";
-      const isBack = e.key === "-" || e.code === "Minus";
-      const isForward = (e.key === "+" && e.shiftKey) || (e.code === "Equal" && e.shiftKey) || e.key === "=";
-
-      if (isBack) {
-        e.preventDefault();
-        setPeriodFilter((prev) => ({
-          fromDate: format(addDays(new Date(prev.fromDate), -1), dateFmt),
-          toDate: format(addDays(new Date(prev.toDate), -1), dateFmt),
-          preset: "custom",
-        }));
-      } else if (isForward) {
-        e.preventDefault();
-        setPeriodFilter((prev) => ({
-          fromDate: format(addDays(new Date(prev.fromDate), 1), dateFmt),
-          toDate: format(addDays(new Date(prev.toDate), 1), dateFmt),
-          preset: "custom",
-        }));
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, []);
+  useSalesReportDateKeyboard(setPeriodFilter);
 
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedStockGroups, setSelectedStockGroups] = useState<string[]>([]);
@@ -377,91 +343,7 @@ export default function SalesReport() {
     window.open(`/sales-report/detail?${params.toString()}`, "_blank");
   };
 
-  const handleExportExcel = async () => {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Detailed Sales Report");
-
-    const currencyCols = [5, 6, 7, 8, 9, 10, 11, 13];
-    const percentCols = [12, 14];
-    const profitCols = [8, 11, 12, 13, 14];
-
-    worksheet.columns = [
-      { header: "Location", key: "location", width: 15 },
-      { header: "Item Code", key: "itemCode", width: 15 },
-      { header: "Item Name", key: "itemName", width: 30 },
-      { header: "Quantity", key: "quantity", width: 10 },
-      { header: "Sold Price", key: "soldPrice", width: 12 },
-      { header: "Cost Price", key: "costPrice", width: 12 },
-      { header: "Hassan's Price", key: "hassansPrice", width: 14 },
-      { header: "Unit Profit", key: "unitProfit", width: 12 },
-      { header: "Total Sales", key: "totalSales", width: 12 },
-      { header: "Total Cost", key: "totalCost", width: 12 },
-      { header: "Cost Profit", key: "costProfit", width: 12 },
-      { header: "Cost %", key: "costPercent", width: 10 },
-      { header: "Hassan's Profit", key: "hassansProfit", width: 14 },
-      { header: "Hassan's %", key: "hassansPercent", width: 12 },
-    ];
-
-    const headerRow = worksheet.getRow(1);
-    headerRow.font = { bold: true };
-    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F5F5" } };
-    headerRow.eachCell((cell) => {
-      cell.border = {
-        top: { style: "medium", color: { argb: "FF999999" } },
-        bottom: { style: "medium", color: { argb: "FF999999" } },
-        left: { style: "medium", color: { argb: "FF999999" } },
-        right: { style: "medium", color: { argb: "FF999999" } },
-      };
-    });
-
-    salesData.forEach((item) => {
-      const unitProfit = parseFloat(item.actualSellingPrice) - parseFloat(item.costPrice);
-      const row = worksheet.addRow({
-        location: item.locationName || "N/A",
-        itemCode: item.stockItemCode || "",
-        itemName: item.stockItemName,
-        quantity: parseFloat(item.quantity),
-        soldPrice: parseFloat(item.actualSellingPrice),
-        costPrice: parseFloat(item.costPrice),
-        hassansPrice: parseFloat(item.configuredSellingPrice),
-        unitProfit: unitProfit,
-        totalSales: parseFloat(item.totalSales),
-        totalCost: parseFloat(item.totalCost),
-        costProfit: parseFloat(item.costProfit),
-        costPercent: item.costProfitPercentage,
-        hassansProfit: item.configuredProfit,
-        hassansPercent: item.configuredProfitPercentage,
-      });
-
-      row.eachCell((cell, colNumber) => {
-        cell.border = {
-          top: { style: "medium", color: { argb: "FF999999" } },
-          bottom: { style: "medium", color: { argb: "FF999999" } },
-          left: { style: "medium", color: { argb: "FF999999" } },
-          right: { style: "medium", color: { argb: "FF999999" } },
-        };
-
-        if (currencyCols.includes(colNumber)) {
-          cell.numFmt = '"$"#,##0.00';
-        }
-        if (percentCols.includes(colNumber)) {
-          cell.numFmt = '0.0"%"';
-        }
-
-        const val = typeof cell.value === "number" ? cell.value : parseFloat(String(cell.value || 0));
-        if (profitCols.includes(colNumber) && !isNaN(val)) {
-          if (val < 0) {
-            cell.font = { color: { argb: "FFE57373" } };
-          } else if (val > 0) {
-            cell.font = { color: { argb: "FF4CAF50" } };
-          }
-        }
-      });
-    });
-
-    const fileName = `detailed-sales-report-${format(new Date(), "yyyy-MM-dd")}.xlsx`;
-    await writeFile(workbook, fileName);
-  };
+  const handleExportExcel = () => exportSalesReportExcel(salesData);
 
   const handleExportPDF = () => {
     window.print();

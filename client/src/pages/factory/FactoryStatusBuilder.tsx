@@ -1,21 +1,46 @@
 import type { ClientErrorLike } from "@/lib/clientError";
-import {useState, useEffect, useRef, useCallback} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {useToast} from "@/hooks/use-toast";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from "@/components/ui/alert-dialog";
-import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {} from "@/components/ui/dialog";
-import {Badge} from "@/components/ui/badge";
-import {LayoutGrid, Plus, Save, FileDown, Upload, Download, X, Link2, Link2Off, History as HistoryIcon} from "lucide-react";
+import { LayoutGrid, Plus, Save, FileDown, Upload, Download, X, Link2, Link2Off } from "lucide-react";
 
-import type {ApiSheet, CellValue, LinkDialogState, StatusBuilderSheet} from "./factorystatusbuilder/types";
-import {calcDiff, computeDiffValue, computeTotalValue, fmt, fromApiSheet, getEffectiveValue, isDiffColumn, isTotalColumn, makeId, parseCellValue, resolveCellValue} from "./factorystatusbuilder/utils";
-import {TabLabel} from "./factorystatusbuilder/components/TabLabel";
-import {LinkDialog} from "./factorystatusbuilder/components/LinkDialog";
+import type {
+  ApiSheet,
+  CellValue,
+  LinkDialogState,
+  PendingDelete,
+  StatusBuilderSheet,
+} from "./factorystatusbuilder/types";
+import {
+  calcDiff,
+  computeDiffValue,
+  computeTotalValue,
+  fmt,
+  fromApiSheet,
+  getEffectiveValue,
+  isDiffColumn,
+  isTotalColumn,
+  makeId,
+  parseCellValue,
+  resolveCellValue,
+} from "./factorystatusbuilder/utils";
+import { TabLabel } from "./factorystatusbuilder/components/TabLabel";
+import { LinkDialog } from "./factorystatusbuilder/components/LinkDialog";
+import { StatusHistoryPanel } from "./factorystatusbuilder/components/StatusHistoryPanel";
+import { DeleteConfirmationDialog } from "./factorystatusbuilder/components/DeleteConfirmationDialog";
+import { StatusViewToggle } from "./factorystatusbuilder/components/StatusViewToggle";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export default function FactoryStatusBuilder() {
@@ -38,11 +63,7 @@ export default function FactoryStatusBuilder() {
     sourceColId: "",
   });
 
-  const [pendingDelete, setPendingDelete] = useState<{
-    type: "row" | "col" | "page";
-    idx: number;
-    label: string;
-  } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 
   const [viewMode, setViewMode] = useState<"sheet" | "history">("sheet");
 
@@ -224,7 +245,7 @@ export default function FactoryStatusBuilder() {
     },
   });
 
-useEffect(() => {
+  useEffect(() => {
     const hasSaveable = localSheets.some((s) => s.dirty && s.id !== null);
     if (!hasSaveable) return;
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
@@ -235,7 +256,6 @@ useEffect(() => {
     return () => {
       if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     };
-    
   }, [localSheets, saveMutation]);
 
   const deleteMutation = useMutation({
@@ -424,7 +444,6 @@ useEffect(() => {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-    
   }, [activeIdx, addColumn, localSheets]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -510,31 +529,7 @@ useEffect(() => {
           </Button>
         </div>
 
-        {/* Sheet / History toggle */}
-        <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/20">
-          <div className="flex items-center rounded-md border overflow-hidden shrink-0">
-            <button
-              onClick={() => setViewMode("sheet")}
-              data-testid="sb-button-view-sheet"
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
-                viewMode === "sheet" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Sheet
-            </button>
-            <button
-              onClick={() => setViewMode("history")}
-              data-testid="sb-button-view-history"
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
-                viewMode === "history" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              <HistoryIcon className="h-3.5 w-3.5" />
-              History
-            </button>
-          </div>
-        </div>
+        <StatusViewToggle viewMode={viewMode} onChange={setViewMode} />
 
         {/* Tabs */}
         <div className="flex items-end gap-0 px-4 border-b overflow-x-auto">
@@ -568,47 +563,7 @@ useEffect(() => {
             </div>
           </div>
         ) : viewMode === "history" ? (
-          /* ── History tab ── */
-          <div className="flex-1 overflow-auto p-4">
-            {historyLoading ? (
-              <div className="text-center text-sm text-muted-foreground py-8">Loading history…</div>
-            ) : !historyLog || historyLog.length === 0 ? (
-              <div className="text-center text-sm text-muted-foreground py-8">
-                No changes recorded yet for this page.
-              </div>
-            ) : (
-              <div className="space-y-2 max-w-2xl mx-auto">
-                {historyLog.map((h) => (
-                  <div
-                    key={h.id}
-                    className="flex items-start gap-3 rounded-md border px-3 py-2 text-sm"
-                    data-testid={`sb-history-entry-${h.id}`}
-                  >
-                    <HistoryIcon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium">{h.rowLabel}</span>
-                        <Badge variant="outline" className="text-[10px]">
-                          {h.columnLabel}
-                        </Badge>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {h.oldValue ? `"${h.oldValue}"` : "(empty)"} → {h.newValue ? `"${h.newValue}"` : "(empty)"}
-                      </div>
-                    </div>
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      {new Date(h.createdAt).toLocaleString([], {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <StatusHistoryPanel historyLoading={historyLoading} historyLog={historyLog} />
         ) : (
           /* ── Spreadsheet grid ── */
           <div className="flex-1 overflow-auto p-4">
@@ -914,53 +869,27 @@ useEffect(() => {
         )}
       </div>
 
-      {/* Delete confirmation dialog */}
-      <AlertDialog
-        open={!!pendingDelete}
+      <DeleteConfirmationDialog
+        pendingDelete={pendingDelete}
         onOpenChange={(isOpen) => {
           if (!isOpen) setPendingDelete(null);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Delete {pendingDelete?.type === "row" ? "Row" : pendingDelete?.type === "col" ? "Column" : "Page"}?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete <span className="font-medium">"{pendingDelete?.label}"</span>?
-              {pendingDelete?.type === "row"
-                ? " All data in this row will be lost."
-                : pendingDelete?.type === "col"
-                  ? " All data in this column will be lost."
-                  : " This page and all its data will be permanently deleted."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                if (!pendingDelete) return;
-                if (pendingDelete.type === "row") removeRow(pendingDelete.idx);
-                else if (pendingDelete.type === "col") removeColumn(pendingDelete.idx);
-                else {
-                  const s = localSheets[pendingDelete.idx];
-                  if (s) {
-                    if (s.id) deleteMutation.mutate(s.id);
-                    else {
-                      setLocalSheets((prev) => prev.filter((_, i) => i !== pendingDelete.idx));
-                      setActiveIdx((prev) => Math.max(0, prev - 1));
-                    }
-                  }
-                }
-                setPendingDelete(null);
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onConfirm={(pending) => {
+          if (pending.type === "row") removeRow(pending.idx);
+          else if (pending.type === "col") removeColumn(pending.idx);
+          else {
+            const sheet = localSheets[pending.idx];
+            if (sheet) {
+              if (sheet.id) deleteMutation.mutate(sheet.id);
+              else {
+                setLocalSheets((prev) => prev.filter((_, i) => i !== pending.idx));
+                setActiveIdx((prev) => Math.max(0, prev - 1));
+              }
+            }
+          }
+          setPendingDelete(null);
+        }}
+      />
     </>
   );
 }

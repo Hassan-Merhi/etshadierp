@@ -27,6 +27,27 @@ export default function Accounts() {
   const model = useAccountsLegacyModel();
   const { selectedAccount, selectedAccountIsLedger } = model;
 
+  const closeSelectedAccount = () => {
+    model.setSelectedAccount(null);
+
+    // Accounts can be opened through a deep-link such as
+    // ?accountId=123&accountType=ledger. If those parameters remain in the URL,
+    // useAccountsLegacyModel immediately auto-selects the same account again after
+    // the X button clears local state. Remove the statement-specific parameters at
+    // the same time so closing actually returns to the account list.
+    const params = new URLSearchParams(window.location.search);
+    params.delete("accountId");
+    params.delete("accountType");
+    params.delete("startDate");
+    params.delete("endDate");
+    const nextSearch = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      nextSearch ? `${window.location.pathname}?${nextSearch}` : window.location.pathname
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -140,7 +161,7 @@ export default function Accounts() {
           ) : (
             <AccountStatementView
               selectedAccount={selectedAccount}
-              onClose={() => model.setSelectedAccount(null)}
+              onClose={closeSelectedAccount}
               periodFilter={model.periodFilter}
               setPeriodFilter={model.setPeriodFilter}
               vouchersWithBalance={model.vouchersWithBalance}

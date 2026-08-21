@@ -12,15 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   Trash2,
-  Search,
   Printer,
+  Search,
   ChevronDown,
   ChevronRight,
   Loader2,
-  Package,
   Weight,
   DollarSign,
   History,
@@ -31,6 +29,7 @@ import {
 
 import type { Bale, ProductGroup } from "./wastedispatch/types";
 import { fmt, fmtKg, today } from "./wastedispatch/utils";
+import { WasteDispatchDialogs } from "./wastedispatch/components/WasteDispatchDialogs";
 export default function WasteDispatch() {
   const { toast } = useToast();
   const [, _navigate] = useLocation();
@@ -48,7 +47,6 @@ export default function WasteDispatch() {
   const [confirming, setConfirming] = useState(false);
   const [printData, setPrintData] = useState<any | null>(null);
   const [deleteDispatchId, setDeleteDispatchId] = useState<number | null>(null);
-  const printRef = useRef<HTMLDivElement>(null);
 
   // ── Dispatch queries ───────────────────────────────────────────
   const { data, isLoading } = useQuery<{ bales: Bale[]; categories: unknown[] }>({
@@ -72,7 +70,7 @@ export default function WasteDispatch() {
   });
 
   // ── Dispatch helpers ───────────────────────────────────────────
-  const bales: Bale[] = useMemo(() => (data?.bales || []), [data?.bales]);
+  const bales: Bale[] = useMemo(() => data?.bales || [], [data?.bales]);
 
   const productGroups: ProductGroup[] = useMemo(() => {
     const map = new Map<string, ProductGroup>();
@@ -281,33 +279,6 @@ export default function WasteDispatch() {
       setDeleteDispatchId(null);
     },
   });
-
-  const handlePrint = () => {
-    if (!printRef.current) return;
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(`
-      <html>
-        <head>
-          <title>Waste Disposal — ${printData?.dispatch?.dispatchNumber}</title>
-          <style>
-            body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; }
-            h1 { font-size: 18px; margin-bottom: 4px; }
-            .sub { color: #555; font-size: 11px; margin-bottom: 16px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-            th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
-            th { background: #f3f4f6; font-weight: bold; }
-            .footer { margin-top: 24px; font-size: 10px; color: #777; }
-          </style>
-        </head>
-        <body>${printRef.current.innerHTML}</body>
-      </html>
-    `);
-    win.document.close();
-    win.focus();
-    win.print();
-    win.close();
-  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -768,216 +739,23 @@ export default function WasteDispatch() {
         </Card>
       </div>
 
-      {/* ── CONFIRM DISPATCH DIALOG ────────────────────────────────── */}
-      <Dialog open={confirming} onOpenChange={setConfirming}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="w-5 h-5" />
-              Confirm Waste Disposal
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <p className="text-sm text-muted-foreground">
-              You are about to permanently remove the following from stock as waste:
-            </p>
-            <div className="bg-destructive/5 border border-destructive/20 rounded-md p-3 space-y-1.5">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Bales</span>
-                <span className="font-medium">{selected.size}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Total Weight</span>
-                <span className="font-medium">{fmtKg(totalWeight)} kg</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Cost Written Off</span>
-                <span className="font-medium text-destructive">{fmt(totalCost)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Date</span>
-                <span className="font-medium">{dispatchDate}</span>
-              </div>
-              {notes && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Notes</span>
-                  <span className="font-medium max-w-xs text-right">{notes}</span>
-                </div>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              This will remove these bales from inventory and log a waste disposal expense in the factory daybook. This
-              action cannot be undone.
-            </p>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setConfirming(false)} disabled={submitMutation.isPending}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => submitMutation.mutate()}
-              disabled={submitMutation.isPending}
-              data-testid="button-confirm-dispatch"
-            >
-              {submitMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Confirm Disposal
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── DELETE DISPATCH CONFIRMATION ───────────────────────────── */}
-      <Dialog
-        open={deleteDispatchId !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeleteDispatchId(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="w-5 h-5" />
-              Delete Waste Dispatch?
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            This will permanently delete the dispatch record and restore all linked bales back to stock. The daybook
-            entry will also be removed. This cannot be undone.
-          </p>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setDeleteDispatchId(null)}
-              disabled={deleteDispatchMutation.isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={deleteDispatchMutation.isPending}
-              onClick={() => {
-                if (deleteDispatchId !== null) deleteDispatchMutation.mutate(deleteDispatchId);
-              }}
-              data-testid="button-confirm-delete-dispatch"
-            >
-              {deleteDispatchMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  Deleting...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete &amp; Restore Stock
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── PRINT RECEIPT DIALOG ───────────────────────────────────── */}
-      {printData && (
-        <Dialog open={!!printData} onOpenChange={() => setPrintData(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Package className="w-5 h-5 text-green-600" />
-                Disposal Complete — {printData.dispatch.dispatchNumber}
-              </DialogTitle>
-            </DialogHeader>
-            <div ref={printRef} className="space-y-3">
-              <div>
-                <h1 style={{ fontSize: 18, fontWeight: "bold", marginBottom: 4 }}>Waste Disposal Record</h1>
-                <p style={{ color: "#555", fontSize: 11, marginBottom: 16 }}>
-                  Dispatch No: {printData.dispatch.dispatchNumber}&nbsp;|&nbsp;Date: {printData.dispatch.dispatchDate}
-                  {printData.dispatch.notes && <>&nbsp;|&nbsp;Note: {printData.dispatch.notes}</>}
-                </p>
-              </div>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    {["Reference", "Weight (kg)", "Cost Written Off"].map((h, i) => (
-                      <th
-                        key={h}
-                        style={{
-                          border: "1px solid #ccc",
-                          padding: "6px 8px",
-                          background: "#f3f4f6",
-                          textAlign: i === 0 ? "left" : "right",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {printData.bales.map((b: any) => (
-                    <tr key={b.id}>
-                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", fontFamily: "monospace" }}>
-                        {b.referenceNumber}
-                      </td>
-                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "right" }}>
-                        {fmtKg(b.weightKg)}
-                      </td>
-                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "right" }}>
-                        {fmt(b.totalCost)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td style={{ border: "1px solid #ccc", padding: "6px 8px", fontWeight: "bold" }}>
-                      TOTAL — {printData.totalBales} bale(s)
-                    </td>
-                    <td
-                      style={{ border: "1px solid #ccc", padding: "6px 8px", textAlign: "right", fontWeight: "bold" }}
-                    >
-                      {fmtKg(printData.totalWeightKg)}
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid #ccc",
-                        padding: "6px 8px",
-                        textAlign: "right",
-                        fontWeight: "bold",
-                        color: "#dc2626",
-                      }}
-                    >
-                      {fmt(printData.totalCostWrittenOff)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-              <p style={{ marginTop: 24, fontSize: 10, color: "#777" }}>
-                This document confirms the waste disposal of factory bales. A daybook expense entry has been created
-                automatically.
-              </p>
-            </div>
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setPrintData(null)}>
-                Close
-              </Button>
-              <Button onClick={handlePrint} className="gap-2">
-                <Printer className="w-4 h-4" /> Print
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+      <WasteDispatchDialogs
+        confirming={confirming}
+        setConfirming={setConfirming}
+        selectedCount={selected.size}
+        totalWeight={totalWeight}
+        totalCost={totalCost}
+        dispatchDate={dispatchDate}
+        notes={notes}
+        submitPending={submitMutation.isPending}
+        onSubmit={() => submitMutation.mutate()}
+        deleteDispatchId={deleteDispatchId}
+        setDeleteDispatchId={setDeleteDispatchId}
+        deletePending={deleteDispatchMutation.isPending}
+        onDelete={(id) => deleteDispatchMutation.mutate(id)}
+        printData={printData}
+        setPrintData={setPrintData}
+      />
     </div>
   );
 }

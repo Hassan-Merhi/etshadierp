@@ -37,7 +37,7 @@ importers:
         version: 2.17.1(bufferutil@4.1.0)(supports-color@7.2.0)
       '@hookform/resolvers':
         specifier: ^3.10.0
-        version: 3.10.0(react-hook-form@7.83.0(react@19.2.8))
+        version: 3.10.0(react-hook-form@7.85.0(react@19.2.8))
       '@jridgewell/trace-mapping':
         specifier: ^0.3.25
         version: 0.3.31
@@ -207,7 +207,7 @@ importers:
         specifier: ^4.21.2
         version: 4.22.2(supports-color@7.2.0)
       express-rate-limit:
-        specifier: ^8.6.2
+        specifier: ^8.5.2
         version: 8.6.2(express@4.22.2(supports-color@7.2.0))(supports-color@7.2.0)
       express-session:
         specifier: ^1.18.1
@@ -223,7 +223,7 @@ importers:
         version: 1.4.1
       input-otp:
         specifier: ^1.4.2
-        version: 1.4.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 1.5.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       jspdf:
         specifier: ^4.2.1
         version: 4.2.1
@@ -253,10 +253,10 @@ importers:
         version: 9.0.5
       openai:
         specifier: ^7.2.0
-        version: 7.4.0(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3)
+        version: 7.5.0(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3)
       papaparse:
-        specifier: ^5.5.3
-        version: 5.5.4
+        specifier: ^5.6.0
+        version: 5.6.0
       passport:
         specifier: ^0.7.0
         version: 0.7.0
@@ -294,10 +294,10 @@ importers:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
       react-hook-form:
-        specifier: ^7.55.0
-        version: 7.83.0(react@19.2.8)
+        specifier: ^7.85.0
+        version: 7.85.0(react@19.2.8)
       react-icons:
-        specifier: ^5.4.0
+        specifier: ^5.7.0
         version: 5.7.0(react@19.2.8)
       react-markdown:
         specifier: ^10.1.0
@@ -4150,8 +4150,8 @@ packages:
   inline-style-parser@0.2.7:
     resolution: {integrity: sha512-Nb2ctOyNR8DqQoR0OwRG95uNWIC0C1lCgf5Naz5H6Ji72KZ8OcFZLz2P5sNgwlyoJ8Yif11oMuYs5pBQa86csA==}
 
-  input-otp@1.4.2:
-    resolution: {integrity: sha512-l3jWwYNvrEa6NTCt7BECfCm48GvwuZzkoeG3gBL2w4CHeOXW3eKFmf9UNYkNfYc3mxMrthMnxjIE07MT0zLBQA==}
+  input-otp@1.5.0:
+    resolution: {integrity: sha512-3AcfdW1sNG0FmSA5hHMBXG7jNW5CdcdKs8ln8JOmn6S2SRkoXoJx+2UwC+ZvjflfnOdHJx0SfQ9/YjlxVYLtGQ==}
     peerDependencies:
       react: ^16.8 || ^17.0 || ^18.0 || ^19.0.0 || ^19.0.0-rc
       react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0.0 || ^19.0.0-rc
@@ -4910,8 +4910,8 @@ packages:
     resolution: {integrity: sha512-7x81NCL719oNbsq/3mh+hVrAWmFuEYUqrq/Iw3kUzH8ReypT9QQ0BLoJS7/G9k6N81XjW4qHWtjWwe/9eLy1EQ==}
     engines: {node: '>=12'}
 
-  openai@7.4.0:
-    resolution: {integrity: sha512-+C9Muit5x8j9R8ej8ZzVgKcrVDtqFqTy9gxFdov0EItLgU68zrJtF9ZeT0cyqJQW9S3PCJkdFgADtRGquRBtew==}
+  openai@7.5.0:
+    resolution: {integrity: sha512-ZbDBz8FSB8Mv8fFYIUvzTFMdV5vl93/octp1MdtK2lfYepSpfv/ewmeugpKz/cwGtFSx+YuUM4NwpZ2P55YiPA==}
     engines: {node: '>=22.0.0'}
     peerDependencies:
       '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
@@ -4959,8 +4959,8 @@ packages:
   pako@2.2.0:
     resolution: {integrity: sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w==}
 
-  papaparse@5.5.4:
-    resolution: {integrity: sha512-SwzWD9gl/ElwYLCI0nUja1mFJzjq2D8ziShfNBa7zCHzkOozeOGDwHWQ+tvCzEZcewecWZ5U7kUopDnG+DFYEQ==}
+  papaparse@5.6.0:
+    resolution: {integrity: sha512-N2vuNQAYGK1/4vs6HJX86+VYU6OkiSTgdJz3JQfTk1y51cFCO/U8gnaeTF4iNE4r57Tt0sV47dUua1/19pxO6Q==}
 
   parse-entities@4.0.2:
     resolution: {integrity: sha512-GG2AQYWoLgL877gQIKeRPGO1xF9+eG1ujIb5soS5gPvLQ1y2o8FL90w2QWNdf9I361Mpp7726c+lj3U0qK1uGw==}
@@ -5326,8 +5326,8 @@ packages:
     peerDependencies:
       react: ^19.2.8
 
-  react-hook-form@7.83.0:
-    resolution: {integrity: sha512-AXt8cMCmx5a7u4uvpb2uRFVrWQhllI4pV+LSykxIac/hjt44TnQkmX9BKuQi2i+LDC62esmiLpilkav+kjVf/A==}
+  react-hook-form@7.85.0:
+    resolution: {integrity: sha512-U2MTriFXnclmV4rOE20p2DcRFv5WEg3FIcBFOKcOLFHDVvGIMPvLTkTWefUsonmlaVy23khVDxDWym6uJVGOzw==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       react: ^16.8.0 || ^17 || ^18 || ^19
@@ -6833,9 +6833,9 @@ snapshots:
 
   '@hexagon/base64@1.1.28': {}
 
-  '@hookform/resolvers@3.10.0(react-hook-form@7.83.0(react@19.2.8))':
+  '@hookform/resolvers@3.10.0(react-hook-form@7.85.0(react@19.2.8))':
     dependencies:
-      react-hook-form: 7.83.0(react@19.2.8)
+      react-hook-form: 7.85.0(react@19.2.8)
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -9914,7 +9914,7 @@ snapshots:
 
   inline-style-parser@0.2.7: {}
 
-  input-otp@1.4.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+  input-otp@1.5.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
@@ -10796,7 +10796,7 @@ snapshots:
       is-docker: 2.2.1
       is-wsl: 2.2.0
 
-  openai@7.4.0(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3):
+  openai@7.5.0(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3):
     optionalDependencies:
       ws: 8.21.3(bufferutil@4.1.0)
       zod: 4.4.3
@@ -10831,7 +10831,7 @@ snapshots:
 
   pako@2.2.0: {}
 
-  papaparse@5.5.4: {}
+  papaparse@5.6.0: {}
 
   parse-entities@4.0.2:
     dependencies:
@@ -11194,7 +11194,7 @@ snapshots:
       react: 19.2.8
       scheduler: 0.27.0
 
-  react-hook-form@7.83.0(react@19.2.8):
+  react-hook-form@7.85.0(react@19.2.8):
     dependencies:
       react: 19.2.8
 
