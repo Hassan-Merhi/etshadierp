@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useState, useRef, useMemo, useEffect } from "react";
+import { forwardRef, useImperativeHandle, useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -71,16 +71,16 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
     const listRef = useRef<HTMLDivElement>(null);
     const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const cancelPendingBlur = () => {
+    const cancelPendingBlur = useCallback(() => {
       if (blurTimerRef.current !== null) {
         clearTimeout(blurTimerRef.current);
         blurTimerRef.current = null;
       }
-    };
+    }, []);
 
     useEffect(() => {
       return () => cancelPendingBlur();
-    }, []);
+    }, [cancelPendingBlur]);
 
     useImperativeHandle(ref, () => ({
       focus: () => {
