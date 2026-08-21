@@ -28,6 +28,12 @@ function extractSection({ start, end, path, fn, returns, args, imports, replacem
   const b = source.indexOf(end, a);
   if (a < 0 || b < 0) throw new Error(`Missing section markers: ${start} -> ${end}`);
   let body = source.slice(a, b);
+  if (fn === "buildStockTransferDrafts") {
+    body = body.replace(
+      /\n\s*if \(stockTransferResponseOverride\) \{\s*finalResponse = stockTransferResponseOverride;\s*\}\s*$/s,
+      "\n"
+    );
+  }
   body = body.replace(new RegExp(`^\\s*${start.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}`), start.trim());
   const module = `${imports}\nexport async function ${fn}(params: { ${args.join("; ")} }) {\n  const { ${args.map((x) => x.split(":")[0].trim()).join(", ")} } = params;\n${body}\n  return { ${returns.join(", ")} };\n}\n`;
   fs.writeFileSync(path, module);
