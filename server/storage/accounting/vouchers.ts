@@ -79,12 +79,20 @@ export async function getVoucherEntriesByLedger(
        MIN(ve.id)                                                  AS "entryId",
        COALESCE(SUM(ve.debit_amount::numeric),  0)::text           AS "debitAmount",
        COALESCE(SUM(ve.credit_amount::numeric), 0)::text           AS "creditAmount",
+       COALESCE(SUM(ve.transaction_debit_amount::numeric), 0)::text AS "transactionDebitAmount",
+       COALESCE(SUM(ve.transaction_credit_amount::numeric), 0)::text AS "transactionCreditAmount",
+       COALESCE(SUM(ve.base_debit_amount::numeric), 0)::text       AS "baseDebitAmount",
+       COALESCE(SUM(ve.base_credit_amount::numeric), 0)::text      AS "baseCreditAmount",
+       MAX(ve.transaction_currency)                                AS "transactionCurrency",
+       MAX(ve.historical_exchange_rate)                            AS "historicalExchangeRate",
+       MAX(ve.rate_convention)                                     AS "rateConvention",
        STRING_AGG(DISTINCT NULLIF(TRIM(ve.narration), ''), ' | ') AS narration,
        v.voucher_number                                            AS "voucherNumber",
        v.voucher_type                                              AS "voucherType",
        COALESCE(v.effective_date::date, v.voucher_date::date)      AS "voucherDate",
        v.description                                               AS "voucherDescription",
-       v.currency
+       v.currency,
+       v.company_id AS "companyId"
      FROM voucher_entries ve
      JOIN vouchers v ON ve.voucher_id = v.id
      WHERE ve.ledger_account_id = $1
@@ -92,7 +100,7 @@ export async function getVoucherEntriesByLedger(
        AND v.deleted_at IS NULL
        ${companyFilter}
        ${dateFilters}
-     GROUP BY v.id, v.voucher_number, v.voucher_type, v.voucher_date, v.effective_date, v.description, v.currency
+     GROUP BY v.id, v.voucher_number, v.voucher_type, v.voucher_date, v.effective_date, v.description, v.currency, v.company_id
      ORDER BY COALESCE(v.effective_date::date, v.voucher_date::date), v.id`,
     params
   );
@@ -127,12 +135,20 @@ export async function getVoucherEntriesByCustomer(
        ve.voucher_id                                                AS "voucherId",
        ve.debit_amount                                              AS "debitAmount",
        ve.credit_amount                                             AS "creditAmount",
+       ve.transaction_currency                                      AS "transactionCurrency",
+       ve.transaction_debit_amount                                  AS "transactionDebitAmount",
+       ve.transaction_credit_amount                                 AS "transactionCreditAmount",
+       ve.base_debit_amount                                         AS "baseDebitAmount",
+       ve.base_credit_amount                                        AS "baseCreditAmount",
+       ve.historical_exchange_rate                                  AS "historicalExchangeRate",
+       ve.rate_convention                                           AS "rateConvention",
        ve.narration,
        v.voucher_number                                             AS "voucherNumber",
        v.voucher_type                                               AS "voucherType",
        COALESCE(v.effective_date::date, v.voucher_date::date)       AS "voucherDate",
        v.description                                                AS "voucherDescription",
-       v.currency
+       v.currency,
+       v.company_id                                                 AS "companyId"
      FROM voucher_entries ve
      JOIN vouchers v ON ve.voucher_id = v.id
      WHERE ve.customer_id = $1
@@ -173,12 +189,20 @@ export async function getVoucherEntriesByBankAccount(
        ve.voucher_id                                                AS "voucherId",
        ve.debit_amount                                              AS "debitAmount",
        ve.credit_amount                                             AS "creditAmount",
+       ve.transaction_currency                                      AS "transactionCurrency",
+       ve.transaction_debit_amount                                  AS "transactionDebitAmount",
+       ve.transaction_credit_amount                                 AS "transactionCreditAmount",
+       ve.base_debit_amount                                         AS "baseDebitAmount",
+       ve.base_credit_amount                                        AS "baseCreditAmount",
+       ve.historical_exchange_rate                                  AS "historicalExchangeRate",
+       ve.rate_convention                                           AS "rateConvention",
        ve.narration,
        v.voucher_number                                             AS "voucherNumber",
        v.voucher_type                                               AS "voucherType",
        COALESCE(v.effective_date::date, v.voucher_date::date)       AS "voucherDate",
        v.description                                                AS "voucherDescription",
-       v.currency
+       v.currency,
+       v.company_id                                                 AS "companyId"
      FROM voucher_entries ve
      JOIN vouchers v ON ve.voucher_id = v.id
      WHERE ve.bank_account_id = $1
@@ -219,12 +243,20 @@ export async function getVoucherEntriesByFixedAsset(
        ve.voucher_id                                                AS "voucherId",
        ve.debit_amount                                              AS "debitAmount",
        ve.credit_amount                                             AS "creditAmount",
+       ve.transaction_currency                                      AS "transactionCurrency",
+       ve.transaction_debit_amount                                  AS "transactionDebitAmount",
+       ve.transaction_credit_amount                                 AS "transactionCreditAmount",
+       ve.base_debit_amount                                         AS "baseDebitAmount",
+       ve.base_credit_amount                                        AS "baseCreditAmount",
+       ve.historical_exchange_rate                                  AS "historicalExchangeRate",
+       ve.rate_convention                                           AS "rateConvention",
        ve.narration,
        v.voucher_number                                             AS "voucherNumber",
        v.voucher_type                                               AS "voucherType",
        COALESCE(v.effective_date::date, v.voucher_date::date)       AS "voucherDate",
        v.description                                                AS "voucherDescription",
-       v.currency
+       v.currency,
+       v.company_id                                                 AS "companyId"
      FROM voucher_entries ve
      JOIN vouchers v ON ve.voucher_id = v.id
      WHERE ve.fixed_asset_id = $1
@@ -271,6 +303,8 @@ export async function getVoucherEntriesBySupplier(
        ve.transaction_credit_amount                                 AS "transactionCreditAmount",
        ve.base_debit_amount                                         AS "baseDebitAmount",
        ve.base_credit_amount                                        AS "baseCreditAmount",
+       ve.historical_exchange_rate                                  AS "historicalExchangeRate",
+       ve.rate_convention                                           AS "rateConvention",
        v.voucher_number                                             AS "voucherNumber",
        v.voucher_type                                               AS "voucherType",
        COALESCE(v.effective_date::date, v.voucher_date::date)       AS "voucherDate",
@@ -317,6 +351,13 @@ export async function getVoucherEntriesByEmployee(
        ve.voucher_id                                                AS "voucherId",
        ve.debit_amount                                              AS "debitAmount",
        ve.credit_amount                                             AS "creditAmount",
+       ve.transaction_currency                                      AS "transactionCurrency",
+       ve.transaction_debit_amount                                  AS "transactionDebitAmount",
+       ve.transaction_credit_amount                                 AS "transactionCreditAmount",
+       ve.base_debit_amount                                         AS "baseDebitAmount",
+       ve.base_credit_amount                                        AS "baseCreditAmount",
+       ve.historical_exchange_rate                                  AS "historicalExchangeRate",
+       ve.rate_convention                                           AS "rateConvention",
        ve.narration,
        v.voucher_number                                             AS "voucherNumber",
        v.voucher_type                                               AS "voucherType",
