@@ -222,7 +222,7 @@ importers:
         specifier: ^1.4.1
         version: 1.4.1
       input-otp:
-        specifier: ^1.5.0
+        specifier: ^1.4.2
         version: 1.5.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       jspdf:
         specifier: ^4.2.1
@@ -246,17 +246,17 @@ importers:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       node-cron:
-        specifier: ^4.6.0
+        specifier: ^4.2.1
         version: 4.6.0
       nodemailer:
         specifier: ^9.0.3
         version: 9.0.5
       openai:
-        specifier: ^7.5.0
+        specifier: ^7.2.0
         version: 7.5.0(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3)
       papaparse:
-        specifier: ^5.5.3
-        version: 5.5.4
+        specifier: ^5.6.0
+        version: 5.6.0
       passport:
         specifier: ^0.7.0
         version: 0.7.0
@@ -4959,8 +4959,8 @@ packages:
   pako@2.2.0:
     resolution: {integrity: sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w==}
 
-  papaparse@5.5.4:
-    resolution: {integrity: sha512-SwzWD9gl/ElwYLCI0nUja1mFJzjq2D8ziShfNBa7zCHzkOozeOGDwHWQ+tvCzEZcewecWZ5U7kUopDnG+DFYEQ==}
+  papaparse@5.6.0:
+    resolution: {integrity: sha512-N2vuNQAYGK1/4vs6HJX86+VYU6OkiSTgdJz3JQfTk1y51cFCO/U8gnaeTF4iNE4r57Tt0sV47dUua1/19pxO6Q==}
 
   parse-entities@4.0.2:
     resolution: {integrity: sha512-GG2AQYWoLgL877gQIKeRPGO1xF9+eG1ujIb5soS5gPvLQ1y2o8FL90w2QWNdf9I361Mpp7726c+lj3U0qK1uGw==}
@@ -10831,7 +10831,7 @@ snapshots:
 
   pako@2.2.0: {}
 
-  papaparse@5.5.4: {}
+  papaparse@5.6.0: {}
 
   parse-entities@4.0.2:
     dependencies:
