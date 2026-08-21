@@ -210,7 +210,15 @@ export default function Suppliers() {
       "Doc Number": txn.docNumber,
       Type: txn.voucherType,
       Description: txn.description,
-      Balance: txn.balance,
+      Currency: txn.currency || txn.transactionCurrency || "USD",
+      "Native Debit": txn.transactionDebitAmount ?? txn.debitAmount ?? "",
+      "Native Credit": txn.transactionCreditAmount ?? txn.creditAmount ?? "",
+      "Historical Base Debit": txn.baseDebitAmount ?? "",
+      "Historical Base Credit": txn.baseCreditAmount ?? "",
+      "Historical Exchange Rate": txn.historicalExchangeRate ?? "",
+      "Balance (Historical Base)": txn.historicalBaseBalance ?? txn.balance,
+      "Currency Status":
+        txn.currencyStatus || (txn.baseDebitAmount != null ? "HISTORICAL_BASE" : "LEGACY_BASE"),
     }));
     const worksheet = utils.json_to_sheet(exportData);
     const workbook = utils.book_new();

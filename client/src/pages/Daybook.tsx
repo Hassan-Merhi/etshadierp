@@ -668,9 +668,43 @@ export default function Daybook({ user }: { user?: any } = {}) {
   };
 
   const handleExportDetailedToExcel = async () => {
-    // Basic logic for detailed export... (kept simplified for brevity in orchestrator)
-    toast({ title: "Export", description: "Starting detailed export..." });
-    // Implementation would go here...
+    const exportVouchers = await loadAllVouchers();
+    const detailRows = exportVouchers.flatMap((v: any) => {
+      const entries = Array.isArray(v.entries) ? v.entries : [];
+      if (entries.length === 0) {
+        return [{
+          "Voucher Number": v.voucherNumber,
+          Date: formatDisplayDate(v.voucherDate),
+          Type: v.voucherType,
+          Description: v.description || "",
+          Currency: v.currency || v.transactionCurrency || "USD",
+          "Native Debit": v.transactionDebitAmount ?? "",
+          "Native Credit": v.transactionCreditAmount ?? "",
+          "Historical Base Debit": v.baseDebitAmount ?? "",
+          "Historical Base Credit": v.baseCreditAmount ?? "",
+          "Currency Status": v.currencyStatus || "LEGACY_BASE",
+        }];
+      }
+      return entries.map((entry: any) => ({
+        "Voucher Number": v.voucherNumber,
+        Date: formatDisplayDate(v.voucherDate),
+        Type: v.voucherType,
+        Description: entry.narration || v.description || "",
+        Account: entry.accountName || "",
+        Currency: entry.transactionCurrency || v.currency || "USD",
+        "Native Debit": entry.transactionDebitAmount ?? entry.debitAmount ?? "",
+        "Native Credit": entry.transactionCreditAmount ?? entry.creditAmount ?? "",
+        "Historical Base Debit": entry.baseDebitAmount ?? "",
+        "Historical Base Credit": entry.baseCreditAmount ?? "",
+        "Historical Exchange Rate": entry.historicalExchangeRate ?? v.exchangeRate ?? "",
+        "Currency Status": entry.currencyStatus || (entry.baseDebitAmount != null ? "HISTORICAL_BASE" : "LEGACY_BASE"),
+      }));
+    });
+    const ws = utils.json_to_sheet(detailRows);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "Daybook Detail");
+    await writeFile(wb, `Daybook_Detail_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    toast({ title: "Export complete", description: `${detailRows.length} detail rows exported.` });
   };
 
   return (

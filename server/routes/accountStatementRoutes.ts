@@ -23,6 +23,10 @@ import { storage } from "../storage";
 import { requireAuth } from "../auth";
 import { isParentCompanyContext } from "./helpers/supplierBalanceHelpers";
 import {
+  projectExportCurrencyRow,
+  summarizeExportCurrencyRows,
+} from "../services/accounting/exportCurrency";
+import {
   bankAccounts,
   companies,
   customerBalances,
@@ -423,17 +427,20 @@ export function registerAccountStatementRoutes(app: Express) {
         for (const r of allTxForBF) {
           const rDate = statementDateKey(r.voucherDate);
           if (rDate && rDate < startDate) {
-            bfBalance += parseFloat(r.debitAmount || "0") - parseFloat(r.creditAmount || "0");
+            const projected = projectExportCurrencyRow(r as Record<string, unknown>);
+            bfBalance +=
+              parseFloat(projected.historicalBaseDebit) - parseFloat(projected.historicalBaseCredit);
           }
         }
       }
 
       let runBal = startDate ? bfBalance : openingBalanceSide === "Dr" ? openingBalance : -openingBalance;
       const enrichedRows = txRows.map((r) => {
-        const dr = parseFloat(r.debitAmount || "0");
-        const cr = parseFloat(r.creditAmount || "0");
+        const projected = projectExportCurrencyRow(r as Record<string, unknown>);
+        const dr = parseFloat(projected.historicalBaseDebit || "0");
+        const cr = parseFloat(projected.historicalBaseCredit || "0");
         runBal += dr - cr;
-        return { ...r, dr, cr, runBal };
+        return { ...r, dr, cr, runBal, projected };
       });
 
       const totalDr = enrichedRows.reduce((s: number, r) => s + r.dr, 0);
@@ -648,6 +655,76 @@ export function registerAccountStatementRoutes(app: Express) {
       cbRow.getCell(4).alignment = { horizontal: "right" };
       cbRow.getCell(5).alignment = { horizontal: "right" };
       cbRow.getCell(6).alignment = { horizontal: "right" };
+
+      // Keep the original transaction currency visible beside the historical
+      // base ledger. Native values are intentionally grouped by currency and
+      // are never folded into one mixed-currency total.
+      const currencySheet = workbook.addWorksheet("Currency Detail");
+      currencySheet.addRow(["Currency-safe export detail"]);
+      currencySheet.addRow(["Historical base currency", "USD"]);
+      currencySheet.addRow(["Rate convention", "TRANSACTION_PER_BASE"]);
+      const currencySummary = summarizeExportCurrencyRows(txRows as unknown[]);
+      currencySheet.addRow([
+        "Totals provisional",
+        currencySummary.totalsProvisional ? "YES" : "NO",
+      ]);
+      currencySheet.addRow(["Unresolved legacy entries", currencySummary.unresolvedEntryCount]);
+      currencySheet.addRow([]);
+      const nativeHeaders = currencySheet.addRow([
+        "Date",
+        "Voucher No.",
+        "Particulars",
+        "Native Currency",
+        "Native Debit",
+        "Native Credit",
+        "Historical Base Debit (USD)",
+        "Historical Base Credit (USD)",
+        "Historical Rate",
+        "Status",
+      ]);
+      nativeHeaders.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = navyFill;
+        cell.border = allBorders;
+      });
+      for (const row of enrichedRows) {
+        const projected = row.projected;
+        const detail = currencySheet.addRow([
+          normalizeStatementDate(row.voucherDate) ?? "",
+          row.voucherNumber || "—",
+          row.narration || row.voucherDescription || row.voucherType || "—",
+          projected.transactionCurrency || "UNRESOLVED",
+          Number(projected.nativeDebit) || null,
+          Number(projected.nativeCredit) || null,
+          Number(projected.historicalBaseDebit) || null,
+          Number(projected.historicalBaseCredit) || null,
+          projected.historicalExchangeRate || "",
+          projected.status,
+        ]);
+        detail.eachCell((cell) => {
+          cell.border = allBorders;
+          cell.alignment = { vertical: "top", wrapText: true };
+        });
+        [5, 6, 7, 8].forEach((column) => {
+          detail.getCell(column).numFmt = numFmt;
+          detail.getCell(column).alignment = { horizontal: "right" };
+        });
+        if (projected.status === "UNRESOLVED_LEGACY") {
+          detail.eachCell((cell) => {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF3CD" } };
+          });
+        }
+      }
+      currencySheet.addRow([]);
+      currencySheet.addRow(["Native debit by currency", JSON.stringify(currencySummary.nativeDebitByCurrency)]);
+      currencySheet.addRow(["Native credit by currency", JSON.stringify(currencySummary.nativeCreditByCurrency)]);
+      currencySheet.addRow(["Historical base debit total (USD)", Number(currencySummary.historicalBaseDebitTotal)]);
+      currencySheet.addRow(["Historical base credit total (USD)", Number(currencySummary.historicalBaseCreditTotal)]);
+      currencySheet.columns = [
+        { width: 14 }, { width: 18 }, { width: 42 }, { width: 18 }, { width: 18 },
+        { width: 18 }, { width: 24 }, { width: 24 }, { width: 18 }, { width: 22 },
+      ];
+      currencySheet.views = [{ state: "frozen", ySplit: 7 }];
 
       sheet.pageSetup.printArea = `A1:F${cbRow.number}`;
       sheet.headerFooter.oddFooter = "&LAccount Statement&CPage &P of &N&R&D";

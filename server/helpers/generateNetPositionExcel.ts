@@ -161,7 +161,7 @@ export async function generateNetPositionExcel(
 
   wsOv.mergeCells("A2:E2");
   const ovSub = wsOv.getCell("A2");
-  ovSub.value = `Period: ${startDate}  →  ${endDate}   |   All figures in USD`;
+  ovSub.value = `Period: ${startDate}  →  ${endDate}   |   Historical base currency: USD   |   Rate convention: TRANSACTION_PER_BASE`;
   ovSub.font = { italic: true, size: 10, color: { argb: C.MUTED } };
   ovSub.alignment = { horizontal: "center" };
   wsOv.getRow(2).height = 18;
@@ -268,7 +268,7 @@ export async function generateNetPositionExcel(
 
   wsInc.mergeCells("A2:D2");
   const incSub = wsInc.getCell("A2");
-  incSub.value = `Period: ${startDate}  →  ${endDate}   |   All figures in USD`;
+  incSub.value = `Period: ${startDate}  →  ${endDate}   |   Historical base currency: USD   |   Rate convention: TRANSACTION_PER_BASE`;
   incSub.font = { italic: true, size: 10, color: { argb: C.MUTED } };
   incSub.alignment = { horizontal: "center" };
   wsInc.getRow(2).height = 18;
