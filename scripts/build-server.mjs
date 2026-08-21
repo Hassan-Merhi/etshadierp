@@ -28,9 +28,9 @@ const require = createRequire(import.meta.url);
 const pkgRoot = fileURLToPath(new URL("../node_modules/decimal.js/", import.meta.url));
 const decimalEntry = resolve(pkgRoot, "decimal.mjs");
 
-// Resolve xlsx-js-style to its actual CommonJS entry. Returning an absolute
-// path from onResolve overrides packages:"external" for this dependency and
-// forces esbuild to generate the correct CJS↔ESM interop inside dist/index.js.
+// Resolve xlsx-js-style to its actual CommonJS entry. This package must be
+// bundled so esbuild can translate its CommonJS exports safely for our ESM
+// server bundle.
 const xlsxJsStyleEntry = require.resolve("xlsx-js-style");
 
 const result = await build({
@@ -39,29 +39,41 @@ const result = await build({
   bundle: true,
   format: "esm",
   outdir: "dist",
-  packages: "external",
-  // Records which packages the output actually imports, and whether each is a
-  // static import-statement or a dynamic import(). scripts/verify-runtime-
-  // dependencies.mjs reads this to check every static import is declared in
-  // "dependencies". Reading it from esbuild rather than grepping the bundle
-  // matters: the output embeds source text containing `import ... from "@/lib/…"`
-  // inside template literals, which no regex can tell apart from a real import.
+  // Do not use packages:"external" here. That setting can re-externalize a
+  // node_modules path even after a plugin resolves it, which is exactly what
+  // allowed xlsx-js-style to survive as an invalid named ESM import on Render.
+  // Instead, the plugin below explicitly externalizes ordinary packages while
+  // forcing the two known-problem dependencies to bundle.
   metafile: true,
   plugins: [
     {
-      name: "bundle-render-runtime-dependencies",
+      name: "render-runtime-dependency-policy",
       setup(buildContext) {
-        // Intercept every import from decimal.js and redirect it to the local
-        // ESM file so esbuild includes it instead of emitting a runtime import.
-        buildContext.onResolve({ filter: /^decimal\.js$/ }, () => ({
-          path: decimalEntry,
-        }));
+        buildContext.onResolve({ filter: /.*/ }, (args) => {
+          if (args.path === "decimal.js") {
+            return { path: decimalEntry };
+          }
 
-        // xlsx-js-style is CommonJS. Bundle it so source-level named imports are
-        // translated by esbuild rather than being emitted as invalid Node ESM.
-        buildContext.onResolve({ filter: /^xlsx-js-style$/ }, () => ({
-          path: xlsxJsStyleEntry,
-        }));
+          if (args.path === "xlsx-js-style") {
+            return { path: xlsxJsStyleEntry };
+          }
+
+          // Keep repository-relative imports and project aliases inside the
+          // bundle so existing server behaviour is unchanged.
+          if (
+            args.path.startsWith(".") ||
+            args.path.startsWith("/") ||
+            args.path.startsWith("@shared/") ||
+            args.path.startsWith("@/") ||
+            args.path.startsWith("@assets/")
+          ) {
+            return null;
+          }
+
+          // Node built-ins and every other package stay as runtime externals,
+          // matching the previous packages:"external" behaviour.
+          return { path: args.path, external: true };
+        });
       },
     },
   ],
