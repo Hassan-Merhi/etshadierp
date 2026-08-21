@@ -166,6 +166,21 @@ function transformV5AllocationPresentation(source: string, seen: Set<string>): s
     seen
   );
 
+  if (!seen.has("V5 draft dialog cleanup")) {
+    const compactDraftCleanup = "if (!open) setEditDraftDialog(null);";
+    const first = code.indexOf(compactDraftCleanup);
+    if (first >= 0) {
+      if (code.indexOf(compactDraftCleanup, first + compactDraftCleanup.length) >= 0) {
+        throw new Error("[heavy-list-pagination] Ambiguous transform target: V5 draft dialog cleanup");
+      }
+      code =
+        code.slice(0, first) +
+        "if (!open) { setEditDraftDialog(null); model.setActionRows(null); }" +
+        code.slice(first + compactDraftCleanup.length);
+      seen.add("V5 draft dialog cleanup");
+    }
+  }
+
   return code;
 }
 
