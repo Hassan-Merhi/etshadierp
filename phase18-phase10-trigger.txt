@@ -1,1 +1,2 @@
 Trigger Phase 10 hard residual sweep on the consolidated Phase 18 continuation lane.
+Final certification trigger after Phase 10 compiler-safe exhaustion.
