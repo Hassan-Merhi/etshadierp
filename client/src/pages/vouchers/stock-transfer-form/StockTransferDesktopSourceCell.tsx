@@ -1,13 +1,8 @@
+import { focusScopedTestId } from "@/lib/scopedFocus";
 import type { StockTransferFormModel } from "./useStockTransferFormModel";
 
-function focusAndSelect(testId: string) {
-  setTimeout(() => {
-    const input = document.querySelector(`[data-testid="${testId}"]`) as HTMLInputElement | null;
-    if (input) {
-      input.focus();
-      input.select();
-    }
-  }, 50);
+function focusAndSelect(testId: string, anchor?: Element | null) {
+  focusScopedTestId(testId, { select: true, delay: 50, anchor });
 }
 
 export function StockTransferDesktopSourceCell({ model, index }: { model: StockTransferFormModel; index: number }) {
@@ -84,13 +79,13 @@ export function StockTransferDesktopSourceCell({ model, index }: { model: StockT
             setTransferInventorySource(location.id);
             setTransferSourceSearchTerm("");
             setShowSourceSidebar(false);
-            focusAndSelect(`input-item-name-${index}`);
+            focusAndSelect(`input-item-name-${index}`, event.currentTarget);
           } else if (event.key === "ArrowUp") {
             event.preventDefault();
             if (showSourceSidebar && filteredLocations.length > 0) {
               setTransferSourceHighlightedIndex(Math.max(0, transferSourceHighlightedIndex - 1));
             } else if (index > 0) {
-              focusAndSelect(`input-source-${index - 1}`);
+              focusAndSelect(`input-source-${index - 1}`, event.currentTarget);
             }
           } else if (event.key === "ArrowDown") {
             event.preventDefault();
@@ -99,11 +94,11 @@ export function StockTransferDesktopSourceCell({ model, index }: { model: StockT
                 Math.min(filteredLocations.length - 1, transferSourceHighlightedIndex + 1)
               );
             } else if (index < transferFields.length - 1) {
-              focusAndSelect(`input-source-${index + 1}`);
+              focusAndSelect(`input-source-${index + 1}`, event.currentTarget);
             }
           } else if (event.key === "ArrowRight" || (event.key === "Tab" && !event.shiftKey)) {
             event.preventDefault();
-            focusAndSelect(`input-item-name-${index}`);
+            focusAndSelect(`input-item-name-${index}`, event.currentTarget);
           }
         }}
         placeholder="Type location..."
