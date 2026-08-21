@@ -51,6 +51,9 @@ jobs:
       - name: Extract Wave 5 dialog presentation blocks
         run: node scripts/tmp-god-files-wave5-dialogs.mjs
 
+      - name: Extract Wave 5 tail presentation blocks
+        run: node scripts/tmp-god-files-wave5-tail.mjs
+
       - name: Format cumulative changed source
         shell: bash
         run: |
@@ -123,8 +126,11 @@ jobs:
             .github/workflows/god-files-wave5-publisher.yml \
             scripts/tmp-god-files-wave5.mjs \
             scripts/tmp-god-files-wave5-dialogs.mjs \
+            scripts/tmp-god-files-wave5-tail.mjs \
             .wave5-trigger \
-            .wave5-trigger-2
+            .wave5-trigger-2 \
+            .wave5-trigger-3 \
+            .wave5-trigger-4
           git add -A
           git commit -m "refactor(god-files): complete cumulative wave 5 on current main"
           git push origin HEAD:agent/god-files-final-wave1-tests
