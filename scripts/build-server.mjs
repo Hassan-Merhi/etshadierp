@@ -36,6 +36,17 @@ const result = await build({
   format: "esm",
   outdir: "dist",
   metafile: true,
+  // xlsx-js-style is bundled as CommonJS and calls require("stream") at load
+  // time. An ESM bundle has no `require`, so esbuild's __require shim throws
+  // "Dynamic require of \"stream\" is not supported" and the server dies at
+  // boot. Defining a real require from import.meta.url makes that shim delegate
+  // to Node instead of throwing.
+  banner: {
+    js: [
+      'import { createRequire as __nodeCreateRequire } from "node:module";',
+      "const require = __nodeCreateRequire(import.meta.url);",
+    ].join("\n"),
+  },
   plugins: [
     {
       name: "render-runtime-dependency-policy",
