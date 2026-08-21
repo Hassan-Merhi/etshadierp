@@ -1,0 +1,76 @@
+name: Temporary Dependency Convergence
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/tmp-dependency-convergence.yml
+
+permissions:
+  contents: write
+
+jobs:
+  converge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.19.0'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Update manifests
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const updateJson = (path, mutate) => {
+            const json = JSON.parse(fs.readFileSync(path, 'utf8'));
+            mutate(json);
+            fs.writeFileSync(path, JSON.stringify(json, null, 2) + '\n');
+          };
+
+          updateJson('package.json', (pkg) => {
+            pkg.dependencies['@napi-rs/canvas'] = '^1.0.0';
+            pkg.dependencies['@vitejs/plugin-react'] = '^6.0.0';
+            pkg.dependencies.archiver = '^8.0.0';
+            pkg.dependencies.express = '^5.0.0';
+            pkg.devDependencies['@types/archiver'] = '^8.0.0';
+            pkg.devDependencies['@types/express'] = '5.0.6';
+            pkg.devDependencies.typescript = '7.0.2';
+          });
+
+          updateJson('artifacts/mockup-sandbox/package.json', (pkg) => {
+            const bucket = pkg.devDependencies?.['@vitejs/plugin-react'] !== undefined ? pkg.devDependencies : pkg.dependencies;
+            bucket['@vitejs/plugin-react'] = '^6.0.0';
+          });
+          NODE
+
+      - name: Regenerate npm lockfile
+        env:
+          npm_config_registry: https://registry.npmjs.org/
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Regenerate pnpm lockfile
+        env:
+          npm_config_registry: https://registry.npmjs.org/
+        run: npx --yes pnpm@10.17.1 install --lockfile-only --ignore-scripts
+
+      - name: Commit converged dependency state
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json pnpm-lock.yaml artifacts/mockup-sandbox/package.json
+          if git diff --cached --quiet; then
+            echo 'Dependency state already converged.'
+            exit 0
+          fi
+          git commit -m 'fix(deps): converge remaining major upgrades'
+          git push origin HEAD:main
