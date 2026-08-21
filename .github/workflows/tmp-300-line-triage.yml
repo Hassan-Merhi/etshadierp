@@ -1,0 +1,84 @@
+name: TEMP 300-Line Triage Audit
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  triage:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 2184d3fddd6862c81ae4b35248686651ec7dec45
+          fetch-depth: 1
+      - name: Classify 301-400 line files
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const cfg = JSON.parse(fs.readFileSync('config/god-file-boundaries.json','utf8'));
+          const roots = cfg.repositoryScan.roots;
+          const exts = new Set(cfg.repositoryScan.extensions);
+          const excludedDirs = new Set(cfg.repositoryScan.excludeDirectories);
+          const excludedFiles = new Set(cfg.repositoryScan.excludeFiles);
+          const rows=[];
+          function walk(p){
+            if(!fs.existsSync(p)) return;
+            for(const ent of fs.readdirSync(p,{withFileTypes:true})){
+              const full=path.join(p,ent.name);
+              const rel=full.split(path.sep).join('/');
+              if(ent.isDirectory()){
+                if(excludedDirs.has(ent.name)) continue;
+                walk(full);
+                continue;
+              }
+              if(!exts.has(path.extname(ent.name)) || excludedFiles.has(rel)) continue;
+              const text=fs.readFileSync(full,'utf8');
+              const lines=text.length===0?0:text.split(/\r?\n/).length;
+              if(lines < 301 || lines > 400) continue;
+              const hooks=(text.match(/\buse(?:State|Effect|Memo|Callback|Reducer|Query|Mutation|Form|Watch|Ref)\b/g)||[]).length;
+              const funcs=(text.match(/(?:^|\n)\s*(?:export\s+)?(?:async\s+)?function\s+\w+|(?:^|\n)\s*(?:export\s+)?const\s+\w+\s*=\s*(?:async\s*)?\(/g)||[]).length;
+              const components=(text.match(/(?:^|\n)\s*(?:export\s+)?(?:function|const)\s+[A-Z][A-Za-z0-9_]*/g)||[]).length;
+              const jsx=(text.match(/<[A-Z][A-Za-z0-9_.]*/g)||[]).length;
+              const exports=(text.match(/\bexport\b/g)||[]).length;
+              const isTest=/(^|\/)(tests?|__tests__|fixtures)(\/|$)|\.(?:test|spec)\.[cm]?[jt]sx?$/.test(rel);
+              const lower=rel.toLowerCase();
+              const isSchema=/shared\/schema|schema|types?\.|interfaces?|constants?|config/.test(lower);
+              const isFrontend=rel.startsWith('client/src/');
+              const isBackend=rel.startsWith('server/');
+              const isScript=rel.startsWith('scripts/');
+              let category='MEDIUM_REVIEW';
+              let reason='mixed responsibilities or domain coupling';
+              if(isTest){ category='LEAVE_OR_DEFER'; reason='test/fixture; low production maintainability payoff'; }
+              else if(isSchema){ category='LEAVE_OR_DEFER'; reason='schema/type/config-like file; may be cohesive'; }
+              else if(isFrontend && (components>=2 || (hooks>=4 && jsx>=8) || funcs>=5 || jsx>=15)) { category='EASY_SPLIT'; reason='clear frontend seams: sections/components/hooks/helpers'; }
+              else if(isScript && funcs>=5) { category='EASY_SPLIT'; reason='multiple script helper seams'; }
+              else if(isBackend && funcs>=7 && exports>=2) { category='EASY_SPLIT'; reason='multiple separable backend helpers/handlers'; }
+              else if(isFrontend) { category='MEDIUM_REVIEW'; reason='frontend file but seam not obvious statically'; }
+              rows.push({rel,lines,category,reason,hooks,funcs,components,jsx,exports});
+            }
+          }
+          for(const r of roots) walk(r);
+          rows.sort((a,b)=>a.category.localeCompare(b.category)||b.lines-a.lines||a.rel.localeCompare(b.rel));
+          const counts={};
+          const areas={};
+          for(const r of rows){
+            counts[r.category]=(counts[r.category]||0)+1;
+            const area=r.rel.startsWith('client/src/')?'client':r.rel.startsWith('server/')?'server':r.rel.startsWith('shared/')?'shared':r.rel.startsWith('scripts/')?'scripts':'tests';
+            areas[area]=(areas[area]||0)+1;
+          }
+          console.log(`TOTAL_301_400=${rows.length}`);
+          for(const k of ['EASY_SPLIT','MEDIUM_REVIEW','LEAVE_OR_DEFER']) console.log(`${k}=${counts[k]||0}`);
+          for(const [k,v] of Object.entries(areas).sort()) console.log(`AREA_${k.toUpperCase()}=${v}`);
+          console.log('EASY_SPLIT_TOP_80');
+          for(const r of rows.filter(x=>x.category==='EASY_SPLIT').slice(0,80)) console.log(`${r.lines}\t${r.rel}\t${r.reason}`);
+          console.log('MEDIUM_TOP_40');
+          for(const r of rows.filter(x=>x.category==='MEDIUM_REVIEW').slice(0,40)) console.log(`${r.lines}\t${r.rel}\t${r.reason}`);
+          console.log('LEAVE_TOP_40');
+          for(const r of rows.filter(x=>x.category==='LEAVE_OR_DEFER').slice(0,40)) console.log(`${r.lines}\t${r.rel}\t${r.reason}`);
+          NODE
