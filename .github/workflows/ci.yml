@@ -211,6 +211,7 @@ jobs:
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PUSH_BASE_SHA: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
           if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -227,9 +228,11 @@ jobs:
           # and shared while parity also covered tests and scripts — and three
           # unformatted test files reached the parity job because this one had
           # never looked at them.
-          mapfile -d '' changed_files < <(
-            git -c safe.directory="$GITHUB_WORKSPACE" diff --name-only --diff-filter=ACMR -z "$base_sha" "$GITHUB_SHA" -- client/src server shared tests scripts |
-              grep -zE '\.(ts|tsx|css|mjs)$' || true
+          mapfile -t changed_files < <(
+            gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/compare/${base_sha}...${GITHUB_SHA}" \
+              --jq '.files[].filename' |
+              grep -E '^(client/src|server|shared|tests|scripts)/.*\.(ts|tsx|css|mjs)$' || true
           )
 
           if [ "${#changed_files[@]}" -eq 0 ]; then
