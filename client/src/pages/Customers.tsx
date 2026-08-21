@@ -50,10 +50,18 @@ const typeBadgeClass: Record<string, string> = {
   Adjustment: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
 };
 
+type CustomerCurrencyBalances = Record<string, { debit: number; credit: number; net: number }>;
+
+function getCustomerCurrencyBalances(customer: unknown): CustomerCurrencyBalances | undefined {
+  if (!customer || typeof customer !== "object") return undefined;
+  const balances = (customer as { balancesByCurrency?: unknown }).balancesByCurrency;
+  return balances && typeof balances === "object" ? (balances as CustomerCurrencyBalances) : undefined;
+}
+
 export default function Customers() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
-  const { formatAmount: _formatAmount, formatCashAmount } = useCurrencyContext();
+  const { formatHistoricalBaseAmount } = useCurrencyContext();
   const [, _navigate] = useLocation();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -351,12 +359,12 @@ export default function Customers() {
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <TrendingUp className="h-4 w-4 text-blue-500" />
               <span className="text-muted-foreground">Receivable</span>
-              <span className="font-semibold font-mono">{formatCashAmount(totalReceivable)}</span>
+                <span className="font-semibold font-mono">{formatHistoricalBaseAmount(totalReceivable)}</span>
             </div>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <TrendingDown className="h-4 w-4 text-red-500" />
               <span className="text-muted-foreground">Payable</span>
-              <span className="font-semibold font-mono">{formatCashAmount(totalPayable)}</span>
+                <span className="font-semibold font-mono">{formatHistoricalBaseAmount(totalPayable)}</span>
             </div>
           </>
         )}
@@ -448,12 +456,21 @@ export default function Customers() {
                   <TableCell className="py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <span className={`font-mono font-semibold text-sm ${drCrClass(customer.balanceSide || "Dr")}`}>
-                        {formatCashAmount(customer.balance || 0)}
+                        {formatHistoricalBaseAmount(customer.balance || 0)}
                       </span>
                       <Badge variant="secondary" className={`text-xs ${drCrClass(customer.balanceSide || "Dr")}`}>
                         {customer.balanceSide || "Dr"}
                       </Badge>
                     </div>
+                    {getCustomerCurrencyBalances(customer) &&
+                      Object.keys(getCustomerCurrencyBalances(customer)!).length > 0 && (
+                      <div className="mt-1 text-[10px] text-muted-foreground">
+                        Native:{" "}
+                        {Object.entries(getCustomerCurrencyBalances(customer)!)
+                          .map(([currency, value]) => `${currency} ${Math.abs(value.net).toLocaleString(undefined, { maximumFractionDigits: 2 })}`)
+                          .join(" · ")}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="py-3">
                     <div className="flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
@@ -515,7 +532,7 @@ export default function Customers() {
                 <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="text-muted-foreground">Balance</span>
                 <span className={`font-mono font-semibold ${drCrClass(statementCustomer?.balanceSide || "Dr")}`}>
-                  {formatCashAmount(statementCustomer?.balance || 0)}
+                  {formatHistoricalBaseAmount(statementCustomer?.balance || 0)}
                 </span>
                 <Badge variant="secondary" className={`text-xs ${drCrClass(statementCustomer?.balanceSide || "Dr")}`}>
                   {statementCustomer?.balanceSide || "Dr"}
@@ -578,7 +595,7 @@ export default function Customers() {
                             <TableCell className="py-2"></TableCell>
                             <TableCell className="py-2"></TableCell>
                             <TableCell className="py-2 text-right font-mono font-medium">
-                              {formatCashAmount(Math.abs(openingBalance))}
+                              {formatHistoricalBaseAmount(Math.abs(openingBalance))}
                             </TableCell>
                             <TableCell className="py-2"></TableCell>
                           </TableRow>
@@ -609,13 +626,13 @@ export default function Customers() {
                                 {t.narration || t.voucherDescription || "—"}
                               </TableCell>
                               <TableCell className="py-2 text-right font-mono">
-                                {dr > 0 ? formatCashAmount(dr) : ""}
+                                {dr > 0 ? formatHistoricalBaseAmount(dr) : ""}
                               </TableCell>
                               <TableCell className="py-2 text-right font-mono">
-                                {cr > 0 ? formatCashAmount(cr) : ""}
+                                {cr > 0 ? formatHistoricalBaseAmount(cr) : ""}
                               </TableCell>
                               <TableCell className="py-2 text-right font-mono font-medium">
-                                {formatCashAmount(Math.abs(running))}
+                                {formatHistoricalBaseAmount(Math.abs(running))}
                                 <span className={`text-xs font-semibold ml-1 ${drCrClass(running >= 0 ? "Dr" : "Cr")}`}>
                                   {running >= 0 ? "Dr" : "Cr"}
                                 </span>
@@ -641,10 +658,10 @@ export default function Customers() {
                       <TableFooter className="bg-muted/40">
                         <TableRow className="font-semibold text-xs">
                           <TableCell colSpan={3}>Total</TableCell>
-                          <TableCell className="text-right font-mono">{formatCashAmount(totalDr)}</TableCell>
-                          <TableCell className="text-right font-mono">{formatCashAmount(totalCr)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatHistoricalBaseAmount(totalDr)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatHistoricalBaseAmount(totalCr)}</TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatCashAmount(Math.abs(closingBalance))}
+                            {formatHistoricalBaseAmount(Math.abs(closingBalance))}
                             <span
                               className={`text-xs font-semibold ml-1 ${drCrClass(statementCustomer?.balanceSide || "Dr")}`}
                             >

@@ -56,13 +56,12 @@ export function useAccountsLegacyModel() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
-  const { formatAmount, formatCashAmount, isMultiCurrency } = useCurrencyContext();
+  const { formatAmount, formatHistoricalBaseAmount, isMultiCurrency } = useCurrencyContext();
 
-  // formatCashAmount handles both USD-base and CFA-base companies correctly:
-  // it converts USD→CFA (or CFA→USD) based on baseCurrency + selectedCurrency,
-  // so all account types — supplier, ledger, customer, bank — show consistent values.
+  // Account-list and statement balances are historical base values. They must
+  // not change when the user changes the current display-rate preference.
   function formatAmountForAccount(amount: number, _accountType?: string): string {
-    return formatCashAmount(amount);
+    return formatHistoricalBaseAmount(amount);
   }
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideBalances = (myErpPages?.hiddenErpCostFields ?? []).includes("accounts_balances");

@@ -38,7 +38,8 @@ import { CustomNetPositionView } from "./propertiesdashboard/components/CustomNe
 export default function PropertiesDashboard() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
-  const { formatAmount } = useCurrencyContext();
+  const { formatAmount: legacyFormatAmount, formatHistoricalBaseAmount } = useCurrencyContext();
+  const formatAmount = formatHistoricalBaseAmount ?? legacyFormatAmount;
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAddPayableDialogOpen, setIsAddPayableDialogOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<number>(0);

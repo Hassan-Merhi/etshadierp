@@ -73,7 +73,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const isFactoryCompany = selectedCompany?.companyType === "factory";
   const isPropertiesCompany = selectedCompany?.companyType === "properties";
   const [isAutoCreating, setIsAutoCreating] = useState(false);
-  const { formatAmount, selectedCurrency, exchangeRate: dailyExchangeRate } = useCurrencyContext();
+  const { formatHistoricalBaseAmount: formatAmount, selectedCurrency, exchangeRate: dailyExchangeRate } = useCurrencyContext();
   const [transactionRate, setTransactionRate] = useState<number | null>(null);
   const exchangeRate = transactionRate || dailyExchangeRate;
   const [voucherEffectiveDate, setVoucherEffectiveDate] = useState<string>("");

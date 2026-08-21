@@ -6,8 +6,6 @@ import { AccountTableProps } from "./accountTypes";
 import { cn } from "@/lib/utils";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
-const RATE_CONVERTED_TYPES = new Set(["bank"]);
-
 const TYPE_LABELS: Record<string, string> = {
   ledger: "Ledger",
   supplier: "Supplier",
@@ -29,10 +27,11 @@ export function AccountTable({
   formatAmount,
   onEdit,
 }: AccountTableProps) {
-  const { formatAmountRaw } = useCurrencyContext();
+  const { formatHistoricalBaseAmount } = useCurrencyContext();
 
   function fmtBalance(amount: number, type: string): string {
-    return RATE_CONVERTED_TYPES.has(type) ? formatAmount(amount) : formatAmountRaw(amount);
+    void type;
+    return formatHistoricalBaseAmount(amount);
   }
   const [typeFilter, setTypeFilter] = useState("all");
 

@@ -117,7 +117,7 @@ type VoucherFormData = z.infer<typeof voucherSchema>;
 
 export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEditDialogProps) {
   const { toast } = useToast();
-  const { formatAmount } = useCurrencyContext();
+  const { formatHistoricalBaseAmount: formatAmount } = useCurrencyContext();
   const { formatDisplayDate } = useDateFormat();
   const [showOptionalWarning, setShowOptionalWarning] = useState(false);
 

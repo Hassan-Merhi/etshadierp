@@ -81,3 +81,4 @@
 - [Spreadsheet security dependency boundary](spreadsheet-security-dependency-boundary.md) — root spreadsheet APIs use xlsx-js-style; Electron's extract-zip remains an upstream-only advisory with no fixed release.
 - [Backend shard bootstrap and coverage](backend-shard-bootstrap.md) — shared-db backend shards need one schema bootstrap and merged V8 coverage before thresholds.
 - [Scoped esbuild security override](scoped-esbuild-override.md) — force patched esbuild only under @esbuild-kit/core-utils; a global override breaks Vite's compatible transform version.
+- [Currency formatter test compatibility](currency-formatter-test-compatibility.md) — financial screens should prefer historical-base formatting but tolerate lightweight test providers that only expose the legacy formatter.

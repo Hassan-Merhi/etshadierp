@@ -8,6 +8,7 @@ export interface AccountTransactionRowsProps {
   toggleVoucherSelection: (id: number) => void;
   handleOpenVoucher: (v: unknown) => void;
   formatAmount: (amt: number) => string;
+  formatTransactionAmount?: (amt: number | string, currency: string) => string;
   hideBalances: boolean;
   appMode: string;
   openingBalance: number;
@@ -23,6 +24,7 @@ export function AccountTransactionRows({
   toggleVoucherSelection,
   handleOpenVoucher,
   formatAmount: fmt,
+  formatTransactionAmount,
   hideBalances,
   appMode,
   openingBalance,
@@ -134,7 +136,11 @@ export function AccountTransactionRows({
               {!hideBalances && (
                 <TableCell className="py-3 text-right font-mono text-sm tabular-nums">
                   {v.totalDebit > 0 ? (
-                    <span className="text-foreground">{fmt(v.totalDebit)}</span>
+                    <span className="text-foreground">
+                      {formatTransactionAmount && v.transactionCurrency
+                        ? formatTransactionAmount(v.transactionDebitAmount || v.totalDebit, v.transactionCurrency)
+                        : fmt(v.totalDebit)}
+                    </span>
                   ) : (
                     <span className="text-muted-foreground/40">—</span>
                   )}
@@ -143,7 +149,11 @@ export function AccountTransactionRows({
               {!hideBalances && (
                 <TableCell className="py-3 text-right font-mono text-sm tabular-nums">
                   {v.totalCredit > 0 ? (
-                    <span className="text-foreground">{fmt(v.totalCredit)}</span>
+                    <span className="text-foreground">
+                      {formatTransactionAmount && v.transactionCurrency
+                        ? formatTransactionAmount(v.transactionCreditAmount || v.totalCredit, v.transactionCurrency)
+                        : fmt(v.totalCredit)}
+                    </span>
                   ) : (
                     <span className="text-muted-foreground/40">—</span>
                   )}

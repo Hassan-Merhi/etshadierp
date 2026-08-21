@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PeriodFilter } from "@/components/ui/period-filter";
 import { AccountStatementViewProps } from "./accountTypes";
 import { AccountTransactionRows } from "./AccountTransactionRows";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 export function AccountStatementView({
   selectedAccount,
@@ -54,6 +55,7 @@ export function AccountStatementView({
   brokerStatementLoading,
   transactionError,
 }: AccountStatementViewProps) {
+  const { formatTransactionAmount } = useCurrencyContext();
   const isFactorySupplierAccount = selectedAccount?.type === "factorySupplier";
   const [pdfLang, setPdfLang] = useState<"en" | "fr" | "ar">("en");
 
@@ -329,6 +331,7 @@ export function AccountStatementView({
             toggleVoucherSelection={toggleVoucherSelection}
             handleOpenVoucher={handleOpenVoucher}
             formatAmount={formatAmount}
+            formatTransactionAmount={formatTransactionAmount}
             hideBalances={hideBalances}
             appMode={appMode}
             openingBalance={openingBalance}

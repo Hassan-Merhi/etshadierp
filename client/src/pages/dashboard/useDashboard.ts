@@ -38,7 +38,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 export function useDashboard() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
-  const { formatAmount, formatCashAmount } = useCurrencyContext();
+  const { formatHistoricalBaseAmount: formatAmount, formatCashAmount } = useCurrencyContext();
   const appMode = useAppMode();
   const modePrefix = useModePrefix();
   const modeApiRequest = getApiRequest(appMode);

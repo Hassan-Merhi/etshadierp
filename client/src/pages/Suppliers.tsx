@@ -59,6 +59,8 @@ interface SupplierWithStats {
   active: boolean;
   containerCount: number;
   balance: number;
+  balancesByCurrency?: Record<string, { debit: number; credit: number; net: number }>;
+  historicalBaseBalance?: number;
 }
 
 export default function Suppliers() {
@@ -69,7 +71,10 @@ export default function Suppliers() {
   useEscapeBack(selectedSupplier ? () => setSelectedSupplier(null) : null);
 
   const { selectedCompany, selectCompany } = useCompany();
-  const { formatAmount } = useCurrencyContext();
+  const { formatAmount: legacyFormatAmount, formatHistoricalBaseAmount } = useCurrencyContext();
+  // Keep lightweight page-test providers and older embedded consumers working
+  // while production uses the historical-base formatter.
+  const formatAmount = formatHistoricalBaseAmount ?? legacyFormatAmount;
   const { toast } = useToast();
   const [_location, navigate] = useLocation();
   const {

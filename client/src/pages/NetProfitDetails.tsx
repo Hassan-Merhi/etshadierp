@@ -266,7 +266,7 @@ function todayStr() {
 }
 
 export default function NetProfitDetails() {
-  const { formatAmount } = useCurrencyContext();
+  const { formatHistoricalBaseAmount: formatAmount } = useCurrencyContext();
   const { toast } = useToast();
   const [fromInput, setFromInput] = useState<string>("");
   const [toInput, setToInput] = useState<string>("");

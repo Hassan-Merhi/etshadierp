@@ -27,6 +27,7 @@ interface DaybookTableProps {
   expandedLoading: boolean;
   expandedEntries: ViewVoucherEntry[];
   formatAmount: (amt: any) => string;
+  formatTransactionAmount?: (amt: any, currency: string) => string;
   formatDisplayDate: (date: Date | string) => string;
   formatDisplayTime: (date: string) => string;
   handleView: (v: Voucher) => void;
@@ -61,6 +62,7 @@ export function DaybookTable({
   expandedLoading,
   expandedEntries,
   formatAmount,
+  formatTransactionAmount,
   formatDisplayDate,
   formatDisplayTime,
   handleView,
@@ -597,12 +599,18 @@ export function DaybookTable({
                           <div className="flex items-center gap-4 shrink-0 ml-4">
                             {parseFloat(e.debitAmount || "0") > 0 && !hideAmounts && (
                               <span className="font-mono text-xs text-red-600 dark:text-red-400">
-                                Dr {formatAmount(parseFloat(e.debitAmount))}
+                                Dr{" "}
+                                {formatTransactionAmount && e.transactionCurrency
+                                  ? formatTransactionAmount(e.transactionDebitAmount || e.debitAmount, e.transactionCurrency)
+                                  : formatAmount(parseFloat(e.debitAmount))}
                               </span>
                             )}
                             {parseFloat(e.creditAmount || "0") > 0 && !hideAmounts && (
                               <span className="font-mono text-xs text-green-600 dark:text-green-400">
-                                Cr {formatAmount(parseFloat(e.creditAmount))}
+                                Cr{" "}
+                                {formatTransactionAmount && e.transactionCurrency
+                                  ? formatTransactionAmount(e.transactionCreditAmount || e.creditAmount, e.transactionCurrency)
+                                  : formatAmount(parseFloat(e.creditAmount))}
                               </span>
                             )}
                           </div>

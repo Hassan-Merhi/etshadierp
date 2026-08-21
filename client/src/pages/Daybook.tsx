@@ -71,7 +71,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const { selectedCompany } = useCompany();
   const vouchersBase = selectedCompany?.companyType === "properties" ? "/properties/vouchers" : "/vouchers";
   const { formatDisplayDate, formatDisplayTime } = useDateFormat();
-  const { formatAmount } = useCurrencyContext();
+  const {
+    formatHistoricalBaseAmount: formatAmount,
+    formatTransactionAmount,
+  } = useCurrencyContext();
   const [, navigate] = useLocation();
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hiddenErpCosts = myErpPages?.hiddenErpCostFields ?? [];
@@ -780,6 +783,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
               expandedLoading={expandedLoading}
               expandedEntries={expandedEntries}
               formatAmount={formatAmount}
+            formatTransactionAmount={formatTransactionAmount}
               formatDisplayDate={formatDisplayDate}
               formatDisplayTime={formatDisplayTime}
               handleView={handleView}
