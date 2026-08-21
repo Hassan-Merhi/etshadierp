@@ -82,7 +82,7 @@ export default function ContainerVerification() {
   });
 
   const addItemMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: LoadedItemDraft) => {
       const res = await apiRequest("POST", `/api/containers/${containerId}/loaded-items`, data);
       return res.json();
     },

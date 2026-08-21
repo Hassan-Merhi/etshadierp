@@ -48,6 +48,7 @@ import { NotesCell } from "./factoryotwtrackingtab/components/NotesCell";
 import { EventTimelineSheet } from "./factoryotwtrackingtab/components/EventTimelineSheet";
 import { TrackingSettingsSheet } from "./factoryotwtrackingtab/components/TrackingSettingsSheet";
 import { TrackNowProgressLog } from "./factoryotwtrackingtab/components/TrackNowProgressLog";
+import { useOtwCsvTools } from "./factoryotwtrackingtab/hooks/useOtwCsvTools";
 export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = {}) {
   const { toast } = useToast();
   const tqClient = useTQClient();
@@ -273,155 +274,8 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   });
   const [bulkTracking, setBulkTracking] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
-  const [importing, setImporting] = useState(false);
-  // ── Dev-only: Export filtered containers as CSV ──────────────────────────
-  function exportCsv() {
-    const rows = [["Container #", "Supplier", "ETA (YYYY-MM-DD)", "Status", "Cost", "Freight", "Weight (KG)", "Notes"]];
-    for (const c of filtered) {
-      rows.push([
-        c.containerNumber || "",
-        c.supplierName || "",
-        c.arrivalDate ? c.arrivalDate.slice(0, 10) : "",
-        c.status || "",
-        containerCost(c).amount > 0 ? String(containerCost(c).amount) : "",
-        num(c.freight) > 0 ? String(num(c.freight)) : "",
-        c.totalKg ? String(c.totalKg) : "",
-        c.otwNote || "",
-      ]);
-    }
-    const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `containers-otw-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-  // ── Dev-only: Import CSV to bulk-update ETA ──────────────────────────────
-  // Expected columns: Container # (col 0), ETA YYYY-MM-DD (col 2)
-  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setImporting(true);
-    try {
-      const text = await file.text();
-      const lines = text.split(/\r?\n/).filter((l) => l.trim());
-      // Parse a CSV line respecting quoted fields
-      function parseCsvLine(line: string): string[] {
-        const out: string[] = [];
-        let cur = "";
-        let inQ = false;
-        for (let i = 0; i < line.length; i++) {
-          const ch = line[i];
-          if (inQ) {
-            if (ch === '"' && line[i + 1] === '"') {
-              cur += '"';
-              i++;
-            } else if (ch === '"') inQ = false;
-            else cur += ch;
-          } else if (ch === '"') {
-            inQ = true;
-          } else if (ch === ",") {
-            out.push(cur.trim());
-            cur = "";
-          } else {
-            cur += ch;
-          }
-        }
-        out.push(cur.trim());
-        return out;
-      }
-      // Convert any recognisable date to YYYY-MM-DD or return null
-      function normaliseDate(raw: string): string | null {
-        const s = raw.trim();
-        if (!s) return null;
-        // Already YYYY-MM-DD
-        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-        // M/D/YY or M/D/YYYY  (also handles MM/DD/YY etc.)
-        const mdY = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-        if (mdY) {
-          const [, m, d, yRaw] = mdY;
-          const year = yRaw.length === 2 ? `20${yRaw}` : yRaw;
-          const mm = m.padStart(2, "0");
-          const dd = d.padStart(2, "0");
-          const iso = `${year}-${mm}-${dd}`;
-          if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
-        }
-        // D-Mon-YY or D-Mon-YYYY (e.g. 6-Aug-26)
-        const dMonY = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
-        if (dMonY) {
-          const months: Record<string, string> = {
-            jan: "01",
-            feb: "02",
-            mar: "03",
-            apr: "04",
-            may: "05",
-            jun: "06",
-            jul: "07",
-            aug: "08",
-            sep: "09",
-            oct: "10",
-            nov: "11",
-            dec: "12",
-          };
-          const [, d, mon, yRaw] = dMonY;
-          const mm = months[mon.toLowerCase()];
-          if (mm) {
-            const year = yRaw.length === 2 ? `20${yRaw}` : yRaw;
-            return `${year}-${mm}-${d.padStart(2, "0")}`;
-          }
-        }
-        return null;
-      }
-      // Detect column positions from header row
-      const headerCols = parseCsvLine(lines[0]).map((h) => h.toLowerCase());
-      const containerCol = headerCols.findIndex((h) => h.includes("container"));
-      const etaCol = headerCols.findIndex((h) => h.includes("eta"));
-      // Fall back to positional defaults if headers are unrecognised
-      const cIdx = containerCol >= 0 ? containerCol : 0;
-      const eIdx = etaCol >= 0 ? etaCol : 2;
-      // Skip header row
-      const dataLines = lines.slice(1);
-      // Build lookup: containerNumber -> container id
-      const lookup = new Map<string, number>(
-        otwContainers.map((c) => [c.containerNumber?.trim().toUpperCase() ?? "", c.id])
-      );
-      let updated = 0;
-      let skipped = 0;
-      for (const line of dataLines) {
-        const cols = parseCsvLine(line);
-        const containerNum = (cols[cIdx] ?? "").toUpperCase().trim();
-        const etaRaw = (cols[eIdx] ?? "").trim();
-        const etaVal = normaliseDate(etaRaw);
-        if (!containerNum || !etaVal) {
-          skipped++;
-          continue;
-        }
-        const id = lookup.get(containerNum);
-        if (!id) {
-          skipped++;
-          continue;
-        }
-        try {
-          await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, { arrivalDate: etaVal });
-          updated++;
-        } catch {
-          skipped++;
-        }
-      }
-      tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
-      toast({
-        title: `Import complete`,
-        description: `${updated} ETA(s) updated, ${skipped} skipped.`,
-      });
-    } catch (err) {
-      toast({ title: "Import failed", description: getErrorDetails(err).optionalMessage, variant: "destructive" });
-    } finally {
-      setImporting(false);
-    }
-  }
+  const { importing, exportCsv, handleImportFile } = useOtwCsvTools(filtered, otwContainers);
+
   async function trackAll() {
     const eligible = otwContainers.filter((c) => {
       const fc = c;

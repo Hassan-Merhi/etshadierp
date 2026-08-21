@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
@@ -31,18 +30,9 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 import type { ComparisonItem, FinalizePreview, OrderDetail, VerificationSummary } from "./pendinginvoiceverify/types";
+import { PendingInvoiceDialogs } from "./pendinginvoiceverify/PendingInvoiceDialogs";
 export default function PendingInvoiceVerify() {
   const { toast } = useToast();
   const { selectedCompany: _selectedCompany } = useCompany();
@@ -863,175 +853,26 @@ export default function PendingInvoiceVerify() {
         </div>
       </div>
 
-      <Dialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Approve & Verify Order</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              This will mark the order as VERIFIED. You can add optional notes below.
-            </p>
-            <Textarea
-              value={approveNotes}
-              onChange={(e) => setApproveNotes(e.target.value)}
-              placeholder="Optional notes..."
-              data-testid="input-approve-notes"
-            />
-            <div className="flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowApproveDialog(false)} data-testid="button-cancel-approve">
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  verifyMutation.mutate({ approved: true, notes: approveNotes || undefined });
-                  setShowApproveDialog(false);
-                }}
-                disabled={verifyMutation.isPending}
-                data-testid="button-confirm-approve"
-              >
-                <Check className="mr-2 h-4 w-4" />
-                Confirm
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showReturnDialog} onOpenChange={setShowReturnDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Return to Loading</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              This will return the order back to the loading stage. Are you sure?
-            </p>
-            <div className="flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowReturnDialog(false)} data-testid="button-cancel-return">
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  returnToLoadingMutation.mutate();
-                  setShowReturnDialog(false);
-                }}
-                disabled={returnToLoadingMutation.isPending}
-                data-testid="button-confirm-return"
-              >
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Confirm Return
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showFinalizePreview} onOpenChange={setShowFinalizePreview}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Finalize Invoice Preview</DialogTitle>
-          </DialogHeader>
-          {finalizePreview && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Bales in order:</span>{" "}
-                  <span className="font-semibold" data-testid="text-preview-total">
-                    {finalizePreview.totalBalesInOrder}
-                  </span>
-                </div>
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Will be removed from stock:</span>{" "}
-                  <span className="font-semibold" data-testid="text-preview-removable">
-                    {finalizePreview.baleCount}
-                  </span>
-                </div>
-              </div>
-
-              {finalizePreview.baleCount > 0 && (
-                <div className="border rounded-md overflow-hidden">
-                  <Table>
-                    <TableHeader className="sticky top-0 z-30 bg-background">
-                      <TableRow>
-                        <TableHead>Reference</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead className="text-right">Weight (kg)</TableHead>
-                        <TableHead>Location</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {finalizePreview.bales.slice(0, 50).map((b) => (
-                        <TableRow key={b.id} data-testid={`row-preview-bale-${b.id}`}>
-                          <TableCell className="font-mono text-sm">{b.baleReference}</TableCell>
-                          <TableCell className="text-sm">{b.productName}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{b.weightKg.toFixed(2)}</TableCell>
-                          <TableCell className="text-sm">{b.locationName}</TableCell>
-                        </TableRow>
-                      ))}
-                      {finalizePreview.bales.length > 50 && (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground text-sm">
-                            ...and {finalizePreview.bales.length - 50} more bales
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-
-              {finalizePreview.baleCount === 0 && (
-                <p className="text-sm text-muted-foreground" data-testid="text-preview-none">
-                  No bales are currently in stock for this order. They may have already been marked as SOLD.
-                </p>
-              )}
-
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowFinalizePreview(false)}
-                  data-testid="button-cancel-finalize"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => {
-                    setShowFinalizePreview(false);
-                    finalizeMutation.mutate();
-                  }}
-                  disabled={finalizeMutation.isPending}
-                  data-testid="button-confirm-finalize"
-                >
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Confirm & Finalize
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={showFixBalesDialog} onOpenChange={setShowFixBalesDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Fix Bale Statuses</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will mark all bales attached to this order as SOLD, removing them from inventory. Use this only if
-              bales were accidentally returned to stock after a previous finalization. This does not create invoices or
-              customer balance entries.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-fix-bales">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => forceSyncMutation.mutate()} data-testid="button-confirm-fix-bales">
-              <Wrench className="mr-2 h-4 w-4" />
-              Fix Bale Statuses
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <PendingInvoiceDialogs
+        showApproveDialog={showApproveDialog}
+        setShowApproveDialog={setShowApproveDialog}
+        approveNotes={approveNotes}
+        setApproveNotes={setApproveNotes}
+        verifyPending={verifyMutation.isPending}
+        onVerify={(notes) => verifyMutation.mutate({ approved: true, notes: notes || undefined })}
+        showReturnDialog={showReturnDialog}
+        setShowReturnDialog={setShowReturnDialog}
+        returnPending={returnToLoadingMutation.isPending}
+        onReturn={() => returnToLoadingMutation.mutate()}
+        showFinalizePreview={showFinalizePreview}
+        setShowFinalizePreview={setShowFinalizePreview}
+        finalizePreview={finalizePreview}
+        finalizePending={finalizeMutation.isPending}
+        onFinalize={() => finalizeMutation.mutate()}
+        showFixBalesDialog={showFixBalesDialog}
+        setShowFixBalesDialog={setShowFixBalesDialog}
+        onFixBales={() => forceSyncMutation.mutate()}
+      />
     </div>
   );
 }

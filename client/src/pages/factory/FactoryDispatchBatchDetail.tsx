@@ -49,7 +49,7 @@ import {
 } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 
-import type { BatchDetail, InvoicePreview } from "./factorydispatchbatchdetail/types";
+import type { AuditScan, BatchDetail, InvoicePreview } from "./factorydispatchbatchdetail/types";
 import { BATCH_STATUS_CONFIG, fmt } from "./factorydispatchbatchdetail/utils";
 import { RideStatusBadge } from "./factorydispatchbatchdetail/components/RideStatusBadge";
 export default function FactoryDispatchBatchDetail() {
@@ -100,22 +100,6 @@ export default function FactoryDispatchBatchDetail() {
     staleTime: 15000,
   });
 
-  interface AuditScan {
-    id: number;
-    truckRideId: number;
-    rideNumber: number;
-    baleId: number;
-    baleReference: string;
-    articleCode: string | null;
-    productName: string | null;
-    weightKg: string;
-    priceUsed: string;
-    amount: string;
-    scannedBy: string | null;
-    scannedAt: string;
-    removedAt: string | null;
-    removalReason: string | null;
-  }
   const { data: auditScans = [] } = useQuery<AuditScan[]>({
     queryKey: [`/api/factory/dispatch-batches/${batchId}/audit`],
     queryFn: async () => {

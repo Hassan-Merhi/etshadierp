@@ -84,3 +84,20 @@ export interface InvoicePreview {
   canGenerate: boolean;
   blockers: string[];
 }
+
+export interface AuditScan {
+  id: number;
+  truckRideId: number;
+  rideNumber: number;
+  baleId: number;
+  baleReference: string;
+  articleCode: string | null;
+  productName: string | null;
+  weightKg: string;
+  priceUsed: string;
+  amount: string;
+  scannedBy: string | null;
+  scannedAt: string;
+  removedAt: string | null;
+  removalReason: string | null;
+}

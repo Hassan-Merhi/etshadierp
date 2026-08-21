@@ -41,20 +41,13 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
 import { buildZplBatch } from "@/lib/zplBuilder";
 import { LabelPrintSettings, getPaperFormat } from "@/components/LabelPrintSettings";
-import {
-  generateCombinedLabelsHtml,
-  generateA5LabelsHtml,
-  generateStickerLabelsHtml,
-  prefetchBannersForPrint,
-  type LabelData,
-  type A4DesignColor,
-  formatLabelNum,
-} from "@/lib/labelHtml";
+import { type LabelData, type A4DesignColor, formatLabelNum } from "@/lib/labelHtml";
 import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
 import * as XLSX from "@/lib/excelHelper";
 import type { CartItem, CreatedBale } from "./wipersreentry/types";
 import { isWipers, isWipersBale } from "./wipersreentry/utils";
+import { buildLabelData, printLabelsInBrowser } from "./wipersreentry/printUtils";
 import { productMatchesSearch } from "@shared/factoryProductSearch";
 export default function WipersReEntry() {
   const [, navigate] = useLocation();
@@ -228,47 +221,10 @@ export default function WipersReEntry() {
     },
   });
 
-  const buildLabelData = (bales: CreatedBale[]): LabelData[] =>
-    bales.map((b) => ({
-      referenceNumber: b.referenceNumber,
-      articleCode: b.articleCode || "",
-      pieces: 1,
-      approxWeightKg: b.weightKg || "0",
-      productName: b.productName || "",
-    }));
-
   const openBrowserPrint = (labels: LabelData[], format: "A4" | "A5" | "sticker", designColor?: A4DesignColor) => {
-    prefetchBannersForPrint();
-    if (format === "sticker") {
-      const w = window.open("", "_blank");
-      if (w) {
-        w.document.write(generateStickerLabelsHtml(labels));
-        w.document.close();
-        w.focus();
-        setTimeout(() => w.print(), 500);
-      }
-    } else if (format === "A5") {
-      const w = window.open("", "_blank");
-      if (w) {
-        w.document.write(generateA5LabelsHtml(labels));
-        w.document.close();
-        w.focus();
-        setTimeout(() => w.print(), 500);
-      }
-    } else {
-      if (!designColor) {
-        setPendingLabels(labels);
-        setDesignPickerOpen(true);
-        return;
-      }
-      const w = window.open("", "_blank");
-      if (w) {
-        w.document.write(generateCombinedLabelsHtml(labels, designColor));
-        w.document.close();
-        w.focus();
-        setTimeout(() => w.print(), 500);
-      }
-    }
+    if (printLabelsInBrowser(labels, format, designColor)) return;
+    setPendingLabels(labels);
+    setDesignPickerOpen(true);
   };
 
   const handlePrint = async (format: "A4" | "A5" | "sticker") => {
