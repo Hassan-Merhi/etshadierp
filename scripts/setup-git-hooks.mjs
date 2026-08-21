@@ -15,6 +15,12 @@ import { dirname, join } from "node:path";
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const hooksDir = "scripts/git-hooks";
 
+// CI checkouts are disposable and monitored for source writes. Hook wiring is
+// a local developer convenience, so do not mutate checkout metadata in CI.
+if (process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true") {
+  process.exit(0);
+}
+
 function git(args) {
   return execFileSync("git", args, { cwd: repoRoot, stdio: ["ignore", "pipe", "ignore"] })
     .toString()
