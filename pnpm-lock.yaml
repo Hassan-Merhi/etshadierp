@@ -198,7 +198,7 @@ importers:
         specifier: ^8.6.0
         version: 8.6.0(react@19.2.8)
       esbuild:
-        specifier: ^0.28.1
+        specifier: ^0.28.2
         version: 0.28.2
       exceljs:
         specifier: ^3.4.0
