@@ -1945,7 +1945,7 @@
         0
       ],
       "server/chatService.ts": [
-        17,
+        3,
         0,
         0
       ],
@@ -4010,6 +4010,26 @@
         0
       ],
       "client/src/pages/factory/factorystockallocationv5/useFactoryStockAllocationV5Model.tsx": [
+        2,
+        0,
+        0
+      ],
+      "server/chat/earlyMultiSourceTransfer.ts": [
+        0,
+        0,
+        0
+      ],
+      "server/chat/voucherAndStockDrafts.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/chat/lookupDrafts.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/chat/stockTransferDrafts.ts": [
         2,
         0,
         0
