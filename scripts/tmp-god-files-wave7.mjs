@@ -2,11 +2,29 @@ import fs from "node:fs";
 
 const indexPath = "server/index.ts";
 const startupModulePath = "server/startup/runServerStartupMigrations.ts";
+const processHandlersPath = "server/startup/registerProcessErrorHandlers.ts";
 const configPath = "config/god-file-boundaries.json";
 const testPath = "tests/god-file-boundaries.test.ts";
 const docs = ["docs/god-file-split-program.md", "docs/system-quality-program.md"];
 
 let source = fs.readFileSync(indexPath, "utf8");
+
+const processStartMarker = "// Global error handlers";
+const buildVersionMarker = "// Build version for cache-busting and deployment tracking.";
+const processStart = source.indexOf(processStartMarker);
+const buildVersionStart = source.indexOf(buildVersionMarker, processStart);
+if (processStart < 0 || buildVersionStart < 0) {
+  throw new Error("Wave 7 could not find the process-error-handler extraction markers");
+}
+const processBlock = source.slice(processStart, buildVersionStart);
+if (!processBlock.includes('process.on("unhandledRejection"') || !processBlock.includes('process.on("uncaughtException"')) {
+  throw new Error("Wave 7 process-error-handler block did not contain both expected handlers");
+}
+const processModuleSource = `import { logger } from "../lib/logger";\n\nexport function registerProcessErrorHandlers() {\n  const isProduction = process.env.NODE_ENV === "production";\n\n  process.on("unhandledRejection", (reason: unknown) => {\n    const detail = reason instanceof Error ? { reason: reason.message, stack: reason.stack ?? "" } : { reason, stack: "" };\n    logger.error("[UnhandledRejection]", detail);\n    if (isProduction) process.exit(1);\n  });\n\n  process.on("uncaughtException", (err: Error) => {\n    logger.error("[UncaughtException]", { message: err.message, error: err.stack });\n    if (isProduction) process.exit(1);\n  });\n}\n`;
+fs.mkdirSync("server/startup", { recursive: true });
+fs.writeFileSync(processHandlersPath, processModuleSource);
+source = source.slice(0, processStart) + "registerProcessErrorHandlers();\n\n" + source.slice(buildVersionStart);
+
 const runStartMarker = "  const runMigrations = async () => {";
 const warmupMarker = "  // Pre-warm the DB connection pool so the first user request";
 const puppeteerMarker = "  // Ensure Puppeteer's Chrome binary is present before the server starts";
@@ -29,10 +47,10 @@ warmupBlock = warmupBlock.replace("  const warmupDb = async () => {", "export as
 warmupBlock = warmupBlock.replace(/\n  };\n\n$/, "\n}\n\n");
 
 const moduleSource = `import { Client } from "pg";\n\nimport { pool } from "../db";\nimport { getErrorMessage } from "../lib/httpHandlers";\nimport { logger } from "../lib/logger";\nimport { resolveDatabaseSsl } from "../lib/databaseSsl.mjs";\nimport { markStartupMigrationsComplete, recordStartupMigrationFailures } from "../startupMigrationReport";\n\n${runBlock}${warmupBlock}`;
-fs.mkdirSync("server/startup", { recursive: true });
 fs.writeFileSync(startupModulePath, moduleSource);
 
-source = source.slice(0, runStart) +
+source =
+  source.slice(0, runStart) +
   `  const runMigrations = () =>\n    runStartupMigrations(migrations, () => {\n      migrationsDone = true;\n    });\n\n` +
   source.slice(puppeteerStart);
 source = source.replace('import { Client } from "pg";\n', "");
@@ -40,7 +58,7 @@ const startupImportAnchor = 'import { startupMigrations, ensureCanonicalStockMov
 if (!source.includes(startupImportAnchor)) throw new Error("Wave 7 missing startup import anchor");
 source = source.replace(
   startupImportAnchor,
-  `${startupImportAnchor}\nimport { runStartupMigrations, warmupDb } from "./startup/runServerStartupMigrations";`
+  `${startupImportAnchor}\nimport { registerProcessErrorHandlers } from "./startup/registerProcessErrorHandlers";\nimport { runStartupMigrations, warmupDb } from "./startup/runServerStartupMigrations";`
 );
 fs.writeFileSync(indexPath, source);
 
@@ -52,7 +70,7 @@ if (!("server/index.ts" in config.repositoryScan.grandfathered)) {
 config.version = 32;
 delete config.repositoryScan.grandfathered["server/index.ts"];
 config.description =
-  "Version 32 completes cumulative Wave 7 by extracting startup migration execution and DB warmup from server/index.ts into server/startup/runServerStartupMigrations.ts, permanently retiring server/index.ts from the grandfathered backlog while preserving startup order and behavior. " +
+  "Version 32 completes cumulative Wave 7 by extracting process-level error handlers, startup migration execution, and DB warmup from server/index.ts into focused server/startup modules, permanently retiring server/index.ts from the grandfathered backlog while preserving startup order and behavior. " +
   config.description;
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
 
@@ -74,9 +92,13 @@ for (const doc of docs) {
 const countLines = (file) => fs.readFileSync(file, "utf8").split(/\r?\n/).length;
 const indexLines = countLines(indexPath);
 const startupLines = countLines(startupModulePath);
-console.log(`WAVE7_SIZES server/index.ts=${indexLines} ${startupModulePath}=${startupLines}`);
+const processHandlerLines = countLines(processHandlersPath);
+console.log(
+  `WAVE7_SIZES server/index.ts=${indexLines} ${startupModulePath}=${startupLines} ${processHandlersPath}=${processHandlerLines}`
+);
 if (indexLines > 900) throw new Error(`server/index.ts remains oversized at ${indexLines} lines`);
 if (startupLines > 900) throw new Error(`${startupModulePath} is oversized at ${startupLines} lines`);
+if (processHandlerLines > 900) throw new Error(`${processHandlersPath} is oversized at ${processHandlerLines} lines`);
 if (config.repositoryScan.grandfathered["server/chatService.ts"] === undefined) {
   throw new Error("Wave 7 unexpectedly removed the final chatService ratchet");
 }
