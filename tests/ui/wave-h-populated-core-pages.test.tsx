@@ -224,7 +224,7 @@ describe("Wave H populated core-page behavior", () => {
     renderWithProviders(<Suppliers />, {
       seedQueries: [
         [
-          ["/api/suppliers/stats"],
+          ["/api/suppliers/stats", 1],
           [
             {
               id: 1,
