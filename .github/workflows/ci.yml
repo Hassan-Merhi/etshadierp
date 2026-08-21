@@ -228,7 +228,7 @@ jobs:
           # unformatted test files reached the parity job because this one had
           # never looked at them.
           mapfile -d '' changed_files < <(
-            git diff --name-only --diff-filter=ACMR -z "$base_sha" "$GITHUB_SHA" -- client/src server shared tests scripts |
+            git -c safe.directory="$GITHUB_WORKSPACE" diff --name-only --diff-filter=ACMR -z "$base_sha" "$GITHUB_SHA" -- client/src server shared tests scripts |
               grep -zE '\.(ts|tsx|css|mjs)$' || true
           )
 
