@@ -61,6 +61,8 @@
     "test:backend": "node node_modules/vitest/vitest.mjs run",
     "test:smoke-sweep": "node node_modules/vitest/vitest.mjs run --config vitest.config.smoke-sweep.ts",
     "test:backend:coverage": "node node_modules/vitest/vitest.mjs run --coverage",
+    "test:backend:verify": "node scripts/run-backend-verification.mjs --complete",
+    "test:backend:verify:coverage": "node scripts/run-backend-verification.mjs --coverage",
     "test:frontend": "node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts",
     "test:frontend:coverage": "node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --coverage"
   },

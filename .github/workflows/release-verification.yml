@@ -188,23 +188,17 @@ jobs:
           curl --fail --silent --show-error http://127.0.0.1:${PORT}/login > artifacts/phase9-startup/login.html
           node scripts/run-phase9-language-browser-smoke.mjs
 
-      - name: Full backend tests
+      - name: Sharded backend tests and coverage
         id: backend
         if: always() && steps.db_schema.outcome == 'success'
         continue-on-error: true
-        run: npm run test:backend
+        run: npm run test:backend:verify
 
       - name: API smoke sweep
         id: smoke
         if: always() && steps.db_schema.outcome == 'success'
         continue-on-error: true
         run: npm run test:smoke-sweep
-
-      - name: Backend coverage thresholds
-        id: backend_coverage
-        if: always() && steps.db_schema.outcome == 'success'
-        continue-on-error: true
-        run: npm run test:backend:coverage
 
       - name: Full frontend tests
         id: frontend

@@ -312,6 +312,7 @@
     "docs/faq.md": "reference",
     "docs/financial-close-and-migrations.md": "reference",
     "docs/fresh-db-bootstrap.md": "reference",
+    "docs/backend-verification.md": "reference",
     "docs/god-file-split-program.md": "reference",
     "docs/i18n/README.md": "reference",
     "docs/i18n/phases-1-4-global-language-foundation.md": "reference",
