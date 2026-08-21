@@ -24,3 +24,9 @@ if entry != [10, 0, 0] and entry != [9, 0, 0]:
 config["scan"]["baseline"]["client/src/pages/factory/WasteDispatch.tsx"] = [9, 0, 0]
 config["totals"]["typeEscapeCeiling"] = 3229
 config_path.write_text(json.dumps(config, indent=2) + "\n")
+
+# Keep the bound current-reference figure synchronized with the falling ceiling.
+doc_path = Path("docs/system-quality-program.md")
+doc = doc_path.read_text()
+doc = doc.replace("| Type escapes (AST) | 3,230 total |", "| Type escapes (AST) | 3,229 total |", 1)
+doc_path.write_text(doc)
