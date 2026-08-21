@@ -62,6 +62,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          echo "WAVE7_FORMATTED_SIZES index=$(wc -l < server/index.ts) migrations=$(wc -l < server/startup/runServerStartupMigrations.ts) handlers=$(wc -l < server/startup/registerProcessErrorHandlers.ts)"
           test "$(wc -l < server/index.ts)" -le 900
           test "$(wc -l < server/startup/runServerStartupMigrations.ts)" -le 900
           test "$(wc -l < server/startup/registerProcessErrorHandlers.ts)" -le 900
