@@ -654,11 +654,6 @@
         0,
         0
       ],
-      "client/src/pages/factory/FactoryProformas.tsx": [
-        1,
-        0,
-        0
-      ],
       "client/src/pages/factory/FactoryShippingContainers.tsx": [
         3,
         0,
@@ -4003,10 +3998,15 @@
         0,
         2,
         0
+      ],
+      "client/src/pages/factory/factoryproformas/useFactoryProformasModel.ts": [
+        1,
+        0,
+        0
       ]
     }
   },
   "totals": {
-    "typeEscapeCeiling": 3229
+    "typeEscapeCeiling": 3175
   }
 }

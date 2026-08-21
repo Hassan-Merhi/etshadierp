@@ -26,7 +26,7 @@ function positiveInteger(value: unknown): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-function firstRow(result: any): any | null {
+function firstRow(result: any): unknown | null {
   return result?.rows?.[0] ?? result?.[0] ?? null;
 }
 

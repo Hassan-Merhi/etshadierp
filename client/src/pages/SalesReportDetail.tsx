@@ -1,493 +1,89 @@
-import { useState, Fragment } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { useBackToParent } from "@/hooks/use-back-to-parent";
-import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
+import { Fragment } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  ArrowLeft,
-  TrendingUp,
-  TrendingDown,
-  LayoutList,
-  ChevronDown,
-  ChevronRight,
-  Receipt,
-  ChevronsDownUp,
-  ChevronsUpDown,
-  SlidersHorizontal,
-} from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { formatNumber } from "@/lib/formatNumber";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 
-import type { ItemGroup, PLBasis, PLFilter, SalesReportItem, VoucherGroup } from "./salesreportdetail/types";
-import { LOCATION_PALETTE, formatNumericValue, profitColor } from "./salesreportdetail/utils";
+import { formatNumericValue, profitColor } from "./salesreportdetail/utils";
+import { useSalesReportDetailModel } from "./salesreportdetail/useSalesReportDetailModel";
+import { SalesReportDetailHeader } from "./salesreportdetail/components/SalesReportDetailHeader";
+import { SalesReportSummaryCards } from "./salesreportdetail/components/SalesReportSummaryCards";
+import { SalesReportItemMobileView } from "./salesreportdetail/components/SalesReportItemMobileView";
 export default function SalesReportDetail() {
-  const [, _navigate] = useLocation();
-  const handleBack = useBackToParent();
-  const { formatAmount } = useCurrencyContext();
-  const [plFilter, setPlFilter] = useState<PLFilter>("all");
-  const [plBasis, setPlBasis] = useState<PLBasis>("config");
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [expandedLocations, setExpandedLocations] = useState<Set<string>>(new Set());
-  const [viewMode, setViewMode] = useState<"items" | "bySale">("items");
-  const [expandedVouchers, setExpandedVouchers] = useState<Set<number>>(new Set());
-
-  const ITEM_COLUMNS = [
-    { id: "qty" as const, label: "Qty" },
-    { id: "costPrice" as const, label: "Cost Price" },
-    { id: "hassanPrice" as const, label: "Hassan's Price" },
-    { id: "pricePerBale" as const, label: "Price / Bale" },
-    { id: "costProfitBale" as const, label: "Cost Profit / Bale" },
-    { id: "hassanProfitBale" as const, label: "Hassan's Profit / Bale" },
-    { id: "costProfitTotal" as const, label: "Cost Profit" },
-    { id: "hassanProfitTotal" as const, label: "Hassan's Profit" },
-  ];
-  type ItemColumnId = (typeof ITEM_COLUMNS)[number]["id"];
-  const [hiddenColumns, setHiddenColumns] = useState<Set<ItemColumnId>>(new Set());
-  const col = (id: ItemColumnId) => !hiddenColumns.has(id);
-  const toggleColumn = (id: ItemColumnId) => {
-    setHiddenColumns((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  useEscapeToParent("/sales-report");
-
-  const params = new URLSearchParams(window.location.search);
-  const startDate = params.get("startDate") || "";
-  const endDate = params.get("endDate") || "";
-  const displayDate = params.get("displayDate") || startDate;
-  const locationId = params.get("locationId") || "";
-  const stockItemId = params.get("stockItemId") || "";
-  const stockGroupId = params.get("stockGroupId") || "";
-  const searchTerm = params.get("searchTerm") || "";
-  const grouping = params.get("grouping") || "daily";
-  const allCompanies = params.get("allCompanies") === "true";
-  const companyFilter = params.get("companyFilter") || "";
-  const isCreditSaleParam = params.get("isCreditSale");
-
-  const queryParams = new URLSearchParams();
-  if (startDate) queryParams.append("startDate", startDate);
-  if (endDate) queryParams.append("endDate", endDate);
-  if (locationId && locationId !== "all") queryParams.append("locationId", locationId);
-  if (stockItemId && stockItemId !== "all") queryParams.append("stockItemId", stockItemId);
-  if (stockGroupId && stockGroupId !== "all") queryParams.append("stockGroupId", stockGroupId);
-  if (allCompanies && companyFilter) queryParams.append("companyFilter", companyFilter);
-  const queryString = queryParams.toString();
-
-  const apiBase = allCompanies ? "/api/dashboard/sales-report-all" : "/api/sales-report";
-  const apiUrl = queryString ? `${apiBase}?${queryString}` : apiBase;
-
-  const { data: items = [], isLoading } = useQuery<SalesReportItem[]>({
-    queryKey: [apiUrl],
-    enabled: !!startDate,
-  });
-
-  // Apply P/L filter, credit sale filter, and optional search term filter
-  const filteredItems = items.filter((item) => {
-    // Separate credit vs cash items based on which row was clicked
-    if (isCreditSaleParam === "true" && !item.isCreditSale) return false;
-    if (isCreditSaleParam === "false" && item.isCreditSale) return false;
-    if (searchTerm) {
-      const lower = searchTerm.toLowerCase();
-      const matches =
-        (item.stockItemName || "").toLowerCase().includes(lower) ||
-        (item.locationName || "").toLowerCase().includes(lower);
-      if (!matches) return false;
-    }
-    if (plFilter === "all") return true;
-    const value = plBasis === "cost" ? parseFloat(item.costProfit) : item.configuredProfit;
-    if (plFilter === "gain") return value > 0;
-    if (plFilter === "loss") return value < 0;
-    return true;
-  });
-
-  // Group items by stock item name
-  const itemGroupMap = new Map<number, ItemGroup>();
-  filteredItems.forEach((item) => {
-    if (!itemGroupMap.has(item.stockItemId)) {
-      itemGroupMap.set(item.stockItemId, {
-        stockItemId: item.stockItemId,
-        stockItemName: item.stockItemName,
-        stockItemCode: item.stockItemCode,
-        totalQty: 0,
-        totalSales: 0,
-        totalCost: 0,
-        totalConfiguredCost: 0,
-        costProfit: 0,
-        configuredProfit: 0,
-        locationBreakdown: [],
-      });
-    }
-    const g = itemGroupMap.get(item.stockItemId)!;
-    const qty = parseFloat(item.quantity);
-    g.totalQty += qty;
-    g.totalSales += parseFloat(item.totalSales || "0");
-    g.totalCost += parseFloat(item.totalCost || "0");
-    g.totalConfiguredCost += item.totalConfiguredCost || 0;
-    g.costProfit += parseFloat(item.costProfit || "0");
-    g.configuredProfit += item.configuredProfit || 0;
-
-    // Also track per-location breakdown within this item group
-    // In all-companies mode, use composite key so same-named locations across companies are separate
-    const locKey = allCompanies
-      ? `${item.companyId ?? "?"}-${item.locationId ?? "no-location"}`
-      : String(item.locationId ?? "no-location");
-    const locDisplayName = item.locationName || "No Location";
-    let locSummary = g.locationBreakdown.find((l) => l.locationKey === locKey);
-    if (!locSummary) {
-      locSummary = {
-        locationKey: locKey,
-        locationId: item.locationId,
-        locationName: locDisplayName,
-        totalQty: 0,
-        totalSales: 0,
-        totalCost: 0,
-        totalConfiguredCost: 0,
-        costProfit: 0,
-        configuredProfit: 0,
-        items: [],
-      };
-      g.locationBreakdown.push(locSummary);
-    }
-    locSummary.totalQty += qty;
-    locSummary.totalSales += parseFloat(item.totalSales || "0");
-    locSummary.totalCost += parseFloat(item.totalCost || "0");
-    locSummary.totalConfiguredCost += item.totalConfiguredCost || 0;
-    locSummary.costProfit += parseFloat(item.costProfit || "0");
-    locSummary.configuredProfit += item.configuredProfit || 0;
-    locSummary.items.push(item);
-  });
-
-  const itemGroups = Array.from(itemGroupMap.values()).sort((a, b) => a.stockItemName.localeCompare(b.stockItemName));
-
-  // Sort location breakdowns alphabetically
-  itemGroups.forEach((g) => {
-    g.locationBreakdown.sort((a, b) => a.locationName.localeCompare(b.locationName));
-  });
-
-  // Build a stable color map for all unique locations (all companies view or multiple locations)
-  const allLocKeys = Array.from(
-    new Set(
-      filteredItems.map((i) =>
-        allCompanies ? `${i.companyId ?? "?"}-${i.locationId ?? "no-location"}` : String(i.locationId ?? "no-location")
-      )
-    )
-  );
-  const locationColorMap = new Map<string, (typeof LOCATION_PALETTE)[0]>();
-  allLocKeys.forEach((key, idx) => {
-    locationColorMap.set(key, LOCATION_PALETTE[idx % LOCATION_PALETTE.length]);
-  });
-  // Apply colors when multiple distinct locations exist (all-companies view or item sold in many locations)
-  const multipleLocations = allLocKeys.length > 1;
-
-  const toggleItem = (key: string) => {
-    setExpandedItems((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  const toggleLocation = (key: string) => {
-    setExpandedLocations((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  // Compute unique customer name(s) for credit sale badge
-  const creditCustomerNames =
-    isCreditSaleParam === "true"
-      ? [
-          ...new Set(
-            filteredItems
-              .map((item) => item.customerName)
-              .filter((n): n is string => !!n)
-              .map((n) => n.replace(/ - Customer Account$/i, "").trim())
-          ),
-        ]
-      : [];
-  const creditCustomerLabel =
-    creditCustomerNames.length === 1
-      ? creditCustomerNames[0]
-      : creditCustomerNames.length > 1
-        ? `${creditCustomerNames.length} customers`
-        : null;
-
-  const totalQty = filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
-  const totalSales = filteredItems.reduce((sum, item) => sum + parseFloat(item.totalSales || "0"), 0);
-  const totalCost = filteredItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0);
-  const totalConfiguredCost = filteredItems.reduce((sum, item) => sum + (item.totalConfiguredCost || 0), 0);
-  const costProfit = totalSales - totalCost;
-  const configuredProfit = totalSales - totalConfiguredCost;
-
-  // By-Sale view: group items by voucher, applying plFilter at the voucher level
-  const baseFilteredItems = items.filter((item) => {
-    if (isCreditSaleParam === "true" && !item.isCreditSale) return false;
-    if (isCreditSaleParam === "false" && item.isCreditSale) return false;
-    if (searchTerm) {
-      const lower = searchTerm.toLowerCase();
-      const matches =
-        (item.stockItemName || "").toLowerCase().includes(lower) ||
-        (item.locationName || "").toLowerCase().includes(lower);
-      if (!matches) return false;
-    }
-    return true;
-  });
-
-  const voucherGroupMap = new Map<number, VoucherGroup>();
-  baseFilteredItems.forEach((item) => {
-    if (!voucherGroupMap.has(item.voucherId)) {
-      voucherGroupMap.set(item.voucherId, {
-        voucherId: item.voucherId,
-        voucherNumber: item.voucherNumber,
-        voucherDate: item.voucherDate,
-        createdAt: item.createdAt,
-        locationName: item.locationName || "No Location",
-        totalQty: 0,
-        totalSales: 0,
-        totalCost: 0,
-        totalConfiguredCost: 0,
-        costProfit: 0,
-        configuredProfit: 0,
-        items: [],
-      });
-    }
-    const g = voucherGroupMap.get(item.voucherId)!;
-    g.totalQty += parseFloat(item.quantity);
-    g.totalSales += parseFloat(item.totalSales || "0");
-    g.totalCost += parseFloat(item.totalCost || "0");
-    g.totalConfiguredCost += item.totalConfiguredCost || 0;
-    g.costProfit += parseFloat(item.costProfit || "0");
-    g.configuredProfit += item.configuredProfit || 0;
-    g.items.push(item);
-    // Use the most common location name (set from first item, good enough)
-    if (g.items.length === 1) g.locationName = item.locationName || "No Location";
-  });
-
-  const allVoucherGroups = Array.from(voucherGroupMap.values()).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-
-  const voucherGroups = allVoucherGroups.filter((vg) => {
-    if (plFilter === "all") return true;
-    const value = plBasis === "cost" ? vg.costProfit : vg.configuredProfit;
-    if (plFilter === "gain") return value > 0;
-    if (plFilter === "loss") return value < 0;
-    return true;
-  });
-
-  const toggleVoucher = (id: number) => {
-    setExpandedVouchers((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const {
+    handleBack,
+    formatAmount,
+    plFilter,
+    setPlFilter,
+    plBasis,
+    setPlBasis,
+    expandedItems,
+    setExpandedItems,
+    expandedLocations,
+    setExpandedLocations,
+    viewMode,
+    setViewMode,
+    expandedVouchers,
+    setExpandedVouchers,
+    ITEM_COLUMNS,
+    hiddenColumns,
+    setHiddenColumns,
+    col,
+    toggleColumn,
+    displayDate,
+    grouping,
+    allCompanies,
+    isCreditSaleParam,
+    searchTerm,
+    items,
+    isLoading,
+    filteredItems,
+    itemGroups,
+    locationColorMap,
+    multipleLocations,
+    toggleItem,
+    toggleLocation,
+    creditCustomerLabel,
+    totalQty,
+    totalSales,
+    totalCost,
+    totalConfiguredCost,
+    costProfit,
+    configuredProfit,
+    voucherGroups,
+    toggleVoucher,
+  } = useSalesReportDetailModel();
 
   return (
     <div className="flex flex-col gap-4 p-3 sm:p-6 w-full min-w-0">
-      <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back-to-sales-report">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-            Sales Details — {displayDate}
-            {isCreditSaleParam === "true" && (
-              <Badge
-                variant="outline"
-                className="text-sm text-amber-600 border-amber-400 dark:text-amber-400 dark:border-amber-600"
-              >
-                Credit Sales{creditCustomerLabel ? ` · ${creditCustomerLabel}` : ""}
-              </Badge>
-            )}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            All items sold {grouping === "daily" ? "on this day" : grouping === "monthly" ? "this month" : "this year"}
-            {searchTerm && <span className="ml-1 text-muted-foreground/70">· filtered by "{searchTerm}"</span>}
-          </p>
-        </div>
-        <div className="flex flex-col gap-1 items-end" data-testid="filter-pl-toggle">
-          <div className="flex items-center gap-1 rounded-md border p-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={plFilter === "all" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
-              onClick={() => setPlFilter("all")}
-              data-testid="button-filter-all"
-            >
-              <LayoutList className="h-3.5 w-3.5 mr-1" />
-              All
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={plFilter === "gain" ? "toggle-elevate toggle-elevated text-green-600" : "toggle-elevate"}
-              onClick={() => setPlFilter("gain")}
-              data-testid="button-filter-gaining"
-            >
-              <TrendingUp className="h-3.5 w-3.5 mr-1" />
-              Gaining
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={plFilter === "loss" ? "toggle-elevate toggle-elevated text-red-600" : "toggle-elevate"}
-              onClick={() => setPlFilter("loss")}
-              data-testid="button-filter-losing"
-            >
-              <TrendingDown className="h-3.5 w-3.5 mr-1" />
-              Losing
-            </Button>
-            <div className="w-px h-5 bg-border mx-0.5" />
-            <Button
-              variant="ghost"
-              size="sm"
-              className={viewMode === "bySale" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
-              onClick={() => setViewMode(viewMode === "bySale" ? "items" : "bySale")}
-              data-testid="button-view-by-sale"
-            >
-              <Receipt className="h-3.5 w-3.5 mr-1" />
-              MHD
-            </Button>
-          </div>
-          <div className="flex items-center gap-1">
-            {viewMode === "bySale" && voucherGroups.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const allExpanded = expandedVouchers.size >= voucherGroups.length;
-                  if (allExpanded) {
-                    setExpandedVouchers(new Set());
-                  } else {
-                    setExpandedVouchers(new Set(voucherGroups.map((v) => v.voucherId)));
-                  }
-                }}
-                data-testid="button-expand-collapse-all"
-              >
-                {expandedVouchers.size >= voucherGroups.length ? (
-                  <>
-                    <ChevronsDownUp className="h-3.5 w-3.5 mr-1" />
-                    Collapse All
-                  </>
-                ) : (
-                  <>
-                    <ChevronsUpDown className="h-3.5 w-3.5 mr-1" />
-                    Expand All
-                  </>
-                )}
-              </Button>
-            )}
-            {viewMode === "items" && itemGroups.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const allExpanded = expandedItems.size >= itemGroups.length;
-                  if (allExpanded) {
-                    setExpandedItems(new Set());
-                    setExpandedLocations(new Set());
-                  } else {
-                    setExpandedItems(new Set(itemGroups.map((g) => String(g.stockItemId))));
-                  }
-                }}
-                data-testid="button-expand-collapse-all-items"
-              >
-                {expandedItems.size >= itemGroups.length ? (
-                  <>
-                    <ChevronsDownUp className="h-3.5 w-3.5 mr-1" />
-                    Collapse All
-                  </>
-                ) : (
-                  <>
-                    <ChevronsUpDown className="h-3.5 w-3.5 mr-1" />
-                    Expand All
-                  </>
-                )}
-              </Button>
-            )}
-            {viewMode === "bySale" && (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" data-testid="button-toggle-columns">
-                    <SlidersHorizontal className="h-3.5 w-3.5 mr-1" />
-                    Columns
-                    {hiddenColumns.size > 0 && (
-                      <span className="ml-1 text-xs text-muted-foreground">({hiddenColumns.size} hidden)</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-56 p-2" align="end">
-                  <p className="text-xs font-medium text-muted-foreground px-2 pb-1">Show / hide columns</p>
-                  <div className="space-y-1">
-                    {ITEM_COLUMNS.map((c) => (
-                      <div
-                        key={c.id}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
-                        onClick={() => toggleColumn(c.id)}
-                        data-testid={`toggle-col-${c.id}`}
-                      >
-                        <Checkbox checked={!hiddenColumns.has(c.id)} className="h-4 w-4 pointer-events-none" />
-                        <span className="text-sm">{c.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {hiddenColumns.size > 0 && (
-                    <div className="border-t mt-1 pt-1 px-2">
-                      <button
-                        className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-                        onClick={() => setHiddenColumns(new Set())}
-                        data-testid="button-show-all-columns"
-                      >
-                        Show all
-                      </button>
-                    </div>
-                  )}
-                </PopoverContent>
-              </Popover>
-            )}
-          </div>
-          {plFilter !== "all" && (
-            <div className="flex items-center gap-1 rounded-md border p-1" data-testid="filter-basis-toggle">
-              <span className="text-xs text-muted-foreground px-1">by:</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={plBasis === "config" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
-                onClick={() => setPlBasis("config")}
-                data-testid="button-basis-config"
-              >
-                Hassan's P/L
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={plBasis === "cost" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
-                onClick={() => setPlBasis("cost")}
-                data-testid="button-basis-cost"
-              >
-                Cost P/L
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
+      <SalesReportDetailHeader
+        handleBack={handleBack}
+        displayDate={displayDate}
+        isCreditSaleParam={isCreditSaleParam}
+        creditCustomerLabel={creditCustomerLabel}
+        grouping={grouping}
+        searchTerm={searchTerm}
+        plFilter={plFilter}
+        setPlFilter={setPlFilter}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        voucherGroups={voucherGroups}
+        expandedVouchers={expandedVouchers}
+        setExpandedVouchers={setExpandedVouchers}
+        itemGroups={itemGroups}
+        expandedItems={expandedItems}
+        setExpandedItems={setExpandedItems}
+        setExpandedLocations={setExpandedLocations}
+        hiddenColumns={hiddenColumns}
+        setHiddenColumns={setHiddenColumns}
+        ITEM_COLUMNS={ITEM_COLUMNS}
+        toggleColumn={toggleColumn}
+        plBasis={plBasis}
+        setPlBasis={setPlBasis}
+      />
 
       {isLoading ? (
         <div className="space-y-3">
@@ -506,49 +102,15 @@ export default function SalesReportDetail() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-xs">Total Qty</CardDescription>
-                <CardTitle className="text-lg">{formatNumber(totalQty)}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-xs">Total Sales</CardDescription>
-                <CardTitle className="text-lg">{formatAmount(totalSales)}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-xs">Cost Total</CardDescription>
-                <CardTitle className="text-lg">{formatAmount(totalCost)}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-xs">Cost Profit</CardDescription>
-                <CardTitle className={`text-lg ${profitColor(costProfit)}`}>
-                  {formatAmount(Math.abs(costProfit))}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-xs">Hassan's Total</CardDescription>
-                <CardTitle className="text-lg">{formatAmount(totalConfiguredCost)}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-xs">Hassan's Profit</CardDescription>
-                <CardTitle className={`text-lg ${profitColor(configuredProfit)}`}>
-                  {formatAmount(Math.abs(configuredProfit))}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-          </div>
+          <SalesReportSummaryCards
+            totalQty={totalQty}
+            totalSales={totalSales}
+            totalCost={totalCost}
+            costProfit={costProfit}
+            totalConfiguredCost={totalConfiguredCost}
+            configuredProfit={configuredProfit}
+            formatAmount={formatAmount}
+          />
 
           {/* By-Sale table */}
           {viewMode === "bySale" && (
@@ -1202,175 +764,16 @@ export default function SalesReportDetail() {
                   </Table>
                 </div>
 
-                {/* Mobile view — item-grouped cards */}
-                <div className="md:hidden space-y-3 p-3">
-                  {itemGroups.map((group) => {
-                    const itemKey = String(group.stockItemId);
-                    const isExpanded = expandedItems.has(itemKey);
-                    return (
-                      <div key={itemKey}>
-                        <Card
-                          className={`cursor-pointer ${isExpanded ? "rounded-b-none border-b-0" : ""}`}
-                          onClick={() => toggleItem(itemKey)}
-                          data-testid={`card-item-${itemKey}`}
-                        >
-                          <CardContent className="p-3 space-y-2">
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                )}
-                                <span className="font-medium text-sm">{group.stockItemName}</span>
-                                {multipleLocations && group.locationBreakdown.length > 1 ? (
-                                  <div className="flex items-center gap-1">
-                                    {group.locationBreakdown.map((loc) => {
-                                      const color = locationColorMap.get(loc.locationKey);
-                                      return color ? (
-                                        <span
-                                          key={loc.locationKey}
-                                          title={loc.locationName}
-                                          className={`inline-block h-2 w-2 rounded-full ${color.dot}`}
-                                        />
-                                      ) : null;
-                                    })}
-                                    <span className="text-xs text-muted-foreground">
-                                      {group.locationBreakdown.length} locs
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <Badge variant="secondary" className="text-xs font-normal">
-                                    {group.locationBreakdown.length} loc
-                                    {group.locationBreakdown.length !== 1 ? "s" : ""}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-1 text-xs">
-                              <div>
-                                <span className="text-muted-foreground">Qty: </span>
-                                <span className="font-mono">{formatNumber(group.totalQty)}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Sales: </span>
-                                <span className="font-mono">{formatAmount(group.totalSales)}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Cost: </span>
-                                <span className="font-mono">{formatAmount(group.totalCost)}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between gap-2 pt-1 border-t text-xs">
-                              <span className={`font-mono font-semibold ${profitColor(group.costProfit)}`}>
-                                Cost P/L: {formatAmount(Math.abs(group.costProfit))}
-                              </span>
-                              <span className={`font-mono font-semibold ${profitColor(group.configuredProfit)}`}>
-                                Hassan's P/L: {formatAmount(Math.abs(group.configuredProfit))}
-                              </span>
-                            </div>
-                          </CardContent>
-                        </Card>
-
-                        {isExpanded && (
-                          <div className="border border-t-0 rounded-b-md p-2 space-y-2 bg-background">
-                            {group.locationBreakdown.map((loc) => {
-                              const locRowKey = `${itemKey}-${loc.locationKey}`;
-                              const isLocExpanded = expandedLocations.has(locRowKey);
-                              return (
-                                <div key={locRowKey}>
-                                  <Card
-                                    className={`cursor-pointer ${isLocExpanded ? "rounded-b-none border-b-0" : ""}`}
-                                    onClick={() => toggleLocation(locRowKey)}
-                                    data-testid={`card-loc-${locRowKey}`}
-                                  >
-                                    <CardContent className="p-2 space-y-1">
-                                      <div className="flex items-center gap-2">
-                                        {isLocExpanded ? (
-                                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                                        ) : (
-                                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                                        )}
-                                        {multipleLocations &&
-                                          (() => {
-                                            const color = locationColorMap.get(loc.locationKey);
-                                            return color ? (
-                                              <span
-                                                className={`inline-block h-2 w-2 rounded-full flex-shrink-0 ${color.dot}`}
-                                              />
-                                            ) : null;
-                                          })()}
-                                        <span
-                                          className={`text-sm font-medium ${multipleLocations ? (locationColorMap.get(loc.locationKey)?.text ?? "") : ""}`}
-                                        >
-                                          {loc.locationName}
-                                        </span>
-                                        {multipleLocations ? (
-                                          <span
-                                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-normal ${locationColorMap.get(loc.locationKey)?.badge ?? ""}`}
-                                          >
-                                            {loc.items.length} sale{loc.items.length !== 1 ? "s" : ""}
-                                          </span>
-                                        ) : (
-                                          <Badge variant="outline" className="text-xs font-normal">
-                                            {loc.items.length} sale{loc.items.length !== 1 ? "s" : ""}
-                                          </Badge>
-                                        )}
-                                      </div>
-                                      <div className="grid grid-cols-2 gap-1 text-xs pl-5">
-                                        <div>
-                                          <span className="text-muted-foreground">Qty: </span>
-                                          <span className="font-mono">{formatNumber(loc.totalQty)}</span>
-                                        </div>
-                                        <div>
-                                          <span className="text-muted-foreground">Sales: </span>
-                                          <span className="font-mono">{formatAmount(loc.totalSales)}</span>
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center justify-between gap-2 pt-1 border-t text-xs pl-5">
-                                        <span className={`font-mono ${profitColor(loc.costProfit)}`}>
-                                          Cost: {formatAmount(Math.abs(loc.costProfit))}
-                                        </span>
-                                        <span className={`font-mono ${profitColor(loc.configuredProfit)}`}>
-                                          Hassan's: {formatAmount(Math.abs(loc.configuredProfit))}
-                                        </span>
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-
-                                  {isLocExpanded && (
-                                    <div className="border border-t-0 rounded-b-md p-2 space-y-1 bg-muted/10">
-                                      {loc.items.map((item) => (
-                                        <div key={item.id} className="text-xs p-1 border-b last:border-b-0">
-                                          <div className="flex items-center gap-2">
-                                            <span className="font-mono text-foreground/80">{item.voucherNumber}</span>
-                                            <span className="text-muted-foreground/60">
-                                              {item.voucherDate?.slice(0, 10)}
-                                            </span>
-                                          </div>
-                                          <div className="grid grid-cols-2 gap-1 mt-1">
-                                            <div>
-                                              <span className="text-muted-foreground">Qty: </span>
-                                              <span className="font-mono">{formatNumericValue(item.quantity)}</span>
-                                            </div>
-                                            <div>
-                                              <span className="text-muted-foreground">Sales: </span>
-                                              <span className="font-mono">{formatAmount(item.totalSales)}</span>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                <SalesReportItemMobileView
+                  itemGroups={itemGroups}
+                  expandedItems={expandedItems}
+                  toggleItem={toggleItem}
+                  multipleLocations={multipleLocations}
+                  locationColorMap={locationColorMap}
+                  formatAmount={formatAmount}
+                  expandedLocations={expandedLocations}
+                  toggleLocation={toggleLocation}
+                />
               </CardContent>
             </Card>
           )}

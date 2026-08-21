@@ -96,7 +96,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
         if (!customer) throw new Error("Customer not found");
 
         // Validate proforma if supplied
-        let proforma: any = null;
+        let proforma = null;
         let proformaLines: unknown[] = [];
         if (proformaId) {
           const [pf] = await tx
@@ -186,7 +186,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
         .where(eq(customers.id, batch.customerId));
 
       // Proforma + lines
-      let proforma: any = null;
+      let proforma = null;
       let proformaLines: unknown[] = [];
       if (batch.proformaId) {
         const [pf] = await db.select().from(customerProformas).where(eq(customerProformas.id, batch.proformaId));
@@ -239,7 +239,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
       `);
 
       // Final invoice link
-      let finalInvoice: any = null;
+      let finalInvoice = null;
       if (batch.finalOrderId) {
         const [inv] = await db
           .select({

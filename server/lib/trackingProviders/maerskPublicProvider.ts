@@ -193,7 +193,7 @@ function parseResponse(containerNumber: string, data: unknown, base: CarrierTrac
   const d = data as Record<string, any>;
 
   // Maersk may wrap in various shapes
-  const entry: any = (Array.isArray(d) ? d[0] : null) ?? d.containers?.[0] ?? d.shipment ?? d.trackingData ?? d;
+  const entry = (Array.isArray(d) ? d[0] : null) ?? d.containers?.[0] ?? d.shipment ?? d.trackingData ?? d;
 
   if (!entry) return { ...base, noData: true, error: "no_entry" };
 

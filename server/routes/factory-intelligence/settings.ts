@@ -142,8 +142,8 @@ export function registerFactorySettingsRoutes(app: Express, requireAuth: any, db
           .select({ extraSettings: factorySettings.extraSettings })
           .from(factorySettings)
           .where(eq(factorySettings.companyId, companyId));
-        const currentExtra: any = current?.extraSettings ?? {};
-        const newExtra: any = { ...currentExtra };
+        const currentExtra = current?.extraSettings ?? {};
+        const newExtra = { ...currentExtra };
         for (const key of extraKeys) {
           if (req.body[key] !== undefined) newExtra[key] = req.body[key];
         }

@@ -1,0 +1,3 @@
+Trigger Phase 10 hard residual sweep on the consolidated Phase 18 continuation lane.
+Final certification trigger after Phase 10 compiler-safe exhaustion.
+Re-trigger final certification after current-main sync and final blocker fixes.

@@ -52,7 +52,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
       }
 
       const result = await db.transaction(async (tx) => {
-        let mixBatch: any = null;
+        let mixBatch = null;
         if (mixBatchId) {
           const [mb] = await tx
             .select()
@@ -63,10 +63,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           mixBatch = mb;
         }
 
-        const totalExpected = items.reduce(
-          (sum: number, item) => sum + parseInt(item.quantity || item.qty || "1"),
-          0
-        );
+        const totalExpected = items.reduce((sum: number, item) => sum + parseInt(item.quantity || item.qty || "1"), 0);
 
         const [seqRecord] = await tx
           .select()
