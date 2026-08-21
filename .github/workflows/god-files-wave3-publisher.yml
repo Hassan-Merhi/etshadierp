@@ -1,0 +1,234 @@
+name: God Files Wave 3 Publisher
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+env:
+  CI: true
+  NODE_OPTIONS: --max-old-space-size=6144
+
+jobs:
+  publish:
+    if: github.event.pull_request.base.ref == 'agent/god-files-final-wave1-tests' && github.event.pull_request.head.ref == 'tmp/god-files-wave3-trigger'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/god-files-final-wave1-tests
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - name: Install dependencies
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          npm ci --no-audit --bin-links=true
+      - name: Apply Wave 3 extractions
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const read = (p) => fs.readFileSync(p, 'utf8');
+          const write = (p, s) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, s.endsWith('\n') ? s : s + '\n'); };
+          const replaceOnce = (text, from, to, label) => {
+            if (!text.includes(from)) throw new Error(`Missing replacement target: ${label}`);
+            return text.replace(from, to);
+          };
+          const removeBetween = (text, startMarker, endMarker, replacement, label) => {
+            const start = text.indexOf(startMarker);
+            const end = text.indexOf(endMarker, start);
+            if (start < 0 || end < 0 || end <= start) throw new Error(`Missing block: ${label}`);
+            return text.slice(0, start) + replacement + text.slice(end);
+          };
+          const lines = (p) => read(p).split(/\r?\n/).length;
+
+          // 1) WasteDispatch — extract confirmation/delete/receipt dialogs and print mechanics.
+          {
+            const page = 'client/src/pages/factory/WasteDispatch.tsx';
+            const component = 'client/src/pages/factory/wastedispatch/components/WasteDispatchDialogs.tsx';
+            let src = read(page);
+            src = replaceOnce(src,
+              'import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";\n',
+              '',
+              'waste dialog imports');
+            src = src.replace('  Printer,\n', '').replace('  Package,\n', '');
+            src = replaceOnce(src,
+              'import { fmt, fmtKg, today } from "./wastedispatch/utils";',
+              'import { fmt, fmtKg, today } from "./wastedispatch/utils";\nimport { WasteDispatchDialogs } from "./wastedispatch/components/WasteDispatchDialogs";',
+              'waste component import');
+            src = src.replace('  const printRef = useRef<HTMLDivElement>(null);\n', '');
+            const printStart = '  const handlePrint = () => {';
+            const printEnd = '  return (\n';
+            src = removeBetween(src, printStart, printEnd, printEnd, 'waste print helper');
+            const dialogsStart = '      {/* ── CONFIRM DISPATCH DIALOG';
+            const pageClose = '    </div>\n  );\n}';
+            const dialogs = `      <WasteDispatchDialogs\n        confirming={confirming}\n        setConfirming={setConfirming}\n        selectedCount={selected.size}\n        totalWeight={totalWeight}\n        totalCost={totalCost}\n        dispatchDate={dispatchDate}\n        notes={notes}\n        submitPending={submitMutation.isPending}\n        onSubmit={() => submitMutation.mutate()}\n        deleteDispatchId={deleteDispatchId}\n        setDeleteDispatchId={setDeleteDispatchId}\n        deletePending={deleteDispatchMutation.isPending}\n        onDelete={(id) => deleteDispatchMutation.mutate(id)}\n        printData={printData}\n        setPrintData={setPrintData}\n      />\n`;
+            src = removeBetween(src, dialogsStart, pageClose, dialogs + pageClose, 'waste dialogs');
+            write(page, src);
+            write(component, `import { useRef } from "react";\nimport { Button } from "@/components/ui/button";\nimport { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";\nimport { Loader2, Package, Printer, Trash2 } from "lucide-react";\nimport { fmt, fmtKg } from "../utils";\n\ninterface WasteDispatchDialogsProps {\n  confirming: boolean;\n  setConfirming: (open: boolean) => void;\n  selectedCount: number;\n  totalWeight: number;\n  totalCost: number;\n  dispatchDate: string;\n  notes: string;\n  submitPending: boolean;\n  onSubmit: () => void;\n  deleteDispatchId: number | null;\n  setDeleteDispatchId: (id: number | null) => void;\n  deletePending: boolean;\n  onDelete: (id: number) => void;\n  printData: any | null;\n  setPrintData: (data: any | null) => void;\n}\n\nexport function WasteDispatchDialogs(props: WasteDispatchDialogsProps) {\n  const printRef = useRef<HTMLDivElement>(null);\n  const handlePrint = () => {\n    if (!printRef.current) return;\n    const win = window.open("", "_blank");\n    if (!win) return;\n    win.document.write(\`<html><head><title>Waste Disposal — \${props.printData?.dispatch?.dispatchNumber}</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}h1{font-size:18px;margin-bottom:4px}.sub{color:#555;font-size:11px;margin-bottom:16px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#f3f4f6;font-weight:bold}.footer{margin-top:24px;font-size:10px;color:#777}</style></head><body>\${printRef.current.innerHTML}</body></html>\`);\n    win.document.close();\n    win.focus();\n    win.print();\n    win.close();\n  };\n\n  return (\n    <>\n      <Dialog open={props.confirming} onOpenChange={props.setConfirming}>\n        <DialogContent>\n          <DialogHeader>\n            <DialogTitle className="flex items-center gap-2 text-destructive"><Trash2 className="w-5 h-5" />Confirm Waste Disposal</DialogTitle>\n          </DialogHeader>\n          <div className="space-y-3 py-2">\n            <p className="text-sm text-muted-foreground">You are about to permanently remove the following from stock as waste:</p>\n            <div className="bg-destructive/5 border border-destructive/20 rounded-md p-3 space-y-1.5">\n              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Bales</span><span className="font-medium">{props.selectedCount}</span></div>\n              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Weight</span><span className="font-medium">{fmtKg(props.totalWeight)} kg</span></div>\n              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Cost Written Off</span><span className="font-medium text-destructive">{fmt(props.totalCost)}</span></div>\n              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Date</span><span className="font-medium">{props.dispatchDate}</span></div>\n              {props.notes && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Notes</span><span className="font-medium max-w-xs text-right">{props.notes}</span></div>}\n            </div>\n            <p className="text-xs text-muted-foreground">This will remove these bales from inventory and log a waste disposal expense in the factory daybook. This action cannot be undone.</p>\n          </div>\n          <DialogFooter className="gap-2">\n            <Button variant="outline" onClick={() => props.setConfirming(false)} disabled={props.submitPending}>Cancel</Button>\n            <Button variant="destructive" onClick={props.onSubmit} disabled={props.submitPending} data-testid="button-confirm-dispatch">\n              {props.submitPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Processing...</> : <><Trash2 className="w-4 h-4 mr-2" />Confirm Disposal</>}\n            </Button>\n          </DialogFooter>\n        </DialogContent>\n      </Dialog>\n\n      <Dialog open={props.deleteDispatchId !== null} onOpenChange={(open) => { if (!open) props.setDeleteDispatchId(null); }}>\n        <DialogContent>\n          <DialogHeader><DialogTitle className="flex items-center gap-2 text-destructive"><Trash2 className="w-5 h-5" />Delete Waste Dispatch?</DialogTitle></DialogHeader>\n          <p className="text-sm text-muted-foreground">This will permanently delete the dispatch record and restore all linked bales back to stock. The daybook entry will also be removed. This cannot be undone.</p>\n          <DialogFooter className="gap-2">\n            <Button variant="outline" onClick={() => props.setDeleteDispatchId(null)} disabled={props.deletePending}>Cancel</Button>\n            <Button variant="destructive" disabled={props.deletePending} onClick={() => props.deleteDispatchId !== null && props.onDelete(props.deleteDispatchId)} data-testid="button-confirm-delete-dispatch">\n              {props.deletePending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Deleting...</> : <><Trash2 className="w-4 h-4 mr-2" />Delete &amp; Restore Stock</>}\n            </Button>\n          </DialogFooter>\n        </DialogContent>\n      </Dialog>\n\n      {props.printData && (\n        <Dialog open={!!props.printData} onOpenChange={() => props.setPrintData(null)}>\n          <DialogContent className="max-w-2xl">\n            <DialogHeader><DialogTitle className="flex items-center gap-2"><Package className="w-5 h-5 text-green-600" />Disposal Complete — {props.printData.dispatch.dispatchNumber}</DialogTitle></DialogHeader>\n            <div ref={printRef} className="space-y-3">\n              <div><h1 style={{ fontSize: 18, fontWeight: "bold", marginBottom: 4 }}>Waste Disposal Record</h1><p style={{ color: "#555", fontSize: 11, marginBottom: 16 }}>Dispatch No: {props.printData.dispatch.dispatchNumber}&nbsp;|&nbsp;Date: {props.printData.dispatch.dispatchDate}{props.printData.dispatch.notes && <>&nbsp;|&nbsp;Note: {props.printData.dispatch.notes}</>}</p></div>\n              <table style={{ width: "100%", borderCollapse: "collapse" }}>\n                <thead><tr>{["Reference", "Weight (kg)", "Cost Written Off"].map((h, i) => <th key={h} style={{ border: "1px solid #ccc", padding: "6px 8px", background: "#f3f4f6", textAlign: i === 0 ? "left" : "right", fontWeight: "bold" }}>{h}</th>)}</tr></thead>\n                <tbody>{props.printData.bales.map((b: any) => <tr key={b.id}><td style={{ border: "1px solid #ccc", padding: "5px 8px", fontFamily: "monospace" }}>{b.referenceNumber}</td><td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "right" }}>{fmtKg(b.weightKg)}</td><td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "right" }}>{fmt(b.totalCost)}</td></tr>)}</tbody>\n                <tfoot><tr><td style={{ border: "1px solid #ccc", padding: "6px 8px", fontWeight: "bold" }}>TOTAL — {props.printData.totalBales} bale(s)</td><td style={{ border: "1px solid #ccc", padding: "6px 8px", textAlign: "right", fontWeight: "bold" }}>{fmtKg(props.printData.totalWeightKg)}</td><td style={{ border: "1px solid #ccc", padding: "6px 8px", textAlign: "right", fontWeight: "bold", color: "#dc2626" }}>{fmt(props.printData.totalCostWrittenOff)}</td></tr></tfoot>\n              </table>\n              <p style={{ marginTop: 24, fontSize: 10, color: "#777" }}>This document confirms the waste disposal of factory bales. A daybook expense entry has been created automatically.</p>\n            </div>\n            <DialogFooter className="gap-2"><Button variant="outline" onClick={() => props.setPrintData(null)}>Close</Button><Button onClick={handlePrint} className="gap-2"><Printer className="w-4 h-4" />Print</Button></DialogFooter>\n          </DialogContent>\n        </Dialog>\n      )}\n    </>\n  );\n}\n`);
+          }
+
+          // 2) SalesReportLegacy — extract date keyboard handling and Excel export implementation.
+          {
+            const page = 'client/src/pages/SalesReportLegacy.tsx';
+            const hook = 'client/src/pages/salesreportlegacy/useSalesReportDateKeyboard.ts';
+            const exporter = 'client/src/pages/salesreportlegacy/exportExcel.ts';
+            let src = read(page);
+            src = src.replace('import { writeFile, ExcelJS } from "@/lib/excelHelper";\n', '');
+            src = src.replace('import { format, parseISO, startOfDay, startOfMonth, startOfYear, addDays } from "date-fns";', 'import { format, parseISO, startOfDay, startOfMonth, startOfYear } from "date-fns";');
+            src = replaceOnce(src,
+              'import type { DailySummary, GroupingType, ProfitFilter, SalesReportItem } from "./salesreportlegacy/types";',
+              'import type { DailySummary, GroupingType, ProfitFilter, SalesReportItem } from "./salesreportlegacy/types";\nimport { useSalesReportDateKeyboard } from "./salesreportlegacy/useSalesReportDateKeyboard";\nimport { exportSalesReportExcel } from "./salesreportlegacy/exportExcel";',
+              'sales helper imports');
+            const keyboardStart = '  // Keyboard date navigation: "-" = back 1 day, "+" or "=" = forward 1 day\n  useEffect(() => {';
+            const keyboardEnd = '  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);';
+            src = removeBetween(src, keyboardStart, keyboardEnd, '  useSalesReportDateKeyboard(setPeriodFilter);\n\n' + keyboardEnd, 'sales date keyboard');
+            const exportStart = '  const handleExportExcel = async () => {';
+            const exportEnd = '  const handleExportPDF = () => {';
+            src = removeBetween(src, exportStart, exportEnd, '  const handleExportExcel = () => exportSalesReportExcel(salesData);\n\n' + exportEnd, 'sales excel export');
+            write(page, src);
+            write(hook, `import type { Dispatch, SetStateAction } from "react";\nimport { useEffect } from "react";\nimport { addDays, format } from "date-fns";\nimport { hasAnyOpenDialog } from "@/hooks/use-escape-back";\nimport type { PeriodFilterValue } from "@/components/ui/period-filter";\n\nexport function useSalesReportDateKeyboard(setPeriodFilter: Dispatch<SetStateAction<PeriodFilterValue>>) {\n  useEffect(() => {\n    const handleKeyDown = (e: KeyboardEvent) => {\n      const target = e.target as HTMLElement;\n      const tag = target?.tagName?.toLowerCase();\n      if (tag === "textarea") return;\n      if (tag === "input") {\n        const inputType = (target as HTMLInputElement).type || "text";\n        if (["text", "number", "email", "password", "search", "tel", "url"].includes(inputType)) return;\n      }\n      if (tag === "select" || hasAnyOpenDialog()) return;\n      const isBack = e.key === "-" || e.code === "Minus";\n      const isForward = (e.key === "+" && e.shiftKey) || (e.code === "Equal" && e.shiftKey) || e.key === "=";\n      if (!isBack && !isForward) return;\n      e.preventDefault();\n      const delta = isBack ? -1 : 1;\n      setPeriodFilter((prev) => ({\n        fromDate: format(addDays(new Date(prev.fromDate), delta), "yyyy-MM-dd"),\n        toDate: format(addDays(new Date(prev.toDate), delta), "yyyy-MM-dd"),\n        preset: "custom",\n      }));\n    };\n    window.addEventListener("keydown", handleKeyDown, true);\n    return () => window.removeEventListener("keydown", handleKeyDown, true);\n  }, [setPeriodFilter]);\n}\n`);
+            write(exporter, `import { ExcelJS, writeFile } from "@/lib/excelHelper";\nimport { format } from "date-fns";\nimport type { SalesReportItem } from "./types";\n\nexport async function exportSalesReportExcel(salesData: SalesReportItem[]) {\n  const workbook = new ExcelJS.Workbook();\n  const worksheet = workbook.addWorksheet("Detailed Sales Report");\n  const currencyCols = [5, 6, 7, 8, 9, 10, 11, 13];\n  const percentCols = [12, 14];\n  const profitCols = [8, 11, 12, 13, 14];\n  worksheet.columns = [\n    { header: "Location", key: "location", width: 15 }, { header: "Item Code", key: "itemCode", width: 15 },\n    { header: "Item Name", key: "itemName", width: 30 }, { header: "Quantity", key: "quantity", width: 10 },\n    { header: "Sold Price", key: "soldPrice", width: 12 }, { header: "Cost Price", key: "costPrice", width: 12 },\n    { header: "Hassan's Price", key: "hassansPrice", width: 14 }, { header: "Unit Profit", key: "unitProfit", width: 12 },\n    { header: "Total Sales", key: "totalSales", width: 12 }, { header: "Total Cost", key: "totalCost", width: 12 },\n    { header: "Cost Profit", key: "costProfit", width: 12 }, { header: "Cost %", key: "costPercent", width: 10 },\n    { header: "Hassan's Profit", key: "hassansProfit", width: 14 }, { header: "Hassan's %", key: "hassansPercent", width: 12 },\n  ];\n  const headerRow = worksheet.getRow(1);\n  headerRow.font = { bold: true };\n  headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F5F5" } };\n  headerRow.eachCell((cell) => { cell.border = { top: { style: "medium", color: { argb: "FF999999" } }, bottom: { style: "medium", color: { argb: "FF999999" } }, left: { style: "medium", color: { argb: "FF999999" } }, right: { style: "medium", color: { argb: "FF999999" } } }; });\n  salesData.forEach((item) => {\n    const unitProfit = parseFloat(item.actualSellingPrice) - parseFloat(item.costPrice);\n    const row = worksheet.addRow({ location: item.locationName || "N/A", itemCode: item.stockItemCode || "", itemName: item.stockItemName, quantity: parseFloat(item.quantity), soldPrice: parseFloat(item.actualSellingPrice), costPrice: parseFloat(item.costPrice), hassansPrice: parseFloat(item.configuredSellingPrice), unitProfit, totalSales: parseFloat(item.totalSales), totalCost: parseFloat(item.totalCost), costProfit: parseFloat(item.costProfit), costPercent: item.costProfitPercentage, hassansProfit: item.configuredProfit, hassansPercent: item.configuredProfitPercentage });\n    row.eachCell((cell, colNumber) => {\n      cell.border = { top: { style: "medium", color: { argb: "FF999999" } }, bottom: { style: "medium", color: { argb: "FF999999" } }, left: { style: "medium", color: { argb: "FF999999" } }, right: { style: "medium", color: { argb: "FF999999" } } };\n      if (currencyCols.includes(colNumber)) cell.numFmt = '\"$\"#,##0.00';\n      if (percentCols.includes(colNumber)) cell.numFmt = '0.0\"%\"';\n      const val = typeof cell.value === "number" ? cell.value : parseFloat(String(cell.value || 0));\n      if (profitCols.includes(colNumber) && !isNaN(val)) {\n        if (val < 0) cell.font = { color: { argb: "FFE57373" } };\n        else if (val > 0) cell.font = { color: { argb: "FF4CAF50" } };\n      }\n    });\n  });\n  await writeFile(workbook, \`detailed-sales-report-\${format(new Date(), "yyyy-MM-dd")}.xlsx\`);\n}\n`);
+          }
+
+          // 3) FactoryOtwTrackingTab — extract CSV import/export state and mechanics into a hook.
+          {
+            const page = 'client/src/pages/factory/FactoryOtwTrackingTab.tsx';
+            const hook = 'client/src/pages/factory/factoryotwtrackingtab/hooks/useOtwCsvTools.ts';
+            let src = read(page);
+            src = replaceOnce(src,
+              'import { TrackNowProgressLog } from "./factoryotwtrackingtab/components/TrackNowProgressLog";',
+              'import { TrackNowProgressLog } from "./factoryotwtrackingtab/components/TrackNowProgressLog";\nimport { useOtwCsvTools } from "./factoryotwtrackingtab/hooks/useOtwCsvTools";',
+              'otw csv hook import');
+            const blockStart = '  const [importing, setImporting] = useState(false);\n  // ── Dev-only: Export filtered containers as CSV';
+            const blockEnd = '  async function trackAll() {';
+            src = removeBetween(src, blockStart, blockEnd, '  const { importing, exportCsv, handleImportFile } = useOtwCsvTools(filtered, otwContainers);\n\n' + blockEnd, 'otw csv tools');
+            write(page, src);
+            write(hook, `import { useState } from "react";\nimport { useQueryClient } from "@tanstack/react-query";\nimport { getErrorDetails } from "@shared/errorUtils";\nimport { useToast } from "@/hooks/use-toast";\nimport { factoryApiRequest } from "@/lib/factoryApi";\nimport type { ContainerWithSupplier } from "../types";\nimport { containerCost, num } from "../utils";\n\nexport function useOtwCsvTools(filtered: ContainerWithSupplier[], otwContainers: ContainerWithSupplier[]) {\n  const { toast } = useToast();\n  const queryClient = useQueryClient();\n  const [importing, setImporting] = useState(false);\n\n  function exportCsv() {\n    const rows = [["Container #", "Supplier", "ETA (YYYY-MM-DD)", "Status", "Cost", "Freight", "Weight (KG)", "Notes"]];\n    for (const c of filtered) rows.push([c.containerNumber || "", c.supplierName || "", c.arrivalDate ? c.arrivalDate.slice(0, 10) : "", c.status || "", containerCost(c).amount > 0 ? String(containerCost(c).amount) : "", num(c.freight) > 0 ? String(num(c.freight)) : "", c.totalKg ? String(c.totalKg) : "", c.otwNote || ""]);\n    const csv = rows.map((r) => r.map((cell) => \`"\${String(cell).replace(/"/g, '""')}"\`).join(",")).join("\\n");\n    const blob = new Blob([csv], { type: "text/csv" });\n    const url = URL.createObjectURL(blob);\n    const a = document.createElement("a");\n    a.href = url; a.download = \`containers-otw-\${new Date().toISOString().slice(0, 10)}.csv\`; a.click(); URL.revokeObjectURL(url);\n  }\n\n  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {\n    const file = e.target.files?.[0]; e.target.value = ""; if (!file) return; setImporting(true);\n    try {\n      const text = await file.text();\n      const csvLines = text.split(/\\r?\\n/).filter((line) => line.trim());\n      const parseCsvLine = (line: string) => { const out: string[] = []; let cur = ""; let inQ = false; for (let i = 0; i < line.length; i++) { const ch = line[i]; if (inQ) { if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') inQ = false; else cur += ch; } else if (ch === '"') inQ = true; else if (ch === ",") { out.push(cur.trim()); cur = ""; } else cur += ch; } out.push(cur.trim()); return out; };\n      const normaliseDate = (raw: string): string | null => { const s = raw.trim(); if (!s) return null; if (/^\\d{4}-\\d{2}-\\d{2}$/.test(s)) return s; const mdY = s.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{2,4})$/); if (mdY) { const [, m, d, yRaw] = mdY; const year = yRaw.length === 2 ? \`20\${yRaw}\` : yRaw; return \`\${year}-\${m.padStart(2, "0")}-\${d.padStart(2, "0")}\`; } const dMonY = s.match(/^(\\d{1,2})-([A-Za-z]{3})-(\\d{2,4})$/); if (dMonY) { const months: Record<string, string> = { jan:"01", feb:"02", mar:"03", apr:"04", may:"05", jun:"06", jul:"07", aug:"08", sep:"09", oct:"10", nov:"11", dec:"12" }; const [, d, mon, yRaw] = dMonY; const mm = months[mon.toLowerCase()]; if (mm) return \`\${yRaw.length === 2 ? `20${yRaw}` : yRaw}-\${mm}-\${d.padStart(2, "0")}\`; } return null; };\n      const headerCols = parseCsvLine(csvLines[0] || "").map((h) => h.toLowerCase());\n      const containerCol = headerCols.findIndex((h) => h.includes("container")); const etaCol = headerCols.findIndex((h) => h.includes("eta")); const cIdx = containerCol >= 0 ? containerCol : 0; const eIdx = etaCol >= 0 ? etaCol : 2;\n      const lookup = new Map<string, number>(otwContainers.map((c) => [c.containerNumber?.trim().toUpperCase() ?? "", c.id]));\n      let updated = 0, skipped = 0;\n      for (const line of csvLines.slice(1)) { const cols = parseCsvLine(line); const containerNum = (cols[cIdx] ?? "").toUpperCase().trim(); const etaVal = normaliseDate((cols[eIdx] ?? "").trim()); const id = lookup.get(containerNum); if (!containerNum || !etaVal || !id) { skipped++; continue; } try { await factoryApiRequest("PATCH", \`/api/factory/containers/\${id}\`, { arrivalDate: etaVal }); updated++; } catch { skipped++; } }\n      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });\n      toast({ title: "Import complete", description: \`\${updated} ETA(s) updated, \${skipped} skipped.\` });\n    } catch (err) { toast({ title: "Import failed", description: getErrorDetails(err).optionalMessage, variant: "destructive" }); } finally { setImporting(false); }\n  }\n\n  return { importing, exportCsv, handleImportFile };\n}\n`);
+          }
+
+          // 4) PendingInvoiceVerify — extract approval/return/finalize/fix dialogs.
+          {
+            const page = 'client/src/pages/PendingInvoiceVerify.tsx';
+            const component = 'client/src/pages/pendinginvoiceverify/PendingInvoiceDialogs.tsx';
+            let src = read(page);
+            src = src.replace('import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";\n', '');
+            src = src.replace('import {\n  AlertDialog,\n  AlertDialogAction,\n  AlertDialogCancel,\n  AlertDialogContent,\n  AlertDialogDescription,\n  AlertDialogFooter,\n  AlertDialogHeader,\n  AlertDialogTitle,\n} from "@/components/ui/alert-dialog";\n', '');
+            src = replaceOnce(src,
+              'import type { ComparisonItem, FinalizePreview, OrderDetail, VerificationSummary } from "./pendinginvoiceverify/types";',
+              'import type { ComparisonItem, FinalizePreview, OrderDetail, VerificationSummary } from "./pendinginvoiceverify/types";\nimport { PendingInvoiceDialogs } from "./pendinginvoiceverify/PendingInvoiceDialogs";',
+              'pending dialog import');
+            const dialogsStart = '      <Dialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>';
+            const pageClose = '    </div>\n  );\n}';
+            const usage = `      <PendingInvoiceDialogs\n        showApproveDialog={showApproveDialog}\n        setShowApproveDialog={setShowApproveDialog}\n        approveNotes={approveNotes}\n        setApproveNotes={setApproveNotes}\n        verifyPending={verifyMutation.isPending}\n        onVerify={(notes) => verifyMutation.mutate({ approved: true, notes: notes || undefined })}\n        showReturnDialog={showReturnDialog}\n        setShowReturnDialog={setShowReturnDialog}\n        returnPending={returnToLoadingMutation.isPending}\n        onReturn={() => returnToLoadingMutation.mutate()}\n        showFinalizePreview={showFinalizePreview}\n        setShowFinalizePreview={setShowFinalizePreview}\n        finalizePreview={finalizePreview}\n        finalizePending={finalizeMutation.isPending}\n        onFinalize={() => finalizeMutation.mutate()}\n        showFixBalesDialog={showFixBalesDialog}\n        setShowFixBalesDialog={setShowFixBalesDialog}\n        onFixBales={() => forceSyncMutation.mutate()}\n      />\n`;
+            src = removeBetween(src, dialogsStart, pageClose, usage + pageClose, 'pending invoice dialogs');
+            write(page, src);
+            write(component, `import { Button } from "@/components/ui/button";\nimport { Textarea } from "@/components/ui/textarea";\nimport { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";\nimport { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";\nimport { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";\nimport { Check, CheckCircle, RotateCcw, Wrench } from "lucide-react";\nimport type { FinalizePreview } from "./types";\n\ninterface PendingInvoiceDialogsProps {\n  showApproveDialog: boolean; setShowApproveDialog: (open: boolean) => void; approveNotes: string; setApproveNotes: (value: string) => void; verifyPending: boolean; onVerify: (notes: string) => void;\n  showReturnDialog: boolean; setShowReturnDialog: (open: boolean) => void; returnPending: boolean; onReturn: () => void;\n  showFinalizePreview: boolean; setShowFinalizePreview: (open: boolean) => void; finalizePreview: FinalizePreview | null; finalizePending: boolean; onFinalize: () => void;\n  showFixBalesDialog: boolean; setShowFixBalesDialog: (open: boolean) => void; onFixBales: () => void;\n}\n\nexport function PendingInvoiceDialogs(props: PendingInvoiceDialogsProps) {\n  return <>\n    <Dialog open={props.showApproveDialog} onOpenChange={props.setShowApproveDialog}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Approve & Verify Order</DialogTitle></DialogHeader><div className="space-y-4"><p className="text-sm text-muted-foreground">This will mark the order as VERIFIED. You can add optional notes below.</p><Textarea value={props.approveNotes} onChange={(e) => props.setApproveNotes(e.target.value)} placeholder="Optional notes..." data-testid="input-approve-notes"/><div className="flex items-center justify-end gap-2"><Button variant="outline" onClick={() => props.setShowApproveDialog(false)} data-testid="button-cancel-approve">Cancel</Button><Button onClick={() => { props.onVerify(props.approveNotes); props.setShowApproveDialog(false); }} disabled={props.verifyPending} data-testid="button-confirm-approve"><Check className="mr-2 h-4 w-4" />Confirm</Button></div></div></DialogContent></Dialog>\n    <Dialog open={props.showReturnDialog} onOpenChange={props.setShowReturnDialog}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Return to Loading</DialogTitle></DialogHeader><div className="space-y-4"><p className="text-sm text-muted-foreground">This will return the order back to the loading stage. Are you sure?</p><div className="flex items-center justify-end gap-2"><Button variant="outline" onClick={() => props.setShowReturnDialog(false)} data-testid="button-cancel-return">Cancel</Button><Button variant="destructive" onClick={() => { props.onReturn(); props.setShowReturnDialog(false); }} disabled={props.returnPending} data-testid="button-confirm-return"><RotateCcw className="mr-2 h-4 w-4" />Confirm Return</Button></div></div></DialogContent></Dialog>\n    <Dialog open={props.showFinalizePreview} onOpenChange={props.setShowFinalizePreview}><DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto"><DialogHeader><DialogTitle>Finalize Invoice Preview</DialogTitle></DialogHeader>{props.finalizePreview && <div className="space-y-4"><div className="flex flex-wrap items-center gap-4"><div className="text-sm"><span className="text-muted-foreground">Bales in order:</span> <span className="font-semibold" data-testid="text-preview-total">{props.finalizePreview.totalBalesInOrder}</span></div><div className="text-sm"><span className="text-muted-foreground">Will be removed from stock:</span> <span className="font-semibold" data-testid="text-preview-removable">{props.finalizePreview.baleCount}</span></div></div>{props.finalizePreview.baleCount > 0 ? <div className="border rounded-md overflow-hidden"><Table><TableHeader className="sticky top-0 z-30 bg-background"><TableRow><TableHead>Reference</TableHead><TableHead>Product</TableHead><TableHead className="text-right">Weight (kg)</TableHead><TableHead>Location</TableHead></TableRow></TableHeader><TableBody>{props.finalizePreview.bales.slice(0,50).map((b) => <TableRow key={b.id} data-testid={\`row-preview-bale-\${b.id}\`}><TableCell className="font-mono text-sm">{b.baleReference}</TableCell><TableCell className="text-sm">{b.productName}</TableCell><TableCell className="text-right font-mono text-sm">{b.weightKg.toFixed(2)}</TableCell><TableCell className="text-sm">{b.locationName}</TableCell></TableRow>)}{props.finalizePreview.bales.length > 50 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground text-sm">...and {props.finalizePreview.bales.length - 50} more bales</TableCell></TableRow>}</TableBody></Table></div> : <p className="text-sm text-muted-foreground" data-testid="text-preview-none">No bales are currently in stock for this order. They may have already been marked as SOLD.</p>}<div className="flex items-center justify-end gap-2"><Button variant="outline" onClick={() => props.setShowFinalizePreview(false)} data-testid="button-cancel-finalize">Cancel</Button><Button onClick={() => { props.setShowFinalizePreview(false); props.onFinalize(); }} disabled={props.finalizePending} data-testid="button-confirm-finalize"><CheckCircle className="mr-2 h-4 w-4" />Confirm & Finalize</Button></div></div>}</DialogContent></Dialog>\n    <AlertDialog open={props.showFixBalesDialog} onOpenChange={props.setShowFixBalesDialog}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Fix Bale Statuses</AlertDialogTitle><AlertDialogDescription>This will mark all bales attached to this order as SOLD, removing them from inventory. Use this only if bales were accidentally returned to stock after a previous finalization. This does not create invoices or customer balance entries.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel data-testid="button-cancel-fix-bales">Cancel</AlertDialogCancel><AlertDialogAction onClick={props.onFixBales} data-testid="button-confirm-fix-bales"><Wrench className="mr-2 h-4 w-4" />Fix Bale Statuses</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>\n  </>;\n}\n`);
+          }
+
+          // Ratchet and docs: derive exact post-transform backlog from the real tree.
+          const configPath = 'config/god-file-boundaries.json';
+          const config = JSON.parse(read(configPath));
+          const retired = [
+            'client/src/pages/factory/WasteDispatch.tsx',
+            'client/src/pages/SalesReportLegacy.tsx',
+            'client/src/pages/factory/FactoryOtwTrackingTab.tsx',
+            'client/src/pages/PendingInvoiceVerify.tsx',
+          ];
+          config.version = 28;
+          config.description = 'Version 28 completes cumulative God Files Wave 3 by retiring four small frontend pages through dialog, export, keyboard and CSV-tool extractions. ' + config.description;
+          for (const file of retired) delete config.repositoryScan.grandfathered[file];
+          write(configPath, JSON.stringify(config, null, 2));
+          const softMax = config.repositoryScan.softMaxLines;
+          for (const file of retired) {
+            const count = lines(file);
+            console.log(`RETIRED ${file}: ${count}`);
+            if (count > softMax) throw new Error(`${file} still exceeds ${softMax} lines (${count})`);
+          }
+          const remaining = Object.keys(config.repositoryScan.grandfathered);
+          let excess = 0;
+          for (const file of remaining) {
+            const count = lines(file);
+            if (count <= softMax) throw new Error(`${file} is stale grandfathering at ${count} lines`);
+            excess += count - softMax;
+          }
+          const backlogFiles = remaining.length;
+          console.log(`WAVE3_BACKLOG files=${backlogFiles} excess=${excess}`);
+          if (backlogFiles !== 12) throw new Error(`Expected 12 remaining God Files, got ${backlogFiles}`);
+          let boundaryTest = read('tests/god-file-boundaries.test.ts');
+          boundaryTest = boundaryTest.replace('expect(report.version).toBe(27);', 'expect(report.version).toBe(28);');
+          boundaryTest = boundaryTest.replace(/expect\(report\.summary\.grandfatheredFiles\)\.toBeLessThanOrEqual\(\d+\);/, `expect(report.summary.grandfatheredFiles).toBeLessThanOrEqual(${backlogFiles});`);
+          boundaryTest = boundaryTest.replace(/expect\(report\.summary\.grandfatheredExcessLines\)\.toBeLessThanOrEqual\(\d+\);/, `expect(report.summary.grandfatheredExcessLines).toBeLessThanOrEqual(${excess});`);
+          write('tests/god-file-boundaries.test.ts', boundaryTest);
+          let godDoc = read('docs/god-file-split-program.md');
+          godDoc = godDoc.replace(/\*\*Backlog: [\d,]+ files, [\d,]+ lines over the limit\*\*/, `**Backlog: ${backlogFiles.toLocaleString('en-US')} files, ${excess.toLocaleString('en-US')} lines over the limit**`);
+          write('docs/god-file-split-program.md', godDoc);
+          let qualityDoc = read('docs/system-quality-program.md');
+          qualityDoc = qualityDoc.replace(/God-file backlog \| [\d,]+ files, [\d,]+ excess lines/, `God-file backlog | ${backlogFiles.toLocaleString('en-US')} files, ${excess.toLocaleString('en-US')} excess lines`);
+          write('docs/system-quality-program.md', qualityDoc);
+          NODE
+      - name: Format and certify Wave 3
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/pages/factory/WasteDispatch.tsx \
+            client/src/pages/factory/wastedispatch/components/WasteDispatchDialogs.tsx \
+            client/src/pages/SalesReportLegacy.tsx \
+            client/src/pages/salesreportlegacy/useSalesReportDateKeyboard.ts \
+            client/src/pages/salesreportlegacy/exportExcel.ts \
+            client/src/pages/factory/FactoryOtwTrackingTab.tsx \
+            client/src/pages/factory/factoryotwtrackingtab/hooks/useOtwCsvTools.ts \
+            client/src/pages/PendingInvoiceVerify.tsx \
+            client/src/pages/pendinginvoiceverify/PendingInvoiceDialogs.tsx \
+            config/god-file-boundaries.json tests/god-file-boundaries.test.ts \
+            docs/god-file-split-program.md docs/system-quality-program.md
+          for file in \
+            client/src/pages/factory/WasteDispatch.tsx \
+            client/src/pages/SalesReportLegacy.tsx \
+            client/src/pages/factory/FactoryOtwTrackingTab.tsx \
+            client/src/pages/PendingInvoiceVerify.tsx; do
+            count=$(wc -l < "$file")
+            echo "$file: $count lines"
+            test "$count" -le 900
+          done
+          npm run audit:god-files
+          npm run audit:doc-index
+          npm run audit:source-text-assertions
+          npm run check
+          node node_modules/prettier/bin/prettier.cjs --check \
+            client/src/pages/factory/WasteDispatch.tsx \
+            client/src/pages/factory/wastedispatch/components/WasteDispatchDialogs.tsx \
+            client/src/pages/SalesReportLegacy.tsx \
+            client/src/pages/salesreportlegacy/useSalesReportDateKeyboard.ts \
+            client/src/pages/salesreportlegacy/exportExcel.ts \
+            client/src/pages/factory/FactoryOtwTrackingTab.tsx \
+            client/src/pages/factory/factoryotwtrackingtab/hooks/useOtwCsvTools.ts \
+            client/src/pages/PendingInvoiceVerify.tsx \
+            client/src/pages/pendinginvoiceverify/PendingInvoiceDialogs.tsx
+      - name: Publish cumulative Wave 3 branch and self-remove
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/god-files-wave3-publisher.yml
+          git add -- \
+            client/src/pages/factory/WasteDispatch.tsx \
+            client/src/pages/factory/wastedispatch/components/WasteDispatchDialogs.tsx \
+            client/src/pages/SalesReportLegacy.tsx \
+            client/src/pages/salesreportlegacy/useSalesReportDateKeyboard.ts \
+            client/src/pages/salesreportlegacy/exportExcel.ts \
+            client/src/pages/factory/FactoryOtwTrackingTab.tsx \
+            client/src/pages/factory/factoryotwtrackingtab/hooks/useOtwCsvTools.ts \
+            client/src/pages/PendingInvoiceVerify.tsx \
+            client/src/pages/pendinginvoiceverify/PendingInvoiceDialogs.tsx \
+            config/god-file-boundaries.json tests/god-file-boundaries.test.ts \
+            docs/god-file-split-program.md docs/system-quality-program.md \
+            .github/workflows/god-files-wave3-publisher.yml
+          git commit -m "refactor(god-files): complete cumulative wave 3"
+          git push origin HEAD:agent/god-files-final-wave1-tests
+          git push origin --delete tmp/god-files-wave3-trigger || true
