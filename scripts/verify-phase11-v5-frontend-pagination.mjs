@@ -32,7 +32,11 @@ assert.match(client, /v5-allocation-page-size/, "page-size control is required")
 assert.match(client, /garbage\/wiper toggle is page-scoped/, "page-scoped garbage filtering must be disclosed");
 assert.match(client, /handleRouteState/, "route changes must reset transient bridge modes");
 
-assert.match(plugin, /V5_ALLOCATION_SUFFIX/, "Vite plugin must target the V5 allocation screen");
+assert.match(
+  plugin,
+  /V5_ALLOCATION_MODEL_SUFFIX|V5_ALLOCATION_COMPONENT_SEGMENT/,
+  "Vite plugin must target the split V5 allocation screen"
+);
 assert.match(plugin, /fetchAllV5AllocationData/, "V5 transform must import the complete-data loader");
 assert.match(plugin, /openCreateDrawerWithAllRows/, "create drawer must wait for complete rows");
 assert.match(plugin, /openEditDrawerWithAllRows/, "edit drawer must wait for complete rows");
@@ -51,10 +55,15 @@ const exactSourceMarkers = [
   'onClose={() => setCreateDrawerOpen(false)}',
   'onClose={() => setEditDrawerProformaId(null)}',
 ];
+const sourceWithModel = `${source}\n${await read("client/src/pages/factory/factorystockallocationv5/useFactoryStockAllocationV5Model.tsx")}`;
 for (const marker of exactSourceMarkers) {
-  const first = source.indexOf(marker);
+  const first = sourceWithModel.indexOf(marker);
   assert.ok(first >= 0, `Missing exact V5 source marker: ${marker}`);
-  assert.equal(source.indexOf(marker, first + marker.length), -1, `Ambiguous V5 source marker: ${marker}`);
+  assert.equal(
+    sourceWithModel.indexOf(marker, first + marker.length),
+    -1,
+    `Ambiguous V5 source marker: ${marker}`
+  );
 }
 
 console.log(

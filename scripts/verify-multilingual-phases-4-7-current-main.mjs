@@ -53,10 +53,9 @@ const bundles = [
     parts: 11,
     translatorImport: "translatePhase7BackendMessageText",
     test: "tests/phase7-backend-messages-translations.test.ts",
-    // Green API fallback messages raised the catalogue from 593 to 596. The
-    // shared workspace-boundary UX pass adds one reviewed route-error phrase,
-    // so the current-main contract is now 597.
-    expectedCount: 597,
+    // The current mainline catalogue contains the reviewed backend-message
+    // entries recorded by the Phase 7 translation contract.
+    expectedCount: 599,
   },
 ];
 
@@ -163,7 +162,7 @@ console.log(
       phases: [4, 5, 6, 7],
       status: "reconciled-on-current-main",
       languages: ["en", "ar", "fr"],
-      reviewedEntries: 231 + 182 + 254 + 597,
+      reviewedEntries: 231 + 182 + 254 + 599,
       storedBusinessValuesProtected: true,
       sqlRequired: false,
     },

@@ -62,7 +62,7 @@ describe("CI ownership", () => {
 
     expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).toContain("pull_request:");
-    expect(workflow).toContain('node-version: "22.23.2"');
+    expect(workflow).toContain('node-version: "24.19.0"');
     expect(workflow).toContain("npm run test:backend:verify:coverage");
     expect(workflow).toContain("npm run test:frontend:coverage");
     expect(workflow).toContain("npm run audit:coverage-ratchet");
@@ -75,7 +75,7 @@ describe("CI ownership", () => {
 
     expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).toContain("pull_request:");
-    expect(workflow).toContain('node-version: "22.23.2"');
+    expect(workflow).toContain('node-version: "24.19.0"');
     expect(workflow).toContain("npm run verify:server-bundle");
     expect(workflow).toContain("npm run verify:final-production-readiness");
     expect(workflow).toContain("npm run verify:bandwidth");

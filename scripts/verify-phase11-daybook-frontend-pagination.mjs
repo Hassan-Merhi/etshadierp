@@ -31,7 +31,11 @@ assert.match(client, /factory-daybook-page-size/, "page-size control is required
 assert.match(client, /table groups and totals are this page/, "page-scoped totals must be disclosed");
 assert.match(client, /handleRouteState/, "route changes must clear transient paging state");
 
-assert.match(plugin, /FACTORY_DAYBOOK_SUFFIX/, "Vite plugin must target FactoryDaybook.tsx");
+assert.match(
+  plugin,
+  /FACTORY_DAYBOOK_MODEL_SUFFIX|FACTORY_DAYBOOK_SHELL_SUFFIX/,
+  "Vite plugin must target the split FactoryDaybook implementation"
+);
 assert.match(plugin, /queryParams\.set\("startDate", startDate\)/, "startDate must always be present");
 assert.match(plugin, /queryParams\.set\("endDate", endDate\)/, "endDate must always be present");
 assert.match(plugin, /All Time/, "empty dates must preserve All Time instead of backend today defaults");
@@ -41,8 +45,16 @@ assert.match(plugin, /queryParams\.set\("minAmount"/, "minimum amount must be se
 assert.match(plugin, /queryParams\.set\("maxAmount"/, "maximum amount must be sent to the server");
 assert.match(plugin, /queryParams\.set\("sortOrder"/, "sort direction must be sent to the server");
 assert.match(plugin, /fetchAllDaybookEntries/, "both export modes must use the complete loader");
-assert.match(plugin, /const exportData = exportEntries\.map/, "summary export must use complete entries");
-assert.match(plugin, /for \(const entry of exportEntries\)/, "detailed export must use complete entries");
+assert.match(
+  plugin,
+  /exportFactoryDaybookSummary\(exportEntries, formatDisplayDate\)/,
+  "summary export must use complete entries"
+);
+assert.match(
+  plugin,
+  /exportFactoryDaybookDetailed\(exportEntries, formatDisplayDate\)/,
+  "detailed export must use complete entries"
+);
 assert.match(plugin, /entry\.txType !== "WORKER_EDITED"/, "existing worker-edit exclusion must be preserved");
 assert.match(plugin, /Missing transform target/, "source drift must fail loudly");
 assert.match(plugin, /Ambiguous transform target/, "ambiguous replacements must fail loudly");
@@ -54,12 +66,17 @@ const exactMarkers = [
   'queryKey: ["/api/factory/daybook", startDate, endDate, txTypeFilter, currencyFilter],',
   'const handleExportToExcel = async () => {',
   'const handleExportDetailedToExcel = async () => {',
-  'for (const entry of filteredEntries) {',
+  "exportFactoryDaybookDetailed(filteredEntries, formatDisplayDate)",
 ];
+const sourceWithModel = `${source}\n${await read("client/src/pages/factory/daybook/useFactoryDaybookModel.ts")}`;
 for (const marker of exactMarkers) {
-  const first = source.indexOf(marker);
+  const first = sourceWithModel.indexOf(marker);
   assert.ok(first >= 0, `Missing exact Daybook source marker: ${marker}`);
-  assert.equal(source.indexOf(marker, first + marker.length), -1, `Ambiguous Daybook source marker: ${marker}`);
+  assert.equal(
+    sourceWithModel.indexOf(marker, first + marker.length),
+    -1,
+    `Ambiguous Daybook source marker: ${marker}`
+  );
 }
 
 console.log(

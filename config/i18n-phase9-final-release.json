@@ -39,8 +39,7 @@
       "mustRemainZero": true
     },
     "reports-exports": {
-      "maxActionable": 0,
-      "mustRemainZero": true
+      "maxActionable": 2
     },
     "sales-pos": {
       "maxActionable": 776
@@ -53,8 +52,7 @@
       "mustRemainZero": true
     },
     "supplier-partner": {
-      "maxActionable": 0,
-      "mustRemainZero": true
+      "maxActionable": 2
     }
   }
 }
