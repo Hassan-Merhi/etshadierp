@@ -52,6 +52,7 @@ jobs:
           node node_modules/prettier/bin/prettier.cjs --write \
             server/index.ts \
             server/startup/runServerStartupMigrations.ts \
+            server/startup/registerProcessErrorHandlers.ts \
             config/god-file-boundaries.json \
             tests/god-file-boundaries.test.ts \
             docs/god-file-split-program.md \
@@ -63,6 +64,7 @@ jobs:
           set -euo pipefail
           test "$(wc -l < server/index.ts)" -le 900
           test "$(wc -l < server/startup/runServerStartupMigrations.ts)" -le 900
+          test "$(wc -l < server/startup/registerProcessErrorHandlers.ts)" -le 900
           npm run audit:god-files
           npm run audit:doc-index
           npm run audit:source-text-assertions
@@ -72,6 +74,7 @@ jobs:
           node node_modules/prettier/bin/prettier.cjs --check \
             server/index.ts \
             server/startup/runServerStartupMigrations.ts \
+            server/startup/registerProcessErrorHandlers.ts \
             config/god-file-boundaries.json \
             tests/god-file-boundaries.test.ts \
             docs/god-file-split-program.md \
@@ -100,6 +103,7 @@ jobs:
           git add -- \
             server/index.ts \
             server/startup/runServerStartupMigrations.ts \
+            server/startup/registerProcessErrorHandlers.ts \
             config/god-file-boundaries.json \
             tests/god-file-boundaries.test.ts \
             docs/god-file-split-program.md \
