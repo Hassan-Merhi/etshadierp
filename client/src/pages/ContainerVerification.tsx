@@ -18,6 +18,17 @@ import { LoadedItemsCard } from "./containerverification/LoadedItemsCard";
 import { SummaryCards } from "./containerverification/SummaryCards";
 import type { LoadedItem, LoadedItemDraft, VerificationResult } from "./containerverification/types";
 
+type SupplierIdentity = {
+  id?: number;
+  legalName?: string | null;
+  name?: string | null;
+  code?: string | null;
+};
+
+type SupplierDetailResponse = SupplierIdentity & {
+  supplier?: SupplierIdentity;
+};
+
 export default function ContainerVerification() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -49,7 +60,7 @@ export default function ContainerVerification() {
     },
   });
 
-  const { data: selectedSupplierData } = useQuery<any>({
+  const { data: selectedSupplierData } = useQuery<SupplierDetailResponse | null>({
     queryKey: ["/api/suppliers", selectedSupplierId],
     queryFn: async () => {
       if (!selectedSupplierId) return null;
