@@ -42,6 +42,8 @@ jobs:
         run: node scripts/tmp-god-files-wave6-fix.mjs
       - name: Finish Wave 6 page extraction
         run: node scripts/tmp-god-files-wave6-final-fix.mjs
+      - name: Repair final Wave 6 generated wiring
+        run: node scripts/tmp-god-files-wave6-ts-fix.mjs
       - name: Format generated source
         run: |
           mapfile -d '' changed_files < <(git diff --name-only --diff-filter=ACMR -z origin/main -- client/src scripts | grep -zE '\.(ts|tsx|mjs)$' || true)
