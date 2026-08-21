@@ -44,7 +44,9 @@ describe("Phase 14 trilingual release gate", () => {
     expect(baseline.modules["backend-messages"].maxActionable).toBeLessThanOrEqual(15);
     expect(workflow).toContain("verify-i18n-audit-classifier.mjs");
     expect(workflow).toContain("--json-out");
-    expect(workflow).toContain("actions/upload-artifact@v7");
+    // Actions are SHA-pinned for supply-chain hardening, so match either the
+    // bare tag or a commit SHA carrying the `# v7` comment.
+    expect(workflow).toMatch(/actions\/upload-artifact@(?:v7\b|[0-9a-f]{40} # v7\b)/);
     expect(workflow).not.toContain("--no-enforce");
   });
 
