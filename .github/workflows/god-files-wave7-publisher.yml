@@ -1,0 +1,111 @@
+name: God Files Wave 7 Publisher
+
+on:
+  pull_request:
+    branches:
+      - agent/god-files-final-wave1-tests
+    paths:
+      - ".wave7-trigger"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.head_ref == 'tmp/god-files-wave7-trigger'
+    runs-on: ubuntu-24.04
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/god-files-final-wave1-tests
+          fetch-depth: 0
+
+      - name: Reconcile exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge --no-commit --no-ff -X ours origin/main
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.14.0
+          cache: npm
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          npm ci --no-audit --bin-links=true
+
+      - name: Apply Wave 7 server index split
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/tmp-god-files-wave7.mjs
+          node node_modules/prettier/bin/prettier.cjs --write \
+            server/index.ts \
+            server/startup/runServerStartupMigrations.ts \
+            config/god-file-boundaries.json \
+            tests/god-file-boundaries.test.ts \
+            docs/god-file-split-program.md \
+            docs/system-quality-program.md
+
+      - name: Certify Wave 7 architecture and startup contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(wc -l < server/index.ts)" -le 900
+          test "$(wc -l < server/startup/runServerStartupMigrations.ts)" -le 900
+          npm run audit:god-files
+          npm run audit:doc-index
+          npm run audit:source-text-assertions
+          npm run audit:type-escapes
+          npm run check
+          node node_modules/vitest/vitest.mjs run tests/startup-schema-integrity.test.ts tests/phase6-chat-report-domains.test.ts
+          node node_modules/prettier/bin/prettier.cjs --check \
+            server/index.ts \
+            server/startup/runServerStartupMigrations.ts \
+            config/god-file-boundaries.json \
+            tests/god-file-boundaries.test.ts \
+            docs/god-file-split-program.md \
+            docs/system-quality-program.md
+
+      - name: Run canonical static-build chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run verify:lockfile
+          npm run verify:production-dependencies
+          npm run lint
+          npm run audit:lint-ratchet
+          npm run check
+          npm run build
+          npm run verify:server-bundle
+          npm run verify:observability
+          npm run verify:final-production-readiness
+          npm run verify:bandwidth
+
+      - name: Publish cumulative Wave 7 and self-remove
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/god-files-wave7-publisher.yml scripts/tmp-god-files-wave7.mjs
+          git add -- \
+            server/index.ts \
+            server/startup/runServerStartupMigrations.ts \
+            config/god-file-boundaries.json \
+            tests/god-file-boundaries.test.ts \
+            docs/god-file-split-program.md \
+            docs/system-quality-program.md
+          git add -u -- .github/workflows/god-files-wave7-publisher.yml scripts/tmp-god-files-wave7.mjs
+          git status --short
+          git commit -m "refactor(god-files): complete cumulative wave 7 on current main"
+          SKIP_TSC_CHECK=1 git push origin HEAD:agent/god-files-final-wave1-tests
+          git push origin --delete tmp/god-files-wave7-trigger || true
