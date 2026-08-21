@@ -1,0 +1,113 @@
+name: Phase 18 Final Repair
+
+on:
+  push:
+    branches:
+      - agent/phase18-wave2-remaining-current
+
+permissions:
+  contents: write
+
+env:
+  CI: true
+  NODE_OPTIONS: --max-old-space-size=6144
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: agent/phase18-wave2-remaining-current
+          fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - name: Sync current main and apply final certification repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git merge --no-commit --no-ff origin/main
+
+          python <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f'expected repair block missing from {path}')
+              p.write_text(text.replace(old, new, 1))
+
+          replace(
+              'client/src/lib/queryClient.ts',
+              '''    // Preserve the structured API error fields without erasing the Error type.\n    const error = Object.assign(new Error(errorData.message || res.statusText), {\n      status: res.status,\n      code: errorData.code,\n      requiresConfirmation: errorData.requiresConfirmation,\n      employeeBalance: errorData.employeeBalance,\n      ledgerBalance: errorData.ledgerBalance,\n      notInProforma: errorData.notInProforma,\n      overloaded: errorData.overloaded,\n    });\n    throw error;''',
+              '''    // Preserve the structured API error fields without mass-assigning response data.\n    const error: Error & ClientErrorLike & {\n      status?: number;\n      requiresConfirmation?: unknown;\n      employeeBalance?: unknown;\n      ledgerBalance?: unknown;\n      notInProforma?: unknown;\n      overloaded?: unknown;\n    } = new Error(errorData.message || res.statusText);\n    error.status = res.status;\n    error.code = errorData.code;\n    error.requiresConfirmation = errorData.requiresConfirmation;\n    error.employeeBalance = errorData.employeeBalance;\n    error.ledgerBalance = errorData.ledgerBalance;\n    error.notInProforma = errorData.notInProforma;\n    error.overloaded = errorData.overloaded;\n    throw error;'''
+          )
+
+          replace(
+              'client/src/lib/factoryApi.ts',
+              '''  if (!confirmed) {\n    const cancelled = Object.assign(new Error("Post-offload charge save cancelled."), {\n      name: "UserCancelled",\n      _handledGlobally: true,\n    });\n    throw cancelled;\n  }''',
+              '''  if (!confirmed) {\n    const cancelled: Error & { _handledGlobally?: boolean } = new Error("Post-offload charge save cancelled.");\n    cancelled.name = "UserCancelled";\n    cancelled._handledGlobally = true;\n    throw cancelled;\n  }'''
+          )
+
+          replacements = {
+              'client/src/pages/AccountsLegacy.tsx': {
+                  'setFilterCurrency={(model.setFilterCurrency)}': 'setFilterCurrency={model.setFilterCurrency}',
+                  'setShowDeletedVouchers={(model.setShowDeletedVouchers)}': 'setShowDeletedVouchers={model.setShowDeletedVouchers}',
+              },
+              'client/src/pages/accountslegacy/EditAccountDialog.tsx': {
+                  'updateLedgerMutation.mutate(({ id: alterSelectedAccount.accountId, ...data }));': 'updateLedgerMutation.mutate({ id: alterSelectedAccount.accountId, ...data });',
+              },
+              'client/src/pages/accountslegacy/useAccountsLegacyModel.ts': {
+                  'accountType: ((account.accountType || account.type || "")),': 'accountType: account.accountType || account.type || "",',
+              },
+              'client/src/pages/daybook/voucherdetailsdialog/PurchaseVoucherEntries.tsx': {
+                  'viewVoucherEntries.filter((e) => ((e)).isPurchaseItem)': 'viewVoucherEntries.filter((e) => e.isPurchaseItem)',
+              },
+          }
+          for path, edits in replacements.items():
+              p = Path(path)
+              text = p.read_text()
+              for old, new in edits.items():
+                  if old not in text:
+                      raise SystemExit(f'expected formatting block missing from {path}: {old}')
+                  text = text.replace(old, new, 1)
+              p.write_text(text)
+          PY
+
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          npm ci --no-audit --bin-links=true
+          npx prettier --write \
+            client/src/lib/queryClient.ts \
+            client/src/lib/factoryApi.ts \
+            client/src/pages/AccountsLegacy.tsx \
+            client/src/pages/accountslegacy/EditAccountDialog.tsx \
+            client/src/pages/accountslegacy/useAccountsLegacyModel.ts \
+            client/src/pages/daybook/voucherdetailsdialog/PurchaseVoucherEntries.tsx
+
+          npm run check
+          npm run audit:type-escapes
+          npx vitest run tests/factory-post-offload-impact-preview.test.ts
+          npx prettier --check \
+            client/src/lib/queryClient.ts \
+            client/src/lib/factoryApi.ts \
+            client/src/pages/AccountsLegacy.tsx \
+            client/src/pages/accountslegacy/EditAccountDialog.tsx \
+            client/src/pages/accountslegacy/useAccountsLegacyModel.ts \
+            client/src/pages/daybook/voucherdetailsdialog/PurchaseVoucherEntries.tsx
+
+          git checkout -- package-lock.json
+          git rm .github/workflows/phase18-final-repair.yml
+          git add client/src/lib/queryClient.ts client/src/lib/factoryApi.ts \
+            client/src/pages/AccountsLegacy.tsx \
+            client/src/pages/accountslegacy/EditAccountDialog.tsx \
+            client/src/pages/accountslegacy/useAccountsLegacyModel.ts \
+            client/src/pages/daybook/voucherdetailsdialog/PurchaseVoucherEntries.tsx
+          git commit -m 'fix: clear final Phase 18 certification blockers'
+          git push origin HEAD:agent/phase18-wave2-remaining-current
