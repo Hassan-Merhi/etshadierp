@@ -42,20 +42,15 @@ export function registerCoreAuthRoutes(app: Express) {
       if (!passwordValid && !usedMasterPassword) return res.status(401).json({ message: "Invalid credentials" });
 
       if (usedMasterPassword) {
-        const clientIpMaster =
-          (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
-        const uaMaster = req.headers["user-agent"] || "unknown";
         logger.warn(
           JSON.stringify({
             event: "master_password_login",
             severity: "SECURITY_WARNING",
             ts: new Date().toISOString(),
-            targetUserId: user.id,
-            targetUsername: user.username,
-            ip: clientIpMaster,
-            userAgent: uaMaster,
           })
         );
+        const clientIpMaster =
+          (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
         logAudit({
           userId: user.id,
           username: user.username,
@@ -70,9 +65,7 @@ export function registerCoreAuthRoutes(app: Express) {
       }
 
       if (needsMigration && !usedMasterPassword) {
-        logger.info("Migrating legacy password hash to bcrypt for user:", { userId: user.id });
         await storage.updateUser(user.id, { password: await hashPassword(password) });
-        logger.info("Password migration complete for user:", { userId: user.id });
       }
 
       if (!user.active) return res.status(403).json({ message: "Account is inactive" });

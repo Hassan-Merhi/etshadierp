@@ -26,10 +26,7 @@ export async function trackDueContainers(): Promise<void> {
   const remaining = Math.max(0, limit - used);
   const { remainingDays, dailyBudget, perRunBudget } = calcPerRunBudget(remaining, now);
 
-  logger.info(
-    `[ContainerTracking] Quota: ${used}/${limit} used (${remaining} remaining). ` +
-      `Budget: ${perRunBudget}/run (${dailyBudget}/day, ${remainingDays} days left in month).`
-  );
+  logger.info("[ContainerTracking] Provider quota evaluated for this scheduler run.");
 
   // ── Fetch all active tracking-enabled containers ───────────────────────────
   let allRows: Array<{
@@ -205,10 +202,10 @@ export async function trackDueContainers(): Promise<void> {
   }
 
   logger.info(
-    `[ContainerTracking] Eligible: ${eligible.length} (maersk=${maerskEligible.length} unlimited + quota=${quotaEligible.length} capped at ${perRunBudget}/run), ` +
-      `tracking: ${toTrack.length}, ` +
-      `budget-skipped: ${budgetSkipped.length}, ` +
-      `recent: ${countRecent}, invalid: ${countInvalid}, disabled: ${countDisabled}.`
+    `[ContainerTracking] Eligible: ${eligible.length} (priority-carrier=${maerskEligible.length}, ` +
+      `quota-eligible=${quotaEligible.length}), tracking: ${toTrack.length}, ` +
+      `deferred-by-priority: ${budgetSkipped.length}, recent: ${countRecent}, ` +
+      `invalid: ${countInvalid}, disabled: ${countDisabled}.`
   );
 
   if (toTrack.length > 0) {

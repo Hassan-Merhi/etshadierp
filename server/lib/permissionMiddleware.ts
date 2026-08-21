@@ -70,11 +70,9 @@ function logPermissionEvent(
       key: details.key,
       role: details.context?.role ?? req.session.currentRole ?? "unknown",
       userId: details.context?.userId ?? req.session.userId ?? null,
-      username: req.session.username ?? null,
       companyId: details.context?.companyId ?? req.session.currentCompanyId ?? null,
       method: req.method,
       path: req.path,
-      ip: req.ip,
       error: details.error instanceof Error ? details.error.message : details.error ? String(details.error) : undefined,
       ts: new Date().toISOString(),
     })

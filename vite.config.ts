@@ -91,6 +91,9 @@ export default defineConfig({
           ) {
             return "routing-vendor";
           }
+          if (id.includes("node_modules/@fortune-sheet/")) {
+            return "fortune-sheet-vendor";
+          }
           if (
             id.includes("node_modules/xlsx/") ||
             id.includes("node_modules/xlsx-js-style/")

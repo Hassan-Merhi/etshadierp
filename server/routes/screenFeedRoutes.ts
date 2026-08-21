@@ -59,7 +59,7 @@ function requireSupportController(req: Request, res: Response): boolean {
 }
 
 function runtimeActor(req: Request): string {
-  return getSessionUsername(req) || String(getSessionUserId(req));
+  return String(getSessionUserId(req));
 }
 
 function openEventStream(res: Response): void {

@@ -31,7 +31,6 @@ export function enforceGlobalMaintenanceScope(req: Request, res: Response): bool
       event: "global_maintenance_scope_denied",
       ts: new Date().toISOString(),
       userId: req.session.userId ?? null,
-      username: req.session.username ?? null,
       role: req.session.currentRole ?? null,
       companyId: req.session.currentCompanyId ?? null,
       method: req.method,

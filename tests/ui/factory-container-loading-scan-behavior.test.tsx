@@ -147,10 +147,6 @@ describe("factory container loading scan behavior", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    localStorage.setItem(
-      "lastScannedBale_77",
-      JSON.stringify({ baleReference: "REF-1", baleName: "Shirts", articleCode: "A1" })
-    );
     Object.defineProperty(window, "AudioContext", { configurable: true, value: FakeAudioContext });
     harness.apiRequest.mockImplementation(async (method: string, url: string, body: any) => {
       if (method === "POST" && url === "/api/factory/customer-orders/77/bales") {
@@ -172,19 +168,19 @@ describe("factory container loading scan behavior", () => {
     );
   });
 
-  it("resumes an in-progress loading with bale totals, proforma progress, and last scan evidence", async () => {
+  it("resumes an in-progress loading without restoring persisted scan evidence", async () => {
     render(<FactoryContainerLoadingScan />);
     await waitFor(() => expect(screen.getByTestId("badge-resuming")).toHaveTextContent("Resuming Loading #77"));
     expect(screen.getByTestId("badge-bale-count")).toHaveTextContent("1 bales");
     expect(screen.getByTestId("badge-total-weight")).toHaveTextContent("50.00 kg");
-    expect(screen.getByTestId("banner-last-scanned")).toHaveTextContent("REF-1");
+    expect(screen.queryByTestId("banner-last-scanned")).not.toBeInTheDocument();
     expect(screen.getByTestId("card-proforma-progress")).toBeInTheDocument();
     expect(screen.getByTestId("row-progress-A1")).toHaveTextContent("2");
     expect(screen.getByTestId("row-progress-A1")).toHaveTextContent("1");
     expect(screen.getByTestId("text-stock-A1")).toHaveTextContent("5");
   });
 
-  it("scans a bale with exact location payload and stores replay evidence", async () => {
+  it("scans a bale with the exact location payload without browser persistence", async () => {
     render(<FactoryContainerLoadingScan />);
     const input = await screen.findByTestId("input-scan-code");
     fireEvent.change(input, { target: { value: " REF-2 " } });
@@ -202,7 +198,7 @@ describe("factory container loading scan behavior", () => {
       ["/api/factory/customer-orders", 77],
       expect.objectContaining({ bales: expect.arrayContaining([expect.objectContaining({ baleReference: "REF-2" })]) })
     );
-    expect(JSON.parse(localStorage.getItem("lastScannedBale_77") || "{}")).toMatchObject({ baleReference: "REF-2" });
+    expect(localStorage.getItem("lastScannedBale_77")).toBeNull();
   });
 
   it("passes the explicit proforma bypass flag when Ignore Proforma is enabled", async () => {

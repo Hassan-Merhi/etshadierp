@@ -17,7 +17,6 @@ function deny(req: Request, res: Response, status: number, code: string, message
       event: "operational_permission_denied",
       ts: new Date().toISOString(),
       userId: req.session.userId ?? null,
-      username: req.session.username ?? null,
       role: req._activeCompanyPermissionContext?.role ?? req.session.currentRole ?? null,
       companyId:
         req._activeCompanyPermissionContext?.companyId ??

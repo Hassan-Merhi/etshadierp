@@ -32,7 +32,6 @@ function deny(
       event: "pos_operational_permission_denied",
       ts: new Date().toISOString(),
       userId: context?.userId ?? req.session.userId ?? null,
-      username: req.session.username ?? null,
       role: context?.role ?? req.session.currentRole ?? null,
       companyId: context?.companyId ?? req.session.currentCompanyId ?? null,
       method: req.method,

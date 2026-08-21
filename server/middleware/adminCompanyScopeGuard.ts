@@ -17,7 +17,6 @@ export function enforceAdminCompanyScope(req: Request, res: Response, next: Next
     JSON.stringify({
       event: "admin_company_scope_denied",
       userId: req.session.userId ?? null,
-      username: req.session.username ?? null,
       role: req.session.currentRole ?? null,
       activeCompanyId: resolveActiveCompanyId(req),
       method: req.method,

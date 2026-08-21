@@ -120,15 +120,6 @@ export function useContainerLoadingScanModel() {
       setSelectedCustomerId(String(orderDetail.customerId));
       setSelectedLocationId(String(orderDetail.locationId || ""));
       setLoadingNote(orderDetail.containerNotes || "");
-      const stored = localStorage.getItem(`lastScannedBale_${orderDetail.id}`);
-      if (stored) {
-        try {
-          setLastScannedRef(JSON.parse(stored));
-        } catch {
-          setLastScannedRef({ baleReference: stored, baleName: "", articleCode: "" });
-        }
-        setShowLastScannedPopup(true);
-      }
       setTimeout(() => scannerRef.current?.focus(), 200);
     }
   }, [isResuming, orderDetail, selectedCustomerId]);
@@ -183,7 +174,6 @@ export function useContainerLoadingScanModel() {
           baleName: newestForRef?.baleName || "",
           articleCode: newestForRef?.articleCode || "",
         };
-        localStorage.setItem(`lastScannedBale_${orderId}`, JSON.stringify(lastScanned));
         setLastScannedRef(lastScanned);
       }
       const newest = [...(data?.bales || [])].sort((a, b) => b.id - a.id)[0];

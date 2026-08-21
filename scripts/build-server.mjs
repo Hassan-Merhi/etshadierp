@@ -6,28 +6,22 @@
  * decimal.js is bundled because historical package-lock registry URLs can make
  * the runtime dependency unavailable on Render.
  *
- * xlsx-js-style is CommonJS. We try to bundle it so esbuild handles interop,
- * and we also harden the final artifact by rewriting any surviving named ESM
- * import to the default-import form Node supports for CommonJS packages.
+ * xlsx-js-style is CommonJS. Keep it external so Node loads its own CommonJS
+ * entry instead of asking esbuild to convert its dynamic built-in requires
+ * into an ESM bundle, and harden the final artifact against named imports.
  *
  * All other npm packages remain external.
  */
 
 import { readFile, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
-
-const require = createRequire(import.meta.url);
 
 // Resolve decimal.js to its ESM entry file (decimal.mjs) so esbuild can
 // bundle it as a native ESM chunk rather than wrapping a CJS module.
 const pkgRoot = fileURLToPath(new URL("../node_modules/decimal.js/", import.meta.url));
 const decimalEntry = resolve(pkgRoot, "decimal.mjs");
-
-// Resolve xlsx-js-style to its actual CommonJS entry.
-const xlsxJsStyleEntry = require.resolve("xlsx-js-style");
 
 const result = await build({
   entryPoints: ["server/index.ts"],
@@ -46,7 +40,7 @@ const result = await build({
           }
 
           if (args.path === "xlsx-js-style") {
-            return { path: xlsxJsStyleEntry };
+            return { path: args.path, external: true };
           }
 
           // Keep repository-relative imports and project aliases inside the

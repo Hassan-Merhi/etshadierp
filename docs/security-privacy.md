@@ -61,3 +61,13 @@
 - **Advisories:** GHSA-4r6h-8v6p-xvw6 (prototype pollution), GHSA-5pgg-2g8v-p4x9 (ReDoS). No npm fix is published — SheetJS ships fixes only via its own CDN.
 - **Exposure:** these are only reachable when *parsing* a malicious `.xlsx` file. In this app that requires an **authenticated user uploading a crafted spreadsheet** (factory/payroll/git import flows) — there is no unauthenticated or remote vector.
 - **Decision:** accepted for now. Removing the dependency means migrating Excel parse/export logic off `xlsx` (used across several import/export routes) to `exceljs`, which cannot be validated without exercising each export/import against real data. Tracked as a follow-up; all other production `npm audit` criticals/highs have been resolved.
+
+### Runtime log privacy
+- Authorization and scope-denial logs correlate events with user IDs, roles, companies, routes, and request methods; they do not include usernames or raw client IP addresses.
+- Master-password authentication retains the actor and source IP in the database audit trail, but the runtime warning is intentionally identifier-free.
+- The last-scanned bale reference is kept in component memory only and is not persisted in browser storage.
+- Dependency audits are clean for production and development dependencies. A scoped `esbuild` override keeps only the Drizzle development toolchain on the patched `0.28.x` line.
+
+### Build warnings
+- The spreadsheet route is lazy-loaded and Fortune Sheet is isolated into its own vendor chunk for cacheability.
+- The remaining PostCSS `from` warning comes from the existing Tailwind/PostCSS plugin chain and does not affect the successful production artifact; it is tracked rather than suppressed by raising the chunk warning limit.

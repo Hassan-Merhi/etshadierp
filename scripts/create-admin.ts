@@ -30,7 +30,7 @@ async function createAdmin() {
       password: hashPassword(password),
       active: true,
     }).returning();
-    console.log(`✅ User created: ${user.username} (ID: ${user.id})\n`);
+    console.log(`✅ Admin user created (ID: ${user.id})\n`);
 
     // 3. Assign admin role to the user for this company
     console.log('Step 3: Assigning Admin role...');
@@ -44,8 +44,7 @@ async function createAdmin() {
     console.log('════════════════════════════════════════');
     console.log('🎉 Setup Complete!');
     console.log('════════════════════════════════════════');
-    console.log('\nYou can now login with:');
-    console.log(`  Username: ${username}`);
+    console.log('\nYou can now log in with the configured admin account.');
     console.log('\n⚠️  IMPORTANT: Change the default password after first login!\n');
     console.log('Your company details:');
     console.log(`  Company: ${company.name}`);

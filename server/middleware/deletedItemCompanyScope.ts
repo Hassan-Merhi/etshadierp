@@ -119,7 +119,6 @@ function deny(
       event: "deleted_item_scope_denied",
       ts: new Date().toISOString(),
       userId: req.session.userId ?? null,
-      username: req.session.username ?? null,
       role: req.session.currentRole ?? null,
       companyId: resolveActiveCompanyId(req),
       method: req.method,

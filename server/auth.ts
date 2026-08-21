@@ -33,7 +33,6 @@ function logDenied(params: {
     event: "access_denied",
     ts: new Date().toISOString(),
     userId: params.userId ?? null,
-    username: params.username ?? null,
     role: params.role ?? null,
     companyId: params.companyId ?? null,
     method: params.method,

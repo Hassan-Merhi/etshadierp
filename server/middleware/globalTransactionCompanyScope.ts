@@ -33,7 +33,6 @@ export async function enforceGlobalTransactionCompanyScope(
       event: "global_transaction_scope_denied",
       ts: new Date().toISOString(),
       userId,
-      username: req.session.username ?? null,
       role,
       method: req.method,
       path: req.path,

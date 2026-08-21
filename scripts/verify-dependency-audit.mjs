@@ -31,41 +31,7 @@ const scope = includeDev ? "all dependencies" : "production dependencies";
  * An entry is NOT a way to silence a finding you have not investigated. If
  * an upstream fix appears, this script tells you to drop the exception.
  */
-const PUPPETEER_ARCHIVE_REASON =
-  "GHSA-jmr9-qjv8-65gv affects extract-zip while unpacking browser archives. " +
-  "This application does not expose extract-zip to user-controlled archives; Puppeteer only " +
-  "uses this path to install Chromium from its configured trusted browser download source. " +
-  "Upstream has a patched Puppeteer release, so this is a short-lived CI exception while the " +
-  "breaking Puppeteer major upgrade is validated. Remove this exception with that upgrade.";
-
-const ACCEPTED = {
-  xlsx: {
-    reason:
-      "GHSA-4r6h-8v6p-xvw6 (prototype pollution) and GHSA-5pgg-2g8v-p4x9 (ReDoS). " +
-      "No patched release exists — SheetJS moved off the npm registry. The app only " +
-      "parses spreadsheets that an authenticated user uploads to their own company " +
-      "scope, so neither issue is reachable by an anonymous caller. Exit path: " +
-      "exceljs is already a dependency and covers the same read/write surface; " +
-      "migrating off xlsx retires this permanently.",
-    reviewOn: "2026-11-01",
-  },
-  "@puppeteer/browsers": {
-    reason: PUPPETEER_ARCHIVE_REASON,
-    reviewOn: "2026-09-01",
-  },
-  "extract-zip": {
-    reason: PUPPETEER_ARCHIVE_REASON,
-    reviewOn: "2026-09-01",
-  },
-  puppeteer: {
-    reason: PUPPETEER_ARCHIVE_REASON,
-    reviewOn: "2026-09-01",
-  },
-  "puppeteer-core": {
-    reason: PUPPETEER_ARCHIVE_REASON,
-    reviewOn: "2026-09-01",
-  },
-};
+const ACCEPTED = {};
 
 const BLOCKING = new Set(["high", "critical"]);
 

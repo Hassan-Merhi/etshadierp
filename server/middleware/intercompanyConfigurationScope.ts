@@ -84,7 +84,6 @@ function deny(
       event: "intercompany_configuration_scope_denied",
       ts: new Date().toISOString(),
       userId: req.session.userId ?? null,
-      username: req.session.username ?? null,
       role: req.session.currentRole ?? null,
       companyId: req.session.currentCompanyId ?? null,
       method: req.method,

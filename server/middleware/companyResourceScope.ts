@@ -50,7 +50,6 @@ export async function enforceCompanyResourceScope(req: Request, res: Response): 
         event: "company_resource_scope_denied",
         ts: new Date().toISOString(),
         userId,
-        username: req.session.username ?? null,
         role,
         companyId,
         method: req.method,

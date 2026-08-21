@@ -19,7 +19,6 @@ function deny(req: Request, res: Response, reason: string, status = 404, message
       event: "user_location_configuration_scope_denied",
       ts: new Date().toISOString(),
       userId: req.session.userId ?? null,
-      username: req.session.username ?? null,
       role: req.session.currentRole ?? null,
       companyId: req.session.currentCompanyId ?? null,
       method: req.method,
