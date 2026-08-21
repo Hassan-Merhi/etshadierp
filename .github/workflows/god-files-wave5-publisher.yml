@@ -1,0 +1,128 @@
+name: God Files Wave 5 Publisher
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+env:
+  CI: true
+  NODE_OPTIONS: --max-old-space-size=6144
+
+jobs:
+  publish:
+    if: github.event.pull_request.base.ref == 'agent/god-files-final-wave1-tests' && github.event.pull_request.head.ref == 'tmp/god-files-wave5-trigger'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/god-files-final-wave1-tests
+          fetch-depth: 0
+
+      - name: Reconcile exact current main
+        run: |
+          git fetch origin main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge --no-commit --no-ff -X ours origin/main
+          # Rebase live one-way ratchets/docs onto current main. Wave 1-5 values
+          # are recomputed from the resulting working tree below.
+          git checkout origin/main -- \
+            config/god-file-boundaries.json \
+            config/type-escape-boundaries.json \
+            tests/god-file-boundaries.test.ts \
+            docs/god-file-split-program.md \
+            docs/system-quality-program.md
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          npm ci --no-audit --bin-links=true
+
+      - name: Apply Wave 5 model splits
+        run: node scripts/tmp-god-files-wave5.mjs split
+
+      - name: Format cumulative changed source
+        shell: bash
+        run: |
+          mapfile -d '' changed_files < <(
+            git diff --name-only --diff-filter=ACMR -z origin/main -- client/src server shared tests scripts |
+              grep -zE '\.(ts|tsx|js|jsx|mjs|cjs)$' || true
+          )
+          printf 'Formatting %s cumulative changed source file(s).\n' "${#changed_files[@]}"
+          if [ "${#changed_files[@]}" -gt 0 ]; then
+            node node_modules/prettier/bin/prettier.cjs --write "${changed_files[@]}"
+          fi
+
+      - name: Recalibrate live Wave 5 ratchets
+        run: |
+          node scripts/tmp-god-files-wave5.mjs finalize
+          node node_modules/prettier/bin/prettier.cjs --write \
+            config/god-file-boundaries.json \
+            config/type-escape-boundaries.json \
+            tests/god-file-boundaries.test.ts \
+            docs/god-file-split-program.md \
+            docs/system-quality-program.md
+
+      - name: Certify Wave 5 architecture and static contracts
+        shell: bash
+        run: |
+          for file in \
+            client/src/pages/factory/FactoryInvoiceDetail.tsx \
+            client/src/pages/factory/factoryinvoicedetail/useFactoryInvoiceDetailModel.tsx \
+            client/src/pages/factory/BalesHistory.tsx \
+            client/src/pages/factory/baleshistory/useBalesHistoryModel.tsx \
+            client/src/pages/factory/FactoryPendingInvoiceVerify.tsx \
+            client/src/pages/factory/factorypendinginvoiceverify/useFactoryPendingInvoiceVerifyModel.tsx; do
+            count=$(wc -l < "$file")
+            echo "$file: $count lines"
+            test "$count" -le 900
+          done
+
+          npm run audit:god-files
+          npm run audit:doc-index
+          npm run audit:source-text-assertions
+          npm run audit:type-escapes
+          npm run check
+
+          mapfile -d '' changed_files < <(
+            git diff --name-only --diff-filter=ACMR -z origin/main -- client/src server shared tests scripts |
+              grep -zE '\.(ts|tsx|css|mjs)$' || true
+          )
+          if [ "${#changed_files[@]}" -gt 0 ]; then
+            node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+          fi
+
+      - name: Run canonical static-build chain
+        shell: bash
+        run: |
+          npm run verify:lockfile
+          npm run verify:production-dependencies
+          npm run lint
+          npm run audit:lint-ratchet
+          npm run check
+          npm run build
+          npm run verify:server-bundle
+          npm run verify:observability
+          npm run verify:final-production-readiness
+          npm run verify:bandwidth
+
+      - name: Publish cumulative Wave 5 and self-remove
+        run: |
+          rm -f \
+            .github/workflows/god-files-wave4-static-diagnostic.yml \
+            .github/workflows/god-files-wave5-publisher.yml \
+            scripts/tmp-god-files-wave5.mjs \
+            .wave5-trigger
+          git add -A
+          git commit -m "refactor(god-files): complete cumulative wave 5 on current main"
+          git push origin HEAD:agent/god-files-final-wave1-tests
+          git push origin --delete tmp/god-files-wave5-trigger || true
