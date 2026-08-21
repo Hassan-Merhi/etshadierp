@@ -21,13 +21,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: agent/god-files-final-wave1-tests
-          fetch-depth: 1
+          fetch-depth: 200
 
       - name: Reconcile exact current main
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --depth=1 origin main
+          git fetch --depth=200 origin main
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git merge --no-commit --no-ff -X ours origin/main
