@@ -25,11 +25,7 @@ export const phase3SharedUiTranslationsPart7: readonly Phase3SharedUiEntry[] = [
     ar: "إجمالي الاسترداد:",
     fr: "Total du remboursement :",
   },
-  {
-    en: "Inventory Value:",
-    ar: "قيمة المخزون:",
-    fr: "Valeur du stock :",
-  },
+  { en: "Inventory Value:", ar: "قيمة المخزون:", fr: "Valeur du stock :" },
   {
     en: "Failed to fetch suppliers",
     ar: "تعذر جلب الموردين",
