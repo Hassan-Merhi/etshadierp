@@ -6,11 +6,9 @@
  * decimal.js is bundled because historical package-lock registry URLs can make
  * the runtime dependency unavailable on Render.
  *
- * xlsx-js-style is bundled because it is CommonJS. Leaving it external while
- * source files use named imports makes Node evaluate emitted code such as
- *   import { read } from "xlsx-js-style";
- * and crash at startup with "Named export 'read' not found". Bundling lets
- * esbuild apply the CommonJS interop wrapper at build time instead.
+ * xlsx-js-style is CommonJS. We try to bundle it so esbuild handles interop,
+ * and we also harden the final artifact by rewriting any surviving named ESM
+ * import to the default-import form Node supports for CommonJS packages.
  *
  * All other npm packages remain external.
  */
@@ -28,9 +26,7 @@ const require = createRequire(import.meta.url);
 const pkgRoot = fileURLToPath(new URL("../node_modules/decimal.js/", import.meta.url));
 const decimalEntry = resolve(pkgRoot, "decimal.mjs");
 
-// Resolve xlsx-js-style to its actual CommonJS entry. This package must be
-// bundled so esbuild can translate its CommonJS exports safely for our ESM
-// server bundle.
+// Resolve xlsx-js-style to its actual CommonJS entry.
 const xlsxJsStyleEntry = require.resolve("xlsx-js-style");
 
 const result = await build({
@@ -39,11 +35,6 @@ const result = await build({
   bundle: true,
   format: "esm",
   outdir: "dist",
-  // Do not use packages:"external" here. That setting can re-externalize a
-  // node_modules path even after a plugin resolves it, which is exactly what
-  // allowed xlsx-js-style to survive as an invalid named ESM import on Render.
-  // Instead, the plugin below explicitly externalizes ordinary packages while
-  // forcing the two known-problem dependencies to bundle.
   metafile: true,
   plugins: [
     {
@@ -70,8 +61,7 @@ const result = await build({
             return null;
           }
 
-          // Node built-ins and every other package stay as runtime externals,
-          // matching the previous packages:"external" behaviour.
+          // Node built-ins and every other package stay as runtime externals.
           return { path: args.path, external: true };
         });
       },
@@ -81,14 +71,31 @@ const result = await build({
 
 await writeFile("dist/server-build-meta.json", JSON.stringify(result.metafile), "utf8");
 
-// Refuse to publish an artifact that can reproduce either known Render startup
-// crash. Keep these checks separate from the resolver implementation so future
-// build refactors cannot silently reintroduce broken runtime imports.
-const output = await readFile("dist/index.js", "utf8");
+// Render has repeatedly shown that a named ESM import can survive into the
+// emitted artifact despite the resolver policy above. Node cannot reliably
+// expose arbitrary CommonJS properties as named ESM exports, but it always
+// supports the default import. Rewrite only the exact xlsx-js-style named
+// imports that survive the build, preserving the local aliases esbuild chose.
+let output = await readFile("dist/index.js", "utf8");
+let xlsxInteropRewriteCount = 0;
+const xlsxNamedImport =
+  /import\s*\{\s*read\s+as\s+([A-Za-z_$][\w$]*)\s*,\s*utils\s+as\s+([A-Za-z_$][\w$]*)\s*,\s*write\s+as\s+([A-Za-z_$][\w$]*)\s*\}\s*from\s*["']xlsx-js-style["'];?/g;
+
+output = output.replace(xlsxNamedImport, (_match, readName, utilsName, writeName) => {
+  const pkgName = `xlsxJsStyleCompat${xlsxInteropRewriteCount++}`;
+  return `import ${pkgName} from "xlsx-js-style";\nconst { read: ${readName}, utils: ${utilsName}, write: ${writeName} } = ${pkgName};`;
+});
+
+if (xlsxInteropRewriteCount > 0) {
+  await writeFile("dist/index.js", output, "utf8");
+  console.log(`Rewrote ${xlsxInteropRewriteCount} xlsx-js-style named import(s) for CommonJS runtime compatibility`);
+}
+
+// Refuse to publish artifacts that can reproduce the known startup crashes.
 const unresolvedDecimalImport =
   /(?:from\s*["']decimal\.js["']|import\s*\(\s*["']decimal\.js["']\s*\)|node_modules\/decimal\.js\/index\.js)/;
-const unresolvedXlsxJsStyleImport =
-  /(?:from\s*["']xlsx-js-style["']|import\s*\(\s*["']xlsx-js-style["']\s*\))/;
+const unresolvedXlsxNamedImport =
+  /import\s*\{[^}]*\}\s*from\s*["']xlsx-js-style["']/;
 
 if (unresolvedDecimalImport.test(output)) {
   throw new Error(
@@ -96,10 +103,10 @@ if (unresolvedDecimalImport.test(output)) {
   );
 }
 
-if (unresolvedXlsxJsStyleImport.test(output)) {
+if (unresolvedXlsxNamedImport.test(output)) {
   throw new Error(
-    "Production bundle still contains a runtime xlsx-js-style import; refusing to publish a broken Render artifact.",
+    "Production bundle still contains a named xlsx-js-style runtime import; refusing to publish a broken Render artifact.",
   );
 }
 
-console.log("Server bundle verified: decimal.js and xlsx-js-style are embedded in dist/index.js");
+console.log("Server bundle verified: xlsx-js-style has safe CommonJS interop and decimal.js is embedded");
