@@ -4,39 +4,88 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
-  static-diagnostic:
+  compatibility-diagnostic:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24.19.0'
           cache: npm
-      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
-      - run: npm ci --no-audit --bin-links=true
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Apply TypeScript 7 compatibility and Vite 8 companion upgrade
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const edit = (file, mutate) => {
+            const json = JSON.parse(fs.readFileSync(file, 'utf8'));
+            mutate(json);
+            fs.writeFileSync(file, JSON.stringify(json, null, 2) + '\n');
+          };
+          edit('package.json', (pkg) => {
+            pkg.dependencies.vite = '^8.0.0';
+            pkg.devDependencies['@typescript/native'] = 'npm:typescript@7.0.2';
+            pkg.devDependencies.typescript = 'npm:@typescript/typescript6@^6.0.2';
+          });
+          edit('artifacts/mockup-sandbox/package.json', (pkg) => {
+            pkg.devDependencies.vite = '^8.0.0';
+          });
+          NODE
+
+      - name: Regenerate lockfiles
+        env:
+          npm_config_registry: https://registry.npmjs.org/
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npx --yes pnpm@10.17.1 install --lockfile-only --ignore-scripts
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Verify TypeScript split
+        run: |
+          echo "TS API: $(node -p \"require('typescript/package.json').version\")"
+          echo "TS compiler: $(node_modules/.bin/tsc --version)"
+          test "$(node -p \"require('typescript/package.json').version.split('.')[0]\")" = "6"
+          node_modules/.bin/tsc --version | grep -q '7.0.2'
+
       - name: Verify dependencies
         run: |
           npm run verify:lockfile
           npm run verify:production-dependencies
+
       - name: Lint
         run: npm run lint
+
       - name: TypeScript
         run: npm run check
+
       - name: Production build
         run: npm run build
 
-  frontend-diagnostic:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: '24.19.0'
-          cache: npm
-      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
-      - run: npm ci --no-audit --bin-links=true
       - name: Frontend tests
         run: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
+
+      - name: Commit validated compatibility files
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- package.json package-lock.json pnpm-lock.yaml artifacts/mockup-sandbox/package.json
+          if git diff --cached --quiet; then
+            echo 'Compatibility files already current.'
+            exit 0
+          fi
+          git commit -m 'fix(deps): complete TypeScript 7 and Vite 8 compatibility'
+          git push origin HEAD:"$HEAD_REF"
