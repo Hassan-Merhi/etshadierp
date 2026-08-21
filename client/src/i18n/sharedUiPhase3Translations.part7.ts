@@ -1,7 +1,7 @@
 import type { Phase3SharedUiEntry } from "./sharedUiPhase3TranslationTypes";
 
-// Customer Loading column chooser translations added after PR #815.
-// Keep these as exact visible-text entries so both the runtime translator and
+// Reviewed shared interface translations added after PR #815.
+// Keep these as exact user-facing entries so both the runtime translator and
 // the classified i18n audit recognize them as reviewed multilingual UI copy.
 export const phase3SharedUiTranslationsPart7: readonly Phase3SharedUiEntry[] = [
   { en: "Columns", ar: "الأعمدة", fr: "Colonnes" },
@@ -20,4 +20,7 @@ export const phase3SharedUiTranslationsPart7: readonly Phase3SharedUiEntry[] = [
   { en: "Total Loaded", ar: "إجمالي المحمّل", fr: "Total chargé" },
   { en: "Total KG", ar: "إجمالي كغ", fr: "Total kg" },
   { en: "Last Loaded", ar: "آخر تحميل", fr: "Dernier chargement" },
+  { en: "Refund Total:", ar: "إجمالي الاسترداد:", fr: "Total du remboursement :" },
+  { en: "Inventory Value:", ar: "قيمة المخزون:", fr: "Valeur du stock :" },
+  { en: "Failed to fetch suppliers", ar: "تعذر جلب الموردين", fr: "Impossible de charger les fournisseurs" },
 ];
