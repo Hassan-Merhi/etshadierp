@@ -11,7 +11,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@/lib/form-resolver";
 import { insertBaleSchema, type InsertBale } from "@shared/schema";
 import { Package, Plus } from "lucide-react";
 import { z } from "zod";

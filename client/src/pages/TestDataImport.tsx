@@ -3,7 +3,7 @@ import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";

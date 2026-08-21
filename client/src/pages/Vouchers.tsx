@@ -2,7 +2,7 @@ import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@/lib/form-resolver";
 import { format } from "date-fns";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { ExchangeRateInput } from "@/components/ExchangeRateInput";

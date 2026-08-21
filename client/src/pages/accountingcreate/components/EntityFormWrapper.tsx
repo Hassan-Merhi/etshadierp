@@ -5,7 +5,7 @@ import type { ClientErrorLike } from "@/lib/clientError";
  * Extracted from AccountingCreate.tsx during the Phase 4 god-file split.
  */
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@/lib/form-resolver";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";

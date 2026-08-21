@@ -6,7 +6,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useParams, useLocation } from "wouter";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
