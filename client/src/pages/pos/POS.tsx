@@ -24,6 +24,7 @@ import { usePosAutosave } from "./hooks/usePosAutosave";
 import { usePosHandlers } from "./hooks/usePosHandlers";
 
 import { POS_COLUMNS, formatDisplayAmount } from "./utils/posCalculations";
+import { ErrorState } from "@/components/ui/page-state";
 
 export default function POS({ posUser, editVoucherId }: { posUser?: any; editVoucherId?: string } = {}) {
   const { selectedLocation, setSelectedLocation } = useLocationContext();
@@ -134,6 +135,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     editVoucherViewEntries,
     stockInventory,
     stockInventoryLoading,
+    inventoryLoading,
+    inventoryError,
+    refetchInventory,
   } = usePosQueries({
     posUser,
     activeLocation,
@@ -536,6 +540,19 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     );
   }
 
+  if (inventoryError) {
+    return (
+      <div className="p-4 md:p-6">
+        <ErrorState
+          title="Inventory unavailable"
+          description="POS inventory could not be loaded for this location. Your sale draft is preserved; retry to continue."
+          actionLabel="Retry inventory"
+          onAction={refetchInventory}
+        />
+      </div>
+    );
+  }
+
   if (posUser && !posLocationsLoading && posAssignedLocations.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8 gap-2">
@@ -619,6 +636,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         <div className="flex flex-row gap-4 h-full w-full">
           <div className="flex-1 flex flex-col overflow-y-auto min-w-0">
             <div>
+              {inventoryLoading ? (
+                <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground" aria-busy="true">
+                  Loading inventory…
+                </div>
+              ) : (
               <SaleGrid
                 rows={rows}
                 columns={POS_COLUMNS}
@@ -640,6 +662,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 toast={toast}
                 isEditMode={!!editVoucherId}
               />
+              )}
             </div>
             <div className="mt-2 px-1 pb-2">
               <Textarea

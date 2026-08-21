@@ -39,6 +39,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PageHeader } from "@/components/PageHeader";
+import { ErrorState } from "@/components/ui/page-state";
 
 /** Safely format a date-time value as "hh:mm a". Returns "—" for null/invalid values. */
 function safeFmtTime(dt: string | null | undefined): string {
@@ -118,7 +119,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
   }, []);
 
   // Get POS user's assigned location
-  const { data: location } = useQuery<Location>({
+  const { data: location, isError: locationError, refetch: refetchLocation } = useQuery<Location>({
     queryKey: posUser?.assignedLocationId ? [`/api/locations/${posUser.assignedLocationId}`] : [],
     enabled: !!posUser?.assignedLocationId,
   });
@@ -126,7 +127,12 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
   const locationId = posUser?.assignedLocationId;
 
   // Fetch current shift
-  const { data: currentShift, isLoading: shiftLoading } = useQuery<PosShift | null>({
+  const {
+    data: currentShift,
+    isLoading: shiftLoading,
+    isError: shiftError,
+    refetch: refetchShift,
+  } = useQuery<PosShift | null>({
     queryKey: locationId ? ["/api/pos/shifts/current", { locationId }] : [],
     queryFn: async () => {
       if (!locationId) return null;
@@ -138,7 +144,12 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
   });
 
   // Fetch today's sales data
-  const { data: todayVouchers = [], isLoading: salesLoading } = useQuery<any[]>({
+  const {
+    data: todayVouchers = [],
+    isLoading: salesLoading,
+    isError: salesError,
+    refetch: refetchSales,
+  } = useQuery<any[]>({
     queryKey: locationId ? [`/api/locations/${locationId}/vouchers/today`] : [],
     enabled: !!locationId,
   });
@@ -256,6 +267,19 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
         )}
       </div>
 
+      {(locationError || shiftError || salesError) && (
+        <ErrorState
+          title="POS dashboard data unavailable"
+          description="Some dashboard information could not be loaded. Retry without losing your shift context."
+          actionLabel="Retry dashboard"
+          onAction={() => {
+            void refetchLocation();
+            void refetchShift();
+            void refetchSales();
+          }}
+        />
+      )}
+
       {/* Stats pill bar */}
       <div className="flex flex-wrap gap-3">
         <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3 min-w-[130px]">
@@ -264,6 +288,8 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             <p className="text-xs text-muted-foreground leading-none mb-0.5">Today's Sales</p>
             {salesLoading ? (
               <Skeleton className="h-5 w-12 mt-0.5" />
+            ) : salesError ? (
+              <span className="text-sm text-destructive">Unavailable</span>
             ) : (
               <p className="text-lg font-semibold leading-none" data-testid="text-today-sales-count">
                 {todaySales?.count || 0}
@@ -277,6 +303,8 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             <p className="text-xs text-muted-foreground leading-none mb-0.5">Today's Revenue</p>
             {salesLoading ? (
               <Skeleton className="h-5 w-20 mt-0.5" />
+            ) : salesError ? (
+              <span className="text-sm text-destructive">Unavailable</span>
             ) : (
               <p className="text-lg font-semibold leading-none font-mono" data-testid="text-today-revenue">
                 {formatAmount(todaySales?.total || 0)}
@@ -290,6 +318,8 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             <p className="text-xs text-muted-foreground leading-none mb-0.5">Avg per Transaction</p>
             {salesLoading ? (
               <Skeleton className="h-5 w-16 mt-0.5" />
+            ) : salesError ? (
+              <span className="text-sm text-destructive">Unavailable</span>
             ) : (
               <p className="text-lg font-semibold leading-none font-mono" data-testid="text-average-sale">
                 {formatAmount(todaySales?.average || 0)}
@@ -385,7 +415,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
       </div>
 
       {/* Shift History */}
-      {showHistory && (
+        {showHistory && (
         <div>
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Recent Shifts</p>
           <div className="border rounded-xl overflow-hidden">

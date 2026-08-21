@@ -9,6 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/PageHeader";
+import { ErrorState } from "@/components/ui/page-state";
 import {
   Download,
   ChevronDown,
@@ -288,7 +289,7 @@ export default function NetProfitReport() {
     return p.toString();
   }, [startDate, endDate, selectedCompanyId, isAdminOrDev]);
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["/api/reports/net-profit-statement", queryParams],
     queryFn: async ({ queryKey }) => {
       const params = queryKey[1] as string;
@@ -432,15 +433,16 @@ export default function NetProfitReport() {
           </div>
         )}
 
-        {error && (
-          <Card>
-            <CardContent className="p-6 text-center text-red-600 dark:text-red-400">
-              Failed to load report. Please try again.
-            </CardContent>
-          </Card>
+        {isError && (
+          <ErrorState
+            title="Net profit report unavailable"
+            description={error instanceof Error ? error.message : "The report could not be loaded."}
+            actionLabel="Retry report"
+            onAction={() => void refetch()}
+          />
         )}
 
-        {!isLoading && !error && data && (
+        {!isLoading && !isError && data && (
           <>
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

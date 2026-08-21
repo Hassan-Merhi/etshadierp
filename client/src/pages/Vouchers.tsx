@@ -59,6 +59,7 @@ import { handlePaymentKeyDown } from "@/pages/vouchers/keyboardHandlers";
 import { exportVoucherHelper } from "@/pages/vouchers/voucherActions";
 import { voucherFormSchema } from "@/pages/vouchers/voucherTypes";
 import type { VoucherFormData } from "@/pages/vouchers/voucherTypes";
+import { ErrorState } from "@/components/ui/page-state";
 
 interface VouchersProps {
   posUser?: { id: number; assignedLocationId?: number } | null;
@@ -145,8 +146,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const {
     bankAccounts,
     bankAccountsFetched,
+    bankAccountsError,
+    refetchBankAccounts,
     ledgerAccounts,
     ledgerAccountsFetched,
+    ledgerAccountsError,
+    refetchLedgerAccounts,
     suppliers,
     suppliersFetched,
     customers,
@@ -159,6 +164,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     posLocationName: _posLocationName,
     myLocations: _myLocations,
     sidebarAccounts,
+    sidebarAccountsError,
+    refetchSidebarAccounts,
     voucherToEdit,
     supplierSearchResults: _supplierSearchResults,
     customerSearchResults: _customerSearchResults,
@@ -533,6 +540,20 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           </div>
         </div>
       )}
+
+      {bankAccountsError || ledgerAccountsError || sidebarAccountsError ? (
+        <ErrorState
+          title="Voucher accounts unavailable"
+          description="Some account choices could not be loaded. Retry before entering a voucher."
+          actionLabel="Retry account data"
+          onAction={() => {
+            void refetchBankAccounts();
+            void refetchLedgerAccounts();
+            void refetchSidebarAccounts();
+          }}
+          className="border-destructive/30"
+        />
+      ) : null}
 
       {!isPOS && (
         <VoucherMobileTabs

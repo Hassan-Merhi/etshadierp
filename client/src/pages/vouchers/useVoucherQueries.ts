@@ -74,12 +74,22 @@ export function useVoucherQueries({
   // StockTransferForm. Do not fetch a second copy in the Vouchers shell.
   const needsStockData = isPOS || activeTab === "transferorder" || activeTab === "adjustment";
 
-  const { data: bankAccounts = [], isFetched: bankAccountsFetched } = useQuery<BankAccount[]>({
+  const {
+    data: bankAccounts = [],
+    isFetched: bankAccountsFetched,
+    isError: bankAccountsError,
+    refetch: refetchBankAccounts,
+  } = useQuery<BankAccount[]>({
     queryKey: ["/api/bank-accounts", selectedCompany?.id],
     enabled: loadVoucherAccountData && !!selectedCompany?.id,
   });
 
-  const { data: ledgerAccounts = [], isFetched: ledgerAccountsFetched } = useQuery<LedgerAccount[]>({
+  const {
+    data: ledgerAccounts = [],
+    isFetched: ledgerAccountsFetched,
+    isError: ledgerAccountsError,
+    refetch: refetchLedgerAccounts,
+  } = useQuery<LedgerAccount[]>({
     // includeHidden=true so cash / loan / bank accounts marked isHidden still appear in voucher pickers.
     // companyId is embedded in the URL so the server uses the explicit company rather than relying
     // on the session (which may not have updated yet on a company switch).
@@ -167,7 +177,11 @@ export function useVoucherQueries({
     },
   });
 
-  const { data: sidebarAccounts = [] } = useQuery<Account[]>({
+  const {
+    data: sidebarAccounts = [],
+    isError: sidebarAccountsError,
+    refetch: refetchSidebarAccounts,
+  } = useQuery<Account[]>({
     queryKey: ["/api/accounts/voucher-sidebar", selectedCompany?.id],
     enabled: loadVoucherAccountData && !!selectedCompany?.id,
   });
@@ -255,8 +269,12 @@ export function useVoucherQueries({
   return {
     bankAccounts,
     bankAccountsFetched,
+    bankAccountsError,
+    refetchBankAccounts,
     ledgerAccounts,
     ledgerAccountsFetched,
+    ledgerAccountsError,
+    refetchLedgerAccounts,
     suppliers,
     suppliersFetched,
     customers,
@@ -270,6 +288,8 @@ export function useVoucherQueries({
     posLocationName,
     myLocations,
     sidebarAccounts,
+    sidebarAccountsError,
+    refetchSidebarAccounts,
     voucherToEdit,
     loadingVoucher,
     supplierSearchResults,

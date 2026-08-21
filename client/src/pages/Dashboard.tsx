@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { ErrorState } from "@/components/ui/page-state";
 import {
   ArrowDownLeft,
   BarChart2,
@@ -47,6 +48,7 @@ export default function Dashboard() {
     profitData,
     isLoading,
     isError,
+    refetchProfit,
     importCycleData,
     importCycleIsError,
     importCycleIsLoading,
@@ -65,13 +67,13 @@ export default function Dashboard() {
 
       {/* ── Net-profit error banner (non-fatal) ── */}
       {isError && (
-        <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          <span className="font-medium">⚠</span>
-          <span>
-            Some financial data could not be loaded. Figures may be incomplete — please refresh or contact support if
-            the issue persists.
-          </span>
-        </div>
+        <ErrorState
+          title="Some financial data is unavailable"
+          description="Figures may be incomplete. Retry the financial summary without losing the rest of the dashboard."
+          actionLabel="Retry financial data"
+          onAction={() => void refetchProfit()}
+          className="border-destructive/30"
+        />
       )}
 
       {/* ── Greeting banner ── */}

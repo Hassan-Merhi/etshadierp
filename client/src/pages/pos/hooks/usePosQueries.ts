@@ -46,6 +46,7 @@ export function usePosQueries({
     data: apiInventory = [],
     isLoading: inventoryLoading,
     error: inventoryError,
+    refetch: refetchInventory,
   } = useQuery<APIInventoryItem[]>({
     queryKey: posInventoryUrl ? [posInventoryUrl] : [],
     // POS only needs item identity, quantity and selling-price data. The compact
@@ -61,6 +62,7 @@ export function usePosQueries({
     data: spStock = [],
     isLoading: spStockLoading,
     error: spStockError,
+    refetch: refetchSpStock,
   } = useQuery<SpMovement[]>({
     queryKey: activeLocation ? ["/api/sp/stock", activeLocation.id] : [],
     queryFn: async () => {
@@ -172,6 +174,10 @@ export function usePosQueries({
     apiInventory,
     inventoryLoading: isSpCompany ? inventoryLoading || spStockLoading : inventoryLoading,
     inventoryError: isSpCompany ? inventoryError || spStockError : inventoryError,
+    refetchInventory: () => {
+      void refetchInventory();
+      if (isSpCompany) void refetchSpStock();
+    },
     inventory,
     bankAccounts,
     allLedgerAccounts,

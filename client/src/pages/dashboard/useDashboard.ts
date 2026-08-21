@@ -59,6 +59,7 @@ export function useDashboard() {
     data: profitData,
     isLoading,
     isError,
+    refetch: refetchProfit,
   } = useQuery<ProfitData>({
     queryKey: ["/api/stats/net-profit", selectedCompany?.id],
     queryFn: async () => {
@@ -368,6 +369,7 @@ export function useDashboard() {
     profitData,
     isLoading,
     isError,
+    refetchProfit,
     importCycleData,
     importCycleIsError,
     importCycleIsLoading,

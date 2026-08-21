@@ -72,7 +72,7 @@ function ensureCelldata(sheet: any): any {
   return { ...rest, celldata };
 }
 
-function fortuneToXlsx(sheets: FortuneSheet[], XLSX: any): any {
+function fortuneToXlsx(sheets: FortuneSheet[], XLSX: typeof import("xlsx-js-style")): any {
   const wb = XLSX.utils.book_new();
 
   for (const sheet of sheets) {

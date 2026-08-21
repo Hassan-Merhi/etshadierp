@@ -40,6 +40,7 @@ import { format, parseISO, startOfDay, startOfMonth, startOfYear, addDays } from
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { formatNumber } from "@/lib/formatNumber";
+import { ErrorState } from "@/components/ui/page-state";
 
 import type { DailySummary, GroupingType, ProfitFilter, SalesReportItem } from "./salesreportlegacy/types";
 export default function SalesReport() {
@@ -145,13 +146,23 @@ export default function SalesReport() {
     : "/api/dashboard/sales-report-all";
 
   // Fetch sales report data (single company)
-  const { data: singleCompanySalesData = [], isLoading: isLoadingSingle } = useQuery<SalesReportItem[]>({
+  const {
+    data: singleCompanySalesData = [],
+    isLoading: isLoadingSingle,
+    isError: isErrorSingle,
+    refetch: refetchSingle,
+  } = useQuery<SalesReportItem[]>({
     queryKey: [singleCompanyQueryKey],
     enabled: !isMultiCompanyMode,
   });
 
   // Fetch sales report data (all companies)
-  const { data: allCompaniesSalesData = [], isLoading: isLoadingMulti } = useQuery<SalesReportItem[]>({
+  const {
+    data: allCompaniesSalesData = [],
+    isLoading: isLoadingMulti,
+    isError: isErrorMulti,
+    refetch: refetchMulti,
+  } = useQuery<SalesReportItem[]>({
     queryKey: [multiCompanyQueryKey],
     enabled: isMultiCompanyMode,
   });
@@ -159,6 +170,8 @@ export default function SalesReport() {
   // Use the appropriate data based on mode
   const salesData = isMultiCompanyMode ? allCompaniesSalesData : singleCompanySalesData;
   const isLoading = isMultiCompanyMode ? isLoadingMulti : isLoadingSingle;
+  const isError = isMultiCompanyMode ? isErrorMulti : isErrorSingle;
+  const refetchReport = isMultiCompanyMode ? refetchMulti : refetchSingle;
 
   // Build set of stockItemIds that belong to selected groups (for client-side group filtering)
   const selectedGroupItemIds = useMemo(() => {
@@ -840,6 +853,17 @@ export default function SalesReport() {
                       <TableCell></TableCell>
                     </TableRow>
                   ))
+                ) : isError ? (
+                  <TableRow>
+                    <TableCell colSpan={8}>
+                      <ErrorState
+                        title="Sales report unavailable"
+                        description="The sales data could not be loaded for this period."
+                        actionLabel="Retry report"
+                        onAction={() => void refetchReport()}
+                      />
+                    </TableCell>
+                  </TableRow>
                 ) : filteredGroupedData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9}>
