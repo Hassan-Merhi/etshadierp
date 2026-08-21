@@ -6,7 +6,10 @@ import { spawnSync } from "node:child_process";
 const root = process.cwd();
 const read = (rel) => fs.readFileSync(path.join(root, rel), "utf8");
 const write = (rel, text) => fs.writeFileSync(path.join(root, rel), text.endsWith("\n") ? text : `${text}\n`);
-const lines = (rel) => read(rel).split("\n").length - 1;
+const lines = (rel) => {
+  const source = read(rel);
+  return source.length === 0 ? 0 : source.split(/\r?\n/).length;
+};
 
 const godPath = "config/god-file-boundaries.json";
 const god = JSON.parse(read(godPath));
