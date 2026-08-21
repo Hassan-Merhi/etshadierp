@@ -49,6 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/tmp-god-files-wave7.mjs
+          sed -i '/IMPORTANT: never use Date.now() as the fallback/d' server/index.ts
           node node_modules/prettier/bin/prettier.cjs --write \
             server/index.ts \
             server/startup/runServerStartupMigrations.ts \
