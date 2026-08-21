@@ -1,18 +1,28 @@
-name: Wave H Backend Shard Diagnostic
+name: Wave H Coverage Diagnostic
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
     paths:
       - .github/workflows/wave-h-ratchet-diagnostic.yml
+      - config/coverage-thresholds.json
+      - scripts/audit-coverage-ratchet.mjs
+      - scripts/run-backend-verification.mjs
+      - vitest.config.ts
+      - vitest.config.frontend.ts
+      - tests/ui/wave-h-*.test.tsx
+
+permissions:
+  contents: read
 
 jobs:
   diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
     services:
       postgres:
-        image: postgres:16
+        image: postgres:15
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -25,39 +35,72 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
       PGSSLMODE: disable
       NODE_ENV: test
-      SESSION_SECRET: wave-h-backend-shard-diagnostic
+      SESSION_SECRET: wave-h-coverage-diagnostic
       CSRF_ENFORCE: "0"
       ENABLE_SCHEDULERS: "false"
       NODE_OPTIONS: --max-old-space-size=4096
       BACKEND_TEST_SHARDS: "8"
-      BACKEND_TEST_SHARD_INDEX: "0"
       BACKEND_TEST_SHARD_BUDGET_SECONDS: "300"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: "24.19.0"
+          node-version: "22.23.2"
           cache: npm
-      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
-      - run: npm ci --no-audit --bin-links=true
+      - name: Normalize registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
       - name: Prepare database schema
         run: node node_modules/drizzle-kit/bin.cjs push --force
-      - name: Reproduce backend shard 0
-        id: shard
+      - name: Backend coverage
+        id: backend
         continue-on-error: true
         run: |
           set -o pipefail
-          node scripts/run-backend-verification.mjs 2>&1 | tee wave-h-backend-shard-0.log
-      - name: Upload shard diagnostics
+          npm run test:backend:verify:coverage 2>&1 | tee wave-h-backend-coverage.log
+      - name: Frontend coverage
+        id: frontend
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run test:frontend:coverage 2>&1 | tee wave-h-frontend-coverage.log
+      - name: Coverage ratchet audit
+        id: ratchet
+        if: always() && steps.backend.outcome == 'success' && steps.frontend.outcome == 'success'
+        continue-on-error: true
+        run: npm run audit:coverage-ratchet 2>&1 | tee wave-h-coverage-ratchet.log
+      - name: Publish diagnostic summary
+        if: always()
+        env:
+          BACKEND: ${{ steps.backend.outcome }}
+          FRONTEND: ${{ steps.frontend.outcome }}
+          RATCHET: ${{ steps.ratchet.outcome }}
+        run: |
+          {
+            echo "## Wave H coverage diagnostic"
+            echo
+            echo "| Check | Outcome |"
+            echo "|---|---|"
+            echo "| Backend coverage | $BACKEND |"
+            echo "| Frontend coverage | $FRONTEND |"
+            echo "| Coverage ratchet | $RATCHET |"
+            echo
+            echo "The ratchet audit treats below-floor findings as blocking and headroom as advisory."
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$BACKEND" != "success" ] || [ "$FRONTEND" != "success" ] || [ "$RATCHET" != "success" ]; then
+            exit 1
+          fi
+      - name: Upload coverage diagnostics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: wave-h-backend-shard-0
+          name: wave-h-coverage-diagnostic
           path: |
-            .artifacts/backend-verification/shard-0.json
-            wave-h-backend-shard-0.log
+            coverage/backend/coverage-summary.json
+            coverage/frontend/coverage-summary.json
+            wave-h-backend-coverage.log
+            wave-h-frontend-coverage.log
+            wave-h-coverage-ratchet.log
           if-no-files-found: warn
-          retention-days: 2
-      - name: Report shard outcome
-        if: always()
-        run: echo "backend shard outcome=${{ steps.shard.outcome }}"
+          retention-days: 7
