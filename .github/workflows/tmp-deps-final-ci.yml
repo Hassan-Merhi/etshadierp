@@ -36,6 +36,7 @@ jobs:
             pkg.dependencies['zod-validation-error'] = '^4.0.2';
             pkg.devDependencies['@typescript/native'] = 'npm:typescript@7.0.2';
             pkg.devDependencies.typescript = 'npm:@typescript/typescript6@^6.0.2';
+            pkg.devDependencies['eslint-plugin-react-hooks'] = '7.0.0';
           });
           edit('artifacts/mockup-sandbox/package.json', (pkg) => {
             pkg.devDependencies.vite = '^8.0.0';
@@ -53,14 +54,17 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --bin-links=true
 
-      - name: Verify TypeScript split
+      - name: Verify compatibility pins
         run: |
           TS_API=$(node -e "process.stdout.write(require('typescript/package.json').version)")
           TS_COMPILER=$(node_modules/.bin/tsc --version)
+          REACT_HOOKS=$(node -e "process.stdout.write(require('eslint-plugin-react-hooks/package.json').version)")
           echo "TS API: $TS_API"
           echo "TS compiler: $TS_COMPILER"
+          echo "eslint-plugin-react-hooks: $REACT_HOOKS"
           test "${TS_API%%.*}" = "6"
           echo "$TS_COMPILER" | grep -q '7.0.2'
+          test "$REACT_HOOKS" = "7.0.0"
 
       - name: Verify dependencies
         run: |
