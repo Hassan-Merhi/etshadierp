@@ -51,7 +51,7 @@ fs.writeFileSync(startupModulePath, moduleSource);
 
 source =
   source.slice(0, runStart) +
-  `  const runMigrations = () =>\n    runStartupMigrations(migrations, () => {\n      migrationsDone = true;\n    });\n\n` +
+  "  const runMigrations = () => runStartupMigrations(migrations, () => { migrationsDone = true; });\n\n" +
   source.slice(puppeteerStart);
 source = source.replace('import { Client } from "pg";\n', "");
 const startupImportAnchor = 'import { startupMigrations, ensureCanonicalStockMovementJournal } from "./startup-schema";';
