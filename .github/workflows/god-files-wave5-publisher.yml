@@ -28,8 +28,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git merge --no-commit --no-ff -X ours origin/main
-          # Rebase live one-way ratchets/docs onto current main. Wave 1-5 values
-          # are recomputed from the resulting working tree below.
           git checkout origin/main -- \
             config/god-file-boundaries.json \
             config/type-escape-boundaries.json \
@@ -49,6 +47,9 @@ jobs:
 
       - name: Apply Wave 5 model splits
         run: node scripts/tmp-god-files-wave5.mjs split
+
+      - name: Extract Wave 5 dialog presentation blocks
+        run: node scripts/tmp-god-files-wave5-dialogs.mjs
 
       - name: Format cumulative changed source
         shell: bash
@@ -121,7 +122,9 @@ jobs:
             .github/workflows/god-files-wave4-static-diagnostic.yml \
             .github/workflows/god-files-wave5-publisher.yml \
             scripts/tmp-god-files-wave5.mjs \
-            .wave5-trigger
+            scripts/tmp-god-files-wave5-dialogs.mjs \
+            .wave5-trigger \
+            .wave5-trigger-2
           git add -A
           git commit -m "refactor(god-files): complete cumulative wave 5 on current main"
           git push origin HEAD:agent/god-files-final-wave1-tests
