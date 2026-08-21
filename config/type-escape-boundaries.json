@@ -184,11 +184,6 @@
         0,
         0
       ],
-      "client/src/pages/BaleProducts.tsx": [
-        7,
-        0,
-        0
-      ],
       "client/src/pages/BarcodeManager.tsx": [
         2,
         0,
@@ -206,11 +201,6 @@
       ],
       "client/src/pages/CompanyDataReset.tsx": [
         1,
-        0,
-        0
-      ],
-      "client/src/pages/ContainerDetail.tsx": [
-        20,
         0,
         0
       ],
@@ -651,11 +641,6 @@
       ],
       "client/src/pages/factory/FactoryShippingContainers.tsx": [
         3,
-        0,
-        0
-      ],
-      "client/src/pages/factory/FactoryStockAllocationV5.tsx": [
-        2,
         0,
         0
       ],
@@ -4001,6 +3986,31 @@
       ],
       "client/src/pages/factory/baleshistory/useBalesHistoryModel.tsx": [
         7,
+        0,
+        0
+      ],
+      "client/src/pages/baleproducts/useBaleProductsModel.tsx": [
+        7,
+        0,
+        0
+      ],
+      "client/src/pages/containerdetail/components/ContainerDetailErpView.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/containerdetail/components/ContainerDetailSpView.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/containerdetail/useContainerDetailModel.tsx": [
+        12,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorystockallocationv5/useFactoryStockAllocationV5Model.tsx": [
+        2,
         0,
         0
       ]

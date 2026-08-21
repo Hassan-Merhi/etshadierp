@@ -266,9 +266,9 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
     if (!voucherIdToEdit) scheduleJournalSave(allJournalValues);
   }, [allJournalValues, scheduleJournalSave, voucherIdToEdit]);
 
-  const [activeJournalRow, setActiveJournalRow] = useState<number | null>(null);
+  const [activeJournalRow, setActiveJournalRowState] = useState<number | null>(null);
   const [showAccountSidebar, setShowAccountSidebar] = useState(false);
-  const [journalAccountSearchTerm, setJournalAccountSearchTerm] = useState("");
+  const [journalAccountSearchTerm, setJournalAccountSearchTermState] = useState("");
   const [journalAccountHighlightedIndex, setJournalAccountHighlightedIndex] = useState(0);
   const journalSidebarRef = useRef<HTMLDivElement>(null);
   const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
@@ -276,6 +276,33 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
     tab: "payment" | "receipt" | "journal";
     rowIndex?: number;
   } | null>(null);
+
+  const isJournalAccountSearchFocused = () => {
+    if (typeof document === "undefined") return false;
+    const activeElement = document.activeElement as HTMLElement | null;
+    const testId = activeElement?.getAttribute("data-testid") || "";
+    return (
+      testId === "input-journal-sidebar-search" ||
+      testId.startsWith("input-journal-account-") ||
+      testId.startsWith("input-journal-account-mobile-")
+    );
+  };
+
+  // Journal row inputs still have legacy delayed blur callbacks. Guard the shared state
+  // so an old 200ms blur cannot clear a newly focused row/sidebar search.
+  const setActiveJournalRow = (nextRow: number | null) => {
+    if (nextRow === null && isJournalAccountSearchFocused()) return;
+    if (nextRow !== null) {
+      setJournalAccountSearchTermState("");
+      setJournalAccountHighlightedIndex(0);
+    }
+    setActiveJournalRowState(nextRow);
+  };
+
+  const setJournalAccountSearchTerm = (nextTerm: string) => {
+    if (nextTerm === "" && isJournalAccountSearchFocused()) return;
+    setJournalAccountSearchTermState(nextTerm);
+  };
 
   useEffect(() => setLiveAccountSearch(journalAccountSearchTerm), [journalAccountSearchTerm]);
   const filteredJournalAccounts = useMemo(() => {
@@ -287,18 +314,55 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
     );
   }, [allAccounts, journalAccountSearchTerm]);
 
+  useEffect(() => {
+    setJournalAccountHighlightedIndex((previous) => {
+      if (filteredJournalAccounts.length === 0) return 0;
+      return Math.min(previous, filteredJournalAccounts.length - 1);
+    });
+  }, [filteredJournalAccounts.length]);
+
+  useEffect(() => {
+    const sidebar = journalSidebarRef.current;
+    if (!sidebar || activeJournalRow === null || filteredJournalAccounts.length === 0) return;
+    const option = sidebar.querySelector(
+      `[data-testid="journal-account-option-${journalAccountHighlightedIndex}"]`
+    ) as HTMLElement | null;
+    if (!option) return;
+
+    const optionTop = option.offsetTop;
+    const optionBottom = optionTop + option.offsetHeight;
+    const visibleTop = sidebar.scrollTop;
+    const visibleBottom = visibleTop + sidebar.clientHeight;
+    if (optionTop < visibleTop) sidebar.scrollTop = optionTop;
+    else if (optionBottom > visibleBottom) sidebar.scrollTop = optionBottom - sidebar.clientHeight;
+  }, [journalAccountHighlightedIndex, filteredJournalAccounts.length, activeJournalRow]);
+
+  const focusVisibleJournalInput = (testIds: string[], select = false, delay = 50) => {
+    setTimeout(() => {
+      if (typeof document === "undefined") return;
+      const candidates = testIds.flatMap((testId) =>
+        Array.from(document.querySelectorAll(`[data-testid="${testId}"]`)) as HTMLInputElement[]
+      );
+      const input = candidates.find((candidate) => candidate.offsetParent !== null) || candidates[0];
+      input?.focus();
+      if (select) input?.select();
+    }, delay);
+  };
+
   const handleJournalAccountSelect = (account: CombinedAccount) => {
     if (activeJournalRow === null) return;
-    journalForm.setValue(`entries.${activeJournalRow}.accountType`, account.type);
-    journalForm.setValue(`entries.${activeJournalRow}.accountId`, account.id);
-    journalForm.setValue(`entries.${activeJournalRow}.accountName`, account.name);
-    setTimeout(() => {
-      const input = document.querySelector(
-        `[data-testid="input-journal-amount-${activeJournalRow}"]`
-      ) as HTMLInputElement | null;
-      input?.focus();
-      input?.select();
-    }, 50);
+    const rowIndex = activeJournalRow;
+    journalForm.setValue(`entries.${rowIndex}.accountType`, account.type);
+    journalForm.setValue(`entries.${rowIndex}.accountId`, account.id);
+    journalForm.setValue(`entries.${rowIndex}.accountName`, account.name);
+    setJournalAccountSearchTermState("");
+    setJournalAccountHighlightedIndex(0);
+    setShowAccountSidebar(false);
+    setActiveJournalRowState(null);
+    focusVisibleJournalInput(
+      [`input-journal-amount-${rowIndex}`, `input-journal-amount-mobile-${rowIndex}`],
+      true
+    );
   };
 
   const getAccountBalance = (accountType: string, accountId: number): number =>
@@ -323,10 +387,10 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
         journalForm.setValue(`entries.${index}.amount`, formatNumber(remaining));
       }
     }
-    setTimeout(() => {
-      const input = document.querySelector(`[data-testid="input-journal-account-${index}"]`) as HTMLInputElement | null;
-      input?.focus();
-    }, 50);
+    focusVisibleJournalInput(
+      [`input-journal-account-${index}`, `input-journal-account-mobile-${index}`],
+      false
+    );
   };
 
   useEffect(() => {
@@ -643,14 +707,14 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
       journalForm.setValue(`entries.${rowIndex}.accountType`, "ledger");
       journalForm.setValue(`entries.${rowIndex}.accountId`, account.id);
       journalForm.setValue(`entries.${rowIndex}.accountName`, account.name);
+      setJournalAccountSearchTermState("");
+      setActiveJournalRowState(null);
       setShowAccountSidebar(false);
-      requestAnimationFrame(() => {
-        const element = document.querySelector(
-          `[data-testid="input-journal-amount-${rowIndex}"]`
-        ) as HTMLInputElement | null;
-        element?.focus();
-        element?.select();
-      });
+      focusVisibleJournalInput(
+        [`input-journal-amount-${rowIndex}`, `input-journal-amount-mobile-${rowIndex}`],
+        true,
+        0
+      );
     }
     setCreateAccountContext(null);
   };

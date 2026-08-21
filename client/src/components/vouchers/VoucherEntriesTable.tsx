@@ -8,6 +8,7 @@ import { Plus, X, Search, Check } from "lucide-react";
 import type { Account } from "@/components/AccountSidebar";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { cn } from "@/lib/utils";
+import { focusScopedTestId } from "@/lib/scopedFocus";
 
 const ENTRY_TYPE_BADGE: Record<string, { label: string; cls: string }> = {
   bank: { label: "Bank", cls: "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300" },
@@ -70,7 +71,6 @@ export function VoucherEntriesTable({
   const { fields, append, remove } = fieldArray;
   const { formatAmount, selectedCurrency, convertToUSD } = useCurrencyContext();
 
-  // ── Mobile Sheet state ──────────────────────────────────────────────────────
   const [mobileEditIndex, setMobileEditIndex] = useState<number | null>(null);
   const [mobileEditOpen, setMobileEditOpen] = useState(false);
   const [mobileSearch, setMobileSearch] = useState("");
@@ -79,22 +79,14 @@ export function VoucherEntriesTable({
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (mobileEditOpen && mobileEditIndex !== null) {
-      const current = form.getValues(`entries.${mobileEditIndex}.amount`) || "";
-      setMobileAmountStr(current);
-      // Call onRowFocus first to set activeRowIndex (needed for account selection routing),
-      // then immediately clear sidebarSearchValue so the list shows all accounts (not pre-filtered
-      // by the existing account name). React 18 batches both — last write wins.
-      onRowFocus(mobileEditIndex, "account");
-      setSidebarSearchValue("");
-      setMobileSearch("");
-      setTimeout(() => mobileSearchInputRef.current?.focus(), 150);
-    }
-    if (!mobileEditOpen) {
-      setMobileSearch("");
-      setSidebarSearchValue("");
-    }
-    
+    if (!mobileEditOpen || mobileEditIndex === null) return;
+    const current = form.getValues(`entries.${mobileEditIndex}.amount`) || "";
+    setMobileAmountStr(current);
+    onRowFocus(mobileEditIndex, "account");
+    setSidebarSearchValue("");
+    setMobileSearch("");
+    const timer = setTimeout(() => mobileSearchInputRef.current?.focus(), 150);
+    return () => clearTimeout(timer);
   }, [mobileEditOpen, mobileEditIndex, form, onRowFocus, setSidebarSearchValue]);
 
   const openMobileEdit = (index: number) => {
@@ -122,7 +114,6 @@ export function VoucherEntriesTable({
     if (mobileEditIndex !== null) {
       const numVal = parseFloat(mobileAmountStr);
       const isPositive = !isNaN(numVal) && numVal > 0;
-      // Always write back — even blank/0 — so clearing an amount actually clears the form field.
       const finalAmount = isPositive
         ? selectedCurrency !== "USD"
           ? convertToUSD(numVal).toFixed(2)
@@ -133,45 +124,37 @@ export function VoucherEntriesTable({
     }
     setMobileEditOpen(false);
   };
-  // ────────────────────────────────────────────────────────────────────────────
 
   const getEntryBalance = (index: number): number | null => {
     const entry = entries[index];
     if (!entry || !entry.accountId || !sidebarAccounts.length) return null;
-    const found = sidebarAccounts.find((a) => {
-      if (a.type !== entry.accountType) return false;
+    const found = sidebarAccounts.find((account) => {
+      if (account.type !== entry.accountType) return false;
       if (entry.accountType === "employee") {
-        return (a as unknown as Account & { accountId: number }).accountId === entry.accountId;
+        return (account as unknown as Account & { accountId: number }).accountId === entry.accountId;
       }
-      return a.id === entry.accountId;
+      return account.id === entry.accountId;
     });
     if (!found || found.balance == null) return null;
     return typeof found.balance === "string" ? parseFloat(found.balance) : found.balance;
   };
 
   const handleAddRow = () => {
-    append({
-      accountType: "ledger",
-      accountId: 0,
-      accountName: "",
-      amount: "",
-    });
+    append({ accountType: "ledger", accountId: 0, accountName: "", amount: "" });
   };
 
-  // Focus helper shared by the Tab / arrow navigation below. Fields are addressed by the
-  // same data-testid attributes the keyboard test-suite already asserts on.
-  const focusField = (field: "account" | "amount", index: number, select = true) => {
-    requestAnimationFrame(() => {
-      const el = document.querySelector(`[data-testid="input-${field}-${index}"]`) as HTMLInputElement | null;
-      if (!el) return;
-      el.focus();
-      if (select) el.select();
-    });
+  const focusField = (
+    field: "account" | "amount",
+    index: number,
+    select = true,
+    anchor?: Element | null,
+    delay = 0
+  ) => {
+    focusScopedTestId(`input-${field}-${index}`, { select, anchor, delay });
   };
 
   const handleAccountKeyDown = async (e: React.KeyboardEvent, index: number) => {
-    // Tab takes the highlighted account (only when the row has none yet, so tabbing
-    // through a filled row never reassigns it) and moves along to the amount.
+    const anchor = e.currentTarget as Element;
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
       const hasAccount = (entries[index]?.accountId ?? 0) > 0;
@@ -179,73 +162,64 @@ export function VoucherEntriesTable({
         const highlighted = filteredSidebarAccounts[sidebarHighlightedIndex];
         if (highlighted) handleSidebarAccountSelect(highlighted);
       }
-      focusField("amount", index);
+      focusField("amount", index, true, anchor);
       return;
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
       if (filteredSidebarAccounts.length === 0) return;
-      const newIndex = Math.min(
-        sidebarHighlightedIndex < 0 ? 0 : sidebarHighlightedIndex + 1,
-        filteredSidebarAccounts.length - 1
+      setSidebarHighlightedIndex(
+        Math.min(
+          sidebarHighlightedIndex < 0 ? 0 : sidebarHighlightedIndex + 1,
+          filteredSidebarAccounts.length - 1
+        )
       );
-      setSidebarHighlightedIndex(newIndex);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       if (filteredSidebarAccounts.length === 0) return;
-      const newIndex = Math.max(sidebarHighlightedIndex - 1, 0);
-      setSidebarHighlightedIndex(newIndex);
+      setSidebarHighlightedIndex(Math.max(sidebarHighlightedIndex - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-
       const currentName = form.getValues(`entries.${index}.accountName`)?.trim() || "";
-
       if (isFactoryCompany && onAutoCreateAccount && currentName) {
-        const exactMatch = filteredSidebarAccounts.find((acc) => acc.name.toLowerCase() === currentName.toLowerCase());
-        if (exactMatch) {
-          handleSidebarAccountSelect(exactMatch);
-        } else {
+        const exactMatch = filteredSidebarAccounts.find(
+          (account) => account.name.toLowerCase() === currentName.toLowerCase()
+        );
+        if (exactMatch) handleSidebarAccountSelect(exactMatch);
+        else {
           const newAccount = await onAutoCreateAccount(currentName);
-          if (newAccount) {
-            handleSidebarAccountSelect(newAccount);
-          }
+          if (newAccount) handleSidebarAccountSelect(newAccount);
         }
       } else if (filteredSidebarAccounts.length > 0 && sidebarHighlightedIndex >= 0) {
         const highlightedAccount = filteredSidebarAccounts[sidebarHighlightedIndex];
-        if (highlightedAccount) {
-          handleSidebarAccountSelect(highlightedAccount);
-        }
+        if (highlightedAccount) handleSidebarAccountSelect(highlightedAccount);
       }
     }
   };
 
   const handleAmountKeyDown = (e: React.KeyboardEvent, index: number) => {
-    // Tab commits the amount and carries on to the next row, adding one when needed —
-    // the same motion as Enter, minus the requirement that the amount be positive.
+    const anchor = e.currentTarget as Element;
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
       const amount = Number(entries[index]?.amount);
       if (!isNaN(amount) && amount > 0 && onAmountCommit) onAmountCommit(index);
-
       const isLastRow = index === fields.length - 1;
       const rowHasContent = (entries[index]?.accountId ?? 0) > 0 || (!isNaN(amount) && amount > 0);
       if (isLastRow) {
-        // Only grow the table off a row that actually holds something, so tabbing
-        // out of an untouched last row doesn't leave a trail of blank lines.
         if (!rowHasContent) return;
         handleAddRow();
       }
-      focusField("account", index + 1, false);
+      focusField("account", index + 1, false, anchor);
       return;
     }
     if (e.key === "ArrowLeft") {
       e.preventDefault();
-      focusField("account", index, false);
+      focusField("account", index, false, anchor);
       return;
     }
     if (e.key === "ArrowRight") {
       e.preventDefault();
-      if (index < fields.length - 1) focusField("account", index + 1, false);
+      if (index < fields.length - 1) focusField("account", index + 1, false, anchor);
       return;
     }
     if (e.key === "Enter") {
@@ -254,36 +228,14 @@ export function VoucherEntriesTable({
       if (!isNaN(amount) && amount > 0) {
         if (onAmountCommit) onAmountCommit(index);
         handleAddRow();
-        requestAnimationFrame(() => {
-          const newInput = document.querySelector(
-            `[data-testid="input-account-${entries.length}"]`
-          ) as HTMLInputElement;
-          if (newInput) {
-            newInput.focus();
-            newInput.select();
-          }
-        });
+        focusField("account", entries.length, true, anchor);
       }
     } else if (e.key === "ArrowUp") {
-      // Always prevent default on ArrowUp/Down for number inputs — without this
-      // the browser increments/decrements the value (especially visible on Mac/Safari).
       e.preventDefault();
-      if (index > 0) {
-        const prevInput = document.querySelector(`[data-testid="input-amount-${index - 1}"]`) as HTMLInputElement;
-        if (prevInput) {
-          prevInput.focus();
-          prevInput.select();
-        }
-      }
+      if (index > 0) focusField("amount", index - 1, true, anchor);
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
-      if (index < entries.length - 1) {
-        const nextInput = document.querySelector(`[data-testid="input-amount-${index + 1}"]`) as HTMLInputElement;
-        if (nextInput) {
-          nextInput.focus();
-          nextInput.select();
-        }
-      }
+      if (index < entries.length - 1) focusField("amount", index + 1, true, anchor);
     }
   };
 
@@ -299,33 +251,34 @@ export function VoucherEntriesTable({
   };
 
   const renderBalanceLine = (index: number) => {
-    const bal = getEntryBalance(index);
-    if (bal == null) return null;
+    const balance = getEntryBalance(index);
+    if (balance == null) return null;
     return (
       <p
-        className={`text-[10px] font-mono tabular-nums mt-0.5 ${bal < 0 ? "text-red-500 dark:text-red-400" : bal > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
+        className={`text-[10px] font-mono tabular-nums mt-0.5 ${
+          balance < 0
+            ? "text-red-500 dark:text-red-400"
+            : balance > 0
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-muted-foreground"
+        }`}
       >
-        bal {formatAmount(bal)}
+        bal {formatAmount(balance)}
       </p>
     );
   };
 
-  // Running subtotal down the amount column, so a batch can be checked against paper
-  // as it is typed. Derived from the same entries the total is derived from.
   const runningTotals: number[] = [];
-  {
-    let running = 0;
-    for (let i = 0; i < fields.length; i++) {
-      const value = parseFloat(entries[i]?.amount || "0");
-      if (!isNaN(value) && value > 0) running += value;
-      runningTotals.push(running);
-    }
+  let running = 0;
+  for (let index = 0; index < fields.length; index++) {
+    const value = parseFloat(entries[index]?.amount || "0");
+    if (!isNaN(value) && value > 0) running += value;
+    runningTotals.push(running);
   }
   const hasAnyAmount = runningTotals.length > 0 && runningTotals[runningTotals.length - 1] > 0;
 
   return (
     <>
-      {/* ── Desktop / tablet: original table ── */}
       <div className="hidden sm:block border rounded-md overflow-hidden">
         <table className="w-full">
           <thead className="bg-muted/50 sticky top-0 z-30">
@@ -361,24 +314,23 @@ export function VoucherEntriesTable({
                     <FormField
                       control={form.control}
                       name={`entries.${index}.accountName`}
-                      render={({ field }) => (
+                      render={({ field: accountField }) => (
                         <FormItem>
                           <FormControl>
                             <Input
-                              {...field}
+                              {...accountField}
                               placeholder="Type to search..."
                               className="text-sm h-8"
                               data-testid={`input-account-${index}`}
-                              onChange={(e) => {
-                                field.onChange(e);
-                                setSidebarSearchValue(e.target.value);
+                              onChange={(event) => {
+                                accountField.onChange(event);
+                                setSidebarSearchValue(event.target.value);
                               }}
                               onFocus={() => onRowFocus(index, "account")}
-                              onKeyDown={(e) => handleAccountKeyDown(e, index)}
+                              onKeyDown={(event) => handleAccountKeyDown(event, index)}
                               onBlur={() => setTimeout(() => onRowBlur(), 200)}
                             />
                           </FormControl>
-                          {/* Type badge lives in its own column on lg+, inline below the name otherwise */}
                           {!isEmpty && typeBadge && (
                             <span
                               className={`lg:hidden inline-block text-[10px] font-medium px-1.5 py-0 rounded mt-0.5 ${typeBadge.cls}`}
@@ -403,18 +355,18 @@ export function VoucherEntriesTable({
                     <FormField
                       control={form.control}
                       name={`entries.${index}.amount`}
-                      render={({ field }) => (
+                      render={({ field: amountField }) => (
                         <FormItem>
                           <FormControl>
                             <Input
-                              {...field}
+                              {...amountField}
                               type="number"
                               step="0.01"
                               placeholder="0.00"
                               className="font-mono tabular-nums text-right h-8"
                               data-testid={`input-amount-${index}`}
-                              onKeyDown={(e) => handleAmountKeyDown(e, index)}
-                              onBlur={(e) => handleAmountBlur(e, index)}
+                              onKeyDown={(event) => handleAmountKeyDown(event, index)}
+                              onBlur={(event) => handleAmountBlur(event, index)}
                               onFocus={() => onRowFocus(index, "amount")}
                             />
                           </FormControl>
@@ -464,9 +416,6 @@ export function VoucherEntriesTable({
                     <Plus className="h-3.5 w-3.5 mr-1.5" />
                     Add Row
                   </Button>
-
-                  {/* The running column already ends on the total, so the footer only
-                      carries the shortcuts rather than repeating the figure a third time. */}
                   <p className="text-[11px] text-muted-foreground hidden xl:block">
                     <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">Tab</kbd> next field
                     <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] ml-2">↵</kbd> new row
@@ -485,7 +434,6 @@ export function VoucherEntriesTable({
         </table>
       </div>
 
-      {/* ── Mobile: compact tappable cards (sm:hidden) ── */}
       <div className="sm:hidden space-y-2">
         {fields.map((field, index) => {
           const entry = entries[index];
@@ -521,8 +469,8 @@ export function VoucherEntriesTable({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={(event) => {
+                      event.stopPropagation();
                       remove(index);
                     }}
                     data-testid={`mobile-remove-entry-${index}`}
@@ -535,7 +483,6 @@ export function VoucherEntriesTable({
           );
         })}
 
-        {/* Dashed "add entry" card */}
         <div
           className="rounded-md border border-dashed border-muted-foreground/30 px-3 py-3 flex items-center gap-2 text-muted-foreground cursor-pointer hover-elevate active-elevate-2"
           onClick={handleMobileAddRow}
@@ -545,7 +492,6 @@ export function VoucherEntriesTable({
           <span className="text-sm">Tap to add entry</span>
         </div>
 
-        {/* Total summary */}
         <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">
             {fields.length} {fields.length === 1 ? "entry" : "entries"}
@@ -554,7 +500,6 @@ export function VoucherEntriesTable({
         </div>
       </div>
 
-      {/* ── Mobile Sheet editor ── */}
       <Sheet
         open={mobileEditOpen}
         onOpenChange={(isOpen) => {
@@ -577,16 +522,15 @@ export function VoucherEntriesTable({
                 Done
               </Button>
             </div>
-            {/* Search input */}
             <div className="relative mt-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
                 ref={mobileSearchInputRef}
                 placeholder="Search accounts..."
                 value={mobileSearch}
-                onChange={(e) => {
-                  setMobileSearch(e.target.value);
-                  setSidebarSearchValue(e.target.value);
+                onChange={(event) => {
+                  setMobileSearch(event.target.value);
+                  setSidebarSearchValue(event.target.value);
                 }}
                 className="pl-9"
                 data-testid="input-mobile-account-search"
@@ -594,7 +538,6 @@ export function VoucherEntriesTable({
             </div>
           </SheetHeader>
 
-          {/* Account list */}
           <div className="flex-1 overflow-y-auto min-h-0">
             {filteredSidebarAccounts.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">
@@ -606,8 +549,7 @@ export function VoucherEntriesTable({
                   mobileEditIndex !== null &&
                   entries[mobileEditIndex]?.accountId === account.id &&
                   entries[mobileEditIndex]?.accountType === account.type;
-                const bal =
-                  typeof account.balance === "string" ? parseFloat(account.balance) : (account.balance ?? null);
+                const balance = typeof account.balance === "string" ? parseFloat(account.balance) : (account.balance ?? null);
                 return (
                   <button
                     key={`${account.type}-${account.id}`}
@@ -621,8 +563,8 @@ export function VoucherEntriesTable({
                   >
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{account.name}</div>
-                      {bal != null && (
-                        <div className="text-xs text-muted-foreground font-mono mt-0.5">{formatAmount(bal)}</div>
+                      {balance != null && (
+                        <div className="text-xs text-muted-foreground font-mono mt-0.5">{formatAmount(balance)}</div>
                       )}
                     </div>
                     {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
@@ -632,7 +574,6 @@ export function VoucherEntriesTable({
             )}
           </div>
 
-          {/* Amount input */}
           <div className="px-4 py-4 border-t shrink-0">
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground shrink-0 w-16">Amount</span>
@@ -643,7 +584,7 @@ export function VoucherEntriesTable({
                 step="0.01"
                 placeholder="0.00"
                 value={mobileAmountStr}
-                onChange={(e) => setMobileAmountStr(e.target.value)}
+                onChange={(event) => setMobileAmountStr(event.target.value)}
                 className="flex-1 font-mono text-right h-12 text-lg"
                 data-testid="input-mobile-entry-amount"
               />

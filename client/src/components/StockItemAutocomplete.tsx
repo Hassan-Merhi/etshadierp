@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +47,18 @@ export function StockItemAutocomplete({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelPendingBlur = useCallback(() => {
+    if (blurTimerRef.current !== null) {
+      clearTimeout(blurTimerRef.current);
+      blurTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => cancelPendingBlur();
+  }, [cancelPendingBlur]);
 
   const displayValue = searchTerm !== null ? searchTerm : value ? value.name : "";
 
@@ -57,7 +69,15 @@ export function StockItemAutocomplete({
       ? sortedItems.filter((item) => item.name.toLowerCase().includes(searchTerm.toLowerCase()))
       : sortedItems;
 
+  useEffect(() => {
+    setSelectedIndex((previous) => {
+      if (filteredItems.length === 0) return 0;
+      return Math.min(previous, filteredItems.length - 1);
+    });
+  }, [filteredItems.length]);
+
   const handleSelect = (item: StockItem) => {
+    cancelPendingBlur();
     onChange(item.id, item.name);
     setSearchTerm(null);
     setIsOpen(false);
@@ -66,18 +86,18 @@ export function StockItemAutocomplete({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown") {
-      if (isOpen) {
+      if (isOpen && filteredItems.length > 0) {
         e.preventDefault();
         setSelectedIndex((prev) => Math.min(prev + 1, filteredItems.length - 1));
-      } else if (onArrowDown) {
+      } else if (!isOpen && onArrowDown) {
         e.preventDefault();
         onArrowDown();
       }
     } else if (e.key === "ArrowUp") {
-      if (isOpen) {
+      if (isOpen && filteredItems.length > 0) {
         e.preventDefault();
         setSelectedIndex((prev) => Math.max(prev - 1, 0));
-      } else if (onArrowUp) {
+      } else if (!isOpen && onArrowUp) {
         e.preventDefault();
         onArrowUp();
       }
@@ -108,20 +128,33 @@ export function StockItemAutocomplete({
         onTab();
       }
     } else if (e.key === "Escape") {
+      cancelPendingBlur();
       setIsOpen(false);
       setSearchTerm(null);
       setSelectedIndex(0);
     }
   };
 
+  // Keep keyboard navigation inside this dropdown. scrollIntoView can move ancestor
+  // scroll containers or the whole page, which made autocomplete fields visibly jump.
   useEffect(() => {
-    if (isOpen && dropdownRef.current) {
-      const selectedElement = dropdownRef.current.children[selectedIndex] as HTMLElement;
-      if (selectedElement) {
-        selectedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      }
+    const dropdown = dropdownRef.current;
+    if (!isOpen || !dropdown || filteredItems.length === 0) return;
+
+    const selectedElement = dropdown.children[selectedIndex] as HTMLElement | undefined;
+    if (!selectedElement) return;
+
+    const itemTop = selectedElement.offsetTop;
+    const itemBottom = itemTop + selectedElement.offsetHeight;
+    const visibleTop = dropdown.scrollTop;
+    const visibleBottom = visibleTop + dropdown.clientHeight;
+
+    if (itemTop < visibleTop) {
+      dropdown.scrollTop = itemTop;
+    } else if (itemBottom > visibleBottom) {
+      dropdown.scrollTop = itemBottom - dropdown.clientHeight;
     }
-  }, [selectedIndex, isOpen]);
+  }, [selectedIndex, isOpen, filteredItems.length]);
 
   return (
     <div className="relative">
@@ -130,17 +163,21 @@ export function StockItemAutocomplete({
         type="text"
         value={displayValue}
         onChange={(e) => {
+          cancelPendingBlur();
           setSearchTerm(e.target.value);
           setIsOpen(true);
           setSelectedIndex(0);
           if (onSearchChange) onSearchChange(e.target.value);
         }}
         onFocus={() => {
+          cancelPendingBlur();
           setIsOpen(true);
           if (onFocus) onFocus();
         }}
         onBlur={() => {
-          setTimeout(() => {
+          cancelPendingBlur();
+          blurTimerRef.current = setTimeout(() => {
+            blurTimerRef.current = null;
             setIsOpen(false);
             setSearchTerm(null);
             setSelectedIndex(0);
@@ -164,6 +201,7 @@ export function StockItemAutocomplete({
                 "px-3 py-2 cursor-pointer hover-elevate",
                 index === selectedIndex && "bg-accent text-accent-foreground"
               )}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleSelect(item)}
             >
               {item.name}

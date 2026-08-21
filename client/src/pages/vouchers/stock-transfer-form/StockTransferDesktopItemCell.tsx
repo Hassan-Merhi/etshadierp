@@ -1,11 +1,7 @@
+import { focusScopedTestId } from "@/lib/scopedFocus";
 import type { StockTransferFormModel } from "./useStockTransferFormModel";
 
-const focusInput = (id: string) =>
-  setTimeout(() => {
-    const input = document.querySelector(`[data-testid="${id}"]`) as HTMLInputElement | null;
-    input?.focus();
-    input?.select();
-  }, 50);
+const focusInput = (id: string) => focusScopedTestId(id, { select: true, delay: 50 });
 
 export function StockTransferDesktopItemCell({ model, index }: { model: StockTransferFormModel; index: number }) {
   const m = model;
@@ -92,20 +88,21 @@ export function StockTransferDesktopItemCell({ model, index }: { model: StockTra
             event.preventDefault();
             if (m.showItemSidebar && items.length > 0)
               m.setTransferHighlightedIndex(Math.max(0, m.transferHighlightedIndex - 1));
-            else if (index > 0) focusInput(`input-item-name-${index - 1}`);
+            else if (index > 0) focusScopedTestId(`input-item-name-${index - 1}`, { select: true, delay: 50, anchor: event.currentTarget });
           } else if (event.key === "ArrowDown" && !event.shiftKey) {
             event.preventDefault();
             if (m.showItemSidebar && items.length > 0)
               m.setTransferHighlightedIndex(Math.min(items.length - 1, m.transferHighlightedIndex + 1));
-            else if (index < m.transferFields.length - 1) focusInput(`input-item-name-${index + 1}`);
+            else if (index < m.transferFields.length - 1)
+              focusScopedTestId(`input-item-name-${index + 1}`, { select: true, delay: 50, anchor: event.currentTarget });
           } else if (event.key === "ArrowLeft" && !m.isPOS) {
             event.preventDefault();
             m.setShowItemSidebar(false);
             m.setTransferSearchTerm("");
-            focusInput(`input-source-${index}`);
+            focusScopedTestId(`input-source-${index}`, { select: true, delay: 50, anchor: event.currentTarget });
           } else if (event.key === "ArrowRight" || (event.key === "Tab" && !event.shiftKey)) {
             event.preventDefault();
-            focusInput(`input-transfer-quantity-${index}`);
+            focusScopedTestId(`input-transfer-quantity-${index}`, { select: true, delay: 50, anchor: event.currentTarget });
           } else if (event.key === "Enter") {
             event.preventDefault();
             chooseHighlightedItem();
