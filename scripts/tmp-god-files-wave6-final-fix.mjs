@@ -47,7 +47,7 @@ const lines = (rel) => read(rel).split("\n").length - 1;
   const modelNames = getModelNames(sf, comp);
   const used = modelNames.filter((n) => referenced(restText, n));
   const rel = "client/src/pages/containerdetail/components/ContainerDetailErpView.tsx";
-  write(rel, `${importsFor(sf, restText)}\nimport type { useContainerDetailModel } from "../useContainerDetailModel";\n\ntype Model = ReturnType<typeof useContainerDetailModel>;\nexport function ContainerDetailErpView({ model }: { model: Model }) {\n  const {\n${used.map((n)=>`    ${n},`).join("\n")}\n  } = model;\n${restText.split("\n").map((l)=>`  ${l}`).join("\n")}\n}\n`);
+  write(rel, `${importsFor(sf, restText)}\nimport type { useContainerDetailModel } from "../useContainerDetailModel";\n\ntype Model = ReturnType<typeof useContainerDetailModel>;\nexport function ContainerDetailErpView({ model }: { model: Model }) {\n  // prettier-ignore\n  const { ${used.join(", ")} } = model;\n${restText.split("\n").map((l)=>`  ${l}`).join("\n")}\n}\n`);
   source = source.slice(0, rest[0].getFullStart()) + `\n  return <ContainerDetailErpView model={model} />;\n` + source.slice(comp.body.end - 1);
   sf = ts.createSourceFile(parent, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX); comp = defaultComponent(sf); const bodyText = source.slice(comp.body.getStart(sf), comp.body.end);
   source = `${importsFor(sf, bodyText)}\nimport { ContainerDetailErpView } from "./containerdetail/components/ContainerDetailErpView";\n\n${source.slice(comp.getStart(sf))}`;
