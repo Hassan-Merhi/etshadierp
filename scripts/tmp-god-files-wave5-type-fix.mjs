@@ -4,6 +4,22 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 const root = process.cwd();
+
+// Current main introduced one extra explicit-any in ContainerVerification while
+// leaving its frozen per-file baseline at 5. Type the add-item payload instead
+// of widening the one-way ratchet.
+const containerVerificationPath = path.join(root, "client/src/pages/ContainerVerification.tsx");
+let containerVerification = fs.readFileSync(containerVerificationPath, "utf8");
+const unsafeAddItem = "mutationFn: async (data: any) =>";
+if (containerVerification.includes(unsafeAddItem)) {
+  containerVerification = containerVerification.replace(
+    unsafeAddItem,
+    "mutationFn: async (data: LoadedItemDraft) =>"
+  );
+  fs.writeFileSync(containerVerificationPath, containerVerification);
+  console.log("WAVE5_CURRENT_MAIN_TYPE_FIX ContainerVerification add-item payload");
+}
+
 const configPath = path.join(root, "config/type-escape-boundaries.json");
 const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
 const ceiling = Number(config.totals?.typeEscapeCeiling ?? Number.MAX_SAFE_INTEGER);
