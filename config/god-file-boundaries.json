@@ -1,6 +1,6 @@
 {
-  "version": 27,
-  "description": "Version 27 completes cumulative God Files Wave 2 by retiring four small factory UI grandfathered files through focused type, hook, print, history and dialog extractions. Version 26 completes the oversized-test Wave 1: xlsx-export, workflow, inventory and excel-export-v2 are split into isolated focused suites, removed from the grandfathered backlog, and protected by the repository-wide 900-line ratchet. Version 25 reconciles current main Waves 5-9 with the recovered God Files programme, preserves newer main implementations, and permanently retires every grandfathered file that is now at or below the repository limit. Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly reviewed. Version 24 merges the Waves 5-9 god-file programme into main: StockItemDetailsDialog.tsx, AccountsLegacy.tsx, StockEntryHistory.tsx, StockItems.tsx, TransactionJournal.tsx, daybook/VoucherDetailsDialog.tsx, FactoryDaybook.tsx, FactoryLocationInventory.tsx, FactoryPOS.tsx, POSImport.tsx, POSPriceList.tsx, StockAdjustmentForm.tsx and StockTransferForm.tsx are all permanently retired from the grandfathered backlog after behavior-preserving splits into typed models, focused views and stable original-path composition shells; ContainerVerification.tsx and FactoryInvoiceLoadingScan.tsx were already retired in Version 21.",
+  "version": 28,
+  "description": "Version 28 completes cumulative God Files Wave 3 by retiring four small frontend pages through dialog, export, keyboard and CSV-tool extractions. Version 27 completes cumulative God Files Wave 2 by retiring four small factory UI grandfathered files through focused type, hook, print, history and dialog extractions. Version 26 completes the oversized-test Wave 1: xlsx-export, workflow, inventory and excel-export-v2 are split into isolated focused suites, removed from the grandfathered backlog, and protected by the repository-wide 900-line ratchet. Version 25 reconciles current main Waves 5-9 with the recovered God Files programme, preserves newer main implementations, and permanently retires every grandfathered file that is now at or below the repository limit. Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly reviewed. Version 24 merges the Waves 5-9 god-file programme into main: StockItemDetailsDialog.tsx, AccountsLegacy.tsx, StockEntryHistory.tsx, StockItems.tsx, TransactionJournal.tsx, daybook/VoucherDetailsDialog.tsx, FactoryDaybook.tsx, FactoryLocationInventory.tsx, FactoryPOS.tsx, POSImport.tsx, POSPriceList.tsx, StockAdjustmentForm.tsx and StockTransferForm.tsx are all permanently retired from the grandfathered backlog after behavior-preserving splits into typed models, focused views and stable original-path composition shells; ContainerVerification.tsx and FactoryInvoiceLoadingScan.tsx were already retired in Version 21.",
   "retiredFiles": [
     "server/routesLegacy.ts",
     "server/routes/reportsRoutesLegacy.ts",
@@ -142,14 +142,10 @@
       "client/src/pages/factory/BalesHistory.tsx": 1725,
       "client/src/pages/factory/CreateProformaV5Drawer.tsx": 1125,
       "client/src/pages/factory/FactoryInvoiceDetail.tsx": 1625,
-      "client/src/pages/factory/FactoryOtwTrackingTab.tsx": 1025,
       "client/src/pages/factory/FactoryPendingInvoiceVerify.tsx": 1850,
       "client/src/pages/factory/FactoryProformas.tsx": 1475,
       "client/src/pages/factory/FactoryStockAllocationV5.tsx": 1875,
-      "client/src/pages/factory/WasteDispatch.tsx": 1000,
-      "client/src/pages/PendingInvoiceVerify.tsx": 1050,
       "client/src/pages/SalesReportDetail.tsx": 1400,
-      "client/src/pages/SalesReportLegacy.tsx": 1000,
       "server/chatService.ts": 2000,
       "server/index.ts": 1725,
       "server/services/factory/postOffloadPhase6Safety.ts": 927

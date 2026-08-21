@@ -164,14 +164,16 @@ export function WasteDispatchDialogs(props: WasteDispatchDialogsProps) {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Package className="w-5 h-5 text-green-600" /> Disposal Complete — {props.printData.dispatch.dispatchNumber}
+                <Package className="w-5 h-5 text-green-600" /> Disposal Complete —{" "}
+                {props.printData.dispatch.dispatchNumber}
               </DialogTitle>
             </DialogHeader>
             <div ref={printRef} className="space-y-3">
               <div>
                 <h1 style={{ fontSize: 18, fontWeight: "bold", marginBottom: 4 }}>Waste Disposal Record</h1>
                 <p style={{ color: "#555", fontSize: 11, marginBottom: 16 }}>
-                  Dispatch No: {props.printData.dispatch.dispatchNumber}&nbsp;|&nbsp;Date: {props.printData.dispatch.dispatchDate}
+                  Dispatch No: {props.printData.dispatch.dispatchNumber}&nbsp;|&nbsp;Date:{" "}
+                  {props.printData.dispatch.dispatchDate}
                   {props.printData.dispatch.notes && <>&nbsp;|&nbsp;Note: {props.printData.dispatch.notes}</>}
                 </p>
               </div>
@@ -214,7 +216,9 @@ export function WasteDispatchDialogs(props: WasteDispatchDialogsProps) {
                     <td style={{ border: "1px solid #ccc", padding: "6px 8px", fontWeight: "bold" }}>
                       TOTAL — {props.printData.totalBales} bale(s)
                     </td>
-                    <td style={{ border: "1px solid #ccc", padding: "6px 8px", textAlign: "right", fontWeight: "bold" }}>
+                    <td
+                      style={{ border: "1px solid #ccc", padding: "6px 8px", textAlign: "right", fontWeight: "bold" }}
+                    >
                       {fmtKg(Number(props.printData.totalWeightKg))}
                     </td>
                     <td
@@ -232,7 +236,8 @@ export function WasteDispatchDialogs(props: WasteDispatchDialogsProps) {
                 </tfoot>
               </table>
               <p style={{ marginTop: 24, fontSize: 10, color: "#777" }}>
-                This document confirms the waste disposal of factory bales. A daybook expense entry has been created automatically.
+                This document confirms the waste disposal of factory bales. A daybook expense entry has been created
+                automatically.
               </p>
             </div>
             <DialogFooter className="gap-2">
