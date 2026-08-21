@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - tmp/god-files-300-lines-final
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
