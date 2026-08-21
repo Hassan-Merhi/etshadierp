@@ -55,7 +55,16 @@ jobs:
           const file = 'scripts/tmp-god-files-wave5-dialogs.mjs';
           let source = fs.readFileSync(file, 'utf8');
           const needle = '    const usedModel = modelNames.filter((name) => referenced(text, name));';
-          const replacement = `    if (\n      target.path.endsWith("FactoryPendingInvoiceVerify.tsx") &&\n      /\\b(?:activeProformaName|activeProformaId|proformaLines)\\b/.test(text)\n    ) {\n      console.log(\`WAVE5_DIALOG_SKIP ${target.path}: render-local proforma values\`);\n      continue;\n    }\n${needle}`;
+          const replacement = [
+            '    if (',
+            '      target.path.endsWith("FactoryPendingInvoiceVerify.tsx") &&',
+            '      /\\b(?:activeProformaName|activeProformaId|proformaLines)\\b/.test(text)',
+            '    ) {',
+            '      console.log(`WAVE5_DIALOG_SKIP ${target.path}: render-local proforma values`);',
+            '      continue;',
+            '    }',
+            needle,
+          ].join('\n');
           if (!source.includes(needle)) throw new Error('Wave 5 dialog insertion point not found');
           source = source.replace(needle, replacement);
           fs.writeFileSync(file, source);
@@ -160,7 +169,8 @@ jobs:
             .wave5-trigger-4 \
             .wave5-trigger-5 \
             .wave5-trigger-6 \
-            .wave5-trigger-7
+            .wave5-trigger-7 \
+            .wave5-trigger-8
           git add -A
           git commit -m "refactor(god-files): complete cumulative wave 5 on current main"
           git push origin HEAD:agent/god-files-final-wave1-tests
