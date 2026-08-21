@@ -383,7 +383,7 @@ export function POSDialogs({
       {/* Hidden printer template for stock report */}
       <div style={{ display: "none" }}>
         <div
-          ref={stockPrintRef}
+          ref={stockPrintRef as React.RefObject<HTMLDivElement>}
           className="p-8 bg-white text-black"
           style={{ width: "800px", fontFamily: "monospace" }}
         >

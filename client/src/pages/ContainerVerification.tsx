@@ -41,7 +41,23 @@ export default function ContainerVerification() {
   });
 
   const { data: suppliers = [] } = useQuery<any[]>({
-    queryKey: ["/api/suppliers"],
+    queryKey: ["/api/suppliers", "allowParentFallback"],
+    queryFn: async () => {
+      const res = await fetch("/api/suppliers?allowParentFallback=true", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch suppliers");
+      return res.json();
+    },
+  });
+
+  const { data: selectedSupplierData } = useQuery<any>({
+    queryKey: ["/api/suppliers", selectedSupplierId],
+    queryFn: async () => {
+      if (!selectedSupplierId) return null;
+      const res = await fetch(`/api/suppliers/${selectedSupplierId}`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!selectedSupplierId && !suppliers.some((s) => String(s.id) === selectedSupplierId),
   });
 
   const { data: proformas = [] } = useQuery<any[]>({
@@ -66,7 +82,7 @@ export default function ContainerVerification() {
   });
 
   const addItemMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: LoadedItemDraft) => {
       const res = await apiRequest("POST", `/api/containers/${containerId}/loaded-items`, data);
       return res.json();
     },
@@ -236,14 +252,11 @@ export default function ContainerVerification() {
   };
 
   useEffect(() => {
-    const container = containerData?.container;
-    if (container?.supplierId && suppliers.length > 0 && !selectedSupplierId) {
-      const supplierMatch = suppliers.find((s) => s.id === container.supplierId);
-      if (supplierMatch) {
-        setSelectedSupplierId(String(supplierMatch.id));
-      }
+    const supplierId = containerData?.container?.supplierId;
+    if (supplierId && !selectedSupplierId) {
+      setSelectedSupplierId(String(supplierId));
     }
-  }, [containerData, suppliers, selectedSupplierId]);
+  }, [containerData, selectedSupplierId]);
 
   useEffect(() => {
     if (
@@ -259,11 +272,12 @@ export default function ContainerVerification() {
   }, [loadedItems, loadingItems, containerData, autoPopulateMutation]);
 
   // Auto-select supplier when opened via "Compare" from Daybook (supplierId URL param).
+  // Do not require the supplier to exist in the active company's list: containers can
+  // legitimately reference a supplier visible through the parent-company fallback.
   useEffect(() => {
-    if (!autoSupplierId || selectedSupplierId || suppliers.length === 0) return;
-    const found = suppliers.find((s) => String(s.id) === autoSupplierId);
-    if (found) setSelectedSupplierId(autoSupplierId);
-  }, [autoSupplierId, selectedSupplierId, suppliers]);
+    if (!autoSupplierId || selectedSupplierId) return;
+    setSelectedSupplierId(autoSupplierId);
+  }, [autoSupplierId, selectedSupplierId]);
 
   // Auto-select proforma when opened via "Compare" button from Daybook.
   // Prefers the starred proforma; falls back to the most recent if none is starred.
@@ -282,6 +296,9 @@ export default function ContainerVerification() {
   }, [autoCompare, selectedSupplierId, selectedProformaId, autoCompareTriggered, generateComparison]);
 
   const container = containerData?.container;
+  const selectedSupplier = selectedSupplierData?.supplier ?? selectedSupplierData;
+  const selectedSupplierMissingFromList =
+    !!selectedSupplierId && !suppliers.some((supplier) => String(supplier.id) === selectedSupplierId);
   const overloaded = verificationResult?.comparison.filter((c) => c.statusQty === "OVER_LOADED") || [];
   const lessLoaded =
     verificationResult?.comparison.filter(
@@ -343,6 +360,14 @@ export default function ContainerVerification() {
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
                 <SelectContent>
+                  {selectedSupplierMissingFromList && (
+                    <SelectItem value={selectedSupplierId}>
+                      {selectedSupplier?.legalName ||
+                        selectedSupplier?.name ||
+                        selectedSupplier?.code ||
+                        `Supplier #${selectedSupplierId}`}
+                    </SelectItem>
+                  )}
                   {suppliers.map((s) => (
                     <SelectItem key={s.id} value={String(s.id)}>
                       {s.legalName || s.name || s.code}

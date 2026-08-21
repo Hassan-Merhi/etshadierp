@@ -112,7 +112,7 @@ export function PosMobileLayout({
             <Search className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
             <input
               id="pos-mobile-product-search"
-              ref={mobileSearchInputRef}
+              ref={mobileSearchInputRef as React.RefObject<HTMLInputElement>}
               role="combobox"
               aria-autocomplete="list"
               aria-expanded={Boolean(searchTerm && filteredInventory.length)}

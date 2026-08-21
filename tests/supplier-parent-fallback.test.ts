@@ -25,7 +25,7 @@ vi.mock("../server/routes/suppliers/supplierRepository", () => ({
   },
 }));
 
-import { resolveParentCompanyId } from "../server/routes/helpers/supplierBalanceHelpers";
+import { getSupplierBalanceForContext, resolveParentCompanyId } from "../server/routes/helpers/supplierBalanceHelpers";
 import { supplierRepository } from "../server/routes/suppliers/supplierRepository";
 import { supplierService } from "../server/routes/suppliers/supplierService";
 
@@ -45,6 +45,36 @@ beforeEach(() => {
 });
 
 describe("supplier parent fallback scope", () => {
+  it("shows the parent supplier master in stats when a child has no local suppliers", async () => {
+    const statsSupplier = {
+      ...parentSupplier,
+      active: true,
+      openingBalance: "500",
+    };
+    vi.mocked(resolveParentCompanyId).mockResolvedValue(parentCompanyId);
+    vi.mocked(supplierRepository.listAll).mockImplementation((companyId: number) =>
+      Promise.resolve(companyId === parentCompanyId ? [statsSupplier] : [])
+    );
+    vi.mocked(supplierRepository.getContainerCount).mockResolvedValue(0);
+    vi.mocked(supplierRepository.getPurchaseOrders).mockResolvedValue([]);
+    vi.mocked(getSupplierBalanceForContext).mockResolvedValue({
+      balance: 0,
+      openingBalance: 0,
+      hasActivity: false,
+      entries: [],
+      balancesByCurrency: {},
+      historicalBaseBalance: 0,
+    });
+
+    const result = await supplierService.stats(activeCompanyId);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(statsSupplier.id);
+    expect(supplierRepository.listAll).toHaveBeenNthCalledWith(1, activeCompanyId);
+    expect(supplierRepository.listAll).toHaveBeenNthCalledWith(2, parentCompanyId);
+    expect(getSupplierBalanceForContext).toHaveBeenCalledWith(statsSupplier, activeCompanyId);
+  });
+
   it("keeps the normal supplier list empty when the active company has no suppliers", async () => {
     vi.mocked(supplierRepository.list).mockResolvedValue([]);
 

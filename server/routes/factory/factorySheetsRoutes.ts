@@ -6,7 +6,10 @@ import { requireAuth } from "../../auth";
 import { factorySheets } from "@shared/schema";
 import { eq, and, asc } from "drizzle-orm";
 import multer from "multer";
-import { read as readExcel, utils as xlsxUtils, write as writeExcel, WorkBook } from "xlsx";
+import xlsxStyle from "xlsx-js-style";
+import type { WorkBook } from "xlsx-js-style";
+
+const { read: readExcel, utils: xlsxUtils, write: writeExcel } = xlsxStyle;
 
 const upload = multer({ storage: multer.memoryStorage() });
 

@@ -52,9 +52,13 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // Uses shared helper (netPositionHelper.ts) – single source of truth for
       // the asset vs liability classification formula used by both ERP and Factory.
 
-      // Parent company determines whether ERP supplier ledger accounts are included
-      // (parentCompanyId already fetched in the parallel Promise.all above)
-      const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
+      // A company only delegates supplier liabilities to another company when it is
+      // explicitly linked through companies.parent_company_id. Standalone companies
+      // must show their own supplier balances even when a global parent company exists.
+      const shouldIncludeSuppliers = companyRecord?.parentCompanyId == null;
+      // Supplier master opening balances are global historical data and belong only to
+      // the explicitly configured parent company, never to a standalone sibling company.
+      const shouldIncludeSupplierOpening = parentCompanyId !== null && companyId === parentCompanyId;
 
       // Build excluded-from-expenses set (needed for the P&L expense pass below)
       const importChargesParent = companyAccounts.find((acc) => acc.code === "IMPORT_CHARGES");
@@ -365,7 +369,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
         });
       }
 
-      // Add Suppliers (only for parent company or if no parent set)
+      // Add Suppliers for parent and standalone companies. Linked children settle through parent.
       if (shouldIncludeSuppliers) {
         // Only fetch suppliers that appear in this company's entries (avoids full-table scan)
         const supplierIdsWithBalance = [...supplierBalances.keys()];
@@ -390,7 +394,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
         for (const sup of allSuppliers) {
           const balance = supplierBalances.get(sup.id);
           if (balance) {
-            const opening = parseFloat(sup.openingBalance || "0");
+            const opening = shouldIncludeSupplierOpening ? parseFloat(sup.openingBalance || "0") : 0;
             // Suppliers: Credit = we owe them, Debit = we paid them
             // Net positive = we owe them (liability), Net negative = they owe us (asset)
             const netBalance = opening + balance.credit - balance.debit;

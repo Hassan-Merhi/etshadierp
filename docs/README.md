@@ -56,6 +56,7 @@ failure, so a correct document cannot quietly become undiscoverable.
 | Doc | What it covers |
 |---|---|
 | [testing.md](testing.md) | Test tiers and how to run them |
+| [backend-verification.md](backend-verification.md) | CI-sized backend shards, timing, and merged coverage |
 | [development-checklist.md](development-checklist.md) | Run before every push |
 | [ci/branch-protection.md](ci/branch-protection.md) | Required checks on `main` |
 | [mobile-tablet-web-regression.md](mobile-tablet-web-regression.md) | Browser regression checklist |

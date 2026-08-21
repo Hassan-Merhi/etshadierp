@@ -105,7 +105,7 @@ export function MixBatchList({
 
         {/* Hidden printable card — screenshotted by html2canvas */}
         <div
-          ref={mixBatchPrintRef}
+          ref={mixBatchPrintRef as React.RefObject<HTMLDivElement>}
           style={{
             position: "fixed",
             top: "-9999px",

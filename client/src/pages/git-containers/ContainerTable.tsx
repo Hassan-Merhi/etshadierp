@@ -24,7 +24,7 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
   return (
     <div className="rounded-md border bg-card h-full flex flex-col shadow-sm overflow-clip">
       <div className="flex-1 overflow-auto custom-scrollbar relative">
-        <div ref={printRef}>
+        <div ref={printRef as React.RefObject<HTMLDivElement>}>
           <Table className="text-xs" wrapperClassName="overflow-visible border-0 rounded-none">
             <TableHeader className="sticky top-0 z-[50] bg-teal-800 dark:bg-teal-950">
               <TableRow className="!bg-transparent hover:!bg-transparent border-b border-teal-600 dark:border-teal-700">

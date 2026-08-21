@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CompanyIsolationError } from "./companyIsolationPolicy";
-import { resolveRequestCompanyId, resolveSessionCompanyActor } from "./requestCompanyScope";
+import { isCompanyIsolationError, resolveRequestCompanyId, resolveSessionCompanyActor } from "./requestCompanyScope";
 
 const session = {
   userId: 7,
@@ -23,5 +23,10 @@ describe("requestCompanyScope", () => {
 
   it("rejects missing authenticated company context", () => {
     expect(() => resolveSessionCompanyActor({ session: { userId: 7 } })).toThrow(CompanyIsolationError);
+  });
+
+  it("recognizes only company-isolation errors", () => {
+    expect(isCompanyIsolationError(new CompanyIsolationError("RESOURCE_COMPANY_INVALID"))).toBe(true);
+    expect(isCompanyIsolationError(new Error("other error"))).toBe(false);
   });
 });

@@ -63,6 +63,12 @@ const entries: Entry[] = [
   { en: "File not found", ar: "الملف غير موجود", fr: "Fichier introuvable" },
   { en: "Invalid date", ar: "تاريخ غير صالح", fr: "Date invalide" },
   { en: "Invalid amount", ar: "مبلغ غير صالح", fr: "Montant invalide" },
+  { en: "Unable to load transactions.", ar: "تعذر تحميل المعاملات.", fr: "Impossible de charger les transactions." },
+  {
+    en: "Could not load All Daybook",
+    ar: "تعذر تحميل كل دفتر اليومية",
+    fr: "Impossible de charger le journal général",
+  },
   {
     en: "Please complete all required fields",
     ar: "يرجى إكمال جميع الحقول المطلوبة",

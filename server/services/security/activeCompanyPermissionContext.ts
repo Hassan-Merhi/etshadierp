@@ -30,9 +30,11 @@ export class ActiveCompanyPermissionContextError extends Error {
   }
 }
 
-declare module "express-serve-static-core" {
-  interface Request {
-    _activeCompanyPermissionContext?: ActiveCompanyPermissionContext;
+declare global {
+  namespace Express {
+    interface Request {
+      _activeCompanyPermissionContext?: ActiveCompanyPermissionContext;
+    }
   }
 }
 

@@ -5,8 +5,7 @@ import { Workbook } from "@fortune-sheet/react";
 import { PageHeader } from "@/components/PageHeader";
 import "@fortune-sheet/react/dist/index.css";
 import type { Sheet as FortuneSheet } from "@fortune-sheet/core";
-import * as XLSX from "xlsx";
-import * as XLSXS from "xlsx-js-style";
+import * as XLSX from "xlsx-js-style";
 import { excelToFortune } from "@/lib/excelImport";
 import { isExcelMode, type SpreadsheetData, arrayBufferToBase64, syncFortuneToXlsx } from "@/lib/excelSync";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -75,7 +74,7 @@ function ensureCelldata(sheet: any): any {
 }
 
 function fortuneToXlsx(sheets: FortuneSheet[]): any {
-  const wb = XLSXS.utils.book_new();
+  const wb = XLSX.utils.book_new();
 
   for (const sheet of sheets) {
     const ws: any = {};
@@ -156,14 +155,14 @@ function fortuneToXlsx(sheets: FortuneSheet[]): any {
       maxC = Math.max(maxC, c);
     };
 
-    const sheetData = (sheet.data);
+    const sheetData = sheet.data;
     if (sheetData && Array.isArray(sheetData) && sheetData.length > 0) {
       for (let r = 0; r < sheetData.length; r++) {
         if (!sheetData[r]) continue;
         for (let c = 0; c < sheetData[r].length; c++) writeCell(r, c, sheetData[r][c]);
       }
     } else {
-      for (const cell of ((sheet.celldata || []))) writeCell(cell.r, cell.c, cell.v);
+      for (const cell of sheet.celldata || []) writeCell(cell.r, cell.c, cell.v);
     }
 
     ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
@@ -218,7 +217,7 @@ function fortuneToXlsx(sheets: FortuneSheet[]): any {
       ws["!autofilter"] = { ref: `${c1}${fs.row[0] + 1}:${c2}${fs.row[1] + 1}` };
     }
 
-    XLSXS.utils.book_append_sheet(wb, ws, sheet.name || "Sheet");
+    XLSX.utils.book_append_sheet(wb, ws, sheet.name || "Sheet");
   }
   return wb;
 }
@@ -652,7 +651,7 @@ export default function SpreadsheetEditor() {
       // Native mode: existing xlsx-js-style export path (unchanged)
       if (!currentSheets.length) return;
       const wb = fortuneToXlsx(currentSheets);
-      XLSXS.writeFile(wb, `${sheetName}.xlsx`);
+      XLSX.writeFile(wb, `${sheetName}.xlsx`);
     }
   };
 

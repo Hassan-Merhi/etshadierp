@@ -88,7 +88,7 @@ export function StockEntryScanner({
         </div>
         <Input
           id="factory-stock-entry-scan"
-          ref={scanRef}
+          ref={scanRef as React.RefObject<HTMLInputElement>}
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={isOpen}

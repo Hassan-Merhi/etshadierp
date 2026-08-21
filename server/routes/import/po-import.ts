@@ -417,10 +417,13 @@ export function registerPoImportRoutes(app: Express) {
         });
 
         // === INTER-COMPANY CREDIT SYSTEM ===
-        // Check if this is a subsidiary company with a parent credit account configured
-        const parentCompanyId = await storage.getParentCompanyId();
+        // Intercompany posting is only valid when this exact company is explicitly linked
+        // to a parent through companies.parent_company_id. The global parentCompanyId setting
+        // identifies the historical parent company; it does not make every other company a child.
         const currentCompanyId = req.session.currentCompanyId!;
-        const isSubsidiary = parentCompanyId && parentCompanyId !== currentCompanyId;
+        const currentCompanyLink = await storage.getCompanyById(currentCompanyId);
+        const parentCompanyId = currentCompanyLink?.parentCompanyId ?? null;
+        const isSubsidiary = parentCompanyId !== null;
 
         // ── SP Company: DR Goods OTW / CR OTW Clearing ───────────────────────
         const companyRow = await db.execute(
@@ -649,8 +652,8 @@ export function registerPoImportRoutes(app: Express) {
             }
           }
         } else {
-          // === PARENT COMPANY: Create direct supplier entry ===
-          // When importing to the parent company, create standard voucher entries:
+          // === PARENT/STANDALONE COMPANY: Create direct supplier entry ===
+          // When importing to a parent or standalone company, create standard voucher entries:
           // DR Purchases (expense), CR Supplier (liability)
 
           // Find or create a Purchases account for the parent company

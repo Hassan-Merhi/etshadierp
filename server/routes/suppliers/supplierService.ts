@@ -3,11 +3,7 @@ import { getSupplierBalanceForContext, resolveParentCompanyId } from "../helpers
 import { SupplierRouteError } from "./supplierErrors";
 import type { SupplierAuditActor } from "./supplierRequestContext";
 import { supplierRepository } from "./supplierRepository";
-import {
-  parseCreateSupplierInput,
-  parseSupplierStockGroupId,
-  parseUpdateSupplierInput,
-} from "./supplierValidation";
+import { parseCreateSupplierInput, parseSupplierStockGroupId, parseUpdateSupplierInput } from "./supplierValidation";
 
 async function requireSupplier(supplierId: number, companyId: number) {
   const supplier = await supplierRepository.getById(supplierId, companyId);
@@ -75,7 +71,14 @@ export const supplierService = {
   },
 
   async stats(companyId: number) {
-    const suppliers = await supplierRepository.listAll(companyId);
+    let suppliers = await supplierRepository.listAll(companyId);
+    if (suppliers.length === 0) {
+      const parentCompanyId = await resolveParentCompanyId();
+      if (parentCompanyId !== companyId) {
+        suppliers = await supplierRepository.listAll(parentCompanyId);
+      }
+    }
+
     return Promise.all(
       suppliers.map(async (supplier) => {
         const [containerCount, balanceResult, purchaseOrders] = await Promise.all([
@@ -91,7 +94,7 @@ export const supplierService = {
           openingBalance: balanceResult.openingBalance,
           hasActivity: containerCount > 0 || balanceResult.hasActivity || purchaseOrders.length > 0,
         };
-      }),
+      })
     );
   },
 
@@ -101,8 +104,10 @@ export const supplierService = {
 
   async balance(supplierId: number, companyId: number) {
     const supplier = await requireSupplier(supplierId, companyId);
-    const { balance, openingBalance, balancesByCurrency, historicalBaseBalance } =
-      await getSupplierBalanceForContext(supplier, companyId);
+    const { balance, openingBalance, balancesByCurrency, historicalBaseBalance } = await getSupplierBalanceForContext(
+      supplier,
+      companyId
+    );
     return { balance, openingBalance, balancesByCurrency, historicalBaseBalance };
   },
 
@@ -182,12 +187,7 @@ export const supplierService = {
     });
   },
 
-  async assignStockGroup(
-    supplierId: number,
-    companyId: number,
-    input: unknown,
-    actor: SupplierAuditActor,
-  ) {
+  async assignStockGroup(supplierId: number, companyId: number, input: unknown, actor: SupplierAuditActor) {
     const supplier = await requireSupplier(supplierId, companyId);
     const stockGroupId = parseSupplierStockGroupId(input);
     if (stockGroupId !== null && !(await supplierRepository.stockGroupExists(stockGroupId, companyId))) {

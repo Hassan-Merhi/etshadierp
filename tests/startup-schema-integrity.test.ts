@@ -24,7 +24,7 @@ import { describe, expect, it } from "vitest";
 import { startupMigrations } from "../server/startup-schema";
 
 /** Statement count of the reviewed composed array. */
-const EXPECTED_STATEMENT_COUNT = 1285;
+const EXPECTED_STATEMENT_COUNT = 1332;
 
 /**
  * sha256 of JSON.stringify(startupMigrations) for the reviewed composed array.
@@ -50,6 +50,11 @@ const EXPECTED_STATEMENT_COUNT = 1285;
  * 1288. They are appended last because they reference companies, stock_items
  * and locations, so nothing before them moved.
  *
+ * Re-pinned again when the legacy orphan repair stage was added before the
+ * foreign-key batch. It archives invalid child rows, preserves nullable
+ * references by clearing only the missing parent id, and raises the count
+ * from 1285 to 1332.
+ *
  * Re-pinned again when three VALIDATE statements were removed from
  * 007-schema-catchup-may-2026.ts, taking the count from 1288 to 1285. They
  * validated factory_raw_stock, factory_fx_allocations and
@@ -59,7 +64,7 @@ const EXPECTED_STATEMENT_COUNT = 1285;
  * parent table and raised foreign_key_violation on every boot of a database
  * holding factory rows. Only those three were deleted and no statement moved.
  */
-const EXPECTED_CONTENT_HASH = "0be36f4cd7fe626b9bdc065d21ddd2ea075c6163093bfc48a821b839c7101d5e";
+const EXPECTED_CONTENT_HASH = "eb83cfe04adb580a102cdceae2ff107f1be8f76ac3a6e24d5cf1cf716cb41cba";
 
 function contentHash(statements: string[]): string {
   return crypto.createHash("sha256").update(JSON.stringify(statements)).digest("hex");
@@ -110,5 +115,33 @@ describe("startup schema integrity", () => {
       unregistered,
       `These parts exist but are not imported by server/startup-schema/index.ts:\n${unregistered.join("\n")}`
     ).toEqual([]);
+  });
+
+  it("archives legacy FK orphans before the strict FK batch runs", () => {
+    const repairStart = startupMigrations.findIndex((statement) =>
+      statement.includes("CREATE TABLE IF NOT EXISTS _orphan_archive_customer_order_bale_removals")
+    );
+    const foreignKeyStart = startupMigrations.findIndex((statement) =>
+      statement.includes("customer_order_bale_removals_order_id_fkey")
+    );
+
+    expect(repairStart).toBeGreaterThanOrEqual(0);
+    expect(foreignKeyStart).toBeGreaterThan(repairStart);
+
+    for (const table of [
+      "customer_order_bale_removals",
+      "supplier_container_loaded_items",
+      "chat_messages",
+      "container_offloads",
+      "import_logs",
+      "inventory",
+      "stock_transfer_items",
+    ]) {
+      expect(startupMigrations.some((statement) => statement.includes(`_orphan_archive_${table}`))).toBe(true);
+    }
+
+    expect(
+      startupMigrations.filter((statement) => statement.includes("ON CONFLICT (id) DO NOTHING")).length
+    ).toBeGreaterThanOrEqual(7);
   });
 });

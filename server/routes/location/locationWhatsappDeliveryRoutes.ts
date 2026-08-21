@@ -31,9 +31,11 @@ interface RetryDeliveryRow {
   scheduled_for: string | Date | null;
 }
 
-declare module "express-serve-static-core" {
-  interface Request {
-    _locationStockRetryDelivery?: RetryDeliveryRow & { id: number };
+declare global {
+  namespace Express {
+    interface Request {
+      _locationStockRetryDelivery?: RetryDeliveryRow & { id: number };
+    }
   }
 }
 

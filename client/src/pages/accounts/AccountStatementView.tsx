@@ -321,7 +321,7 @@ export function AccountStatementView({
       {transactionsLoading ? (
         <Skeleton className="h-40 w-full" />
       ) : transactionError ? null : (
-        <div ref={printRef}>
+        <div ref={printRef as React.RefObject<HTMLDivElement>}>
           <AccountTransactionRows
             vouchersWithBalance={vouchersWithBalance}
             selectedVoucherIds={selectedVoucherIds}

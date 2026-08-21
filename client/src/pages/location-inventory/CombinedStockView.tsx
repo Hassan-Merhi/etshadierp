@@ -220,7 +220,10 @@ export function CombinedStockView({
             }
           />
         ) : (
-          <div className="w-full overflow-auto max-h-[calc(100vh-200px)]" ref={allStockTableRef}>
+          <div
+            className="w-full overflow-auto max-h-[calc(100vh-200px)]"
+            ref={allStockTableRef as React.RefObject<HTMLDivElement>}
+          >
             <table className="w-full text-sm border-collapse">
               <thead className="sticky top-0 z-30 bg-muted/50">
                 <tr className="bg-muted/60 border-b">

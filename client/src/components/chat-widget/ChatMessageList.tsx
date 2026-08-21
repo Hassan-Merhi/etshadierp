@@ -157,7 +157,7 @@ export function ChatMessageList({
   scrollAreaRef,
 }: ChatMessageListProps) {
   return (
-    <ScrollArea ref={scrollAreaRef} className="flex-1 px-4 py-3">
+    <ScrollArea ref={scrollAreaRef as React.RefObject<HTMLDivElement>} className="flex-1 px-4 py-3">
       {history.length === 0 && !isPending && (
         <div className="flex flex-col items-center justify-center h-full text-center py-6">
           <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">

@@ -10,7 +10,7 @@ import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import { eq, and } from "drizzle-orm";
 import fs from "fs";
-import XLSX from "xlsx";
+import XLSX from "xlsx-js-style";
 import ExcelJS from "exceljs";
 import { factoryWorkers } from "@shared/schema";
 

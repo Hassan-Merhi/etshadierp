@@ -10,6 +10,9 @@
  * No business cost values are changed and the historical replay is never executed.
  */
 export const FACTORY_HISTORICAL_REPLAY_V7_SCHEMA_SQL = `
+DROP TRIGGER IF EXISTS factory_mix_source_inventory_supplier_trg
+  ON factory_mix_batch_sources;
+
 ALTER TABLE factory_mix_batch_sources
   ADD COLUMN IF NOT EXISTS inventory_supplier_id INTEGER;
 

@@ -15,9 +15,11 @@ interface PermissionState {
   permissionMap: Map<string, boolean>;
 }
 
-declare module "express-serve-static-core" {
-  interface Request {
-    _permissionStates?: Map<string, PermissionState>;
+declare global {
+  namespace Express {
+    interface Request {
+      _permissionStates?: Map<string, PermissionState>;
+    }
   }
 }
 

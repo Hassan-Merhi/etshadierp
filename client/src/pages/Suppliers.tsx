@@ -40,6 +40,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { apiRequest } from "@/lib/queryClient";
+import { companyDataKey } from "@/lib/frontendDataArchitecture";
 import { suppliersApi } from "@/api/suppliersApi";
 import { format } from "date-fns";
 import { utils, writeFile } from "@/lib/excelHelper";
@@ -125,7 +126,7 @@ export default function Suppliers() {
   };
 
   const { data: suppliers = [], isLoading } = useQuery<SupplierWithStats[]>({
-    queryKey: ["/api/suppliers/stats"],
+    queryKey: companyDataKey("/api/suppliers/stats", selectedCompany?.id),
   });
 
   const { data: companies = [] } = useQuery<any[]>({

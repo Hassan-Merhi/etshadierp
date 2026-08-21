@@ -124,7 +124,7 @@ export function ImportProformaExcelDialog({
               <p className="text-xs text-muted-foreground mt-1">Supports .xlsx format</p>
             </div>
             <input
-              ref={excelFileInputRef}
+              ref={excelFileInputRef as React.RefObject<HTMLInputElement>}
               type="file"
               accept=".xlsx,.xls"
               className="hidden"

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "One-way ratchet on type escapes, counted from the TypeScript AST by scripts/audit-type-escapes.mjs. Every file carrying escapes is frozen at its current count in scan.baseline as [explicitAny, asAny, suppressions]: counts may fall freely, any increase fails, and a file with no entry must introduce none. totals.typeEscapeCeiling is the backlog as a single number and may only fall. Lower a baseline in the same change that removes the escapes \u2014 leaving headroom lets it refill silently. The god-file Waves 5-9 merge moved page bodies into split modules: each retired god file had its baseline dropped to its measured count and the escapes that travelled with the code are recorded against the module that now owns them, so the repository total did not rise. The God Files recovery merge repeats that move for DataToolsTab, FactorySuppliers, StockTransferOrder, SupplierProfitCheck and JournalForm: their baselines fall to the measured count and the relocated escapes are recorded against the extracted modules (datatoolstab/, factorysettings/, stock-transfer-order/dialogs/, daybook/VoucherDetailsDialog). No escape is new \u2014 the ceiling falls from 3296 to 3230.",
+  "description": "One-way ratchet on type escapes, counted from the TypeScript AST by scripts/audit-type-escapes.mjs. Every file carrying escapes is frozen at its current count in scan.baseline as [explicitAny, asAny, suppressions]: counts may fall freely, any increase fails, and a file with no entry must introduce none. totals.typeEscapeCeiling is the backlog as a single number and may only fall. Lower a baseline in the same change that removes the escapes — leaving headroom lets it refill silently. The god-file Waves 5-9 merge moved page bodies into split modules: each retired god file had its baseline dropped to its measured count and the escapes that travelled with the code are recorded against the module that now owns them, so the repository total did not rise. The God Files recovery merge repeats that move for DataToolsTab, FactorySuppliers, StockTransferOrder, SupplierProfitCheck and JournalForm: their baselines fall to the measured count and the relocated escapes are recorded against the extracted modules (datatoolstab/, factorysettings/, stock-transfer-order/dialogs/, daybook/VoucherDetailsDialog). No escape is new — the ceiling falls from 3296 to 3230.",
   "scan": {
     "roots": [
       "server",
@@ -526,11 +526,6 @@
       ],
       "client/src/pages/factory/BaleStockEntry.tsx": [
         1,
-        0,
-        0
-      ],
-      "client/src/pages/factory/BalesHistory.tsx": [
-        7,
         0,
         0
       ],
@@ -4001,6 +3996,11 @@
       ],
       "client/src/pages/factory/factoryproformas/useFactoryProformasModel.ts": [
         1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/baleshistory/useBalesHistoryModel.tsx": [
+        7,
         0,
         0
       ]

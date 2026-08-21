@@ -1,7 +1,6 @@
 import { Fragment } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { formatNumber } from "@/lib/formatNumber";
@@ -35,12 +34,12 @@ export default function SalesReportDetail() {
     toggleColumn,
     displayDate,
     grouping,
-    allCompanies,
+    allCompanies: _allCompanies,
     isCreditSaleParam,
     searchTerm,
     items,
     isLoading,
-    filteredItems,
+    filteredItems: _filteredItems,
     itemGroups,
     locationColorMap,
     multipleLocations,

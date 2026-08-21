@@ -15,6 +15,7 @@ import { factoryContainerColumns } from "./002-factory-container-columns";
 import { rentalAndProductionPlanner } from "./003-rental-and-production-planner";
 import { postDeployTables } from "./004-post-deploy-tables";
 import { tenantAndPerformanceIndexes } from "./005-tenant-and-performance-indexes";
+import { orphanForeignKeyRepairs } from "./005-orphan-fk-repairs";
 import { primaryAndForeignKeys } from "./006-primary-and-foreign-keys";
 import { schemaCatchupMay2026 } from "./007-schema-catchup-may-2026";
 import { posExportsAndDispatch } from "./008-pos-exports-and-dispatch";
@@ -38,6 +39,7 @@ export const startupMigrations: string[] = [
   ...rentalAndProductionPlanner,
   ...postDeployTables,
   ...tenantAndPerformanceIndexes,
+  ...orphanForeignKeyRepairs,
   ...primaryAndForeignKeys,
   ...schemaCatchupMay2026,
   ...posExportsAndDispatch,

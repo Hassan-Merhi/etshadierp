@@ -33,8 +33,10 @@ describeDatabase("company-scope RLS runtime", () => {
     await applyMigration(client);
 
     await client.query(`DROP TABLE IF EXISTS ${probeTable}`);
+    await client.query(`DROP OWNED BY ${roleName}`).catch(() => {});
     await client.query(`DROP ROLE IF EXISTS ${roleName}`);
     await client.query(`CREATE ROLE ${roleName} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS`);
+    await client.query(`GRANT USAGE ON SCHEMA public TO ${roleName}`);
     await client.query(
       `CREATE TABLE ${probeTable} (id serial PRIMARY KEY, company_id integer NOT NULL, marker text NOT NULL)`
     );
@@ -51,6 +53,7 @@ describeDatabase("company-scope RLS runtime", () => {
     if (!client) return;
     await client.query("RESET ROLE").catch(() => {});
     await client.query(`DROP TABLE IF EXISTS ${probeTable}`).catch(() => {});
+    await client.query(`DROP OWNED BY ${roleName}`).catch(() => {});
     await client.query(`DROP ROLE IF EXISTS ${roleName}`).catch(() => {});
     await client.end();
   });

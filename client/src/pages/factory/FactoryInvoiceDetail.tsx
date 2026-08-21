@@ -1,19 +1,9 @@
-import type { ClientErrorLike } from "@/lib/clientError";
-import { getErrorDetails } from "@shared/errorUtils";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
-import { useAppMode } from "@/contexts/AppModeContext";
-import { getApiRequest } from "@/lib/factoryApi";
-import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useLocation, useRoute } from "wouter";
-import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import {
   FileDown,
   FileSpreadsheet,
@@ -30,7 +20,6 @@ import {
   GitCompare,
   DollarSign,
   ScanLine,
-  ArrowLeftRight,
   Truck,
   ExternalLink,
 } from "lucide-react";
@@ -42,524 +31,87 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { queryClient, keyStartsWith, invalidateCustomerBalances } from "@/lib/queryClient";
-import { useState, useRef } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { useFactoryInvoiceDetailModel } from "./factoryinvoicedetail/useFactoryInvoiceDetailModel";
+import { FactoryInvoiceDetailDialog1 } from "./factoryinvoicedetail/components/FactoryInvoiceDetailDialog1";
+import { FactoryInvoiceDetailDialog2 } from "./factoryinvoicedetail/components/FactoryInvoiceDetailDialog2";
+import { FactoryInvoiceDetailDialog3 } from "./factoryinvoicedetail/components/FactoryInvoiceDetailDialog3";
+import { FactoryInvoiceDetailDialog4 } from "./factoryinvoicedetail/components/FactoryInvoiceDetailDialog4";
+import { FactoryInvoiceDetailDialog5 } from "./factoryinvoicedetail/components/FactoryInvoiceDetailDialog5";
+import { FactoryInvoiceDetailFinalizeDialog } from "./factoryinvoicedetail/components/FactoryInvoiceDetailFinalizeDialog";
 
-import type { OrderDetail } from "./factoryinvoicedetail/types";
 export default function FactoryInvoiceDetail() {
-  const { formatDisplayDate } = useDateFormat();
-  const { toast } = useToast();
-  const { selectedCompany: _selectedCompany } = useCompany();
-  const [, navigate] = useLocation();
-  const [editingArticleCode, setEditingArticleCode] = useState<string | null>(null);
-  const [editingChargeLedger, setEditingChargeLedger] = useState<number | null>(null);
-  const [editingChargeAmount, setEditingChargeAmount] = useState<number | null>(null);
-  const [chargeAmountInput, setChargeAmountInput] = useState("");
-  const [showAddCharge, setShowAddCharge] = useState(false);
-  const [newChargeName, setNewChargeName] = useState("");
-  const [newChargeAmount, setNewChargeAmount] = useState("");
-  const [newChargeType, setNewChargeType] = useState("FREIGHT");
-  const [newChargeLedgerId, setNewChargeLedgerId] = useState<string>("");
-  const [editValue, setEditValue] = useState("");
-  const [revertDialogOpen, setRevertDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [baleRefArticle, setBaleRefArticle] = useState<{ code: string; name: string } | null>(null);
-  const [exchangeBale, setExchangeBale] = useState<{ orderBaleId: number; reference: string } | null>(null);
-  const [newRefInput, setNewRefInput] = useState("");
-  const [removeBaleState, setRemoveBaleState] = useState<{ orderBaleId: number; reference: string } | null>(null);
-  const [showProformaDialog, setShowProformaDialog] = useState(false);
-  const [selectedProformaId, setSelectedProformaId] = useState<string>("");
-  const inputRef = useRef<HTMLInputElement>(null);
-  useEscapeToParent("/factory/invoicing?tab=invoices");
-  const appMode = useAppMode();
-  const modeApiRequest = getApiRequest(appMode);
-  const [, params] = useRoute("/factory/sales/invoices/:id");
-
-  const orderId = params?.id ? parseInt(params.id) : null;
-
-  const { data: order, isLoading } = useQuery<OrderDetail>({
-    queryKey: ["/api/factory/customer-orders", orderId],
-    queryFn: async () => {
-      const res = await fetch(`/api/factory/customer-orders/${orderId}`, { credentials: "include" });
-      if (!res.ok) throw new Error((await res.json()).message);
-      return res.json();
-    },
-    enabled: !!orderId,
-  });
-
-  const { data: ledgerAccounts = [] } = useQuery<{ id: number; name: string; code: string }[]>({
-    queryKey: ["/api/ledger-accounts?includeHidden=true"],
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
-  });
-
-  const updateChargeLedgerMutation = useMutation({
-    mutationFn: async ({ chargeId, ledgerAccountId }: { chargeId: number; ledgerAccountId: number | null }) => {
-      const res = await modeApiRequest("PATCH", `/api/factory/customer-orders/${orderId}/charges/${chargeId}`, {
-        ledgerAccountId,
-      });
-      if (!res.ok) throw new Error((await res.json()).message || "Failed to update charge");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
-      setEditingChargeLedger(null);
-      toast({ title: "Ledger account updated" });
-    },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const addChargeMutation = useMutation({
-    mutationFn: async ({
-      name,
-      amount,
-      chargeType,
-      ledgerAccountId,
-    }: {
-      name: string;
-      amount: number;
-      chargeType: string;
-      ledgerAccountId: number | null;
-    }) => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/charges`, {
-        name,
-        amount,
-        chargeType,
-        ledgerAccountId,
-      });
-      if (!res.ok) throw new Error((await res.json()).message || "Failed to add charge");
-      return res.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
-      setShowAddCharge(false);
-      setNewChargeName("");
-      setNewChargeAmount("");
-      setNewChargeType("FREIGHT");
-      setNewChargeLedgerId("");
-      if (data?.warning) {
-        toast({ title: "Charge added — ledger entry skipped", description: data.warning, variant: "destructive" });
-      } else {
-        toast({ title: "Charge added", description: "Accounting voucher posted." });
-      }
-    },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const relinkVouchersMutation = useMutation({
-    mutationFn: async () => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/charges/relink-vouchers`, {});
-      if (!res.ok) throw new Error((await res.json()).message || "Failed to relink");
-      return res.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
-      toast({ title: data.linked > 0 ? "Ledger entries created" : "Nothing to relink", description: data.message });
-    },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const updateChargeAmountMutation = useMutation({
-    mutationFn: async ({ chargeId, amount }: { chargeId: number; amount: number }) => {
-      const res = await modeApiRequest("PATCH", `/api/factory/customer-orders/${orderId}/charges/${chargeId}`, {
-        amount,
-      });
-      if (!res.ok) throw new Error((await res.json()).message || "Failed to update charge amount");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
-      setEditingChargeAmount(null);
-      setChargeAmountInput("");
-      toast({ title: "Charge amount updated" });
-    },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const { data: myAccess } = useQuery<{ hiddenCostFields: string[]; fullAccess?: boolean }>({
-    queryKey: ["/api/factory/my-access"],
-  });
-  const { data: me } = useQuery<{ role: string }>({ queryKey: ["/api/auth/me"] });
-  const isDeveloper = me?.role === "Developer";
-
-  const { data: proformas = [] } = useQuery<
-    { id: number; name: string; lines: { articleCode: string; pricePerBale: string }[] }[]
-  >({
-    queryKey: ["/api/factory/customer-proformas", order?.customerId],
-    queryFn: async () => {
-      if (!order?.customerId) return [];
-      const res = await fetch(`/api/factory/customer-proformas?customerId=${order.customerId}`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to fetch proformas");
-      return res.json();
-    },
-    enabled: !!order?.customerId,
-  });
-
-  interface DispatchBatchSummary {
-    batch: { id: number; batchNumber: string; batchDate: string; status: string; currency: string };
-    customerName: string | null;
-    proforma: { id: number; name: string } | null;
-    rides: { id: number; rideNumber: number; status: string; baleCount: number | string; totalWeightKg: string }[];
-    totals: { totalBales: number; totalWeightKg: string; grandTotal: string };
-  }
-  const { data: dispatchBatch } = useQuery<DispatchBatchSummary>({
-    queryKey: ["/api/factory/dispatch-batches", order?.dispatchBatchId],
-    queryFn: async () => {
-      const res = await fetch(`/api/factory/dispatch-batches/${order!.dispatchBatchId}`, { credentials: "include" });
-      if (!res.ok) return null;
-      return res.json();
-    },
-    enabled: !!order?.dispatchBatchId,
-  });
-
-  const hideExportSelling = (myAccess?.hiddenCostFields ?? []).includes("hide_export_selling_price");
-  const isAdmin = myAccess?.fullAccess === true;
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "DRAFT":
-        return (
-          <Badge variant="secondary" data-testid="badge-status-draft">
-            Draft
-          </Badge>
-        );
-      case "LOADING":
-        return (
-          <Badge
-            variant="outline"
-            className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
-            data-testid="badge-status-loading"
-          >
-            Loading
-          </Badge>
-        );
-      case "PENDING_VERIFICATION":
-      case "VERIFIED":
-        return (
-          <Badge
-            variant="outline"
-            className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
-            data-testid="badge-status-verified"
-          >
-            Verified
-          </Badge>
-        );
-      case "FINALIZED":
-        return (
-          <Badge variant="default" data-testid="badge-status-finalized">
-            Finalized
-          </Badge>
-        );
-      case "CANCELLED":
-        return (
-          <Badge variant="destructive" data-testid="badge-status-cancelled">
-            Cancelled
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="secondary" data-testid="badge-status-unknown">
-            {status}
-          </Badge>
-        );
-    }
-  };
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await modeApiRequest("DELETE", `/api/factory/customer-orders/${id}`);
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to delete");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Deleted", description: "Invoice deleted successfully." });
-      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
-      invalidateCustomerBalances(order?.customerId ?? undefined);
-      navigate("/factory/invoicing?tab=invoices");
-    },
-    onError: (error: ClientErrorLike) => {
-      if (error?._handledGlobally) return;
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const repriceMutation = useMutation({
-    mutationFn: async () => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/reprice`);
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to reprice");
-      }
-      return res.json();
-    },
-    onSuccess: (data) => {
-      if (data.repriced === 0) {
-        toast({
-          title: "Prices already current",
-          description: "All bale prices already match the current catalogue — no changes needed.",
-        });
-      } else {
-        toast({
-          title: "Prices updated",
-          description: `Updated ${data.repriced} bale(s) to current catalogue prices.`,
-        });
-      }
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
-    },
-    onError: (error: ClientErrorLike) => {
-      if (error?._handledGlobally) return;
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const repriceArticleMutation = useMutation({
-    mutationFn: async ({ articleCode, pricePerBale }: { articleCode: string; pricePerBale: number }) => {
-      const res = await modeApiRequest("PATCH", `/api/factory/customer-orders/${orderId}/bales/reprice-article`, {
-        articleCode,
-        pricePerBale,
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to update price");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Price updated",
-        description: "All bales for this article have been repriced and totals recalculated.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
-      setEditingArticleCode(null);
-    },
-    onError: (error: ClientErrorLike) => {
-      if (error?._handledGlobally) return;
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      setEditingArticleCode(null);
-    },
-  });
-
-  const unfinalizeMutation = useMutation({
-    mutationFn: async () => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/unfinalize`);
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to revert invoice");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Reverted to Draft", description: "Invoice has been reverted. You can now edit prices." });
-      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
-      invalidateCustomerBalances(order?.customerId ?? undefined);
-    },
-    onError: (error: ClientErrorLike) => {
-      if (error?._handledGlobally) return;
-      toast({ title: "Cannot revert", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const repriceProductionMutation = useMutation({
-    mutationFn: async () => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/reprice-production`);
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to apply production prices");
-      }
-      return res.json();
-    },
-    onSuccess: (data) => {
-      if (data.repriced === 0) {
-        toast({
-          title: "Already at production prices",
-          description: "All bale prices already match the current production prices — no changes needed.",
-        });
-      } else {
-        toast({
-          title: "Production prices applied",
-          description: `Updated ${data.repriced} bale(s) to production prices.`,
-        });
-      }
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
-    },
-    onError: (error: ClientErrorLike) => {
-      if (error?._handledGlobally) return;
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const applyProformaMutation = useMutation({
-    mutationFn: async (proformaId: number) => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/apply-proforma-prices`, {
-        proformaId,
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to apply proforma prices");
-      }
-      return res.json();
-    },
-    onSuccess: (data) => {
-      const repriced = data?.repriced ?? 0;
-      if (repriced === 0) {
-        toast({
-          title: "No changes",
-          description: "All bale prices already match the selected proforma — no updates needed.",
-        });
-      } else {
-        toast({ title: "Proforma prices applied", description: `Updated ${repriced} bale(s).` });
-      }
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
-      setShowProformaDialog(false);
-      setSelectedProformaId("");
-    },
-    onError: (error: ClientErrorLike) => {
-      if (error?._handledGlobally) return;
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const exchangeMutation = useMutation({
-    mutationFn: async ({ orderBaleId, newBaleReference }: { orderBaleId: number; newBaleReference: string }) => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales/exchange`, {
-        orderBaleId,
-        newBaleReference,
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to exchange bale");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Bale exchanged", description: `Replaced successfully.` });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
-      setExchangeBale(null);
-      setNewRefInput("");
-    },
-    onError: (error: ClientErrorLike) => {
-      if (error?._handledGlobally) return;
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const removeBaleMutation = useMutation({
-    mutationFn: async (orderBaleId: number) => {
-      const res = await modeApiRequest("DELETE", `/api/factory/customer-orders/${orderId}/bales/${orderBaleId}`);
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to remove bale");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Bale removed", description: "Bale returned to stock." });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
-      setRemoveBaleState(null);
-    },
-    onError: (error: ClientErrorLike) => {
-      if (error?._handledGlobally) return;
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const startEdit = (articleCode: string, currentPrice: number) => {
-    setEditingArticleCode(articleCode);
-    setEditValue(String(currentPrice));
-    setTimeout(() => inputRef.current?.select(), 30);
-  };
-
-  const commitEdit = (articleCode: string) => {
-    const price = parseFloat(editValue);
-    if (isNaN(price) || price < 0) {
-      toast({ title: "Invalid price", description: "Please enter a valid number.", variant: "destructive" });
-      setEditingArticleCode(null);
-      return;
-    }
-    repriceArticleMutation.mutate({ articleCode, pricePerBale: price });
-  };
-
-  const cancelEdit = () => {
-    setEditingArticleCode(null);
-    setEditValue("");
-  };
-
-  // Shared helper: fetch a binary file from the server and trigger a browser download.
-  // Using fetch+blob instead of window.open() ensures auth cookies are always sent,
-  // errors surface as toast messages, and stalled 0-byte downloads are avoided.
-  const downloadFromUrl = async (url: string, fallbackName: string) => {
-    try {
-      const res = await fetch(url, { credentials: "include", cache: "no-store" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || `Server error ${res.status}`);
-      }
-      const blob = await res.blob();
-      if (blob.size === 0) {
-        throw new Error("Server returned an empty file.");
-      }
-      const cd = res.headers.get("content-disposition") || "";
-      // Handle both  filename*=UTF-8''encoded-name  and  filename="plain-name"
-      const starMatch = cd.match(/filename\*=UTF-8''([^;\s]+)/i);
-      const plainMatch = cd.match(/filename="([^"]+)"/i);
-      const rawName = starMatch ? starMatch[1] : plainMatch ? plainMatch[1] : null;
-      const objectUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objectUrl;
-      a.download = rawName ? decodeURIComponent(rawName) : fallbackName;
-      document.body.appendChild(a);
-      a.click();
-      // Delay cleanup so Chrome has time to consume the blob URL before it is revoked.
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(objectUrl);
-      }, 10000);
-    } catch (err) {
-      toast({ title: "Export failed", description: getErrorDetails(err).message, variant: "destructive" });
-    }
-  };
-
-  const handleExportExcel = () => {
-    if (!orderId) return;
-    downloadFromUrl(`/api/factory/customer-orders/${orderId}/export-excel`, "invoice.xlsx");
-  };
-
-  const handleExportExcelNoCharges = () => {
-    if (!orderId) return;
-    downloadFromUrl(`/api/factory/customer-orders/${orderId}/export-excel?noCharges=1`, "invoice-no-charges.xlsx");
-  };
-
-  const handleExportPdf = () => {
-    if (!orderId) return;
-    downloadFromUrl(`/api/factory/customer-orders/${orderId}/export-pdf`, "invoice.pdf");
-  };
-
-  const handleExportPdfNoCharges = () => {
-    if (!orderId) return;
-    downloadFromUrl(`/api/factory/customer-orders/${orderId}/export-pdf?noCharges=1`, "invoice-no-charges.pdf");
-  };
-
-  const handleExportLoadingStatus = () => {
-    if (!orderId) return;
-    downloadFromUrl(`/api/factory/customer-orders/${orderId}/loading-status-export`, "loading-status.xlsx");
-  };
+  const model = useFactoryInvoiceDetailModel();
+  const {
+    formatDisplayDate,
+    navigate,
+    editingArticleCode,
+    editingChargeLedger,
+    setEditingChargeLedger,
+    editingChargeAmount,
+    setEditingChargeAmount,
+    chargeAmountInput,
+    setChargeAmountInput,
+    showAddCharge,
+    setShowAddCharge,
+    newChargeName,
+    setNewChargeName,
+    newChargeAmount,
+    setNewChargeAmount,
+    newChargeType,
+    setNewChargeType,
+    newChargeLedgerId,
+    setNewChargeLedgerId,
+    editValue,
+    setEditValue,
+    revertDialogOpen: _revertDialogOpen,
+    setRevertDialogOpen,
+    deleteDialogOpen: _deleteDialogOpen,
+    setDeleteDialogOpen,
+    baleRefArticle: _baleRefArticle,
+    setBaleRefArticle,
+    exchangeBale: _exchangeBale,
+    setExchangeBale: _setExchangeBale,
+    newRefInput: _newRefInput,
+    setNewRefInput: _setNewRefInput,
+    removeBaleState: _removeBaleState,
+    setRemoveBaleState: _setRemoveBaleState,
+    showProformaDialog: _showProformaDialog,
+    setShowProformaDialog,
+    selectedProformaId: _selectedProformaId,
+    setSelectedProformaId,
+    inputRef,
+    orderId: _orderId,
+    order,
+    isLoading,
+    ledgerAccounts,
+    updateChargeLedgerMutation,
+    addChargeMutation,
+    relinkVouchersMutation,
+    updateChargeAmountMutation,
+    isDeveloper,
+    proformas: _proformas,
+    dispatchBatch,
+    hideExportSelling,
+    isAdmin,
+    getStatusBadge,
+    deleteMutation: _deleteMutation,
+    repriceMutation,
+    repriceArticleMutation,
+    unfinalizeMutation: _unfinalizeMutation,
+    repriceProductionMutation,
+    applyProformaMutation,
+    exchangeMutation: _exchangeMutation,
+    removeBaleMutation: _removeBaleMutation,
+    startEdit,
+    commitEdit,
+    cancelEdit,
+    handleExportExcel,
+    handleExportExcelNoCharges,
+    handleExportPdf,
+    handleExportPdfNoCharges,
+    handleExportLoadingStatus,
+  } = model;
 
   if (isLoading) {
     return (
@@ -824,46 +376,9 @@ export default function FactoryInvoiceDetail() {
         </div>
 
         {/* Controlled dialogs outside dropdown */}
-        <AlertDialog open={revertDialogOpen} onOpenChange={setRevertDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Revert invoice to Draft?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will un-finalize {order.invoiceNumber || `Order #${order.id}`} and return it to Draft status. The
-                invoice number will be cleared and bales will be returned to "Reserved" state. Any recorded payments
-                must be reversed first.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel data-testid="button-cancel-unfinalize">Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => unfinalizeMutation.mutate()}
-                disabled={unfinalizeMutation.isPending}
-                data-testid="button-confirm-unfinalize"
-              >
-                {unfinalizeMutation.isPending ? "Reverting…" : "Revert to Draft"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <FactoryInvoiceDetailDialog1 model={model} />
 
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will permanently delete order {order.invoiceNumber || `#${order.id}`} for {order.customerName}. Any
-                bales assigned to this order will be returned to stock. This cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => deleteMutation.mutate(order.id)} data-testid="button-confirm-delete">
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <FactoryInvoiceDetailDialog2 model={model} />
       </div>
 
       {/* ── Dispatch Batch Info Card (Developer only) ───────────────────── */}
@@ -1364,246 +879,16 @@ export default function FactoryInvoiceDetail() {
         </div>
       </Card>
 
-      <Dialog open={showProformaDialog} onOpenChange={setShowProformaDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Apply Proforma Prices</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Select a proforma to apply its article prices to all matching bales in this order.
-            </p>
-            {proformas.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">No proformas found for this customer.</p>
-            ) : (
-              <Select value={selectedProformaId} onValueChange={setSelectedProformaId}>
-                <SelectTrigger data-testid="select-proforma">
-                  <SelectValue placeholder="Select a proforma..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {proformas.map((p) => (
-                    <SelectItem key={p.id} value={String(p.id)} data-testid={`option-proforma-${p.id}`}>
-                      {p.name} ({p.lines.length} line{p.lines.length !== 1 ? "s" : ""})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {selectedProformaId &&
-              (() => {
-                const pf = proformas.find((p) => String(p.id) === selectedProformaId);
-                if (!pf || pf.lines.length === 0) return null;
-                return (
-                  <div className="rounded-md border p-3 space-y-1 max-h-48 overflow-y-auto">
-                    <p className="text-xs font-medium text-muted-foreground mb-2">Price lines in this proforma:</p>
-                    {pf.lines.map((l, i) => (
-                      <div key={i} className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">{l.articleCode}</span>
-                        <span className="font-medium">${parseFloat(l.pricePerBale).toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowProformaDialog(false)}
-                data-testid="button-cancel-proforma"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  if (selectedProformaId) applyProformaMutation.mutate(parseInt(selectedProformaId));
-                }}
-                disabled={!selectedProformaId || applyProformaMutation.isPending}
-                data-testid="button-confirm-proforma"
-              >
-                <DollarSign className="mr-2 h-4 w-4" />
-                {applyProformaMutation.isPending ? "Applying…" : "Apply Prices"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <FactoryInvoiceDetailDialog3 model={model} />
 
       {/* Bale References Dialog */}
-      <Dialog
-        open={baleRefArticle !== null}
-        onOpenChange={(open) => {
-          if (!open) setBaleRefArticle(null);
-        }}
-      >
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-base">
-              {baleRefArticle?.name}
-              <span className="ml-2 font-mono text-sm text-muted-foreground">({baleRefArticle?.code})</span>
-            </DialogTitle>
-          </DialogHeader>
-          {baleRefArticle &&
-            (() => {
-              const balesForArticle = (order?.bales ?? [])
-                .filter((b) => b.articleCode === baleRefArticle.code)
-                .sort((a, b) => a.baleReference.localeCompare(b.baleReference));
-              const canExchange = isAdmin && isFinalized;
-              return balesForArticle.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">
-                  No bale references found for this item.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-xs text-muted-foreground">
-                    {balesForArticle.length} bale{balesForArticle.length !== 1 ? "s" : ""} loaded
-                    {canExchange && (
-                      <span className="ml-1">
-                        — hover a chip to remove <Trash2 className="inline h-3 w-3" /> or exchange{" "}
-                        <ArrowLeftRight className="inline h-3 w-3" />
-                      </span>
-                    )}
-                  </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {balesForArticle.map((b) => (
-                      <div
-                        key={b.id}
-                        className="group relative rounded-md border bg-muted/30 px-2.5 py-1.5 font-mono text-sm text-center"
-                        data-testid={`bale-ref-${b.baleReference}`}
-                      >
-                        {b.baleReference}
-                        {canExchange && (
-                          <>
-                            <button
-                              className="absolute -top-1.5 -left-1.5 opacity-0 group-hover:opacity-100 bg-background border rounded-full p-0.5 hover-elevate transition-opacity"
-                              onClick={() => setRemoveBaleState({ orderBaleId: b.id, reference: b.baleReference })}
-                              data-testid={`button-remove-bale-${b.id}`}
-                              title="Remove this bale and return to stock"
-                            >
-                              <Trash2 className="h-3 w-3 text-destructive" />
-                            </button>
-                            <button
-                              className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 bg-background border rounded-full p-0.5 hover-elevate transition-opacity"
-                              onClick={() => {
-                                setExchangeBale({ orderBaleId: b.id, reference: b.baleReference });
-                                setNewRefInput("");
-                              }}
-                              data-testid={`button-exchange-bale-${b.id}`}
-                              title="Exchange this bale for another"
-                            >
-                              <ArrowLeftRight className="h-3 w-3" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
-        </DialogContent>
-      </Dialog>
+      <FactoryInvoiceDetailFinalizeDialog model={model} isFinalized={isFinalized} />
 
       {/* Remove Bale Confirm Dialog */}
-      <AlertDialog
-        open={removeBaleState !== null}
-        onOpenChange={(open) => {
-          if (!open) setRemoveBaleState(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove bale from invoice?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bale <span className="font-mono font-medium">{removeBaleState?.reference}</span> will be removed from this
-              invoice and returned to stock. The invoice totals will update automatically.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-remove-bale">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => removeBaleState && removeBaleMutation.mutate(removeBaleState.orderBaleId)}
-              disabled={removeBaleMutation.isPending}
-              data-testid="button-confirm-remove-bale"
-              className="bg-destructive text-destructive-foreground"
-            >
-              {removeBaleMutation.isPending ? "Removing…" : "Remove"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <FactoryInvoiceDetailDialog4 model={model} />
 
       {/* Exchange Bale Dialog */}
-      <Dialog
-        open={exchangeBale !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setExchangeBale(null);
-            setNewRefInput("");
-          }
-        }}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-base flex items-center gap-2">
-              <ArrowLeftRight className="h-4 w-4" />
-              Exchange Bale
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
-              <span className="text-muted-foreground">Removing: </span>
-              <span className="font-mono font-medium">{exchangeBale?.reference}</span>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Replacement bale reference</label>
-              <Input
-                placeholder="e.g. REF12345"
-                value={newRefInput}
-                onChange={(e) => setNewRefInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && newRefInput.trim() && exchangeBale) {
-                    exchangeMutation.mutate({
-                      orderBaleId: exchangeBale.orderBaleId,
-                      newBaleReference: newRefInput.trim(),
-                    });
-                  }
-                }}
-                data-testid="input-exchange-bale-ref"
-                autoFocus
-              />
-              <p className="text-xs text-muted-foreground">
-                The replacement bale must be in stock. Price is preserved.
-              </p>
-            </div>
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setExchangeBale(null);
-                  setNewRefInput("");
-                }}
-                data-testid="button-cancel-exchange"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  if (exchangeBale && newRefInput.trim())
-                    exchangeMutation.mutate({
-                      orderBaleId: exchangeBale.orderBaleId,
-                      newBaleReference: newRefInput.trim(),
-                    });
-                }}
-                disabled={!newRefInput.trim() || exchangeMutation.isPending}
-                data-testid="button-confirm-exchange"
-              >
-                <ArrowLeftRight className="mr-2 h-4 w-4" />
-                {exchangeMutation.isPending ? "Exchanging…" : "Exchange"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <FactoryInvoiceDetailDialog5 model={model} />
     </div>
   );
 }

@@ -31,7 +31,7 @@ export function ChatWidgetInput({
     <div className="p-4 border-t bg-background">
       <div className="flex items-center gap-1 bg-muted/50 dark:bg-zinc-800/50 rounded-2xl border border-border/60 px-1 pr-1.5 focus-within:border-blue-300 dark:focus-within:border-blue-700 focus-within:ring-2 focus-within:ring-blue-100 dark:focus-within:ring-blue-900/40 transition-all">
         <input
-          ref={fileInputRef}
+          ref={fileInputRef as React.RefObject<HTMLInputElement>}
           type="file"
           accept=".pdf,.xlsx,.xls,.csv"
           className="hidden"
@@ -50,7 +50,7 @@ export function ChatWidgetInput({
           {poDraftUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
         </Button>
         <Input
-          ref={inputRef}
+          ref={inputRef as React.RefObject<HTMLInputElement>}
           placeholder="Ask anything..."
           value={message}
           onChange={(e) => setMessage(e.target.value)}
