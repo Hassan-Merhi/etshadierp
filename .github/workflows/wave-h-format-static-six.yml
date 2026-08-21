@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: { ref: wave-i/convergence-automation }
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with: { node-version: "22.23.2", cache: npm }
+        with: { node-version: "24.19.0", cache: npm }
       - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
       - run: npm ci --no-audit --bin-links=true
       - name: Format exact static offenders

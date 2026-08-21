@@ -22,7 +22,7 @@ jobs:
       - name: Set up canonical Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: "22.23.2"
+          node-version: "24.19.0"
 
       - name: Verify audit classifier contract
         run: node scripts/verify-i18n-audit-classifier.mjs
