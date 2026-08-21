@@ -13,7 +13,8 @@ type ChildrenProps = { children: React.ReactNode };
 
 vi.mock("wouter", () => ({
   useLocation: () => ["/factory/sales/invoices/77", harness.navigate],
-  useRoute: (pattern: string) => (pattern === "/factory/sales/invoices/:id" ? [true, { id: "77" }] : [false, {}]),
+  useRoute: (pattern: string) =>
+    pattern === "/factory/sales/invoices/:id" ? [true, { id: "77" }] : [false, {}],
   useSearch: () => "",
   useParams: () => ({}),
   Link: ({ children, ...props }: React.PropsWithChildren<React.AnchorHTMLAttributes<HTMLAnchorElement>>) => (
@@ -133,22 +134,8 @@ const finalizedOrder = {
   ],
   bales: [],
   charges: [
-    {
-      id: 11,
-      name: "Ocean Freight",
-      amount: "30",
-      chargeType: "FREIGHT",
-      ledgerAccountId: 9,
-      voucherId: 101,
-    },
-    {
-      id: 12,
-      name: "Clearance",
-      amount: "20",
-      chargeType: "CLEARANCE",
-      ledgerAccountId: 10,
-      voucherId: 102,
-    },
+    { id: 11, name: "Ocean Freight", amount: "30", chargeType: "FREIGHT", ledgerAccountId: 9, voucherId: 101 },
+    { id: 12, name: "Clearance", amount: "20", chargeType: "CLEARANCE", ledgerAccountId: 10, voucherId: 102 },
   ],
 };
 
