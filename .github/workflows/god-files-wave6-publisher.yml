@@ -38,6 +38,8 @@ jobs:
           npm ci --no-audit --bin-links=true
       - name: Apply Wave 6 client splits
         run: node scripts/tmp-god-files-wave6.mjs
+      - name: Harden Wave 6 generated boundaries
+        run: node scripts/tmp-god-files-wave6-fix.mjs
       - name: Format generated source
         run: |
           mapfile -d '' changed_files < <(git diff --name-only --diff-filter=ACMR -z origin/main -- client/src scripts | grep -zE '\.(ts|tsx|mjs)$' || true)
@@ -52,6 +54,11 @@ jobs:
             client/src/pages/factory/FactoryStockAllocationV5.tsx \
             client/src/pages/factory/factorystockallocationv5/useFactoryStockAllocationV5Model.tsx; do
             echo "$file: $(wc -l < "$file") lines"
+            test "$(wc -l < "$file")" -le 900
+          done
+          find client/src/pages/baleproducts/components client/src/pages/containerdetail/components client/src/pages/factory/factorystockallocationv5/components -type f -name '*.tsx' -print0 | while IFS= read -r -d '' file; do
+            echo "$file: $(wc -l < "$file") lines"
+            test "$(wc -l < "$file")" -le 900
           done
       - name: TypeScript diagnostic
         run: npm run check
