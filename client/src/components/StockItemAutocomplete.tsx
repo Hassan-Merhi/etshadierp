@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -49,16 +49,16 @@ export function StockItemAutocomplete({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const cancelPendingBlur = () => {
+  const cancelPendingBlur = useCallback(() => {
     if (blurTimerRef.current !== null) {
       clearTimeout(blurTimerRef.current);
       blurTimerRef.current = null;
     }
-  };
+  }, []);
 
   useEffect(() => {
     return () => cancelPendingBlur();
-  }, []);
+  }, [cancelPendingBlur]);
 
   const displayValue = searchTerm !== null ? searchTerm : value ? value.name : "";
 
@@ -68,6 +68,13 @@ export function StockItemAutocomplete({
     searchTerm !== null && searchTerm.length > 0
       ? sortedItems.filter((item) => item.name.toLowerCase().includes(searchTerm.toLowerCase()))
       : sortedItems;
+
+  useEffect(() => {
+    setSelectedIndex((previous) => {
+      if (filteredItems.length === 0) return 0;
+      return Math.min(previous, filteredItems.length - 1);
+    });
+  }, [filteredItems.length]);
 
   const handleSelect = (item: StockItem) => {
     cancelPendingBlur();
@@ -79,18 +86,18 @@ export function StockItemAutocomplete({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown") {
-      if (isOpen) {
+      if (isOpen && filteredItems.length > 0) {
         e.preventDefault();
         setSelectedIndex((prev) => Math.min(prev + 1, filteredItems.length - 1));
-      } else if (onArrowDown) {
+      } else if (!isOpen && onArrowDown) {
         e.preventDefault();
         onArrowDown();
       }
     } else if (e.key === "ArrowUp") {
-      if (isOpen) {
+      if (isOpen && filteredItems.length > 0) {
         e.preventDefault();
         setSelectedIndex((prev) => Math.max(prev - 1, 0));
-      } else if (onArrowUp) {
+      } else if (!isOpen && onArrowUp) {
         e.preventDefault();
         onArrowUp();
       }
