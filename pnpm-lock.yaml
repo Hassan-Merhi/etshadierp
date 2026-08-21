@@ -33,8 +33,8 @@ importers:
         specifier: ^1.0.4
         version: 1.0.4(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@google/genai':
-        specifier: ^2.15.0
-        version: 2.17.1(bufferutil@4.1.0)(supports-color@7.2.0)
+        specifier: ^2.18.0
+        version: 2.18.0(bufferutil@4.1.0)(supports-color@7.2.0)
       '@hookform/resolvers':
         specifier: ^3.10.0
         version: 3.10.0(react-hook-form@7.85.0(react@19.2.8))
@@ -1206,8 +1206,8 @@ packages:
       react: '>= 18.2'
       react-dom: '>= 18.2'
 
-  '@google/genai@2.17.1':
-    resolution: {integrity: sha512-CdZ3M/titoH81hXXkvOikrOW26bC9IXh9iYT7u+r+5p7wi1LnMEnB0AbJfDeWAkjuneP4oJ299BtCt6twmORWg==}
+  '@google/genai@2.18.0':
+    resolution: {integrity: sha512-uy9gWVTAZXuA/2tld0QJl/QNiGEn4QOmfX4PiRgZQmeFQRQhojpD/Gf41SPnBJmjEnT83a+h4AdU1HHYaYvVDw==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@modelcontextprotocol/sdk': ^1.25.2
@@ -6820,7 +6820,7 @@ snapshots:
       react-dom: 19.2.8(react@19.2.8)
       regenerator-runtime: 0.14.1
 
-  '@google/genai@2.17.1(bufferutil@4.1.0)(supports-color@7.2.0)':
+  '@google/genai@2.18.0(bufferutil@4.1.0)(supports-color@7.2.0)':
     dependencies:
       google-auth-library: 10.9.1(supports-color@7.2.0)
       p-retry: 4.6.2
