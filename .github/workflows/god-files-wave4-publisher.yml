@@ -36,7 +36,9 @@ jobs:
           sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
           npm ci --no-audit --bin-links=true
       - name: Apply Wave 4 model extractions
-        run: python3 scripts/tmp-god-files-wave4.py
+        run: |
+          python3 scripts/tmp-god-files-wave4.py
+          python3 scripts/tmp-god-files-wave4-fix.py
       - name: Format Wave 4
         run: |
           node node_modules/prettier/bin/prettier.cjs --write \
@@ -49,6 +51,7 @@ jobs:
             client/src/pages/salesreportdetail/useSalesReportDetailModel.ts \
             client/src/pages/salesreportdetail/components/SalesReportDetailHeader.tsx \
             client/src/pages/salesreportdetail/components/SalesReportSummaryCards.tsx \
+            client/src/pages/salesreportdetail/components/SalesReportItemMobileView.tsx \
             config/god-file-boundaries.json tests/god-file-boundaries.test.ts
       - name: Recalibrate live ratchets and docs
         shell: bash
@@ -93,6 +96,7 @@ jobs:
             'client/src/pages/salesreportdetail/useSalesReportDetailModel.ts',
             'client/src/pages/salesreportdetail/components/SalesReportDetailHeader.tsx',
             'client/src/pages/salesreportdetail/components/SalesReportSummaryCards.tsx',
+            'client/src/pages/salesreportdetail/components/SalesReportItemMobileView.tsx',
           }
           counts = {f['path']: f for f in report['files']}
           baseline = cfg['scan']['baseline']
@@ -125,7 +129,8 @@ jobs:
             client/src/pages/SalesReportDetail.tsx \
             client/src/pages/salesreportdetail/useSalesReportDetailModel.ts \
             client/src/pages/salesreportdetail/components/SalesReportDetailHeader.tsx \
-            client/src/pages/salesreportdetail/components/SalesReportSummaryCards.tsx; do
+            client/src/pages/salesreportdetail/components/SalesReportSummaryCards.tsx \
+            client/src/pages/salesreportdetail/components/SalesReportItemMobileView.tsx; do
             count=$(wc -l < "$file")
             echo "$file: $count lines"
             test "$count" -le 900
@@ -145,11 +150,12 @@ jobs:
             client/src/pages/salesreportdetail/useSalesReportDetailModel.ts \
             client/src/pages/salesreportdetail/components/SalesReportDetailHeader.tsx \
             client/src/pages/salesreportdetail/components/SalesReportSummaryCards.tsx \
+            client/src/pages/salesreportdetail/components/SalesReportItemMobileView.tsx \
             config/god-file-boundaries.json config/type-escape-boundaries.json \
             tests/god-file-boundaries.test.ts docs/god-file-split-program.md docs/system-quality-program.md
       - name: Publish cumulative Wave 4 and self-remove
         run: |
-          rm -f .github/workflows/god-files-wave4-publisher.yml scripts/tmp-god-files-wave4.py .wave4-sync-trigger
+          rm -f .github/workflows/god-files-wave4-publisher.yml scripts/tmp-god-files-wave4.py scripts/tmp-god-files-wave4-fix.py .wave4-sync-trigger
           git add -- \
             client/src/pages/factory/CreateProformaV5Drawer.tsx \
             client/src/pages/factory/createproformav5drawer/useCreateProformaV5Model.ts \
@@ -160,9 +166,10 @@ jobs:
             client/src/pages/salesreportdetail/useSalesReportDetailModel.ts \
             client/src/pages/salesreportdetail/components/SalesReportDetailHeader.tsx \
             client/src/pages/salesreportdetail/components/SalesReportSummaryCards.tsx \
+            client/src/pages/salesreportdetail/components/SalesReportItemMobileView.tsx \
             config/god-file-boundaries.json config/type-escape-boundaries.json \
             tests/god-file-boundaries.test.ts docs/god-file-split-program.md docs/system-quality-program.md \
-            .github/workflows/god-files-wave4-publisher.yml scripts/tmp-god-files-wave4.py .wave4-sync-trigger
+            .github/workflows/god-files-wave4-publisher.yml scripts/tmp-god-files-wave4.py scripts/tmp-god-files-wave4-fix.py .wave4-sync-trigger
           git commit -m "refactor(god-files): complete cumulative wave 4 on current main"
           git push origin HEAD:agent/god-files-final-wave1-tests
           git push origin --delete tmp/god-files-wave4-trigger || true
