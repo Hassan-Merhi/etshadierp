@@ -4,9 +4,15 @@ on:
   push:
     branches:
       - agent/phase18-wave2-remaining-current
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
+
+concurrency:
+  group: phase18-final-repair
+  cancel-in-progress: true
 
 env:
   CI: true
@@ -14,6 +20,7 @@ env:
 
 jobs:
   repair:
+    if: github.event_name == 'push' || github.event.pull_request.head.ref == 'agent/phase18-wave2-remaining-current'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
