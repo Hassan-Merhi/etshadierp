@@ -1,0 +1,32 @@
+name: Wave H Ratchet Diagnostic
+
+on:
+  push:
+    branches: [agent/wave-h-coverage-completion]
+    paths:
+      - .github/workflows/wave-h-ratchet-diagnostic.yml
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22.23.2"
+          cache: npm
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - name: Capture type-escape audit
+        run: npm run audit:type-escapes -- --json > wave-h-type-escapes.json || true
+      - name: Capture script-inventory audit
+        run: npm run audit:scripts -- --json > wave-h-script-inventory.json || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: wave-h-ratchet-diagnostics
+          path: |
+            wave-h-type-escapes.json
+            wave-h-script-inventory.json
+          if-no-files-found: error
+          retention-days: 2
