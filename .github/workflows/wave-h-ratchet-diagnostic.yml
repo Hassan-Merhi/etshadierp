@@ -3,8 +3,6 @@ name: Wave H Ratchet Diagnostic
 on:
   pull_request:
     branches: [main]
-    paths:
-      - .github/workflows/wave-h-ratchet-diagnostic.yml
 
 jobs:
   diagnose:
