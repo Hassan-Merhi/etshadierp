@@ -41,7 +41,12 @@ export default function ContainerVerification() {
   });
 
   const { data: suppliers = [] } = useQuery<any[]>({
-    queryKey: ["/api/suppliers"],
+    queryKey: ["/api/suppliers", "allowParentFallback"],
+    queryFn: async () => {
+      const res = await fetch("/api/suppliers?allowParentFallback=true", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch suppliers");
+      return res.json();
+    },
   });
 
   const { data: selectedSupplierData } = useQuery<any>({
