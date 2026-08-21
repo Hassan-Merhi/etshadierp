@@ -134,8 +134,22 @@ const finalizedOrder = {
   ],
   bales: [],
   charges: [
-    { id: 11, name: "Ocean Freight", amount: "30", chargeType: "FREIGHT", ledgerAccountId: 9, voucherId: 101 },
-    { id: 12, name: "Clearance", amount: "20", chargeType: "CLEARANCE", ledgerAccountId: 10, voucherId: 102 },
+    {
+      id: 11,
+      name: "Ocean Freight",
+      amount: "30",
+      chargeType: "FREIGHT",
+      ledgerAccountId: 9,
+      voucherId: 101,
+    },
+    {
+      id: 12,
+      name: "Clearance",
+      amount: "20",
+      chargeType: "CLEARANCE",
+      ledgerAccountId: 10,
+      voucherId: 102,
+    },
   ],
 };
 
