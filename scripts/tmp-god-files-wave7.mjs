@@ -54,6 +54,8 @@ source =
   "  const runMigrations = () => runStartupMigrations(migrations, () => { migrationsDone = true; });\n\n" +
   source.slice(puppeteerStart);
 source = source.replace('import { Client } from "pg";\n', "");
+source = source.replace("// Build version for cache-busting and deployment tracking.\n", "");
+source = source.replace("// Unique ID generated fresh on every server start.\n", "");
 const startupImportAnchor = 'import { startupMigrations, ensureCanonicalStockMovementJournal } from "./startup-schema";';
 if (!source.includes(startupImportAnchor)) throw new Error("Wave 7 missing startup import anchor");
 source = source.replace(
