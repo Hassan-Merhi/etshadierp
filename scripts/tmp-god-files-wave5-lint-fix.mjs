@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import ts from "typescript";
 import { loadESLint } from "eslint";
 
 const patterns = ["client/src/**/*.{ts,tsx}", "server/**/*.ts", "shared/**/*.ts"];
 const ESLint = await loadESLint({ useFlatConfig: true });
+const touched = new Set();
 
-// First apply ESLint's safe fixes (primarily unused imports).
 {
   const eslint = new ESLint({ fix: true });
   const results = await eslint.lintFiles(patterns);
+  for (const result of results) if (result.output !== undefined) touched.add(result.filePath);
   await ESLint.outputFixes(results);
 }
 
@@ -26,6 +28,7 @@ for (const result of results) {
 function findIdentifierAt(sourceFile, line, column) {
   let match = null;
   function visit(node) {
+    if (match) return;
     if (ts.isIdentifier(node)) {
       const pos = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
       if (pos.line === line - 1 && pos.character === column - 1) {
@@ -51,27 +54,22 @@ for (const [filePath, warnings] of byFile) {
     if (!node) throw new Error(`Unused identifier not found at ${filePath}:${warning.line}:${warning.column}`);
     const name = node.text;
     if (name.startsWith("_")) continue;
-
     let replacement = `_${name}`;
     const parent = node.parent;
-    if (
-      ts.isBindingElement(parent) &&
-      parent.name === node &&
-      ts.isObjectBindingPattern(parent.parent) &&
-      !parent.propertyName
-    ) {
+    if (ts.isBindingElement(parent) && parent.name === node && ts.isObjectBindingPattern(parent.parent) && !parent.propertyName) {
       replacement = `${name}: _${name}`;
     }
-
     edits.push({ start: node.getStart(sourceFile), end: node.end, replacement });
     renamed += 1;
   }
 
   edits.sort((a, b) => b.start - a.start);
-  for (const edit of edits) {
-    source = source.slice(0, edit.start) + edit.replacement + source.slice(edit.end);
-  }
+  for (const edit of edits) source = source.slice(0, edit.start) + edit.replacement + source.slice(edit.end);
   fs.writeFileSync(filePath, source);
+  touched.add(filePath);
 }
 
-console.log(`WAVE5_LINT_FIX renamed=${renamed} files=${byFile.size}`);
+if (touched.size) {
+  execFileSync(process.execPath, ["node_modules/prettier/bin/prettier.cjs", "--write", ...touched], { stdio: "inherit" });
+}
+console.log(`WAVE5_LINT_FIX renamed=${renamed} files=${byFile.size} formatted=${touched.size}`);
