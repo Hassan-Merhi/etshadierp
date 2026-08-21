@@ -101,7 +101,8 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     const data = await res.json();
     return parseResponse(containerNumber, data, base);
   } catch (err: unknown) {
-    const isTimeout = (err as { name?: string }).name === "TimeoutError" || (err as { name?: string }).name === "AbortError";
+    const isTimeout =
+      (err as { name?: string }).name === "TimeoutError" || (err as { name?: string }).name === "AbortError";
     logger.info(`[CMAPublic] ${containerNumber}: ${isTimeout ? "timeout" : (getErrorMessage(err) ?? "error")}`);
     return { ...base, error: isTimeout ? "timeout" : (getErrorMessage(err) ?? "unknown_error") };
   }
@@ -121,7 +122,7 @@ function parseResponse(containerNumber: string, data: unknown, base: CarrierTrac
   const d = data as Record<string, unknown>;
 
   // CMA response shapes vary — be defensive
-  const shipment: any =
+  const shipment =
     d.shipment ??
     d.tracking ??
     (Array.isArray(d.shipments) ? d.shipments[0] : null) ??

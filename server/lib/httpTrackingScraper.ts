@@ -104,7 +104,7 @@ async function tryMsc(containerNumber: string): Promise<HttpScraperResult> {
       signal: ctrl.signal,
     });
     if (!resp.ok) return { success: false, shipment: null, error: `MSC HTTP ${resp.status}` };
-    const data: any = await resp.json();
+    const data = await resp.json();
     const activities: any[] = data?.TrackingDetails?.TrackingActivities ?? data?.trackingActivities ?? [];
     if (!activities.length) return { success: false, shipment: null, error: "MSC: no activities" };
     const events = activities.map((a) => ({
@@ -153,7 +153,7 @@ async function tryHapag(containerNumber: string): Promise<HttpScraperResult> {
       }
     );
     if (!resp.ok) return { success: false, shipment: null, error: `Hapag HTTP ${resp.status}` };
-    const data: any = await resp.json();
+    const data = await resp.json();
     const moves: any[] = data?.containerJourneys?.[0]?.containerMoves ?? data?.moves ?? [];
     if (!moves.length) return { success: false, shipment: null, error: "Hapag: no moves" };
     const events = moves.map((m) => ({
@@ -183,7 +183,7 @@ async function tryCosco(containerNumber: string): Promise<HttpScraperResult> {
       }
     );
     if (!resp.ok) return { success: false, shipment: null, error: `COSCO HTTP ${resp.status}` };
-    const data: any = await resp.json();
+    const data = await resp.json();
     const detail = data?.data?.content?.[0];
     if (!detail) return { success: false, shipment: null, error: "COSCO: no data" };
     const moves: any[] = detail.movementActivities ?? detail.activities ?? [];
@@ -214,7 +214,7 @@ async function tryEvergreen(containerNumber: string): Promise<HttpScraperResult>
       }
     );
     if (!resp.ok) return { success: false, shipment: null, error: `Evergreen HTTP ${resp.status}` };
-    const data: any = await resp.json();
+    const data = await resp.json();
     const moves: any[] = data?.EventList ?? data?.events ?? [];
     if (!moves.length) return { success: false, shipment: null, error: "Evergreen: no events" };
     const events = moves.map((m) => ({

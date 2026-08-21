@@ -325,7 +325,7 @@ export function registerRawStockContainerRoutes(app: Express) {
       const oldContainerCostPerKgUsd = parseFloat(container.ratePerKgUsd || "0");
       const oldContainerTotalUsd = parseFloat(container.finalPayableAmountUsd || "0");
 
-      let lastResult: any = null;
+      let lastResult = null;
       const allCascadeResults: any[] = [];
 
       await db.transaction(async (tx) => {

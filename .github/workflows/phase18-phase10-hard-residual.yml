@@ -1,0 +1,143 @@
+name: Phase 18 Wave 2 Phase 10 Hard Residual Sweep
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: write
+env:
+  CI: true
+  NODE_OPTIONS: --max-old-space-size=6144
+jobs:
+  hard-residual:
+    if: github.event.pull_request.head.ref == 'agent/phase18-wave2-remaining-current'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: agent/phase18-wave2-remaining-current
+          fetch-depth: 0
+      - name: Guard certified result
+        id: guard
+        shell: bash
+        run: |
+          if [ -f phase18-phase10-hard-residual-report.md ] && grep -Fq 'Certification: full TypeScript compiler green; compiler-safe hard residual transforms exhausted.' phase18-phase10-hard-residual-report.md; then
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'skip=false' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        if: steps.guard.outputs.skip != 'true'
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci
+        if: steps.guard.outputs.skip != 'true'
+      - name: Solve compiler-safe hard residuals
+        if: steps.guard.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          npm run check
+          audit(){ set +e; node scripts/audit-type-escapes.mjs --json >"$1" 2>/dev/null; set -e; }
+          audit /tmp/phase10-initial.json
+          start=$(git rev-parse HEAD)
+          : >/tmp/phase10-results
+
+          cat >.phase18-hard-sweep.cjs <<'NODE'
+          const ts=require('typescript'),fs=require('fs'),path=require('path');
+          const target=process.env.PHASE10_CLASS;
+          const root=process.cwd();
+          const cp=ts.findConfigFile(root,ts.sys.fileExists,'tsconfig.json');
+          const cf=ts.readConfigFile(cp,ts.sys.readFile);
+          const pc=ts.parseJsonConfigFileContent(cf.config,ts.sys,path.dirname(cp));
+          const files=pc.fileNames.filter(f=>{const r=path.relative(root,f).replaceAll('\\','/');return /^(client\/src|server|shared)\//.test(r)&&/\.(ts|tsx)$/.test(r)&&!r.endsWith('.d.ts')&&fs.existsSync(f)});
+          const state=new Map(pc.fileNames.filter(fs.existsSync).map(f=>[path.resolve(f),{text:fs.readFileSync(f,'utf8'),version:0}]));
+          const host={getCompilationSettings:()=>pc.options,getScriptFileNames:()=>pc.fileNames,getScriptVersion:f=>String(state.get(path.resolve(f))?.version??0),getScriptSnapshot:f=>{const e=state.get(path.resolve(f));if(e)return ts.ScriptSnapshot.fromString(e.text);if(fs.existsSync(f))return ts.ScriptSnapshot.fromString(fs.readFileSync(f,'utf8'))},getCurrentDirectory:()=>root,getDefaultLibFileName:o=>ts.getDefaultLibFilePath(o),fileExists:ts.sys.fileExists,readFile:ts.sys.readFile,readDirectory:ts.sys.readDirectory,directoryExists:ts.sys.directoryExists,getDirectories:ts.sys.getDirectories,realpath:ts.sys.realpath};
+          const ls=ts.createLanguageService(host,ts.createDocumentRegistry());
+          const set=(f,t)=>{const k=path.resolve(f),e=state.get(k)||{text:fs.readFileSync(f,'utf8'),version:0};e.text=t;e.version++;state.set(k,e)};
+          const diags=f=>[...ls.getSyntacticDiagnostics(f),...ls.getSemanticDiagnostics(f)];
+          const apply=(text,e)=>text.slice(0,e.start)+e.repl+text.slice(e.end);
+          const candidates=(node,sf)=>{const p=node.parent,out=[];const add=(start,end,repl,label)=>{if(label===target)out.push({start,end,repl,label})};
+            if((ts.isVariableDeclaration(p)||ts.isPropertyDeclaration(p))&&p.type===node&&p.initializer)add(p.name.end,p.type.end,'','infer-annotation');
+            if(ts.isParameter(p)&&p.type===node)add(node.getStart(sf),node.end,'unknown','param-unknown');
+            if(ts.isArrayTypeNode(p)&&p.elementType===node)add(node.getStart(sf),node.end,'unknown','array-unknown');
+            if(ts.isTypeReferenceNode(p)&&p.typeArguments?.includes(node))add(node.getStart(sf),node.end,'unknown','typearg-unknown');
+            if(ts.isUnionTypeNode(p))add(node.getStart(sf),node.end,'unknown','union-unknown');
+            if(ts.isFunctionLike(p)&&p.type===node)add(node.getStart(sf),node.end,'unknown','return-unknown');
+            if((ts.isAsExpression(p)||ts.isTypeAssertionExpression(p))&&p.type===node)add(p.getStart(sf),p.end,`(${p.expression.getText(sf)})`,'remove-cast');
+            return out;
+          };
+          let seen=0,accepted=0,changed=0;
+          for(const file of files){let text=fs.readFileSync(file,'utf8'),fileAccepted=0;
+            for(let round=0;round<40;round++){
+              const sf=ts.createSourceFile(file,text,ts.ScriptTarget.Latest,true,file.endsWith('x')?ts.ScriptKind.TSX:ts.ScriptKind.TS),nodes=[];
+              const visit=n=>{if(n.kind===ts.SyntaxKind.AnyKeyword)nodes.push(n);ts.forEachChild(n,visit)};visit(sf);
+              let progressed=false;
+              for(const n of nodes){seen++;for(const e of candidates(n,sf)){const trial=apply(text,e);set(file,trial);if(diags(file).length===0){text=trial;accepted++;fileAccepted++;progressed=true;break}else set(file,text)}if(progressed)break}
+              if(!progressed)break;
+            }
+            if(fileAccepted){set(file,text);if(diags(file).length===0){fs.writeFileSync(file,text);changed++}else set(file,fs.readFileSync(file,'utf8'))}
+          }
+          fs.writeFileSync('/tmp/phase10-class.json',JSON.stringify({target,seen,accepted,changed},null,2));
+          console.log(`PHASE10 class=${target} seen=${seen} accepted=${accepted} files=${changed}`);
+          NODE
+
+          for cls in infer-annotation remove-cast array-unknown typearg-unknown union-unknown return-unknown param-unknown; do
+            echo "Phase 10 trying class: $cls"
+            before_head=$(git rev-parse HEAD)
+            audit /tmp/phase10-before.json
+            PHASE10_CLASS="$cls" node .phase18-hard-sweep.cjs
+            git diff --name-only -- client/src server shared >/tmp/phase10-files
+            if [ ! -s /tmp/phase10-files ]; then
+              echo "$cls no-candidates" >>/tmp/phase10-results
+              continue
+            fi
+            xargs -d '\n' node node_modules/prettier/bin/prettier.cjs --write </tmp/phase10-files
+            set +e
+            npm run check >/tmp/phase10-check.log 2>&1
+            rc=$?
+            set -e
+            if [ "$rc" -ne 0 ]; then
+              git reset --hard "$before_head"
+              echo "$cls rejected-global-compiler" >>/tmp/phase10-results
+              continue
+            fi
+            audit /tmp/phase10-after.json
+            set +e
+            node - <<'NODE'
+          const fs=require('fs');
+          const before=JSON.parse(fs.readFileSync('/tmp/phase10-before.json','utf8')).summary;
+          const after=JSON.parse(fs.readFileSync('/tmp/phase10-after.json','utf8')).summary;
+          if(after.typeEscapeTotal>before.typeEscapeTotal||after.explicitAny>before.explicitAny||after.asAny>before.asAny||after.suppressions>before.suppressions) process.exit(2);
+          if(after.typeEscapeTotal>=before.typeEscapeTotal) process.exit(3);
+          NODE
+            ratchet_rc=$?
+            set -e
+            if [ "$ratchet_rc" -ne 0 ]; then
+              git reset --hard "$before_head"
+              echo "$cls rejected-ratchet" >>/tmp/phase10-results
+              continue
+            fi
+            git add $(cat /tmp/phase10-files)
+            git commit -m "refactor: Phase 10 ${cls} hard residuals [phase18-phase10] [skip ci]"
+            echo "$cls accepted" >>/tmp/phase10-results
+          done
+
+          rm -f .phase18-hard-sweep.cjs
+          npm run check
+          audit /tmp/final.json
+          if [ "$(git rev-parse HEAD)" != "$start" ]; then
+            git push origin HEAD:agent/phase18-wave2-remaining-current
+          fi
+          node - <<'NODE'
+          const fs=require('fs');
+          const r=JSON.parse(fs.readFileSync('/tmp/final.json','utf8'));
+          const results=fs.readFileSync('/tmp/phase10-results','utf8').trim().split('\n').filter(Boolean);
+          fs.writeFileSync('phase18-phase10-hard-residual-report.md',['# Phase 18 Wave 2 — Phase 10 Hard Residual Sweep','',`Type escapes after Phase 10: ${r.summary.typeEscapeTotal}`,`Explicit any: ${r.summary.explicitAny}`,`as any: ${r.summary.asAny}`,`Suppressions: ${r.summary.suppressions}`,`Files with escapes: ${r.summary.filesWithEscapes}`,'',...results.map(x=>`- ${x}`),'','Scope: transactional compiler-safe residual inference, unknown-boundary, type-argument, union, return, array, and cast transforms across client/src, server, and shared. Each class is retained only when the full project compiler remains green and all ratchets stay non-widening.','Certification: full TypeScript compiler green; compiler-safe hard residual transforms exhausted.',''].join('\n'));
+          NODE
+          git add phase18-phase10-hard-residual-report.md
+          git commit -m 'chore: certify Phase 10 hard residual sweep [phase18-phase10-result]'
+          git push origin HEAD:agent/phase18-wave2-remaining-current

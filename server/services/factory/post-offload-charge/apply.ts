@@ -397,7 +397,7 @@ export async function applyPostOffloadChargeMutation(
 
     const isLegacyUnknownBaseline =
       chargeRow.supplierLockedRateBefore === null && params.legacyBaselineRate !== undefined;
-    let cascadeResult: any = null;
+    let cascadeResult = null;
 
     // Update container cost
     await updateContainerCost(tx, containerId, newCost);

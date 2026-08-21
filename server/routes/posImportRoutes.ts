@@ -82,7 +82,7 @@ export function registerPosImportRoutes(app: Express) {
 
       await storage.getAllStockItems(req.session.currentCompanyId!);
       for (const item of items) {
-        const validatedItem: any = { ...item };
+        const validatedItem = { ...item };
         const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
         if (!stockItem) {
           validatedItem.error = `Barcode '${item.barcode}' not found in stock items`;
