@@ -120,7 +120,7 @@ export function registerCreditSalesImportRoutes(app: Express) {
       }
 
       for (const item of items) {
-        const validatedItem: any = { ...item };
+        const validatedItem = { ...item };
 
         const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
 

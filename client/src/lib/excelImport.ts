@@ -64,7 +64,7 @@ function buildConditions(ws: any): any[] {
     for (const cf of cfs) {
       for (const rule of cf.rules || []) {
         try {
-          const base: any = {
+          const base = {
             ref: cf.ref,
             type: rule.type,
             priority: rule.priority ?? 1,
@@ -310,7 +310,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
     if (Object.keys(rowhidden).length > 0) config.rowhidden = rowhidden;
 
     // ── Auto filter ──────────────────────────────────────────────────────
-    let filter_select: any = null;
+    let filter_select = null;
     const af = (ws as { autoFilter: unknown }).autoFilter;
     if (af) {
       filter_select = decodeAutoFilter(af);

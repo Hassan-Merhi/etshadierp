@@ -43,7 +43,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
       const [customer] = await db.select().from(customers).where(eq(customers.id, batch.customerId));
 
       // Proforma info
-      let proforma: any = null;
+      let proforma = null;
       let proformaLines: any[] = [];
       if (batch.proformaId) {
         const rows = await db.select().from(customerProformas).where(eq(customerProformas.id, batch.proformaId));
@@ -192,7 +192,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
         if (batch.status === "CANCELLED") throw new Error("Batch is cancelled");
 
         // 2. Check proforma status
-        let proforma: any = null;
+        let proforma = null;
         let proformaLines: any[] = [];
         if (batch.proforma_id) {
           const pfRows = await tx.execute(

@@ -117,7 +117,7 @@ export function registerProductionBaleRoutes(app: Express) {
         return res.status(404).json({ message: "Product not found" });
       }
 
-      let batch: any = null;
+      let batch = null;
       let costPerKg = 0;
       let totalCostPerBale = "0";
 

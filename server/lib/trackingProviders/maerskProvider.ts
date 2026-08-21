@@ -154,7 +154,7 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     const raw: unknown = await res.json();
 
     // Response is usually an array; normalise to the first entry.
-    const entry: any = Array.isArray(raw) ? raw[0] : raw;
+    const entry = Array.isArray(raw) ? raw[0] : raw;
     if (!entry) throw new Error("Maersk returned empty response");
 
     // Events may be on entry.events or entry.containers[0].events
