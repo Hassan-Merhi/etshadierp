@@ -70,7 +70,7 @@ export function EditAccountDialog({ model }: { model: AccountsLegacyModel }) {
           <Form {...editForm}>
             <form
               onSubmit={editForm.handleSubmit((data) => {
-                updateLedgerMutation.mutate(({ id: alterSelectedAccount.accountId, ...data }));
+                updateLedgerMutation.mutate({ id: alterSelectedAccount.accountId, ...data });
                 model.setEditDialogOpen(false);
               })}
               className="space-y-4 mt-1"

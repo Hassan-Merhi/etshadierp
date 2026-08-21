@@ -641,7 +641,7 @@ export function useAccountsLegacyModel() {
     editForm.reset({
       code: account.code,
       name: account.name,
-      accountType: ((account.accountType || account.type || "")),
+      accountType: account.accountType || account.type || "",
       subType: account.subType || "",
       openingBalance: String(Math.abs(account.openingBalance || 0)),
       openingBalanceSide: (account.openingBalanceSide as "Dr" | "Cr") || "Dr",

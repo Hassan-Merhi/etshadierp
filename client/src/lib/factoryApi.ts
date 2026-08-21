@@ -182,10 +182,9 @@ async function attachPostOffloadImpactPreview(
   const confirmed =
     typeof window === "undefined" || window.confirm(buildPostOffloadImpactConfirmation(prepared.preview));
   if (!confirmed) {
-    const cancelled = Object.assign(new Error("Post-offload charge save cancelled."), {
-      name: "UserCancelled",
-      _handledGlobally: true,
-    });
+    const cancelled: Error & { _handledGlobally?: boolean } = new Error("Post-offload charge save cancelled.");
+    cancelled.name = "UserCancelled";
+    cancelled._handledGlobally = true;
     throw cancelled;
   }
 

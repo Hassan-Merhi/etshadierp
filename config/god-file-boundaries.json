@@ -1,6 +1,6 @@
 {
-  "version": 25,
-  "description": "Version 25 reconciles current main Waves 5-9 with the recovered God Files programme, preserves newer main implementations, and permanently retires every grandfathered file that is now at or below the repository limit. Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly reviewed. Version 24 merges the Waves 5-9 god-file programme into main: StockItemDetailsDialog.tsx, AccountsLegacy.tsx, StockEntryHistory.tsx, StockItems.tsx, TransactionJournal.tsx, daybook/VoucherDetailsDialog.tsx, FactoryDaybook.tsx, FactoryLocationInventory.tsx, FactoryPOS.tsx, POSImport.tsx, POSPriceList.tsx, StockAdjustmentForm.tsx and StockTransferForm.tsx are all permanently retired from the grandfathered backlog after behavior-preserving splits into typed models, focused views and stable original-path composition shells; ContainerVerification.tsx and FactoryInvoiceLoadingScan.tsx were already retired in Version 21.",
+  "version": 26,
+  "description": "Version 26 salvages the final unique God Files work from superseded PR #675: server/services/factory/postOffloadPhase6Safety.ts is permanently retired from the grandfathered backlog behind its stable public import path, with the behavior-preserving Phase 15 implementation moved into postOffloadPhase6SafetyImpl.ts and kept below the repository limit. Version 25 reconciles current main Waves 5-9 with the recovered God Files programme, preserves newer main implementations, and permanently retires every grandfathered file that is now at or below the repository limit. Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly reviewed. Version 24 merges the Waves 5-9 god-file programme into main: StockItemDetailsDialog.tsx, AccountsLegacy.tsx, StockEntryHistory.tsx, StockItems.tsx, TransactionJournal.tsx, daybook/VoucherDetailsDialog.tsx, FactoryDaybook.tsx, FactoryLocationInventory.tsx, FactoryPOS.tsx, POSImport.tsx, POSPriceList.tsx, StockAdjustmentForm.tsx and StockTransferForm.tsx are all permanently retired from the grandfathered backlog after behavior-preserving splits into typed models, focused views and stable original-path composition shells; ContainerVerification.tsx and FactoryInvoiceLoadingScan.tsx were already retired in Version 21.",
   "retiredFiles": [
     "server/routesLegacy.ts",
     "server/routes/reportsRoutesLegacy.ts",
@@ -156,7 +156,6 @@
       "client/src/pages/SalesReportLegacy.tsx": 1000,
       "server/chatService.ts": 2000,
       "server/index.ts": 1725,
-      "server/services/factory/postOffloadPhase6Safety.ts": 927,
       "tests/excel-export-v2.test.ts": 1425,
       "tests/inventory.test.ts": 1450,
       "tests/workflow.test.ts": 1025,

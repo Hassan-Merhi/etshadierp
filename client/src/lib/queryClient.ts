@@ -299,16 +299,23 @@ async function throwIfResNotOk(res: Response) {
       errorData = { message: fallback };
     }
 
-    // Preserve the structured API error fields without erasing the Error type.
-    const error = Object.assign(new Error(errorData.message || res.statusText), {
-      status: res.status,
-      code: errorData.code,
-      requiresConfirmation: errorData.requiresConfirmation,
-      employeeBalance: errorData.employeeBalance,
-      ledgerBalance: errorData.ledgerBalance,
-      notInProforma: errorData.notInProforma,
-      overloaded: errorData.overloaded,
-    });
+    // Preserve structured API error fields without mass-assigning response data.
+    const error: Error &
+      ClientErrorLike & {
+        status?: number;
+        requiresConfirmation?: unknown;
+        employeeBalance?: unknown;
+        ledgerBalance?: unknown;
+        notInProforma?: unknown;
+        overloaded?: unknown;
+      } = new Error(errorData.message || res.statusText);
+    error.status = res.status;
+    error.code = errorData.code;
+    error.requiresConfirmation = errorData.requiresConfirmation;
+    error.employeeBalance = errorData.employeeBalance;
+    error.ledgerBalance = errorData.ledgerBalance;
+    error.notInProforma = errorData.notInProforma;
+    error.overloaded = errorData.overloaded;
     throw error;
   }
 }
