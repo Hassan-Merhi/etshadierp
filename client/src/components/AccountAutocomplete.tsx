@@ -69,18 +69,30 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
     const [highlightedIndex, setHighlightedIndex] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
+    const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Expose focus and clear methods
+    const cancelPendingBlur = () => {
+      if (blurTimerRef.current !== null) {
+        clearTimeout(blurTimerRef.current);
+        blurTimerRef.current = null;
+      }
+    };
+
+    useEffect(() => {
+      return () => cancelPendingBlur();
+    }, []);
+
     useImperativeHandle(ref, () => ({
       focus: () => {
+        cancelPendingBlur();
         inputRef.current?.focus();
       },
       clear: () => {
+        cancelPendingBlur();
         setSearchTerm(null);
       },
     }));
 
-    // Filter accounts based on search term (search both name and code/barcode)
     const filteredAccounts = useMemo(() => {
       const term = (searchTerm ?? "").toLowerCase();
 
@@ -89,22 +101,33 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
       );
     }, [allAccounts, searchTerm]);
 
-    // Reset highlighted index when filtered list changes
     useEffect(() => {
       setHighlightedIndex(0);
     }, [filteredAccounts.length]);
 
-    // Scroll highlighted item into view
+    // Keep keyboard navigation inside the dropdown only. scrollIntoView can scroll
+    // ancestor containers/the whole page, which caused account pickers to jump the UI.
     useEffect(() => {
-      if (listRef.current && open && filteredAccounts.length > 0) {
-        const highlightedButton = listRef.current.querySelector(`[data-index="${highlightedIndex}"]`) as HTMLElement;
-        if (highlightedButton) {
-          highlightedButton.scrollIntoView({ block: "nearest", behavior: "smooth" });
-        }
+      const list = listRef.current;
+      if (!list || !open || filteredAccounts.length === 0) return;
+
+      const highlightedButton = list.querySelector(`[data-index="${highlightedIndex}"]`) as HTMLElement | null;
+      if (!highlightedButton) return;
+
+      const itemTop = highlightedButton.offsetTop;
+      const itemBottom = itemTop + highlightedButton.offsetHeight;
+      const visibleTop = list.scrollTop;
+      const visibleBottom = visibleTop + list.clientHeight;
+
+      if (itemTop < visibleTop) {
+        list.scrollTop = itemTop;
+      } else if (itemBottom > visibleBottom) {
+        list.scrollTop = itemBottom - list.clientHeight;
       }
     }, [highlightedIndex, open, filteredAccounts.length]);
 
     const handleSelectAccount = (account: CombinedAccount) => {
+      cancelPendingBlur();
       onChange(account.type, account.id, account.name);
       setSearchTerm(null);
       setOpen(false);
@@ -120,6 +143,7 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
           onEnterWithoutSelection?.();
         }
       } else if (e.key === "Tab") {
+        cancelPendingBlur();
         setOpen(false);
         if (onTabPressed && !e.shiftKey) {
           e.preventDefault();
@@ -127,36 +151,31 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
         }
       } else if (e.key === "Escape") {
         e.preventDefault();
+        cancelPendingBlur();
         setOpen(false);
         setSearchTerm(null);
       } else if (e.key === "ArrowUp") {
         if (open && filteredAccounts.length > 0) {
-          // When dropdown is open, navigate within the list
           e.preventDefault();
           setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : filteredAccounts.length - 1));
         } else {
-          // When dropdown is closed, navigate between fields
           e.preventDefault();
           onArrowUp?.();
         }
       } else if (e.key === "ArrowDown") {
         if (open && filteredAccounts.length > 0) {
-          // When dropdown is open, navigate within the list
           e.preventDefault();
           setHighlightedIndex((prev) => (prev < filteredAccounts.length - 1 ? prev + 1 : 0));
         } else {
-          // When dropdown is closed, navigate between fields
           e.preventDefault();
           onArrowDown?.();
         }
       } else if (e.key === "ArrowLeft") {
-        // Only navigate between fields when dropdown is closed
         if (!open) {
           e.preventDefault();
           onArrowLeft?.();
         }
       } else if (e.key === "ArrowRight") {
-        // Only navigate between fields when dropdown is closed
         if (!open) {
           e.preventDefault();
           onArrowRight?.();
@@ -164,10 +183,8 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
       }
     };
 
-    // Show searchTerm if user has started editing (not null), otherwise show selected value
     const displayValue = searchTerm !== null ? searchTerm : value?.name || "";
 
-    // Unique IDs for accessibility
     const listboxId = `account-listbox-${rowIndex}`;
     const activeOptionId = `account-option-${rowIndex}-${highlightedIndex}`;
 
@@ -181,6 +198,7 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
           aria-activedescendant={open && filteredAccounts.length > 0 ? activeOptionId : undefined}
           value={displayValue}
           onChange={(e) => {
+            cancelPendingBlur();
             const newValue = e.target.value;
             setSearchTerm(newValue);
             onSearchChange?.(newValue);
@@ -188,12 +206,13 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
           }}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            // Open dropdown to show all accounts for browsing
+            cancelPendingBlur();
             setOpen(true);
           }}
           onBlur={() => {
-            // Delay to allow click on dropdown
-            setTimeout(() => {
+            cancelPendingBlur();
+            blurTimerRef.current = setTimeout(() => {
+              blurTimerRef.current = null;
               setOpen(false);
               setSearchTerm(null);
             }, 200);
@@ -218,6 +237,7 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
                 key={`${account.type}-${account.id}`}
                 id={`account-option-${rowIndex}-${idx}`}
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleSelectAccount(account)}
                 role="option"
                 aria-selected={value?.type === account.type && value?.id === account.id}
