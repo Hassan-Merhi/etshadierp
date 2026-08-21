@@ -1,0 +1,67 @@
+name: Temporary Actions V7 Stage
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Stage updated workflow blobs
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const replacements = [
+            ['actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6', 'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7'],
+            ['actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4', 'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7'],
+            ['actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4', 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7'],
+          ];
+          const root = '.github/workflows';
+          const out = 'tmp/actions-v7-stage';
+          fs.rmSync(out, { recursive: true, force: true });
+          fs.mkdirSync(out, { recursive: true });
+          const manifest = [];
+          for (const name of fs.readdirSync(root)) {
+            if ((!name.endsWith('.yml') && !name.endsWith('.yaml')) || name === 'tmp-actions-v7-stage.yml') continue;
+            const file = path.join(root, name);
+            const text = fs.readFileSync(file, 'utf8');
+            let next = text;
+            for (const [from, to] of replacements) next = next.split(from).join(to);
+            if (next === text) continue;
+            const staged = path.join(out, name + '.txt');
+            fs.writeFileSync(staged, next);
+            manifest.push({ target: file, staged });
+          }
+          fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+          if (manifest.length !== 24) {
+            console.error(`Expected 24 changed workflows, found ${manifest.length}`);
+            process.exit(1);
+          }
+          console.log(`Staged ${manifest.length} workflows.`);
+          NODE
+
+      - name: Commit staged blobs
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- tmp/actions-v7-stage
+          if git diff --cached --quiet; then
+            echo 'Stage already current.'
+            exit 0
+          fi
+          git commit -m 'chore: stage GitHub Actions v7 workflow blobs'
+          git push origin HEAD:"$HEAD_REF"
