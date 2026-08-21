@@ -112,10 +112,12 @@ function transformV5AllocationModel(source: string): string {
     "openCreateDrawerWithAllRows",
     "openEditDrawerWithAllRows",
   ];
-  const existing = returnMatch[1];
+  const existing = returnMatch[1].trimEnd();
   const missing = additions.filter((name) => !new RegExp(`\\b${name}\\b`).test(existing));
-  code = code.slice(0, returnMatch.index) +
-    `return {${existing.trimEnd()}${existing.trim() ? ", " : ""}${missing.join(", ")} } as const;` +
+  const separator = existing.trim() && !existing.trimEnd().endsWith(",") ? "," : "";
+  code =
+    code.slice(0, returnMatch.index) +
+    `return {${existing}${separator}${missing.length ? ` ${missing.join(", ")}` : ""} } as const;` +
     code.slice(returnMatch.index + returnMatch[0].length);
 
   return code;
@@ -167,9 +169,6 @@ function transformV5AllocationPresentation(source: string, seen: Set<string>): s
   return code;
 }
 
-/**
- * Factory Daybook pagination, re-anchored onto the split controller hook.
- */
 function transformFactoryDaybookModel(source: string): string {
   let code = source;
 
