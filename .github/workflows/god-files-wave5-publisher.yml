@@ -70,6 +70,7 @@ jobs:
         run: |
           node scripts/tmp-god-files-wave5.mjs finalize
           node scripts/tmp-god-files-wave5-doc-fix.mjs
+          node scripts/tmp-god-files-wave5-type-fix.mjs
           node node_modules/prettier/bin/prettier.cjs --write \
             config/god-file-boundaries.json \
             config/type-escape-boundaries.json \
@@ -129,11 +130,13 @@ jobs:
             scripts/tmp-god-files-wave5-dialogs.mjs \
             scripts/tmp-god-files-wave5-tail.mjs \
             scripts/tmp-god-files-wave5-doc-fix.mjs \
+            scripts/tmp-god-files-wave5-type-fix.mjs \
             .wave5-trigger \
             .wave5-trigger-2 \
             .wave5-trigger-3 \
             .wave5-trigger-4 \
-            .wave5-trigger-5
+            .wave5-trigger-5 \
+            .wave5-trigger-6
           git add -A
           git commit -m "refactor(god-files): complete cumulative wave 5 on current main"
           git push origin HEAD:agent/god-files-final-wave1-tests
