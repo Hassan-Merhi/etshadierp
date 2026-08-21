@@ -50,11 +50,26 @@ jobs:
           set -euo pipefail
           node scripts/tmp-god-files-wave7.mjs
           sed -i '/IMPORTANT: never use Date.now() as the fallback/d' server/index.ts
+          sed -i 's/God-file backlog | 2 files, 1,896 excess lines/God-file backlog | 1 file, 1,076 excess lines/' docs/system-quality-program.md
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'config/doc-index.json';
+          const data = JSON.parse(fs.readFileSync(path, 'utf8'));
+          for (const id of ['godFileBacklogFiles', 'godFileBacklogExcessLines']) {
+            const figure = data.figures.find((entry) => entry.id === id);
+            if (!figure) throw new Error(`Missing doc-index figure ${id}`);
+            for (const claim of figure.claims) {
+              claim.pattern = claim.pattern.replace(' files', ' files?');
+            }
+          }
+          fs.writeFileSync(path, JSON.stringify(data, null, 2) + '\n');
+          NODE
           node node_modules/prettier/bin/prettier.cjs --write \
             server/index.ts \
             server/startup/runServerStartupMigrations.ts \
             server/startup/registerProcessErrorHandlers.ts \
             config/god-file-boundaries.json \
+            config/doc-index.json \
             tests/god-file-boundaries.test.ts \
             docs/god-file-split-program.md \
             docs/system-quality-program.md
@@ -78,6 +93,7 @@ jobs:
             server/startup/runServerStartupMigrations.ts \
             server/startup/registerProcessErrorHandlers.ts \
             config/god-file-boundaries.json \
+            config/doc-index.json \
             tests/god-file-boundaries.test.ts \
             docs/god-file-split-program.md \
             docs/system-quality-program.md
@@ -107,6 +123,7 @@ jobs:
             server/startup/runServerStartupMigrations.ts \
             server/startup/registerProcessErrorHandlers.ts \
             config/god-file-boundaries.json \
+            config/doc-index.json \
             tests/god-file-boundaries.test.ts \
             docs/god-file-split-program.md \
             docs/system-quality-program.md
