@@ -274,6 +274,7 @@ jobs:
         if: always() && steps.db_schema.outcome == 'success' && steps.build.outcome == 'success'
         run: |
           set -o pipefail
+          # shellcheck disable=SC2317
           node dist/index.js > startup-migrations-ci.txt 2>&1 &
           app_pid=$!
           cleanup() {
