@@ -255,7 +255,7 @@ importers:
         specifier: ^7.2.0
         version: 7.5.0(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3)
       papaparse:
-        specifier: ^5.6.0
+        specifier: ^5.5.3
         version: 5.6.0
       passport:
         specifier: ^0.7.0
@@ -294,10 +294,10 @@ importers:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
       react-hook-form:
-        specifier: ^7.85.0
+        specifier: ^7.55.0
         version: 7.85.0(react@19.2.8)
       react-icons:
-        specifier: ^5.7.0
+        specifier: ^5.4.0
         version: 5.7.0(react@19.2.8)
       react-markdown:
         specifier: ^10.1.0
