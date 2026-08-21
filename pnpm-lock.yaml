@@ -33,7 +33,7 @@ importers:
         specifier: ^1.0.4
         version: 1.0.4(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@google/genai':
-        specifier: ^2.18.0
+        specifier: ^2.15.0
         version: 2.18.0(bufferutil@4.1.0)(supports-color@7.2.0)
       '@hookform/resolvers':
         specifier: ^3.10.0
@@ -159,7 +159,7 @@ importers:
         specifier: ^1.0.3
         version: 1.0.3
       bwip-js:
-        specifier: ^4.11.4
+        specifier: ^4.11.2
         version: 4.11.4
       class-variance-authority:
         specifier: ^0.7.1
@@ -270,7 +270,7 @@ importers:
         specifier: ^0.19.1
         version: 0.19.1
       pg:
-        specifier: ^8.23.0
+        specifier: ^8.16.3
         version: 8.23.0
       postcss:
         specifier: ^8.5.15
@@ -303,7 +303,7 @@ importers:
         specifier: ^10.1.0
         version: 10.1.0(@types/react@19.2.18)(react@19.2.8)(supports-color@7.2.0)
       react-resizable-panels:
-        specifier: ^4.12.3
+        specifier: ^4.12.2
         version: 4.12.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-to-print:
         specifier: ^3.2.0
@@ -406,8 +406,8 @@ importers:
         specifier: ^3.0.11
         version: 3.0.11
       '@types/nodemailer':
-        specifier: ^7.0.12
-        version: 7.0.12
+        specifier: ^8.0.0
+        version: 8.0.1
       '@types/papaparse':
         specifier: ^5.5.2
         version: 5.5.2
@@ -442,7 +442,7 @@ importers:
         specifier: ^0.31.10
         version: 0.31.10
       eslint:
-        specifier: ^10.8.1
+        specifier: ^10.5.0
         version: 10.8.1(jiti@1.21.7)(supports-color@7.2.0)
       eslint-config-prettier:
         specifier: ^10.1.8
@@ -457,7 +457,7 @@ importers:
         specifier: ^29.1.1
         version: 29.1.1(@noble/hashes@1.8.0)
       prettier:
-        specifier: ^3.9.6
+        specifier: ^3.8.4
         version: 3.9.6
       supertest:
         specifier: ^7.2.2
@@ -2601,14 +2601,11 @@ packages:
   '@types/node@14.18.63':
     resolution: {integrity: sha512-fAtCfv4jJg+ExtXhvCkCqUKZ+4ok/JQk01qDKhL5BDDoS3AxKXhV5/MAVUZyQnSEd2GT92fkgZl0pz0Q0AzcIQ==}
 
-  '@types/node@26.1.2':
-    resolution: {integrity: sha512-Vu4a5UFA9rIIFJ7rB/Vaafh9lrCQszopTCx6KjFboXTGQbPNasehVR5TEiithSDGyd1DEiUByggTZsg8jukeIg==}
-
   '@types/node@26.2.0':
     resolution: {integrity: sha512-5IviulTZeRNp2vAJ514cc/HUlY5nZ9fCbq9DMyC52BrhFZACo3nI0R7qBxhQmo/d27NFe96ur/b7Wwxklda+kg==}
 
-  '@types/nodemailer@7.0.12':
-    resolution: {integrity: sha512-80vKwiIsVSyFA1rRovH59jNPLBOuc6dRZIHEu40gXTkBkZnQv8vog1xSGEb9j5q/tdMAs5ivvDR2pLTU0hGHXA==}
+  '@types/nodemailer@8.0.1':
+    resolution: {integrity: sha512-PxpaInm8V1JQDd4j0ds5HfvWQk8JupS1C0Picb96QJsrrRDjBH+DlK7L4ZdNSqNULhiZRQHc40nLVShaGxXAMw==}
 
   '@types/pako@2.0.4':
     resolution: {integrity: sha512-VWDCbrLeVXJM9fihYodcLiIv0ku+AlOa/TQ1SvYOaBuyrSKgEcro95LJyIsJ4vSo6BXIxOKxiJAat04CmST9Fw==}
@@ -5057,9 +5054,6 @@ packages:
     resolution: {integrity: sha512-gKtPkFdQPU3DksooVLi9LsjZxrsBUZIpa+7aVx+LV5pNh0KzP4Zleud2po+ConrxbuXGBJ6Hfer6hdgpIBpBaw==}
     peerDependencies:
       pg: '>=8.0'
-
-  pg-protocol@1.15.0:
-    resolution: {integrity: sha512-cq9sECI5s0+uPUXjbz8ioyPJni6RzsRib0US67i5IoTZKw8fNeYlVE7u8F4dG7vEJJtc5wdD1K189lCCUwqWTQ==}
 
   pg-protocol@1.16.0:
     resolution: {integrity: sha512-sILXutLVjCLjcDuOmvhX5e2Z4cS5qG/6Bu3VkpFwdf/633ElGLpEh9bgmuI5I4sqKqkifQiGyiCcx1HdtrK7tg==}
@@ -8142,7 +8136,7 @@ snapshots:
   '@types/body-parser@1.19.6':
     dependencies:
       '@types/connect': 3.4.38
-      '@types/node': 26.1.2
+      '@types/node': 26.2.0
 
   '@types/chai@5.2.3':
     dependencies:
@@ -8162,7 +8156,7 @@ snapshots:
 
   '@types/connect@3.4.38':
     dependencies:
-      '@types/node': 26.1.2
+      '@types/node': 26.2.0
 
   '@types/cookiejar@2.1.5': {}
 
@@ -8208,7 +8202,7 @@ snapshots:
 
   '@types/express-serve-static-core@4.19.9':
     dependencies:
-      '@types/node': 26.1.2
+      '@types/node': 26.2.0
       '@types/qs': 6.15.1
       '@types/range-parser': 1.2.7
       '@types/send': 1.2.1
@@ -8261,15 +8255,11 @@ snapshots:
 
   '@types/node@14.18.63': {}
 
-  '@types/node@26.1.2':
-    dependencies:
-      undici-types: 8.3.0
-
   '@types/node@26.2.0':
     dependencies:
       undici-types: 8.3.0
 
-  '@types/nodemailer@7.0.12':
+  '@types/nodemailer@8.0.1':
     dependencies:
       '@types/node': 26.2.0
 
@@ -8305,7 +8295,7 @@ snapshots:
   '@types/pg@8.20.0':
     dependencies:
       '@types/node': 26.2.0
-      pg-protocol: 1.15.0
+      pg-protocol: 1.16.0
       pg-types: 2.2.0
 
   '@types/qs@6.15.1': {}
@@ -8334,16 +8324,16 @@ snapshots:
   '@types/send@0.17.6':
     dependencies:
       '@types/mime': 1.3.5
-      '@types/node': 26.1.2
+      '@types/node': 26.2.0
 
   '@types/send@1.2.1':
     dependencies:
-      '@types/node': 26.1.2
+      '@types/node': 26.2.0
 
   '@types/serve-static@1.15.10':
     dependencies:
       '@types/http-errors': 2.0.5
-      '@types/node': 26.1.2
+      '@types/node': 26.2.0
       '@types/send': 0.17.6
 
   '@types/slice-ansi@4.0.0': {}
@@ -10942,8 +10932,6 @@ snapshots:
   pg-pool@3.14.0(pg@8.23.0):
     dependencies:
       pg: 8.23.0
-
-  pg-protocol@1.15.0: {}
 
   pg-protocol@1.16.0: {}
 
