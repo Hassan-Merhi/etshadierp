@@ -29,8 +29,8 @@ export function useVoucherHandlers({
   toast,
   setSelectedAccountId,
   setSelectedAccountType,
-  setSidebarSearchValue,
-  setSidebarHighlightedIndex,
+  setSidebarSearchValue: _setSidebarSearchValue,
+  setSidebarHighlightedIndex: _setSidebarHighlightedIndex,
 }: UseVoucherHandlersProps) {
   const handleSidebarAccountSelect = async (account: Account) => {
     const currentEntries = form.getValues("entries");
@@ -86,18 +86,15 @@ export function useVoucherHandlers({
     setActiveRowIndex(targetRowIndex);
   };
 
-  const handleAmountCommit = async (rowIndex: number) => {
-    if (rowIndex === activeRowIndex) {
-      setSelectedAccountId(null);
-      setSelectedAccountType(null);
-      setActiveRowIndex(null);
-      setSidebarSearchValue("");
-      setSidebarHighlightedIndex(0);
-      requestAnimationFrame(() => {
-        const searchInput = document.querySelector('[data-testid="input-search-account"]') as HTMLInputElement;
-        if (searchInput) searchInput.focus();
-      });
-    }
+  const handleAmountCommit = async (_rowIndex: number) => {
+    // Do not clear the active row or account search on amount commit/blur.
+    // The amount input blurs naturally when the user clicks either the row account
+    // field or the right-side account search. Clearing search state here raced the
+    // new input event, erased what the user had just typed, and reset the sidebar
+    // back to the full account list. Enter/Tab already move focus themselves, and
+    // the next row's onFocus updates activeRowIndex, so no forced refocus is needed.
+    setSelectedAccountId(null);
+    setSelectedAccountType(null);
   };
 
   const handleAutoCreateAccount = async (name: string): Promise<Account | null> => {
