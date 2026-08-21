@@ -3,6 +3,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
+import { resolveRequestCompanyId } from "../../services/security/requestCompanyScope";
 import { statusReportTemplates, statusMetrics, statusReportRuns, statusMetricValues } from "@shared/schema";
 import { eq, and, asc } from "drizzle-orm";
 
@@ -44,7 +45,7 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
   // Returns (or creates) the default template + seed metrics for a company.
   app.get("/api/factory/status-builder/template", requireAuth, async (req, res) => {
     try {
-      const companyId = parseOptionalId(req.query.companyId);
+      const companyId = resolveRequestCompanyId(req);
       if (!companyId) return res.status(400).json({ error: "companyId required" });
 
       let [template] = await db

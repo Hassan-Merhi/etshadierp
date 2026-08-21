@@ -4,8 +4,11 @@ import path from "node:path";
 
 const root = process.cwd();
 const serverRoot = path.join(root, "server");
+const reviewConfigPath = path.join(root, "config", "company-scope-review.json");
 const failOnFindings = process.argv.includes("--fail-on-findings");
 const json = process.argv.includes("--json");
+const reviewConfig = JSON.parse(fs.readFileSync(reviewConfigPath, "utf8"));
+const reviewedFiles = new Map(reviewConfig.reviews.map((review) => [review.path, review]));
 
 const HIGH_RISK_TABLES = [
   "vouchers",
@@ -31,6 +34,15 @@ const COMPANY_AUTH_MARKERS = [
   "getActiveCompanyPermissionContext",
   "enforceCompanyResourceScope",
   "tenantIsolationBoundary",
+  "resolveActiveCompanyId",
+  "resolveCompanyIdForPath",
+  "resolveSessionCompanyActor",
+  "authorizeCompanyIdParam",
+  "getFactoryCompanyId",
+  "getActiveSupplierCompanyId",
+  "enforceSupplierCompanyQuery",
+  "req.session.currentCompanyId",
+  "req.session.factoryCompanyId",
 ];
 
 function walk(dir) {
@@ -54,6 +66,18 @@ function lineFor(source, index) {
 
 function hasCompanyAuthorizationMarker(source) {
   return COMPANY_AUTH_MARKERS.some((marker) => source.includes(marker));
+}
+
+function isExecutableDataSql(template) {
+  // Backtick strings are also used for prompts, error messages, migration DDL,
+  // and schema comments. Only inspect templates that begin with a data
+  // statement; this keeps the audit focused on query paths that can expose or
+  // mutate tenant data.
+  const normalized = template
+    .replace(/^\s*(?:\/\*[\s\S]*?\*\/\s*)+/, "")
+    .replace(/^\s*(?:--[^\n]*\n\s*)+/, "")
+    .trim();
+  return /^(?:select|insert|update|delete|with)\b/i.test(normalized);
 }
 
 const findings = [];
@@ -82,6 +106,7 @@ for (const file of walk(serverRoot)) {
   // parent table that carries company_id.
   const sqlTemplates = /`([\s\S]*?)`/g;
   for (const template of source.matchAll(sqlTemplates)) {
+    if (!isExecutableDataSql(template[1])) continue;
     const sql = template[1].toLowerCase();
     const touched = HIGH_RISK_TABLES.filter((table) => new RegExp(`\\b${table}\\b`, "i").test(sql));
     if (touched.length === 0) continue;
@@ -116,24 +141,33 @@ for (const file of walk(serverRoot)) {
 }
 
 findings.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.kind.localeCompare(b.kind));
+const reviewedFindings = findings.filter((finding) => reviewedFiles.has(finding.file));
+const unreviewedFindings = findings.filter((finding) => !reviewedFiles.has(finding.file));
+const staleReviews = reviewConfig.reviews.filter(
+  (review) => !fs.existsSync(path.join(root, review.path)) || !review.reason?.trim()
+);
 
 const report = {
   generatedAt: new Date().toISOString(),
   scannedRoot: "server",
   highRiskTables: HIGH_RISK_TABLES,
-  findingCount: findings.length,
-  findings,
+  findingCount: unreviewedFindings.length,
+  findings: unreviewedFindings,
+  reviewedFindingCount: reviewedFindings.length,
+  reviewedFiles: [...new Set(reviewedFindings.map((finding) => finding.file))].sort(),
+  staleReviews,
 };
 
 if (json) {
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-} else if (findings.length === 0) {
-  console.log("Company-scope audit: no review findings.");
+} else if (unreviewedFindings.length === 0 && staleReviews.length === 0) {
+  console.log(`Company-scope audit: no unreviewed findings (${reviewedFindings.length} reviewed finding(s)).`);
 } else {
-  console.log(`Company-scope audit: ${findings.length} review finding(s).`);
-  for (const finding of findings) {
+  console.log(`Company-scope audit: ${unreviewedFindings.length} unreviewed finding(s), ${reviewedFindings.length} reviewed finding(s).`);
+  for (const finding of unreviewedFindings) {
     console.log(` - ${finding.file}:${finding.line} [${finding.kind}] ${finding.detail}`);
   }
+  for (const review of staleReviews) console.log(` - stale or invalid review registry entry: ${review.path}`);
 }
 
-if (failOnFindings && findings.length > 0) process.exit(1);
+if (failOnFindings && (unreviewedFindings.length > 0 || staleReviews.length > 0)) process.exit(1);
