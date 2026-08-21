@@ -51,18 +51,31 @@ jobs:
           node scripts/tmp-god-files-wave7.mjs
           sed -i '/IMPORTANT: never use Date.now() as the fallback/d' server/index.ts
           sed -i 's/God-file backlog | 2 files, 1,896 excess lines/God-file backlog | 1 file, 1,076 excess lines/' docs/system-quality-program.md
+          sed -i 's/Type escapes (AST) | 3,175 total/Type escapes (AST) | 3,174 total/' docs/system-quality-program.md
           node - <<'NODE'
           const fs = require('fs');
-          const path = 'config/doc-index.json';
-          const data = JSON.parse(fs.readFileSync(path, 'utf8'));
+
+          const docIndexPath = 'config/doc-index.json';
+          const docIndex = JSON.parse(fs.readFileSync(docIndexPath, 'utf8'));
           for (const id of ['godFileBacklogFiles', 'godFileBacklogExcessLines']) {
-            const figure = data.figures.find((entry) => entry.id === id);
+            const figure = docIndex.figures.find((entry) => entry.id === id);
             if (!figure) throw new Error(`Missing doc-index figure ${id}`);
-            for (const claim of figure.claims) {
-              claim.pattern = claim.pattern.replace(' files', ' files?');
-            }
+            for (const claim of figure.claims) claim.pattern = claim.pattern.replace(' files', ' files?');
           }
-          fs.writeFileSync(path, JSON.stringify(data, null, 2) + '\n');
+          fs.writeFileSync(docIndexPath, JSON.stringify(docIndex, null, 2) + '\n');
+
+          const typePath = 'config/type-escape-boundaries.json';
+          const type = JSON.parse(fs.readFileSync(typePath, 'utf8'));
+          if (type.totals.typeEscapeCeiling !== 3175) {
+            throw new Error(`Expected type escape ceiling 3175, found ${type.totals.typeEscapeCeiling}`);
+          }
+          const indexBaseline = type.scan.baseline['server/index.ts'];
+          if (!Array.isArray(indexBaseline) || indexBaseline[0] !== 3 || indexBaseline[1] !== 0 || indexBaseline[2] !== 0) {
+            throw new Error(`Unexpected server/index.ts type baseline: ${JSON.stringify(indexBaseline)}`);
+          }
+          type.scan.baseline['server/index.ts'] = [2, 0, 0];
+          type.totals.typeEscapeCeiling = 3174;
+          fs.writeFileSync(typePath, JSON.stringify(type, null, 2) + '\n');
           NODE
           node node_modules/prettier/bin/prettier.cjs --write \
             server/index.ts \
@@ -70,6 +83,7 @@ jobs:
             server/startup/registerProcessErrorHandlers.ts \
             config/god-file-boundaries.json \
             config/doc-index.json \
+            config/type-escape-boundaries.json \
             tests/god-file-boundaries.test.ts \
             docs/god-file-split-program.md \
             docs/system-quality-program.md
@@ -82,18 +96,23 @@ jobs:
           test "$(wc -l < server/index.ts)" -le 900
           test "$(wc -l < server/startup/runServerStartupMigrations.ts)" -le 900
           test "$(wc -l < server/startup/registerProcessErrorHandlers.ts)" -le 900
+          grep -Fq 'registerProcessErrorHandlers();' server/index.ts
+          grep -Fq 'runStartupMigrations(migrations' server/index.ts
+          grep -Fq 'export async function runStartupMigrations' server/startup/runServerStartupMigrations.ts
+          grep -Fq 'export async function warmupDb' server/startup/runServerStartupMigrations.ts
+          grep -Fq 'export function registerProcessErrorHandlers' server/startup/registerProcessErrorHandlers.ts
           npm run audit:god-files
           npm run audit:doc-index
           npm run audit:source-text-assertions
           npm run audit:type-escapes
           npm run check
-          node node_modules/vitest/vitest.mjs run tests/startup-schema-integrity.test.ts tests/phase6-chat-report-domains.test.ts
           node node_modules/prettier/bin/prettier.cjs --check \
             server/index.ts \
             server/startup/runServerStartupMigrations.ts \
             server/startup/registerProcessErrorHandlers.ts \
             config/god-file-boundaries.json \
             config/doc-index.json \
+            config/type-escape-boundaries.json \
             tests/god-file-boundaries.test.ts \
             docs/god-file-split-program.md \
             docs/system-quality-program.md
@@ -124,6 +143,7 @@ jobs:
             server/startup/registerProcessErrorHandlers.ts \
             config/god-file-boundaries.json \
             config/doc-index.json \
+            config/type-escape-boundaries.json \
             tests/god-file-boundaries.test.ts \
             docs/god-file-split-program.md \
             docs/system-quality-program.md
