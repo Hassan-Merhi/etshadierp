@@ -39,3 +39,9 @@ for (const rel of movedHookPaths) {
 config.totals = { ...(config.totals ?? {}), typeEscapeCeiling: measured };
 fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
 console.log(`WAVE5_TYPE_CEILING total=${measured}`);
+
+const lintFix = spawnSync(process.execPath, ["scripts/tmp-god-files-wave5-lint-fix.mjs"], {
+  cwd: root,
+  stdio: "inherit",
+});
+if (lintFix.status !== 0) throw new Error(`Wave 5 lint cleanup failed with status ${lintFix.status}`);
