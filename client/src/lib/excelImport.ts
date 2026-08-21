@@ -1,4 +1,4 @@
-import ExcelJS from "exceljs";
+import type ExcelJS from "exceljs";
 import type { Sheet as FortuneSheet } from "@fortune-sheet/core";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -154,7 +154,9 @@ function decodeAutoFilter(af: any): { row: [number, number]; column: [number, nu
 // ─── Main export ─────────────────────────────────────────────────────────────
 
 export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> {
-  const wb = new ExcelJS.Workbook();
+  const excelJsModule = await import("exceljs");
+  const ExcelJSRuntime = excelJsModule.default ?? excelJsModule;
+  const wb = new ExcelJSRuntime.Workbook();
   await wb.xlsx.load(buf);
 
   const result: FortuneSheet[] = [];
@@ -168,7 +170,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
     ws.eachRow({ includeEmpty: false }, (row) => {
       row.eachCell({ includeEmpty: false }, (cell) => {
         // Skip non-primary merged cells
-        if ((cell as { type: ExcelJS.ValueType.Merge }).type === ExcelJS.ValueType.Merge) return;
+        if ((cell as { type: ExcelJS.ValueType.Merge }).type === ExcelJSRuntime.ValueType.Merge) return;
 
         const r = (cell.row as unknown as number) - 1;
         const c = (cell.col as unknown as number) - 1;

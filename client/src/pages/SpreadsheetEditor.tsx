@@ -5,7 +5,6 @@ import { Workbook } from "@fortune-sheet/react";
 import { PageHeader } from "@/components/PageHeader";
 import "@fortune-sheet/react/dist/index.css";
 import type { Sheet as FortuneSheet } from "@fortune-sheet/core";
-import * as XLSX from "xlsx-js-style";
 import { excelToFortune } from "@/lib/excelImport";
 import { isExcelMode, type SpreadsheetData, arrayBufferToBase64, syncFortuneToXlsx } from "@/lib/excelSync";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -73,7 +72,7 @@ function ensureCelldata(sheet: any): any {
   return { ...rest, celldata };
 }
 
-function fortuneToXlsx(sheets: FortuneSheet[]): any {
+function fortuneToXlsx(sheets: FortuneSheet[], XLSX: any): any {
   const wb = XLSX.utils.book_new();
 
   for (const sheet of sheets) {
@@ -650,7 +649,9 @@ export default function SpreadsheetEditor() {
     } else {
       // Native mode: existing xlsx-js-style export path (unchanged)
       if (!currentSheets.length) return;
-      const wb = fortuneToXlsx(currentSheets);
+      const xlsxModule = await import("xlsx-js-style");
+      const XLSX = xlsxModule.default ?? xlsxModule;
+      const wb = fortuneToXlsx(currentSheets, XLSX);
       XLSX.writeFile(wb, `${sheetName}.xlsx`);
     }
   };

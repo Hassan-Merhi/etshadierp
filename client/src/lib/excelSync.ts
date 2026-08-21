@@ -1,4 +1,4 @@
-import ExcelJS from "exceljs";
+import type ExcelJS from "exceljs";
 import type { Sheet as FortuneSheet } from "@fortune-sheet/core";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -194,7 +194,9 @@ function applyFortuneStyleToCell(excelCell: ExcelJS.Cell, v: any): void {
  * re-writes them without modification.
  */
 export async function syncFortuneToXlsx(rawXlsx: string, sheets: FortuneSheet[]): Promise<ArrayBuffer> {
-  const wb = new ExcelJS.Workbook();
+  const excelJsModule = await import("exceljs");
+  const ExcelJSRuntime = excelJsModule.default ?? excelJsModule;
+  const wb = new ExcelJSRuntime.Workbook();
   await wb.xlsx.load(base64ToArrayBuffer(rawXlsx));
 
   for (let sheetIdx = 0; sheetIdx < sheets.length; sheetIdx++) {
