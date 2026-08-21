@@ -78,23 +78,20 @@ export function VoucherEntriesTable({
   const mobileAmountInputRef = useRef<HTMLInputElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
+  // Only initialize the mobile editor when it is actually open. Previously this
+  // effect also cleared the shared desktop sidebar search whenever the mobile
+  // sheet was closed. Because onRowFocus is recreated by the parent on renders,
+  // that effect re-ran on every desktop keystroke and erased the account search.
   useEffect(() => {
-    if (mobileEditOpen && mobileEditIndex !== null) {
-      const current = form.getValues(`entries.${mobileEditIndex}.amount`) || "";
-      setMobileAmountStr(current);
-      // Call onRowFocus first to set activeRowIndex (needed for account selection routing),
-      // then immediately clear sidebarSearchValue so the list shows all accounts (not pre-filtered
-      // by the existing account name). React 18 batches both — last write wins.
-      onRowFocus(mobileEditIndex, "account");
-      setSidebarSearchValue("");
-      setMobileSearch("");
-      setTimeout(() => mobileSearchInputRef.current?.focus(), 150);
-    }
-    if (!mobileEditOpen) {
-      setMobileSearch("");
-      setSidebarSearchValue("");
-    }
-    
+    if (!mobileEditOpen || mobileEditIndex === null) return;
+
+    const current = form.getValues(`entries.${mobileEditIndex}.amount`) || "";
+    setMobileAmountStr(current);
+    onRowFocus(mobileEditIndex, "account");
+    setSidebarSearchValue("");
+    setMobileSearch("");
+    const timer = setTimeout(() => mobileSearchInputRef.current?.focus(), 150);
+    return () => clearTimeout(timer);
   }, [mobileEditOpen, mobileEditIndex, form, onRowFocus, setSidebarSearchValue]);
 
   const openMobileEdit = (index: number) => {
@@ -122,7 +119,6 @@ export function VoucherEntriesTable({
     if (mobileEditIndex !== null) {
       const numVal = parseFloat(mobileAmountStr);
       const isPositive = !isNaN(numVal) && numVal > 0;
-      // Always write back — even blank/0 — so clearing an amount actually clears the form field.
       const finalAmount = isPositive
         ? selectedCurrency !== "USD"
           ? convertToUSD(numVal).toFixed(2)
@@ -133,7 +129,6 @@ export function VoucherEntriesTable({
     }
     setMobileEditOpen(false);
   };
-  // ────────────────────────────────────────────────────────────────────────────
 
   const getEntryBalance = (index: number): number | null => {
     const entry = entries[index];
@@ -150,16 +145,9 @@ export function VoucherEntriesTable({
   };
 
   const handleAddRow = () => {
-    append({
-      accountType: "ledger",
-      accountId: 0,
-      accountName: "",
-      amount: "",
-    });
+    append({ accountType: "ledger", accountId: 0, accountName: "", amount: "" });
   };
 
-  // Focus helper shared by the Tab / arrow navigation below. Fields are addressed by the
-  // same data-testid attributes the keyboard test-suite already asserts on.
   const focusField = (field: "account" | "amount", index: number, select = true) => {
     requestAnimationFrame(() => {
       const el = document.querySelector(`[data-testid="input-${field}-${index}"]`) as HTMLInputElement | null;
@@ -170,8 +158,6 @@ export function VoucherEntriesTable({
   };
 
   const handleAccountKeyDown = async (e: React.KeyboardEvent, index: number) => {
-    // Tab takes the highlighted account (only when the row has none yet, so tabbing
-    // through a filled row never reassigns it) and moves along to the amount.
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
       const hasAccount = (entries[index]?.accountId ?? 0) > 0;
@@ -197,41 +183,30 @@ export function VoucherEntriesTable({
       setSidebarHighlightedIndex(newIndex);
     } else if (e.key === "Enter") {
       e.preventDefault();
-
       const currentName = form.getValues(`entries.${index}.accountName`)?.trim() || "";
-
       if (isFactoryCompany && onAutoCreateAccount && currentName) {
         const exactMatch = filteredSidebarAccounts.find((acc) => acc.name.toLowerCase() === currentName.toLowerCase());
         if (exactMatch) {
           handleSidebarAccountSelect(exactMatch);
         } else {
           const newAccount = await onAutoCreateAccount(currentName);
-          if (newAccount) {
-            handleSidebarAccountSelect(newAccount);
-          }
+          if (newAccount) handleSidebarAccountSelect(newAccount);
         }
       } else if (filteredSidebarAccounts.length > 0 && sidebarHighlightedIndex >= 0) {
         const highlightedAccount = filteredSidebarAccounts[sidebarHighlightedIndex];
-        if (highlightedAccount) {
-          handleSidebarAccountSelect(highlightedAccount);
-        }
+        if (highlightedAccount) handleSidebarAccountSelect(highlightedAccount);
       }
     }
   };
 
   const handleAmountKeyDown = (e: React.KeyboardEvent, index: number) => {
-    // Tab commits the amount and carries on to the next row, adding one when needed —
-    // the same motion as Enter, minus the requirement that the amount be positive.
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
       const amount = Number(entries[index]?.amount);
       if (!isNaN(amount) && amount > 0 && onAmountCommit) onAmountCommit(index);
-
       const isLastRow = index === fields.length - 1;
       const rowHasContent = (entries[index]?.accountId ?? 0) > 0 || (!isNaN(amount) && amount > 0);
       if (isLastRow) {
-        // Only grow the table off a row that actually holds something, so tabbing
-        // out of an untouched last row doesn't leave a trail of blank lines.
         if (!rowHasContent) return;
         handleAddRow();
       }
@@ -255,9 +230,7 @@ export function VoucherEntriesTable({
         if (onAmountCommit) onAmountCommit(index);
         handleAddRow();
         requestAnimationFrame(() => {
-          const newInput = document.querySelector(
-            `[data-testid="input-account-${entries.length}"]`
-          ) as HTMLInputElement;
+          const newInput = document.querySelector(`[data-testid="input-account-${entries.length}"]`) as HTMLInputElement;
           if (newInput) {
             newInput.focus();
             newInput.select();
@@ -265,8 +238,6 @@ export function VoucherEntriesTable({
         });
       }
     } else if (e.key === "ArrowUp") {
-      // Always prevent default on ArrowUp/Down for number inputs — without this
-      // the browser increments/decrements the value (especially visible on Mac/Safari).
       e.preventDefault();
       if (index > 0) {
         const prevInput = document.querySelector(`[data-testid="input-amount-${index - 1}"]`) as HTMLInputElement;
@@ -310,8 +281,6 @@ export function VoucherEntriesTable({
     );
   };
 
-  // Running subtotal down the amount column, so a batch can be checked against paper
-  // as it is typed. Derived from the same entries the total is derived from.
   const runningTotals: number[] = [];
   {
     let running = 0;
@@ -325,7 +294,6 @@ export function VoucherEntriesTable({
 
   return (
     <>
-      {/* ── Desktop / tablet: original table ── */}
       <div className="hidden sm:block border rounded-md overflow-hidden">
         <table className="w-full">
           <thead className="bg-muted/50 sticky top-0 z-30">
@@ -378,7 +346,6 @@ export function VoucherEntriesTable({
                               onBlur={() => setTimeout(() => onRowBlur(), 200)}
                             />
                           </FormControl>
-                          {/* Type badge lives in its own column on lg+, inline below the name otherwise */}
                           {!isEmpty && typeBadge && (
                             <span
                               className={`lg:hidden inline-block text-[10px] font-medium px-1.5 py-0 rounded mt-0.5 ${typeBadge.cls}`}
@@ -424,10 +391,7 @@ export function VoucherEntriesTable({
                     />
                   </td>
                   <td className="px-2 py-1.5 align-top pt-3 text-right hidden lg:table-cell">
-                    <span
-                      className="text-xs font-mono tabular-nums text-muted-foreground"
-                      data-testid={`text-running-${index}`}
-                    >
+                    <span className="text-xs font-mono tabular-nums text-muted-foreground" data-testid={`text-running-${index}`}>
                       {runningTotals[index] > 0 ? formatAmount(runningTotals[index]) : "—"}
                     </span>
                   </td>
@@ -464,9 +428,6 @@ export function VoucherEntriesTable({
                     <Plus className="h-3.5 w-3.5 mr-1.5" />
                     Add Row
                   </Button>
-
-                  {/* The running column already ends on the total, so the footer only
-                      carries the shortcuts rather than repeating the figure a third time. */}
                   <p className="text-[11px] text-muted-foreground hidden xl:block">
                     <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">Tab</kbd> next field
                     <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] ml-2">↵</kbd> new row
@@ -485,7 +446,6 @@ export function VoucherEntriesTable({
         </table>
       </div>
 
-      {/* ── Mobile: compact tappable cards (sm:hidden) ── */}
       <div className="sm:hidden space-y-2">
         {fields.map((field, index) => {
           const entry = entries[index];
@@ -535,7 +495,6 @@ export function VoucherEntriesTable({
           );
         })}
 
-        {/* Dashed "add entry" card */}
         <div
           className="rounded-md border border-dashed border-muted-foreground/30 px-3 py-3 flex items-center gap-2 text-muted-foreground cursor-pointer hover-elevate active-elevate-2"
           onClick={handleMobileAddRow}
@@ -545,7 +504,6 @@ export function VoucherEntriesTable({
           <span className="text-sm">Tap to add entry</span>
         </div>
 
-        {/* Total summary */}
         <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">
             {fields.length} {fields.length === 1 ? "entry" : "entries"}
@@ -554,7 +512,6 @@ export function VoucherEntriesTable({
         </div>
       </div>
 
-      {/* ── Mobile Sheet editor ── */}
       <Sheet
         open={mobileEditOpen}
         onOpenChange={(isOpen) => {
@@ -577,7 +534,6 @@ export function VoucherEntriesTable({
                 Done
               </Button>
             </div>
-            {/* Search input */}
             <div className="relative mt-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
@@ -594,7 +550,6 @@ export function VoucherEntriesTable({
             </div>
           </SheetHeader>
 
-          {/* Account list */}
           <div className="flex-1 overflow-y-auto min-h-0">
             {filteredSidebarAccounts.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">
@@ -606,8 +561,7 @@ export function VoucherEntriesTable({
                   mobileEditIndex !== null &&
                   entries[mobileEditIndex]?.accountId === account.id &&
                   entries[mobileEditIndex]?.accountType === account.type;
-                const bal =
-                  typeof account.balance === "string" ? parseFloat(account.balance) : (account.balance ?? null);
+                const bal = typeof account.balance === "string" ? parseFloat(account.balance) : (account.balance ?? null);
                 return (
                   <button
                     key={`${account.type}-${account.id}`}
@@ -632,7 +586,6 @@ export function VoucherEntriesTable({
             )}
           </div>
 
-          {/* Amount input */}
           <div className="px-4 py-4 border-t shrink-0">
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground shrink-0 w-16">Amount</span>
