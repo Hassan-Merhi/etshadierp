@@ -1,5 +1,6 @@
 import { getErrorDetails } from "@shared/errorUtils";
 import type { Account } from "@/components/AccountSidebar";
+import { focusScopedTestId } from "@/lib/scopedFocus";
 
 interface UseVoucherHandlersProps {
   form: any;
@@ -41,46 +42,20 @@ export function useVoucherHandlers({
       form.setValue(`entries.${activeRowIndex}.accountType`, account.type);
       form.setValue(`entries.${activeRowIndex}.accountId`, account.id);
       form.setValue(`entries.${activeRowIndex}.accountName`, account.name);
-      requestAnimationFrame(() => {
-        const amountInput = document.querySelector(
-          `[data-testid="input-amount-${activeRowIndex}"]`
-        ) as HTMLInputElement;
-        if (amountInput) {
-          amountInput.focus();
-          amountInput.select();
-        }
-      });
     } else {
-      const emptyEntryIndex = currentEntries.findIndex((e: any) => e.accountId === 0 || !e.accountName);
+      const emptyEntryIndex = currentEntries.findIndex((entry: any) => entry.accountId === 0 || !entry.accountName);
       if (emptyEntryIndex >= 0) {
         targetRowIndex = emptyEntryIndex;
         form.setValue(`entries.${emptyEntryIndex}.accountType`, account.type);
         form.setValue(`entries.${emptyEntryIndex}.accountId`, account.id);
         form.setValue(`entries.${emptyEntryIndex}.accountName`, account.name);
-        requestAnimationFrame(() => {
-          const amountInput = document.querySelector(
-            `[data-testid="input-amount-${emptyEntryIndex}"]`
-          ) as HTMLInputElement;
-          if (amountInput) {
-            amountInput.focus();
-            amountInput.select();
-          }
-        });
       } else {
         targetRowIndex = currentEntries.length;
         append({ accountType: account.type, accountId: account.id, accountName: account.name, amount: "" });
-        requestAnimationFrame(() => {
-          const amountInput = document.querySelector(
-            `[data-testid="input-amount-${targetRowIndex}"]`
-          ) as HTMLInputElement;
-          if (amountInput) {
-            amountInput.focus();
-            amountInput.select();
-          }
-        });
       }
     }
 
+    focusScopedTestId(`input-amount-${targetRowIndex}`, { select: true });
     setSelectedAccountId(account.id);
     setSelectedAccountType(account.type);
     setActiveRowIndex(targetRowIndex);
@@ -102,7 +77,7 @@ export function useVoucherHandlers({
     setIsAutoCreating(true);
     try {
       const normalizedName = name.trim().toLowerCase();
-      const existingAccount = sidebarAccounts.find((acc) => acc.name.toLowerCase() === normalizedName);
+      const existingAccount = sidebarAccounts.find((account) => account.name.toLowerCase() === normalizedName);
       if (existingAccount) return existingAccount;
 
       const payload = { name: name.trim(), accountType: "Indirect Expense", companyId: selectedCompany.id };
