@@ -8,6 +8,7 @@ import { Plus, X, Search, Check } from "lucide-react";
 import type { Account } from "@/components/AccountSidebar";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { cn } from "@/lib/utils";
+import { focusScopedTestId } from "@/lib/scopedFocus";
 
 const ENTRY_TYPE_BADGE: Record<string, { label: string; cls: string }> = {
   bank: { label: "Bank", cls: "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300" },
@@ -70,7 +71,6 @@ export function VoucherEntriesTable({
   const { fields, append, remove } = fieldArray;
   const { formatAmount, selectedCurrency, convertToUSD } = useCurrencyContext();
 
-  // ── Mobile Sheet state ──────────────────────────────────────────────────────
   const [mobileEditIndex, setMobileEditIndex] = useState<number | null>(null);
   const [mobileEditOpen, setMobileEditOpen] = useState(false);
   const [mobileSearch, setMobileSearch] = useState("");
@@ -78,13 +78,8 @@ export function VoucherEntriesTable({
   const mobileAmountInputRef = useRef<HTMLInputElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
-  // Only initialize the mobile editor when it is actually open. Previously this
-  // effect also cleared the shared desktop sidebar search whenever the mobile
-  // sheet was closed. Because onRowFocus is recreated by the parent on renders,
-  // that effect re-ran on every desktop keystroke and erased the account search.
   useEffect(() => {
     if (!mobileEditOpen || mobileEditIndex === null) return;
-
     const current = form.getValues(`entries.${mobileEditIndex}.amount`) || "";
     setMobileAmountStr(current);
     onRowFocus(mobileEditIndex, "account");
@@ -133,12 +128,12 @@ export function VoucherEntriesTable({
   const getEntryBalance = (index: number): number | null => {
     const entry = entries[index];
     if (!entry || !entry.accountId || !sidebarAccounts.length) return null;
-    const found = sidebarAccounts.find((a) => {
-      if (a.type !== entry.accountType) return false;
+    const found = sidebarAccounts.find((account) => {
+      if (account.type !== entry.accountType) return false;
       if (entry.accountType === "employee") {
-        return (a as unknown as Account & { accountId: number }).accountId === entry.accountId;
+        return (account as unknown as Account & { accountId: number }).accountId === entry.accountId;
       }
-      return a.id === entry.accountId;
+      return account.id === entry.accountId;
     });
     if (!found || found.balance == null) return null;
     return typeof found.balance === "string" ? parseFloat(found.balance) : found.balance;
@@ -148,16 +143,18 @@ export function VoucherEntriesTable({
     append({ accountType: "ledger", accountId: 0, accountName: "", amount: "" });
   };
 
-  const focusField = (field: "account" | "amount", index: number, select = true) => {
-    requestAnimationFrame(() => {
-      const el = document.querySelector(`[data-testid="input-${field}-${index}"]`) as HTMLInputElement | null;
-      if (!el) return;
-      el.focus();
-      if (select) el.select();
-    });
+  const focusField = (
+    field: "account" | "amount",
+    index: number,
+    select = true,
+    anchor?: Element | null,
+    delay = 0
+  ) => {
+    focusScopedTestId(`input-${field}-${index}`, { select, anchor, delay });
   };
 
   const handleAccountKeyDown = async (e: React.KeyboardEvent, index: number) => {
+    const anchor = e.currentTarget as Element;
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
       const hasAccount = (entries[index]?.accountId ?? 0) > 0;
@@ -165,30 +162,31 @@ export function VoucherEntriesTable({
         const highlighted = filteredSidebarAccounts[sidebarHighlightedIndex];
         if (highlighted) handleSidebarAccountSelect(highlighted);
       }
-      focusField("amount", index);
+      focusField("amount", index, true, anchor);
       return;
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
       if (filteredSidebarAccounts.length === 0) return;
-      const newIndex = Math.min(
-        sidebarHighlightedIndex < 0 ? 0 : sidebarHighlightedIndex + 1,
-        filteredSidebarAccounts.length - 1
+      setSidebarHighlightedIndex(
+        Math.min(
+          sidebarHighlightedIndex < 0 ? 0 : sidebarHighlightedIndex + 1,
+          filteredSidebarAccounts.length - 1
+        )
       );
-      setSidebarHighlightedIndex(newIndex);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       if (filteredSidebarAccounts.length === 0) return;
-      const newIndex = Math.max(sidebarHighlightedIndex - 1, 0);
-      setSidebarHighlightedIndex(newIndex);
+      setSidebarHighlightedIndex(Math.max(sidebarHighlightedIndex - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
       const currentName = form.getValues(`entries.${index}.accountName`)?.trim() || "";
       if (isFactoryCompany && onAutoCreateAccount && currentName) {
-        const exactMatch = filteredSidebarAccounts.find((acc) => acc.name.toLowerCase() === currentName.toLowerCase());
-        if (exactMatch) {
-          handleSidebarAccountSelect(exactMatch);
-        } else {
+        const exactMatch = filteredSidebarAccounts.find(
+          (account) => account.name.toLowerCase() === currentName.toLowerCase()
+        );
+        if (exactMatch) handleSidebarAccountSelect(exactMatch);
+        else {
           const newAccount = await onAutoCreateAccount(currentName);
           if (newAccount) handleSidebarAccountSelect(newAccount);
         }
@@ -200,6 +198,7 @@ export function VoucherEntriesTable({
   };
 
   const handleAmountKeyDown = (e: React.KeyboardEvent, index: number) => {
+    const anchor = e.currentTarget as Element;
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
       const amount = Number(entries[index]?.amount);
@@ -210,17 +209,17 @@ export function VoucherEntriesTable({
         if (!rowHasContent) return;
         handleAddRow();
       }
-      focusField("account", index + 1, false);
+      focusField("account", index + 1, false, anchor);
       return;
     }
     if (e.key === "ArrowLeft") {
       e.preventDefault();
-      focusField("account", index, false);
+      focusField("account", index, false, anchor);
       return;
     }
     if (e.key === "ArrowRight") {
       e.preventDefault();
-      if (index < fields.length - 1) focusField("account", index + 1, false);
+      if (index < fields.length - 1) focusField("account", index + 1, false, anchor);
       return;
     }
     if (e.key === "Enter") {
@@ -229,32 +228,14 @@ export function VoucherEntriesTable({
       if (!isNaN(amount) && amount > 0) {
         if (onAmountCommit) onAmountCommit(index);
         handleAddRow();
-        requestAnimationFrame(() => {
-          const newInput = document.querySelector(`[data-testid="input-account-${entries.length}"]`) as HTMLInputElement;
-          if (newInput) {
-            newInput.focus();
-            newInput.select();
-          }
-        });
+        focusField("account", entries.length, true, anchor);
       }
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      if (index > 0) {
-        const prevInput = document.querySelector(`[data-testid="input-amount-${index - 1}"]`) as HTMLInputElement;
-        if (prevInput) {
-          prevInput.focus();
-          prevInput.select();
-        }
-      }
+      if (index > 0) focusField("amount", index - 1, true, anchor);
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
-      if (index < entries.length - 1) {
-        const nextInput = document.querySelector(`[data-testid="input-amount-${index + 1}"]`) as HTMLInputElement;
-        if (nextInput) {
-          nextInput.focus();
-          nextInput.select();
-        }
-      }
+      if (index < entries.length - 1) focusField("amount", index + 1, true, anchor);
     }
   };
 
@@ -270,25 +251,29 @@ export function VoucherEntriesTable({
   };
 
   const renderBalanceLine = (index: number) => {
-    const bal = getEntryBalance(index);
-    if (bal == null) return null;
+    const balance = getEntryBalance(index);
+    if (balance == null) return null;
     return (
       <p
-        className={`text-[10px] font-mono tabular-nums mt-0.5 ${bal < 0 ? "text-red-500 dark:text-red-400" : bal > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
+        className={`text-[10px] font-mono tabular-nums mt-0.5 ${
+          balance < 0
+            ? "text-red-500 dark:text-red-400"
+            : balance > 0
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-muted-foreground"
+        }`}
       >
-        bal {formatAmount(bal)}
+        bal {formatAmount(balance)}
       </p>
     );
   };
 
   const runningTotals: number[] = [];
-  {
-    let running = 0;
-    for (let i = 0; i < fields.length; i++) {
-      const value = parseFloat(entries[i]?.amount || "0");
-      if (!isNaN(value) && value > 0) running += value;
-      runningTotals.push(running);
-    }
+  let running = 0;
+  for (let index = 0; index < fields.length; index++) {
+    const value = parseFloat(entries[index]?.amount || "0");
+    if (!isNaN(value) && value > 0) running += value;
+    runningTotals.push(running);
   }
   const hasAnyAmount = runningTotals.length > 0 && runningTotals[runningTotals.length - 1] > 0;
 
@@ -329,20 +314,20 @@ export function VoucherEntriesTable({
                     <FormField
                       control={form.control}
                       name={`entries.${index}.accountName`}
-                      render={({ field }) => (
+                      render={({ field: accountField }) => (
                         <FormItem>
                           <FormControl>
                             <Input
-                              {...field}
+                              {...accountField}
                               placeholder="Type to search..."
                               className="text-sm h-8"
                               data-testid={`input-account-${index}`}
-                              onChange={(e) => {
-                                field.onChange(e);
-                                setSidebarSearchValue(e.target.value);
+                              onChange={(event) => {
+                                accountField.onChange(event);
+                                setSidebarSearchValue(event.target.value);
                               }}
                               onFocus={() => onRowFocus(index, "account")}
-                              onKeyDown={(e) => handleAccountKeyDown(e, index)}
+                              onKeyDown={(event) => handleAccountKeyDown(event, index)}
                               onBlur={() => setTimeout(() => onRowBlur(), 200)}
                             />
                           </FormControl>
@@ -370,18 +355,18 @@ export function VoucherEntriesTable({
                     <FormField
                       control={form.control}
                       name={`entries.${index}.amount`}
-                      render={({ field }) => (
+                      render={({ field: amountField }) => (
                         <FormItem>
                           <FormControl>
                             <Input
-                              {...field}
+                              {...amountField}
                               type="number"
                               step="0.01"
                               placeholder="0.00"
                               className="font-mono tabular-nums text-right h-8"
                               data-testid={`input-amount-${index}`}
-                              onKeyDown={(e) => handleAmountKeyDown(e, index)}
-                              onBlur={(e) => handleAmountBlur(e, index)}
+                              onKeyDown={(event) => handleAmountKeyDown(event, index)}
+                              onBlur={(event) => handleAmountBlur(event, index)}
                               onFocus={() => onRowFocus(index, "amount")}
                             />
                           </FormControl>
@@ -391,7 +376,10 @@ export function VoucherEntriesTable({
                     />
                   </td>
                   <td className="px-2 py-1.5 align-top pt-3 text-right hidden lg:table-cell">
-                    <span className="text-xs font-mono tabular-nums text-muted-foreground" data-testid={`text-running-${index}`}>
+                    <span
+                      className="text-xs font-mono tabular-nums text-muted-foreground"
+                      data-testid={`text-running-${index}`}
+                    >
                       {runningTotals[index] > 0 ? formatAmount(runningTotals[index]) : "—"}
                     </span>
                   </td>
@@ -481,8 +469,8 @@ export function VoucherEntriesTable({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={(event) => {
+                      event.stopPropagation();
                       remove(index);
                     }}
                     data-testid={`mobile-remove-entry-${index}`}
@@ -540,9 +528,9 @@ export function VoucherEntriesTable({
                 ref={mobileSearchInputRef}
                 placeholder="Search accounts..."
                 value={mobileSearch}
-                onChange={(e) => {
-                  setMobileSearch(e.target.value);
-                  setSidebarSearchValue(e.target.value);
+                onChange={(event) => {
+                  setMobileSearch(event.target.value);
+                  setSidebarSearchValue(event.target.value);
                 }}
                 className="pl-9"
                 data-testid="input-mobile-account-search"
@@ -561,7 +549,7 @@ export function VoucherEntriesTable({
                   mobileEditIndex !== null &&
                   entries[mobileEditIndex]?.accountId === account.id &&
                   entries[mobileEditIndex]?.accountType === account.type;
-                const bal = typeof account.balance === "string" ? parseFloat(account.balance) : (account.balance ?? null);
+                const balance = typeof account.balance === "string" ? parseFloat(account.balance) : (account.balance ?? null);
                 return (
                   <button
                     key={`${account.type}-${account.id}`}
@@ -575,8 +563,8 @@ export function VoucherEntriesTable({
                   >
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{account.name}</div>
-                      {bal != null && (
-                        <div className="text-xs text-muted-foreground font-mono mt-0.5">{formatAmount(bal)}</div>
+                      {balance != null && (
+                        <div className="text-xs text-muted-foreground font-mono mt-0.5">{formatAmount(balance)}</div>
                       )}
                     </div>
                     {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
@@ -596,7 +584,7 @@ export function VoucherEntriesTable({
                 step="0.01"
                 placeholder="0.00"
                 value={mobileAmountStr}
-                onChange={(e) => setMobileAmountStr(e.target.value)}
+                onChange={(event) => setMobileAmountStr(event.target.value)}
                 className="flex-1 font-mono text-right h-12 text-lg"
                 data-testid="input-mobile-entry-amount"
               />
