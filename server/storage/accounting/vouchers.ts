@@ -81,8 +81,10 @@ export async function getVoucherEntriesByLedger(
        COALESCE(SUM(ve.credit_amount::numeric), 0)::text           AS "creditAmount",
        COALESCE(SUM(ve.transaction_debit_amount::numeric), 0)::text AS "transactionDebitAmount",
        COALESCE(SUM(ve.transaction_credit_amount::numeric), 0)::text AS "transactionCreditAmount",
-       COALESCE(SUM(ve.base_debit_amount::numeric), 0)::text       AS "baseDebitAmount",
-       COALESCE(SUM(ve.base_credit_amount::numeric), 0)::text      AS "baseCreditAmount",
+       CASE WHEN COUNT(ve.base_debit_amount) = COUNT(ve.id)
+         THEN COALESCE(SUM(ve.base_debit_amount::numeric), 0)::text END AS "baseDebitAmount",
+       CASE WHEN COUNT(ve.base_credit_amount) = COUNT(ve.id)
+         THEN COALESCE(SUM(ve.base_credit_amount::numeric), 0)::text END AS "baseCreditAmount",
        MAX(ve.transaction_currency)                                AS "transactionCurrency",
        MAX(ve.historical_exchange_rate)                            AS "historicalExchangeRate",
        MAX(ve.rate_convention)                                     AS "rateConvention",

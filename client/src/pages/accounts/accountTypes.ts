@@ -20,6 +20,14 @@ export interface Transaction {
   voucherId: number;
   debitAmount: string;
   creditAmount: string;
+  transactionCurrency?: string | null;
+  transactionDebitAmount?: string | null;
+  transactionCreditAmount?: string | null;
+  baseDebitAmount?: string | null;
+  baseCreditAmount?: string | null;
+  historicalExchangeRate?: string | null;
+  rateConvention?: string | null;
+  companyId?: number;
   narration: string;
   voucherNumber: string;
   voucherType: string;

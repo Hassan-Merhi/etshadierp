@@ -7,6 +7,7 @@ import {
   RateConvention,
 } from "../server/services/accounting/currencyAmounts";
 import { normalizeOpeningBalanceCurrency } from "../server/services/accounting/openingBalanceCurrency";
+import { summarizeAccountStatementCurrency } from "../server/services/accounting/accountStatementCurrency";
 
 const root = path.resolve(process.cwd());
 const read = (relativePath: string) => fs.readFileSync(path.join(root, relativePath), "utf8");
@@ -217,6 +218,47 @@ describe("cash/bank revaluation safety source checks", () => {
 });
 
 describe("legacy history safety", () => {
+  it("returns separate native buckets and marks unresolved legacy rows provisional", () => {
+    const summary = summarizeAccountStatementCurrency([
+      {
+        debitAmount: "100.000000",
+        creditAmount: "0",
+        transactionCurrency: "USD",
+        transactionDebitAmount: "100.000000",
+        baseDebitAmount: "100.000000",
+        baseCreditAmount: "0",
+      },
+      {
+        debitAmount: "600000.000000",
+        creditAmount: "0",
+        currency: "CFA",
+        transactionCurrency: "CFA",
+        transactionDebitAmount: "600000.000000",
+        baseDebitAmount: "1000.000000",
+        baseCreditAmount: "0",
+      },
+      { debitAmount: "500000", creditAmount: "0", currency: "CFA" },
+    ]);
+
+    expect(summary.nativeDebitByCurrency).toEqual({ USD: "100.000000", CFA: "600000.000000" });
+    expect(summary.historicalBaseDebitTotal).toBe("1100.000000");
+    expect(summary.unresolvedEntryCount).toBe(1);
+    expect(summary.totalsProvisional).toBe(true);
+  });
+
+  it("exposes the currency response contract from account transaction routes", () => {
+    const source = read("server/routes/accountTransactionRoutes.ts");
+    expect(source).toContain("currencySummary");
+    expect(source).toContain("summarizeAccountStatementCurrency");
+    expect(source).toContain("No access to this account's company");
+  });
+
+  it("exposes dual-currency fields from every voucher account storage query", () => {
+    const source = read("server/storage/accounting/vouchers.ts");
+    expect((source.match(/transaction_debit_amount/g) || []).length).toBeGreaterThanOrEqual(6);
+    expect((source.match(/historical_exchange_rate/g) || []).length).toBeGreaterThanOrEqual(6);
+  });
+
   it("blocks protected financial reports instead of guessing unresolved base values", () => {
     const guard = read("server/routes/historicalCurrencyGuardRoutes.ts");
     const readiness = read("server/services/accounting/historicalCurrencyReadiness.ts");

@@ -407,7 +407,7 @@ export function registerAccountStatementRoutes(app: Express) {
       if (accountType === "ledger") {
         txRows = await storage.getVoucherEntriesByLedger(accountId, startDate, endDate, companyId);
       } else if (accountType === "bank") {
-        txRows = await storage.getVoucherEntriesByBankAccount(accountId, startDate, endDate);
+        txRows = await storage.getVoucherEntriesByBankAccount(accountId, startDate, endDate, companyId);
       } else if (accountType === "supplier") {
         txRows = await storage.getVoucherEntriesBySupplier(accountId, companyId, startDate, endDate);
       } else if (accountType === "employee") {

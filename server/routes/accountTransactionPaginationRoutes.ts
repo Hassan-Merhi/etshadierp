@@ -8,6 +8,7 @@ import { authorizeCompanyIdParam } from "./helpers/supplierBalanceHelpers";
 import { getCustomerByLedgerId } from "../lib/factoryCustomerLedger";
 import { bankAccounts, companies, customers, employees, fixedAssets, ledgerAccounts } from "@shared/schema";
 import { companyScopedSuppliers } from "@shared/schema/supplierCompanyScope";
+import { summarizeAccountStatementCurrency } from "../services/accounting/accountStatementCurrency";
 
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 250;
@@ -29,6 +30,7 @@ interface Pagination {
 
 interface StatementPage {
   transactions: unknown[];
+  currencySummary: ReturnType<typeof summarizeAccountStatementCurrency>;
   preNetBalance: number;
   periodPreNetBalance: number;
   periodDebitTotal: number;
@@ -102,6 +104,7 @@ function buildPageResponse(
   const totalPages = total === 0 ? 0 : Math.ceil(total / pagination.limit);
   return {
     transactions: rows,
+    currencySummary: summarizeAccountStatementCurrency(rows),
     // This is the opening balance for the selected page. The frontend adds the
     // account master opening balance separately, exactly as it did before paging.
     preNetBalance: prePeriodNet + precedingPageNet,
@@ -157,14 +160,23 @@ function genericFilteredCte(
         SELECT
           v.id AS "voucherId",
           MIN(ve.id) AS "entryId",
-          COALESCE(SUM(ve.debit_amount::numeric), 0)::text AS "debitAmount",
-          COALESCE(SUM(ve.credit_amount::numeric), 0)::text AS "creditAmount",
+           COALESCE(SUM(ve.debit_amount::numeric), 0)::text AS "debitAmount",
+           COALESCE(SUM(ve.credit_amount::numeric), 0)::text AS "creditAmount",
+           COALESCE(SUM(ve.transaction_debit_amount::numeric), 0)::text AS "transactionDebitAmount",
+           COALESCE(SUM(ve.transaction_credit_amount::numeric), 0)::text AS "transactionCreditAmount",
+           CASE WHEN COUNT(ve.base_debit_amount) = COUNT(ve.id)
+             THEN COALESCE(SUM(ve.base_debit_amount::numeric), 0)::text END AS "baseDebitAmount",
+           CASE WHEN COUNT(ve.base_credit_amount) = COUNT(ve.id)
+             THEN COALESCE(SUM(ve.base_credit_amount::numeric), 0)::text END AS "baseCreditAmount",
+           MAX(ve.transaction_currency) AS "transactionCurrency",
+           MAX(ve.historical_exchange_rate) AS "historicalExchangeRate",
+           MAX(ve.rate_convention) AS "rateConvention",
           STRING_AGG(DISTINCT NULLIF(TRIM(ve.narration), ''), ' | ') AS narration,
           v.voucher_number AS "voucherNumber",
           v.voucher_type AS "voucherType",
           COALESCE(v.effective_date::date, v.voucher_date::date)::text AS "voucherDate",
           v.description AS "voucherDescription",
-          v.currency,
+           v.currency,
           COALESCE(v.effective_date::date, v.voucher_date::date) AS sort_date,
           v.id AS sort_id
         ${baseFrom}
@@ -180,15 +192,6 @@ function genericFilteredCte(
     };
   }
 
-  const supplierFields =
-    kind === "supplier"
-      ? `ve.transaction_currency AS "transactionCurrency",
-          ve.transaction_debit_amount AS "transactionDebitAmount",
-          ve.transaction_credit_amount AS "transactionCreditAmount",
-          ve.base_debit_amount AS "baseDebitAmount",
-          ve.base_credit_amount AS "baseCreditAmount",`
-      : "";
-
   return {
     column,
     values,
@@ -197,10 +200,16 @@ function genericFilteredCte(
       SELECT
         ve.id AS "entryId",
         ve.voucher_id AS "voucherId",
-        ve.debit_amount AS "debitAmount",
-        ve.credit_amount AS "creditAmount",
+         ve.debit_amount AS "debitAmount",
+         ve.credit_amount AS "creditAmount",
+         ve.transaction_currency AS "transactionCurrency",
+         ve.transaction_debit_amount AS "transactionDebitAmount",
+         ve.transaction_credit_amount AS "transactionCreditAmount",
+         ve.base_debit_amount AS "baseDebitAmount",
+         ve.base_credit_amount AS "baseCreditAmount",
+         ve.historical_exchange_rate AS "historicalExchangeRate",
+         ve.rate_convention AS "rateConvention",
         ve.narration,
-        ${supplierFields}
         v.voucher_number AS "voucherNumber",
         v.voucher_type AS "voucherType",
         COALESCE(v.effective_date::date, v.voucher_date::date)::text AS "voucherDate",
@@ -324,6 +333,7 @@ async function runCustomerBalanceStatement(options: {
       COALESCE(cb.description, '') AS narration,
       cb.debit_amount AS "debitAmount",
       cb.credit_amount AS "creditAmount",
+      cb.currency AS currency,
       cb.transaction_date AS sort_date,
       cb.id AS sort_id
     FROM customer_balances cb

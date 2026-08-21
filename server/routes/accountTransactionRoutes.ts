@@ -16,6 +16,11 @@ import { authorizeCompanyIdParam } from "./helpers/supplierBalanceHelpers";
 import { getClientDate } from "../lib/dateUtils";
 import { buildFactoryCustomerLedgerEntries, getCustomerByLedgerId } from "../lib/factoryCustomerLedger";
 import { bankAccounts, customers, employees, fixedAssets, ledgerAccounts } from "@shared/schema";
+import { summarizeAccountStatementCurrency } from "../services/accounting/accountStatementCurrency";
+
+function statementResponse(transactions: unknown[], fields: Record<string, unknown>) {
+  return { transactions, currencySummary: summarizeAccountStatementCurrency(transactions), ...fields };
+}
 
 export function registerAccountTransactionRoutes(app: Express) {
   // Get transactions for a specific ledger account with optional date filtering
@@ -48,6 +53,10 @@ export function registerAccountTransactionRoutes(app: Express) {
         return res.status(404).json({ message: "Ledger account not found" });
       }
       const companyId: number = ledgerAccount.companyId;
+      const authorizedCompanyId = await authorizeCompanyIdParam(req, companyId);
+      if (authorizedCompanyId === null) {
+        return res.status(403).json({ message: "No access to this account's company" });
+      }
 
       // 2. If this ledger is linked to a factory customer, return the unified
       //    factory-customer ledger view (plain array — frontend handles both shapes).
@@ -104,13 +113,12 @@ export function registerAccountTransactionRoutes(app: Express) {
         preNetBalance = parseFloat(bfResult.rows[0]?.net ?? "0");
       }
 
-      return res.json({
-        transactions,
+      return res.json(statementResponse(transactions, {
         preNetBalance,
         asOfDate,
         startDate: rawStart ?? null,
         endDate: effectiveEndDate,
-      });
+      }));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
@@ -166,13 +174,12 @@ export function registerAccountTransactionRoutes(app: Express) {
         preNetBalance = parseFloat(bfResult.rows[0]?.net ?? "0");
       }
 
-      return res.json({
-        transactions,
+      return res.json(statementResponse(transactions, {
         preNetBalance,
         asOfDate,
         startDate: rawStart ?? null,
         endDate: effectiveEndDate,
-      });
+      }));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
@@ -228,13 +235,12 @@ export function registerAccountTransactionRoutes(app: Express) {
         preNetBalance = parseFloat(bfResult.rows[0]?.net ?? "0");
       }
 
-      return res.json({
-        transactions,
+      return res.json(statementResponse(transactions, {
         preNetBalance,
         asOfDate,
         startDate: rawStart ?? null,
         endDate: effectiveEndDate,
-      });
+      }));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
@@ -300,13 +306,12 @@ export function registerAccountTransactionRoutes(app: Express) {
         preNetBalance = parseFloat(bfResult.rows[0]?.net ?? "0");
       }
 
-      return res.json({
-        transactions,
+      return res.json(statementResponse(transactions, {
         preNetBalance,
         asOfDate,
         startDate: rawStart ?? null,
         endDate: effectiveEndDate,
-      });
+      }));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
@@ -357,13 +362,12 @@ export function registerAccountTransactionRoutes(app: Express) {
         preNetBalance = parseFloat(bfResult.rows[0]?.net ?? "0");
       }
 
-      return res.json({
-        transactions,
+      return res.json(statementResponse(transactions, {
         preNetBalance,
         asOfDate,
         startDate: rawStart ?? null,
         endDate: effectiveEndDate,
-      });
+      }));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
@@ -408,6 +412,14 @@ export function registerAccountTransactionRoutes(app: Express) {
         narration: row.description || "",
         debitAmount: row.debitAmount,
         creditAmount: row.creditAmount,
+        transactionCurrency: row.currency,
+        transactionDebitAmount: row.debitAmount,
+        transactionCreditAmount: row.creditAmount,
+        baseDebitAmount: row.currency === "USD" ? row.debitAmount : null,
+        baseCreditAmount: row.currency === "USD" ? row.creditAmount : null,
+        historicalExchangeRate: row.currency === "USD" ? "1.0000000000" : null,
+        rateConvention: row.currency === "USD" ? "IDENTITY" : null,
+        currency: row.currency,
       }));
 
       let preNetBalance = 0;
@@ -423,13 +435,12 @@ export function registerAccountTransactionRoutes(app: Express) {
         preNetBalance = parseFloat(bfResult.rows[0]?.net ?? "0");
       }
 
-      return res.json({
-        transactions: mapped,
+      return res.json(statementResponse(mapped, {
         preNetBalance,
         asOfDate,
         startDate: rawStart ?? null,
         endDate: effectiveEndDate,
-      });
+      }));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
