@@ -67,6 +67,16 @@ interface NetProfitData {
   onUsTotal: number;
   incomeTotal: number;
   expensesTotal: number;
+  currency?: {
+    rateConvention: string;
+    nativeDebitByCurrency: Record<string, string>;
+    nativeCreditByCurrency: Record<string, string>;
+    historicalBaseDebitTotal: string;
+    historicalBaseCreditTotal: string;
+    unresolvedLegacyEntryCount: number;
+    unresolvedLegacyRawNet: string;
+    totalsProvisional: boolean;
+  };
 }
 
 function CategoryGroup({
@@ -353,6 +363,7 @@ export default function NetProfitDetails() {
   // Ratio bar: what fraction of total is assets
   const grandTotal = forUsTotal + onUsTotal;
   const assetPct = grandTotal > 0 ? (forUsTotal / grandTotal) * 100 : 50;
+  const nativeCurrencies = Object.keys(data?.currency?.nativeDebitByCurrency ?? {});
 
   return (
     <div className="p-4 md:p-6 space-y-5 w-full">
@@ -377,6 +388,40 @@ export default function NetProfitDetails() {
             </p>
           </div>
         </div>
+
+        {data?.currency && (
+          <Card
+            className={data.currency.totalsProvisional ? "border-amber-500/40 bg-amber-500/5" : "bg-muted/20"}
+            data-testid="net-position-currency-context"
+          >
+            <CardContent className="p-4 space-y-2">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="text-sm font-semibold">Currency context</p>
+                <Badge variant={data.currency.totalsProvisional ? "outline" : "secondary"}>
+                  {data.currency.totalsProvisional ? "Provisional" : "Historical rates resolved"}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Native balances remain separate; historical base values use the {data.currency.rateConvention} convention.
+              </p>
+              {nativeCurrencies.length > 0 && (
+                <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs font-mono">
+                  {nativeCurrencies.map((currency) => (
+                    <span key={currency}>
+                      {currency} debit {data.currency?.nativeDebitByCurrency[currency]}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {data.currency.totalsProvisional && (
+                <p className="text-xs text-amber-800 dark:text-amber-200" role="status">
+                  {data.currency.unresolvedLegacyEntryCount} legacy foreign-currency entries remain unresolved and are
+                  excluded from reliable base totals.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">

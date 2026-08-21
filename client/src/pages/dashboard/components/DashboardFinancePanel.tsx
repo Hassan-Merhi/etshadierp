@@ -109,6 +109,33 @@ export function DashboardFinancePanel({ dashboard }: DashboardFinancePanelProps)
             );
           })()}
 
+        {profitData?.currency?.totalsProvisional && (
+          <div
+            className="mb-4 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200"
+            role="status"
+            data-testid="net-position-currency-warning"
+          >
+            Net Position is provisional: {profitData.currency.unresolvedLegacyEntryCount} legacy foreign-currency
+            {profitData.currency.unresolvedLegacyEntryCount === 1 ? " entry remains" : " entries remain"} unresolved.
+            Native currency totals are shown separately and were not revalued with today&apos;s rate.
+          </div>
+        )}
+        {profitData?.currency && Object.keys(profitData.currency.nativeDebitByCurrency).length > 0 && (
+          <div className="mb-4 rounded-md border border-border/60 bg-muted/20 px-3 py-2" data-testid="net-position-currency-summary">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-xs font-semibold">Native currency balances</span>
+              <span className="text-[11px] text-muted-foreground">{profitData.currency.rateConvention}</span>
+            </div>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs font-mono">
+              {Object.entries(profitData.currency.nativeDebitByCurrency).map(([currency, amount]) => (
+                <span key={currency}>
+                  {currency} {amount}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="flex items-center justify-center h-[200px]">
             <p className="text-muted-foreground">Loading...</p>

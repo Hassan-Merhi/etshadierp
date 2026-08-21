@@ -12,6 +12,7 @@ import { computeRentalOutstanding } from "./netProfitRentalSection";
 import { computeStockInHand } from "./netProfitStockSection";
 import { loadNetProfitData } from "./netProfitDataLoad";
 import { firstRow } from "../../lib/queryResult";
+import { getNetPositionCurrencySummary } from "../../services/accounting/netPositionCurrency";
 
 export function registerStatsNetProfitRoutes(app: Express) {
   app.get("/api/stats/net-profit", requireAuth, requireNonPOS, async (req, res) => {
@@ -37,6 +38,10 @@ export function registerStatsNetProfitRoutes(app: Express) {
 
       // All the report's raw inputs - company row, ledger accounts and the three
       // grouped balance maps - are loaded in ./netProfitDataLoad.
+      const [netPositionCurrency, reportData] = await Promise.all([
+        getNetPositionCurrencySummary(companyId, toDate),
+        loadNetProfitData(companyId, toDate),
+      ]);
       const {
         companyRecord,
         companyAccounts,
@@ -46,7 +51,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
         accountBalances,
         supplierBalances,
         employeeBalances,
-      } = await loadNetProfitData(companyId, toDate);
+      } = reportData;
 
       // ============ NET POSITION CALCULATION ============
       // Uses shared helper (netPositionHelper.ts) – single source of truth for
@@ -149,27 +154,9 @@ export function registerStatsNetProfitRoutes(app: Express) {
           : [];
       const currentCfaRate = cfaRateRows.length > 0 ? parseFloat(cfaRateRows[0].rate) : 0;
 
-      if (currentCfaRate > 0 && !hasMigratedEntries) {
-        // Legacy CFA revaluation: only runs when ALL entries are pre-migration.
-        // After backfill (hasMigratedEntries=true) COALESCE already returns historical USD
-        // base amounts — dividing again would produce double-conversion errors.
-        // For a pre-migration CFA company every ledger balance is stored in CFA — divide by
-        // the current rate to get an approximate USD equivalent.
-        for (const acc of forUsAccounts) {
-          const oldVal = acc.value;
-          const newVal = round2(oldVal / currentCfaRate);
-          forUsTotal = round2(forUsTotal - oldVal + newVal);
-          classified.forUsTotal = forUsTotal;
-          acc.value = newVal;
-        }
-        for (const acc of onUsAccounts) {
-          const oldVal = acc.value;
-          const newVal = round2(oldVal / currentCfaRate);
-          onUsTotal = round2(onUsTotal - oldVal + newVal);
-          classified.onUsTotal = onUsTotal;
-          acc.value = newVal;
-        }
-      }
+      // Legacy non-base balances are intentionally not revalued here. Only the
+      // dedicated cash/bank middleware may apply the current rate, and it
+      // exposes null/provisional values when the native history is unresolved.
 
       // 2. Process income and expense accounts for the P&L breakdown (ERP-specific)
       //    The helper skips expense/income types; we handle them here.
@@ -341,12 +328,10 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // Guard: only convert if ALL entries are pre-migration (hasMigratedEntries=false).
       // After migration COALESCE already returns USD-base values; re-dividing by CFA rate
       // would produce incorrect double-conversion.
-      const workerLiabilitiesDisplay =
-        currentCfaRate > 0 && !hasMigratedEntries ? round2(workerLiabilities / currentCfaRate) : workerLiabilities;
+      const workerLiabilitiesDisplay = workerLiabilities;
       // rawSalaryAdvances comes from the salary_advances table (not voucher entries).
       // Its currency follows the company base currency for CFA companies.
-      const workerAdvancesDisplay =
-        currentCfaRate > 0 && !hasMigratedEntries ? round2(rawSalaryAdvances / currentCfaRate) : rawSalaryAdvances;
+      const workerAdvancesDisplay = rawSalaryAdvances;
       if (workerLiabilitiesDisplay > 0) {
         onUsTotal += workerLiabilitiesDisplay;
         categoryTotals["liability_Workers"] = (categoryTotals["liability_Workers"] || 0) + workerLiabilitiesDisplay;
@@ -400,15 +385,11 @@ export function registerStatsNetProfitRoutes(app: Express) {
             const netBalance = opening + balance.credit - balance.debit;
             if (netBalance > 0) {
               supplierLiabilities += netBalance;
-              const displayVal =
-                currentCfaRate > 0 && !hasMigratedEntries ? round2(netBalance / currentCfaRate) : netBalance;
+              const displayVal = netBalance;
               onUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: displayVal, category: "Supplier" });
             } else if (netBalance < 0) {
               supplierAssets += Math.abs(netBalance);
-              const displayVal =
-                currentCfaRate > 0 && !hasMigratedEntries
-                  ? round2(Math.abs(netBalance) / currentCfaRate)
-                  : Math.abs(netBalance);
+              const displayVal = Math.abs(netBalance);
               forUsAccounts.push({
                 name: sup.legalName,
                 code: sup.code || "",
@@ -422,12 +403,8 @@ export function registerStatsNetProfitRoutes(app: Express) {
         // For CFA companies, supplier balances are in CFA → convert to USD
         // Guard: supplier balances come from voucher entries via COALESCE.
         // Only convert pre-migration amounts; after migration the COALESCE already returns USD.
-        const supplierLiabilitiesDisplay =
-          currentCfaRate > 0 && !hasMigratedEntries
-            ? round2(supplierLiabilities / currentCfaRate)
-            : supplierLiabilities;
-        const supplierAssetsDisplay =
-          currentCfaRate > 0 && !hasMigratedEntries ? round2(supplierAssets / currentCfaRate) : supplierAssets;
+        const supplierLiabilitiesDisplay = supplierLiabilities;
+        const supplierAssetsDisplay = supplierAssets;
         if (supplierLiabilitiesDisplay > 0) {
           onUsTotal += supplierLiabilitiesDisplay;
           categoryTotals["liability_Suppliers"] = supplierLiabilitiesDisplay;
@@ -677,6 +654,14 @@ export function registerStatsNetProfitRoutes(app: Express) {
         onUsTotal,
         incomeTotal,
         expensesTotal,
+         currency: {
+           ...netPositionCurrency,
+           currentCashBankTranslationApplied: false,
+           historicalValuesLocked: true,
+         },
+         currencyRevaluation: {
+           reportTotalsProvisional: netPositionCurrency.totalsProvisional,
+         },
       };
       _setCached(_cacheKey, _result);
       res.json(_result);

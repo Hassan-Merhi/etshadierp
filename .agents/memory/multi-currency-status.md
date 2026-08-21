@@ -60,7 +60,8 @@ No migration performs a historical data backfill.
 - Date-filtered snapshots remain historical.
 - Cached report payloads are cloned before cash-only adjustment, preventing repeated revaluation.
 - `historicalCurrencyReadiness.ts` identifies unresolved foreign voucher rows and unresolved ledger, bank, customer, supplier, employee, and fixed-asset values.
-- Protected Net Position, Net Profit, and statement export endpoints return HTTP 409 while ambiguous historical currency data remains unresolved instead of returning convincing but wrong totals.
+- Net Position exposes native debit/credit buckets, historical base totals, unresolved legacy counts, and a provisional flag; dashboard/detail views show the warning instead of flattening unresolved data.
+- Only the cash/bank middleware may apply current-rate translation, and it marks that adjustment as current-snapshot-only.
 
 ### Historical repair
 - `scripts/backfill-voucher-entry-currency-amounts.mjs` remains explicit and dry-run by default.

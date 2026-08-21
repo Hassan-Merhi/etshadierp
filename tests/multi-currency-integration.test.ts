@@ -218,6 +218,18 @@ describe("cash/bank revaluation safety source checks", () => {
 });
 
 describe("legacy history safety", () => {
+  it("keeps Net Position historical values locked and reports native currency provenance", () => {
+    const route = read("server/routes/stats/statsNetProfitRoutes.ts");
+    const currencyService = read("server/services/accounting/netPositionCurrency.ts");
+    const middleware = read("server/routes/stats/statsMultiCurrencyRoutes.ts");
+    expect(route).toContain("getNetPositionCurrencySummary");
+    expect(route).toContain("historicalValuesLocked: true");
+    expect(route).not.toContain("oldVal / currentCfaRate");
+    expect(currencyService).toContain("TRANSACTION_PER_BASE");
+    expect(currencyService).toContain("UNRESOLVED_LEGACY_CURRENCY");
+    expect(middleware).toContain("currentCashBankTranslationApplied = true");
+  });
+
   it("returns separate native buckets and marks unresolved legacy rows provisional", () => {
     const summary = summarizeAccountStatementCurrency([
       {

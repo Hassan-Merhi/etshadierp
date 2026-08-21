@@ -4,8 +4,8 @@
   "pins": {
     "GET /api/stats/net-profit": {
       "status": 200,
-      "shape": "{currencyRevaluation,expenses,expensesTotal,forUs,forUsTotal,income,incomeTotal,netPosition,netPositionBreakdown,netPositionLabel,netProfit,netWorth,onUs,onUsTotal,ownersCapital,spPosProfit,totalExpenses,totalIncome}",
-      "hash": "7ac19ef0aa714dcf0c3e2cc8ba2a4492f208dcee78f0e5fce0c665faaf3c4a20"
+      "shape": "{currency,currencyRevaluation,expenses,expensesTotal,forUs,forUsTotal,income,incomeTotal,netPosition,netPositionBreakdown,netPositionLabel,netProfit,netWorth,onUs,onUsTotal,ownersCapital,spPosProfit,totalExpenses,totalIncome}",
+      "hash": "b20e765ec3c448d635e0222dea7f3e05435556bfaf34101906ba56e82519c502"
     },
     "GET /api/reports/net-profit-excel": {
       "status": 200,

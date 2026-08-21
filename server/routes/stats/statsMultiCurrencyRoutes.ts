@@ -106,8 +106,10 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
       res.json = ((payload) => {
         // The existing report engine caches its object. Clone before adjusting so
         // repeated requests never reapply translation to the cached reference.
+        const reportTotalsProvisional = Boolean(payload?.currencyRevaluation?.reportTotalsProvisional);
         const copy = payload == null ? payload : JSON.parse(JSON.stringify(payload));
         const adjusted = applyCurrentCashTranslation(copy, revaluation.accounts);
+        if (adjusted?.currency) adjusted.currency.currentCashBankTranslationApplied = true;
         adjusted.currencyRevaluation = {
           currentCfaPerUsd: revaluation.currentCfaPerUsd,
           unresolvedAccountCount: revaluation.unresolvedAccountCount,
@@ -123,6 +125,7 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
               unresolvedTranslationCurrencies: row.unresolvedTranslationCurrencies,
             })),
           appliedToCurrentSnapshotOnly: true,
+          reportTotalsProvisional,
         };
         return originalJson(adjusted);
       }) as typeof res.json;

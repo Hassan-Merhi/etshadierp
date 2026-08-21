@@ -36,6 +36,24 @@ export type ProfitData = {
     };
     netPosition: number;
   };
+  currency?: {
+    rateConvention: "TRANSACTION_PER_BASE" | string;
+    nativeDebitByCurrency: Record<string, string>;
+    nativeCreditByCurrency: Record<string, string>;
+    historicalBaseDebitTotal: string;
+    historicalBaseCreditTotal: string;
+    unresolvedLegacyEntryCount: number;
+    unresolvedLegacyRawNet: string;
+    totalsProvisional: boolean;
+    provisionalReason: string | null;
+    currentCashBankTranslationApplied?: boolean;
+    historicalValuesLocked?: boolean;
+  };
+  currencyRevaluation?: {
+    unresolvedAccountCount?: number;
+    reportTotalsProvisional?: boolean;
+    appliedToCurrentSnapshotOnly?: boolean;
+  };
 };
 
 export type ImportCycleBalanceData = {
