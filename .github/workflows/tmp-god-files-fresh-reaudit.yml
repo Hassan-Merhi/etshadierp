@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 48ea5dac8aec7f72342c0c40cc3e022e84053de6
+          ref: 320f1a3aedfba7379a0d8cdd08cdcc46c09d372b
           fetch-depth: 1
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
