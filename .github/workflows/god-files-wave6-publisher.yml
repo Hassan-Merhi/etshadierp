@@ -1,0 +1,57 @@
+name: God Files Wave 6 Publisher
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - agent/god-files-final-wave1-tests
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.head_ref == 'tmp/god-files-wave6-trigger'
+    runs-on: ubuntu-24.04
+    env:
+      CI: true
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/god-files-final-wave1-tests
+          fetch-depth: 0
+      - name: Reconcile exact current main
+        run: |
+          git fetch origin main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge --no-commit --no-ff -X ours origin/main
+          git checkout origin/main -- config/god-file-boundaries.json config/type-escape-boundaries.json tests/god-file-boundaries.test.ts docs/god-file-split-program.md docs/system-quality-program.md
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.14.0
+          cache: npm
+      - name: Install dependencies
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          npm ci --no-audit --bin-links=true
+      - name: Apply Wave 6 client splits
+        run: node scripts/tmp-god-files-wave6.mjs
+      - name: Format generated source
+        run: |
+          mapfile -d '' changed_files < <(git diff --name-only --diff-filter=ACMR -z origin/main -- client/src scripts | grep -zE '\.(ts|tsx|mjs)$' || true)
+          if [ "${#changed_files[@]}" -gt 0 ]; then node node_modules/prettier/bin/prettier.cjs --write "${changed_files[@]}"; fi
+      - name: Diagnose line boundaries
+        run: |
+          for file in \
+            client/src/pages/BaleProducts.tsx \
+            client/src/pages/baleproducts/useBaleProductsModel.tsx \
+            client/src/pages/ContainerDetail.tsx \
+            client/src/pages/containerdetail/useContainerDetailModel.tsx \
+            client/src/pages/factory/FactoryStockAllocationV5.tsx \
+            client/src/pages/factory/factorystockallocationv5/useFactoryStockAllocationV5Model.tsx; do
+            echo "$file: $(wc -l < "$file") lines"
+          done
+      - name: TypeScript diagnostic
+        run: npm run check
