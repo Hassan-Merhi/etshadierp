@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/page-state";
 import { formatNumber } from "@/lib/formatNumber";
 import { cn } from "@/lib/utils";
 import { currencySymbol, formatTxType, getFactoryTxTypeBadge, mergeBaleEntries } from "./daybookUtils";
@@ -88,6 +89,16 @@ function CondensedGroupRow({
       <div
         data-testid={`row-condensed-${row.date}-${row.txType}`}
         onClick={() => model.setExpandedRowKey(isExpanded ? null : row.key)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            model.setExpandedRowKey(isExpanded ? null : row.key);
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        aria-label={`${formatTxType(row.txType)} on ${row.date}`}
         className={cn("grid w-full pl-6 pr-4 py-3 cursor-pointer hover-elevate items-center", colsClass)}
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -169,7 +180,7 @@ function CondensedRows({ model }: { model: FactoryDaybookModel }) {
 }
 
 export function FactoryDaybookTable({ model }: { model: FactoryDaybookModel }) {
-  const { isLoading, filteredEntries, condensedRows, hasActiveFilters, showAmounts } = model;
+  const { isLoading, isError, error, refetch, filteredEntries, condensedRows, hasActiveFilters, showAmounts } = model;
   return (
     <Card>
       <CardHeader>
@@ -193,6 +204,14 @@ export function FactoryDaybookTable({ model }: { model: FactoryDaybookModel }) {
               <Skeleton key={i} className="h-12 w-full" />
             ))}
           </div>
+        ) : isError ? (
+          <ErrorState
+            title="Could not load factory transactions"
+            description={error instanceof Error ? error.message : "The factory daybook could not be loaded."}
+            actionLabel="Try again"
+            onAction={() => void refetch()}
+            data-testid="factory-daybook-error"
+          />
         ) : filteredEntries.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             {hasActiveFilters ? (

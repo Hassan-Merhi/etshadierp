@@ -407,7 +407,13 @@ export function useAccountsLegacyModel() {
 
   // Accounts query — includes the selected period end date so the list balance
   // is always computed through the same cut-off as the opened statement.
-  const { data: accountsResponse, isLoading: accountsLoading } = useQuery<{
+  const {
+    data: accountsResponse,
+    isLoading: accountsLoading,
+    isError: accountsError,
+    error: accountsQueryError,
+    refetch: refetchAccounts,
+  } = useQuery<{
     accounts: Account[];
     asOfDate: string;
   }>({
@@ -672,6 +678,9 @@ export function useAccountsLegacyModel() {
     hideBalances,
     // account list + statement
     accountsLoading,
+    accountsError,
+    accountsQueryError,
+    refetchAccounts,
     allAccounts,
     filteredAccounts,
     searchTerm,

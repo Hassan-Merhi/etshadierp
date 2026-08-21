@@ -11,6 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/page-state";
 import { PageHeader } from "@/components/PageHeader";
 import {
   ChevronDown,
@@ -74,6 +75,9 @@ export function StockItemsView({ stockItems }: { stockItems: StockItemsModel }) 
     stockCategories,
     aliasMap,
     isLoading,
+    isError,
+    error,
+    refetch,
     handleSelectAll,
     handleSelectItem,
     allPageSelected,
@@ -277,6 +281,14 @@ export function StockItemsView({ stockItems }: { stockItems: StockItemsModel }) 
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-12 w-full" />
         </div>
+      ) : isError ? (
+        <ErrorState
+          title="Could not load stock items"
+          description={error instanceof Error ? error.message : "Stock items could not be loaded."}
+          actionLabel="Try again"
+          onAction={() => void refetch()}
+          data-testid="stock-items-error"
+        />
       ) : (
         <>
           <div className="hidden md:block border rounded-xl overflow-auto max-h-[calc(100vh-300px)]">

@@ -72,7 +72,13 @@ export function useStockItems() {
     },
   ];
 
-  const { data: pagedData, isLoading } = useQuery<PagedStockItemsResponse>({
+  const {
+    data: pagedData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery<PagedStockItemsResponse>({
     queryKey: pagedQueryKey,
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(currentPage), pageSize: String(PAGE_SIZE) });
@@ -504,6 +510,9 @@ export function useStockItems() {
     activeCount,
     inactiveCount,
     isLoading,
+    isError,
+    error,
+    refetch,
     deleteMutation,
     adjustStockMutation,
     assignCategoryMutation,

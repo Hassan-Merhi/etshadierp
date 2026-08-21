@@ -160,7 +160,13 @@ export function useFactoryDaybookModel() {
   if (txTypeFilter !== "ALL") queryParams.set("txType", txTypeFilter);
   if (currencyFilter !== "ALL") queryParams.set("currencyCode", currencyFilter);
 
-  const { data: entries = [], isLoading } = useQuery<DaybookEntry[]>({
+  const {
+    data: entries = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery<DaybookEntry[]>({
     queryKey: ["/api/factory/daybook", startDate, endDate, txTypeFilter, currencyFilter],
     queryFn: async () => {
       const res = await fetch(`/api/factory/daybook?${queryParams.toString()}`, { credentials: "include" });
@@ -575,6 +581,9 @@ export function useFactoryDaybookModel() {
     clearFilters,
     // data
     isLoading,
+    isError,
+    error,
+    refetch,
     filteredEntries,
     condensedRows,
     getEntriesForCondensedRow,

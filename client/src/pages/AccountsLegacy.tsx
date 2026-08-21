@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/PageHeader";
+import { ErrorState } from "@/components/ui/page-state";
 import { exportLabels } from "./accounts/accountTypes";
 import { AccountDialogs } from "./accounts/AccountDialogs";
 import { AccountTable } from "./accounts/AccountTable";
@@ -108,6 +109,18 @@ export default function Accounts() {
                 <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
                   Loading accounts…
                 </div>
+              ) : model.accountsError ? (
+                <ErrorState
+                  title="Could not load accounts"
+                  description={
+                    model.accountsQueryError instanceof Error
+                      ? model.accountsQueryError.message
+                      : "Accounts could not be loaded."
+                  }
+                  actionLabel="Try again"
+                  onAction={() => void model.refetchAccounts()}
+                  data-testid="accounts-error"
+                />
               ) : model.searchTerm ? (
                 /* Command-palette result list when searching */
                 <AccountSearchResults model={model} />
