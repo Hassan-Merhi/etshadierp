@@ -22,11 +22,11 @@
       "claims": [
         {
           "doc": "docs/god-file-split-program.md",
-          "pattern": "\\*\\*Backlog: ([\\d,]+) files"
+          "pattern": "\\*\\*Backlog: ([\\d,]+) files?"
         },
         {
           "doc": "docs/system-quality-program.md",
-          "pattern": "God-file backlog \\| ([\\d,]+) files"
+          "pattern": "God-file backlog \\| ([\\d,]+) files?"
         }
       ]
     },
@@ -41,11 +41,11 @@
       "claims": [
         {
           "doc": "docs/god-file-split-program.md",
-          "pattern": "\\*\\*Backlog: [\\d,]+ files, ([\\d,]+) lines over the limit\\*\\*"
+          "pattern": "\\*\\*Backlog: [\\d,]+ files?, ([\\d,]+) lines over the limit\\*\\*"
         },
         {
           "doc": "docs/system-quality-program.md",
-          "pattern": "God-file backlog \\| [\\d,]+ files, ([\\d,]+) excess lines"
+          "pattern": "God-file backlog \\| [\\d,]+ files?, ([\\d,]+) excess lines"
         }
       ]
     },

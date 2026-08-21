@@ -45,7 +45,7 @@ describe("repository-wide god-file architecture boundaries", () => {
       return !mentionsReviewedPath || mentionsUnexpectedPath;
     });
 
-    expect(report.version).toBe(31);
+    expect(report.version).toBe(32);
     expect(unexpectedFailureMessages, unexpectedFailureMessages.join("\n")).toEqual([]);
     expect(report.summary.retiredFiles).toBe(4);
     expect(report.summary.boundedFiles).toBe(8);
@@ -117,7 +117,7 @@ describe("repository-wide god-file architecture boundaries", () => {
     // limit. It exists to be driven down, so it is asserted as a ceiling and
     // should be lowered as the split phases land.
     //
-    expect(report.summary.grandfatheredFiles).toBeLessThanOrEqual(2);
-    expect(report.summary.grandfatheredExcessLines).toBeLessThanOrEqual(1896);
+    expect(report.summary.grandfatheredFiles).toBeLessThanOrEqual(1);
+    expect(report.summary.grandfatheredExcessLines).toBeLessThanOrEqual(1076);
   });
 });
