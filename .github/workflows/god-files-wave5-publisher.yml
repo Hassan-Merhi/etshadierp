@@ -76,7 +76,7 @@ jobs:
       - name: Extract Wave 5 tail presentation blocks
         run: node scripts/tmp-god-files-wave5-tail.mjs
 
-      - name: Rebase relative imports moved into Wave 5 modules
+      - name: Rebase moved imports and preserve invoice order narrowing
         shell: bash
         run: |
           sed -i 's#"\./factoryinvoicedetail/#"./#g' client/src/pages/factory/factoryinvoicedetail/useFactoryInvoiceDetailModel.tsx
@@ -85,6 +85,19 @@ jobs:
           find client/src/pages/factory/factoryinvoicedetail/components -type f -name '*.tsx' -print0 | xargs -0 -r sed -i 's#"\./factoryinvoicedetail/#"../#g'
           find client/src/pages/factory/baleshistory/components -type f -name '*.tsx' -print0 | xargs -0 -r sed -i 's#"\./baleshistory/#"../#g'
           find client/src/pages/factory/factorypendinginvoiceverify/components -type f -name '*.tsx' -print0 | xargs -0 -r sed -i 's#"\./factorypendinginvoiceverify/#"../#g'
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          for (const file of [
+            'client/src/pages/factory/factoryinvoicedetail/components/FactoryInvoiceDetailDialog1.tsx',
+            'client/src/pages/factory/factoryinvoicedetail/components/FactoryInvoiceDetailDialog2.tsx',
+          ]) {
+            let source = fs.readFileSync(file, 'utf8');
+            const needle = '  return (\n';
+            if (!source.includes(needle)) throw new Error(`Return boundary not found in ${file}`);
+            source = source.replace(needle, '  if (!order) return null;\n\n  return (\n');
+            fs.writeFileSync(file, source);
+          }
+          NODE
 
       - name: Format cumulative changed source
         shell: bash
@@ -170,7 +183,8 @@ jobs:
             .wave5-trigger-5 \
             .wave5-trigger-6 \
             .wave5-trigger-7 \
-            .wave5-trigger-8
+            .wave5-trigger-8 \
+            .wave5-trigger-9
           git add -A
           git commit -m "refactor(god-files): complete cumulative wave 5 on current main"
           git push origin HEAD:agent/god-files-final-wave1-tests
