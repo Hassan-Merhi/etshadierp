@@ -21,13 +21,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: agent/god-files-final-wave1-tests
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Reconcile exact current main
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin main
+          git fetch --depth=1 origin main
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git merge --no-commit --no-ff -X ours origin/main
@@ -140,7 +140,7 @@ jobs:
           git add -u -- .github/workflows/god-files-wave8-publisher.yml scripts/tmp-god-files-wave8.mjs
           git status --short
           git commit -m "refactor(god-files): complete cumulative wave 8 on current main"
-          git fetch origin agent/god-files-final-wave1-tests
+          git fetch --depth=1 origin agent/god-files-final-wave1-tests
           if [ "$(git rev-parse origin/agent/god-files-final-wave1-tests)" != "$(git rev-parse HEAD^)" ]; then
             echo "Cumulative branch advanced during certification; refusing stale publish."
             exit 2
