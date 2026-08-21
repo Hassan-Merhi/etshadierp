@@ -54,10 +54,12 @@ jobs:
 
       - name: Verify TypeScript split
         run: |
-          echo "TS API: $(node -p \"require('typescript/package.json').version\")"
-          echo "TS compiler: $(node_modules/.bin/tsc --version)"
-          test "$(node -p \"require('typescript/package.json').version.split('.')[0]\")" = "6"
-          node_modules/.bin/tsc --version | grep -q '7.0.2'
+          TS_API=$(node -e "process.stdout.write(require('typescript/package.json').version)")
+          TS_COMPILER=$(node_modules/.bin/tsc --version)
+          echo "TS API: $TS_API"
+          echo "TS compiler: $TS_COMPILER"
+          test "${TS_API%%.*}" = "6"
+          echo "$TS_COMPILER" | grep -q '7.0.2'
 
       - name: Verify dependencies
         run: |
