@@ -1,13 +1,36 @@
-name: Wave H Ratchet Diagnostic
+name: Wave H Backend Coverage Measurement
 
 on:
   pull_request:
     branches: [main]
+    paths:
+      - .github/workflows/wave-h-ratchet-diagnostic.yml
 
 jobs:
-  diagnose:
+  measure:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: wave-h-backend-coverage-measurement
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+      BACKEND_TEST_SHARDS: "8"
+      BACKEND_TEST_COVERAGE_SHARD_BUDGET_SECONDS: "300"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -16,15 +39,24 @@ jobs:
           cache: npm
       - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
       - run: npm ci --no-audit --bin-links=true
-      - name: Capture type-escape audit
-        run: npm run audit:type-escapes -- --json > wave-h-type-escapes.json || true
-      - name: Capture script-inventory audit
-        run: npm run audit:scripts -- --json > wave-h-script-inventory.json || true
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - name: Prepare database schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
+      - name: Run sharded backend coverage
+        id: backend
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run test:backend:verify:coverage 2>&1 | tee wave-h-backend-coverage.log
+      - name: Upload merged backend coverage
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: wave-h-ratchet-diagnostics
+          name: wave-h-backend-coverage
           path: |
-            wave-h-type-escapes.json
-            wave-h-script-inventory.json
-          if-no-files-found: error
+            coverage/backend/coverage-summary.json
+            wave-h-backend-coverage.log
+          if-no-files-found: warn
           retention-days: 2
+      - name: Enforce measurement success
+        if: always()
+        run: test '${{ steps.backend.outcome }}' = success
