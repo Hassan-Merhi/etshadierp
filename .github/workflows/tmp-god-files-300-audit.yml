@@ -1,0 +1,67 @@
+name: TEMP God Files 300-Line Audit
+
+on:
+  push:
+    branches:
+      - tmp/god-files-300-lines-final
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: f51253a4c5b72258989f509efa417bdd539409c1
+          fetch-depth: 1
+      - name: Count source files above 300 lines
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const cfg = JSON.parse(fs.readFileSync('config/god-file-boundaries.json','utf8'));
+          const roots = cfg.repositoryScan.roots;
+          const exts = new Set(cfg.repositoryScan.extensions);
+          const excludedDirs = new Set(cfg.repositoryScan.excludeDirectories);
+          const excludedFiles = new Set(cfg.repositoryScan.excludeFiles);
+          const rows=[];
+          let total=0;
+          function walk(p){
+            if(!fs.existsSync(p)) return;
+            for(const ent of fs.readdirSync(p,{withFileTypes:true})){
+              const full=path.join(p,ent.name);
+              const rel=full.split(path.sep).join('/');
+              if(ent.isDirectory()){
+                if(excludedDirs.has(ent.name)) continue;
+                walk(full);
+              } else {
+                if(!exts.has(path.extname(ent.name))) continue;
+                if(excludedFiles.has(rel)) continue;
+                total++;
+                const text=fs.readFileSync(full,'utf8');
+                const lines=text.length===0?0:text.split(/\r?\n/).length;
+                if(lines>300) rows.push({path:rel,lines});
+              }
+            }
+          }
+          for(const root of roots) walk(root);
+          rows.sort((a,b)=>b.lines-a.lines || a.path.localeCompare(b.path));
+          const bucket = {"301-400":0,"401-500":0,"501-600":0,"601-700":0,"701-800":0,"801-900":0,"901+":0};
+          for(const r of rows){
+            if(r.lines<=400) bucket['301-400']++;
+            else if(r.lines<=500) bucket['401-500']++;
+            else if(r.lines<=600) bucket['501-600']++;
+            else if(r.lines<=700) bucket['601-700']++;
+            else if(r.lines<=800) bucket['701-800']++;
+            else if(r.lines<=900) bucket['801-900']++;
+            else bucket['901+']++;
+          }
+          console.log(`TOTAL_SOURCE_FILES=${total}`);
+          console.log(`FILES_OVER_300=${rows.length}`);
+          for(const [k,v] of Object.entries(bucket)) console.log(`BUCKET_${k}=${v}`);
+          console.log('TOP_30');
+          for(const r of rows.slice(0,30)) console.log(`${r.lines}\t${r.path}`);
+          NODE
