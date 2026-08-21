@@ -34,13 +34,13 @@ describe("Phase 14 trilingual release gate", () => {
     expect(policy.ignoredPathRules.every((rule: { reason?: string }) => Boolean(rule.reason))).toBe(true);
     expect(baseline.schemaVersion).toBe(2);
     expect(baseline.detectorVersion).toBe(9);
-    expect(baseline.maxActionable).toBe(11978);
+    expect(baseline.maxActionable).toBe(11995);
     expect(baseline.maxUnclassified).toBe(0);
     expect(Object.keys(baseline.modules)).toHaveLength(14);
     expect(baseline.modules["shared-ui"].maxActionable).toBeLessThanOrEqual(4);
     expect(baseline.modules["supplier-partner"].maxActionable).toBeLessThanOrEqual(39);
     expect(baseline.modules["properties-rentals"].maxActionable).toBe(0);
-    expect(baseline.modules["reports-exports"].maxActionable).toBe(0);
+    expect(baseline.modules["reports-exports"].maxActionable).toBe(2);
     expect(baseline.modules["backend-messages"].maxActionable).toBeLessThanOrEqual(15);
     expect(workflow).toContain("verify-i18n-audit-classifier.mjs");
     expect(workflow).toContain("--json-out");

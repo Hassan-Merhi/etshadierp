@@ -194,6 +194,12 @@ jobs:
         continue-on-error: true
         run: npm run test:backend:verify
 
+      - name: Backend coverage thresholds
+        id: backend_coverage
+        if: always() && steps.db_schema.outcome == 'success'
+        continue-on-error: true
+        run: npm run test:backend:verify:coverage
+
       - name: API smoke sweep
         id: smoke
         if: always() && steps.db_schema.outcome == 'success'

@@ -7,12 +7,12 @@ import {
 
 describe("Phase 3 shared interface translations", () => {
   it("covers every reviewed shared UI phrase exactly once", () => {
-    // The current reviewed registry contains 594 unique entries after the
+    // The current reviewed registry contains 597 unique entries after the
     // Customer Loading/i18n reconciliation. The i18n audit is the source of
     // truth for missing actionable copy; this assertion freezes the exact
     // reviewed table size so additions/removals require an intentional update.
-    expect(phase3SharedUiTranslations).toHaveLength(594);
-    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(594);
+    expect(phase3SharedUiTranslations).toHaveLength(597);
+    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(597);
 
     for (const entry of phase3SharedUiTranslations) {
       expect(entry.en.trim()).not.toBe("");

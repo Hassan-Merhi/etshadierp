@@ -13,7 +13,7 @@ function candidateRoots(anchor?: Element | null): ParentNode[] {
 
   const source = anchor ?? document.activeElement;
   const roots: ParentNode[] = [];
-  if (source instanceof Element) {
+  if (source && typeof (source as Element).closest === "function") {
     const form = source.closest("form");
     const dialog = source.closest('[role="dialog"]');
     const sheet = source.closest('[data-radix-dialog-content]');
@@ -28,10 +28,20 @@ function candidateRoots(anchor?: Element | null): ParentNode[] {
 
 export function findScopedTestId(testId: string, anchor?: Element | null): HTMLElement | null {
   if (typeof document === "undefined") return null;
-  const selector = `[data-testid="${CSS.escape(testId)}"]`;
+  const escapedTestId =
+    globalThis.CSS?.escape?.(testId) ?? testId.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const selector = `[data-testid="${escapedTestId}"]`;
 
   for (const root of candidateRoots(anchor)) {
-    const matches = Array.from(root.querySelectorAll(selector)) as HTMLElement[];
+    const queryRoot = root as ParentNode & {
+      querySelector?: (query: string) => Element | null;
+    };
+    if (typeof queryRoot.querySelectorAll !== "function") {
+      const match = queryRoot.querySelector?.(selector) as HTMLElement | null;
+      if (match) return match;
+      continue;
+    }
+    const matches = Array.from(queryRoot.querySelectorAll(selector)) as HTMLElement[];
     const visible = matches.find(isVisible);
     if (visible) return visible;
     if (matches[0]) return matches[0];
@@ -45,7 +55,8 @@ export function focusScopedTestId(testId: string, options: FocusOptions = {}): v
     const element = findScopedTestId(testId, anchor);
     if (!element) return;
     element.focus();
-    if (select && element instanceof HTMLInputElement) element.select();
+    const selectable = element as HTMLElement & { select?: () => void };
+    if (select && typeof selectable.select === "function") selectable.select();
   };
 
   if (delay > 0) setTimeout(run, delay);

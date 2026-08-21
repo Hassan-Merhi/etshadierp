@@ -85,8 +85,6 @@ describe("operational event detection", () => {
         endpointCount: 4,
         apiEndpointCount: 2,
         staticAssetCount: 2,
-        totalApiResponseBytes: 2_500_000,
-        totalStaticAssetResponseBytes: 1_500_000,
         ranked,
       })
     );

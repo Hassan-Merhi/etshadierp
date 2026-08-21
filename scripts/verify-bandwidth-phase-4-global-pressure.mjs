@@ -27,7 +27,7 @@ const [
   read("client/src/lib/queryKeys.ts"),
   read("client/src/pages/vouchers/useVoucherQueries.ts"),
   read("client/src/pages/voucher-edit/useVoucherEditQueries.ts"),
-  read("client/src/pages/factory/FactoryProformas.tsx"),
+  read("client/src/pages/factory/factoryproformas/useFactoryProformasModel.ts"),
   read("client/src/lib/bandwidthInvalidationPolicy.ts"),
   read("client/src/lib/requestStormGuard.ts"),
   read("client/src/lib/queryPolicies.ts"),

@@ -29,7 +29,7 @@ const [
   read("build/viteSalesReportInvalidationPlugin.ts"),
   read("vite.config.ts"),
   read("client/src/pages/SalesReportLegacy.tsx"),
-  read("client/src/pages/SalesReportDetail.tsx"),
+  read("client/src/pages/salesreportdetail/useSalesReportDetailModel.ts"),
   read("client/src/pages/SalesReportComparison.tsx"),
   read("client/src/lib/queryClient.ts"),
 ]);

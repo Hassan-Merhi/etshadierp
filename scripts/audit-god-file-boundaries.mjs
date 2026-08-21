@@ -10,7 +10,9 @@ function readText(relativePath) {
 }
 
 function countLines(source) {
-  return source.length === 0 ? 0 : source.split(/\r?\n/).length;
+  if (source.length === 0) return 0;
+  const lines = source.split(/\r?\n/);
+  return source.endsWith("\n") ? lines.length - 1 : lines.length;
 }
 
 function normalizeRelativePath(absolutePath) {
