@@ -1,0 +1,167 @@
+name: Phase 18 Main Cleanup Worker v3
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CI: true
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24.19.0'
+          cache: npm
+      - run: npm ci
+      - name: Require compiler-green baseline
+        run: npm run check
+      - name: Recover the proven compiler-aware helpers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('.github/workflows/phase18-main-worker-v2.yml').read_text()
+          def extract(marker, target):
+              start = text.index(marker) + len(marker)
+              end = text.index('\n          NODE', start)
+              body = text[start:end]
+              lines = body.splitlines()
+              body = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines).lstrip('\n') + '\n'
+              Path(target).write_text(body)
+          extract("cat >.phase18-transform.cjs <<'NODE'", '.phase18-transform.cjs')
+          extract("cat >.phase18-gate.cjs <<'NODE'", '.phase18-gate.cjs')
+          PY
+          node --check .phase18-transform.cjs
+          node --check .phase18-gate.cjs
+      - name: Run every compiler-aware inference family
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          harvest() {
+            mode="$1"
+            echo "=== HARVEST $mode ==="
+            node .phase18-transform.cjs "$mode"
+            list=".phase18-${mode}.files"
+            if [ ! -s "$list" ]; then
+              rm -f "$list"
+              return 0
+            fi
+            green=0
+            for attempt in $(seq 1 16); do
+              set +e
+              npm run check >".phase18-${mode}.check" 2>&1
+              rc=$?
+              set -e
+              if [ "$rc" -eq 0 ]; then
+                green=1
+                echo "${mode}_GREEN_ATTEMPT=$attempt"
+                break
+              fi
+              rm -f .phase18-unresolved
+              node .phase18-gate.cjs "$list" ".phase18-${mode}.check"
+              if [ -f .phase18-unresolved ]; then
+                tail -n 120 ".phase18-${mode}.check"
+                git reset --hard HEAD
+                break
+              fi
+              if [ ! -s "$list" ]; then
+                git reset --hard HEAD
+                break
+              fi
+            done
+            if [ "$green" = 1 ]; then
+              git add client/src server shared
+              if ! git diff --cached --quiet; then
+                git commit -m "refactor: compiler-safe inferred ${mode} types [phase18-${mode}] [skip ci]"
+              fi
+            else
+              git reset --hard HEAD
+            fi
+            rm -f "$list" ".phase18-${mode}.check" .phase18-unresolved
+            npm run check
+          }
+          harvest contextual
+          harvest declarations
+          harvest casts
+          harvest typeargs
+          harvest catch
+          harvest arrays
+      - name: Run usage-derived parameter and property inference
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show agent/lint-phase18-inference2:scripts/phase18-usage-infer.cjs > .phase18-usage-infer.cjs
+          sed -i "s#/tmp/inference2.files#.phase18-usage.files#g" .phase18-usage-infer.cjs
+          node .phase18-usage-infer.cjs
+          if [ -s .phase18-usage.files ]; then
+            green=0
+            for attempt in $(seq 1 24); do
+              set +e
+              npm run check >.phase18-usage-check.log 2>&1
+              rc=$?
+              set -e
+              if [ "$rc" -eq 0 ]; then green=1; break; fi
+              mapfile -t errs < <(sed -nE 's#^(.+\.(ts|tsx))\([0-9]+,[0-9]+\): error TS[0-9]+:.*#\1#p' .phase18-usage-check.log | sort -u)
+              reverted=0
+              for f in "${errs[@]}"; do
+                if grep -Fxq "$f" .phase18-usage.files; then
+                  git restore --source=HEAD --worktree -- "$f"
+                  grep -Fxv "$f" .phase18-usage.files > .phase18-usage.files.next || true
+                  mv .phase18-usage.files.next .phase18-usage.files
+                  reverted=$((reverted+1))
+                fi
+              done
+              echo "USAGE_ROLLBACK attempt=$attempt errors=${#errs[@]} reverted=$reverted"
+              [ "$reverted" -gt 0 ] || break
+              [ -s .phase18-usage.files ] || break
+            done
+            if [ "$green" = 1 ]; then
+              git add client/src server shared
+              if ! git diff --cached --quiet; then git commit -m 'refactor: infer concrete Phase 18 types from usage [phase18-usage-types] [skip ci]'; fi
+            else
+              git reset --hard HEAD
+            fi
+          fi
+          rm -f .phase18-usage-infer.cjs .phase18-usage.files .phase18-usage-check.log
+          npm run check
+      - name: Measure real remaining type debt
+        shell: bash
+        run: |
+          set +e
+          node scripts/audit-type-escapes.mjs --json > /tmp/type.json
+          type_rc=$?
+          npm run lint -- --quiet > /tmp/lint.txt 2>&1
+          lint_rc=$?
+          set -e
+          node - <<'NODE'
+          const fs=require('fs');
+          const r=JSON.parse(fs.readFileSync('/tmp/type.json','utf8'));
+          console.log('TYPE_ESCAPE_SUMMARY='+JSON.stringify(r.summary));
+          console.log('TOP_ESCAPE_FILES');
+          for(const f of [...r.files].sort((a,b)=>b.total-a.total).slice(0,40)) console.log(`${f.total}\t${f.path}`);
+          NODE
+          tail -n 80 /tmp/lint.txt || true
+          echo "TYPE_AUDIT_EXIT=$type_rc LINT_EXIT=$lint_rc"
+      - name: Push proven compiler-green changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .phase18-transform.cjs .phase18-gate.cjs
+          npm run check
+          git fetch origin main
+          git rebase origin/main
+          npm run check
+          git push origin HEAD:main

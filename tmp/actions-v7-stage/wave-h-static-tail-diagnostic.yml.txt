@@ -1,0 +1,57 @@
+name: Wave H Static Tail Diagnostic
+
+on:
+  push:
+    branches: [wave-i/convergence-automation]
+    paths:
+      - .github/workflows/wave-h-static-tail-diagnostic.yml
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_ENV: test
+      SESSION_SECRET: phase2-static-tail
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: { ref: wave-i/convergence-automation }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with: { node-version: "24.19.0", cache: npm }
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - name: Run remaining static steps
+        shell: bash
+        run: |
+          set +e
+          : > phase2-static-tail-diagnostic.txt
+          run_step() {
+            label="$1"; shift
+            echo "===== ${label} =====" >> phase2-static-tail-diagnostic.txt
+            "$@" > phase2-step.log 2>&1
+            code=$?
+            echo "exit=${code}" >> phase2-static-tail-diagnostic.txt
+            tail -n 160 phase2-step.log >> phase2-static-tail-diagnostic.txt
+            echo >> phase2-static-tail-diagnostic.txt
+          }
+          run_step verify_lockfile npm run verify:lockfile
+          run_step verify_production_dependencies npm run verify:production-dependencies
+          run_step build npm run build
+          run_step verify_server_bundle npm run verify:server-bundle
+          run_step verify_observability npm run verify:observability
+          run_step verify_final_readiness npm run verify:final-production-readiness
+          run_step verify_bandwidth npm run verify:bandwidth
+      - name: Commit diagnostic and self-remove
+        run: |
+          rm -f .github/workflows/wave-h-static-tail-diagnostic.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add phase2-static-tail-diagnostic.txt .github/workflows/wave-h-static-tail-diagnostic.yml
+          git commit -m "test: record Wave H static-tail diagnostic"
+          git push origin HEAD:wave-i/convergence-automation

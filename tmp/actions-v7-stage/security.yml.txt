@@ -1,0 +1,93 @@
+name: Security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  # Cancel superseded pull-request runs only; every commit on main is gated.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden Runner (audit mode)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24.19.0"
+          cache: npm
+
+      - name: Normalize Replit registry URLs for CI
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Capture production dependency audit
+        id: production_audit_report
+        if: always()
+        run: |
+          npm audit --omit=dev --json > production-audit.json || true
+          npm audit --omit=dev --audit-level=high || true
+
+      - name: Block unreviewed high and critical production vulnerabilities
+        run: npm run verify:dependency-audit
+
+      - name: Upload production dependency audit
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: production-dependency-audit
+          path: production-audit.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Audit all dependencies
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: npm run verify:dependency-audit -- --include-dev
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden Runner (audit mode)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Block verified secrets
+        uses: trufflesecurity/trufflehog@bcfcf73aaf4759d4dadc2783177c245a02792318 # v3.97.0
+        with:
+          extra_args: --results=verified
+
+      - name: Report unknown secret candidates
+        continue-on-error: true
+        uses: trufflesecurity/trufflehog@bcfcf73aaf4759d4dadc2783177c245a02792318 # v3.97.0
+        with:
+          extra_args: --results=unknown

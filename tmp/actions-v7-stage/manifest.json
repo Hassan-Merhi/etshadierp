@@ -1,0 +1,98 @@
+[
+  {
+    "target": ".github/workflows/bandwidth-phase5-final-verification.yml",
+    "staged": "tmp/actions-v7-stage/bandwidth-phase5-final-verification.yml.txt"
+  },
+  {
+    "target": ".github/workflows/bandwidth-phase5-repair.yml",
+    "staged": "tmp/actions-v7-stage/bandwidth-phase5-repair.yml.txt"
+  },
+  {
+    "target": ".github/workflows/bandwidth-phase5-verification.yml",
+    "staged": "tmp/actions-v7-stage/bandwidth-phase5-verification.yml.txt"
+  },
+  {
+    "target": ".github/workflows/build-windows.yml",
+    "staged": "tmp/actions-v7-stage/build-windows.yml.txt"
+  },
+  {
+    "target": ".github/workflows/ci.yml",
+    "staged": "tmp/actions-v7-stage/ci.yml.txt"
+  },
+  {
+    "target": ".github/workflows/i18n-audit.yml",
+    "staged": "tmp/actions-v7-stage/i18n-audit.yml.txt"
+  },
+  {
+    "target": ".github/workflows/mobile-responsive.yml",
+    "staged": "tmp/actions-v7-stage/mobile-responsive.yml.txt"
+  },
+  {
+    "target": ".github/workflows/phase18-candidate-solver.yml",
+    "staged": "tmp/actions-v7-stage/phase18-candidate-solver.yml.txt"
+  },
+  {
+    "target": ".github/workflows/phase18-contract-audit-only.yml",
+    "staged": "tmp/actions-v7-stage/phase18-contract-audit-only.yml.txt"
+  },
+  {
+    "target": ".github/workflows/phase18-eslint-autofix.yml",
+    "staged": "tmp/actions-v7-stage/phase18-eslint-autofix.yml.txt"
+  },
+  {
+    "target": ".github/workflows/phase18-main-worker-v2.yml",
+    "staged": "tmp/actions-v7-stage/phase18-main-worker-v2.yml.txt"
+  },
+  {
+    "target": ".github/workflows/phase18-main-worker-v3.yml",
+    "staged": "tmp/actions-v7-stage/phase18-main-worker-v3.yml.txt"
+  },
+  {
+    "target": ".github/workflows/phase18-phase3-arrays-temp.yml",
+    "staged": "tmp/actions-v7-stage/phase18-phase3-arrays-temp.yml.txt"
+  },
+  {
+    "target": ".github/workflows/phase18-phase4-generic.yml",
+    "staged": "tmp/actions-v7-stage/phase18-phase4-generic.yml.txt"
+  },
+  {
+    "target": ".github/workflows/phase18-phase5-property.yml",
+    "staged": "tmp/actions-v7-stage/phase18-phase5-property.yml.txt"
+  },
+  {
+    "target": ".github/workflows/phase18-toolchain-audit-only.yml",
+    "staged": "tmp/actions-v7-stage/phase18-toolchain-audit-only.yml.txt"
+  },
+  {
+    "target": ".github/workflows/phase2-puppeteer-security-repair.yml",
+    "staged": "tmp/actions-v7-stage/phase2-puppeteer-security-repair.yml.txt"
+  },
+  {
+    "target": ".github/workflows/phase4-as-any-worker.yml",
+    "staged": "tmp/actions-v7-stage/phase4-as-any-worker.yml.txt"
+  },
+  {
+    "target": ".github/workflows/release-verification.yml",
+    "staged": "tmp/actions-v7-stage/release-verification.yml.txt"
+  },
+  {
+    "target": ".github/workflows/rtl-accessibility.yml",
+    "staged": "tmp/actions-v7-stage/rtl-accessibility.yml.txt"
+  },
+  {
+    "target": ".github/workflows/security.yml",
+    "staged": "tmp/actions-v7-stage/security.yml.txt"
+  },
+  {
+    "target": ".github/workflows/wave-h-format-static-six.yml",
+    "staged": "tmp/actions-v7-stage/wave-h-format-static-six.yml.txt"
+  },
+  {
+    "target": ".github/workflows/wave-h-ratchet-diagnostic.yml",
+    "staged": "tmp/actions-v7-stage/wave-h-ratchet-diagnostic.yml.txt"
+  },
+  {
+    "target": ".github/workflows/wave-h-static-tail-diagnostic.yml",
+    "staged": "tmp/actions-v7-stage/wave-h-static-tail-diagnostic.yml.txt"
+  }
+]
