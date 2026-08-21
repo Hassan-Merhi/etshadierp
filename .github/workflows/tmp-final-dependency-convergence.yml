@@ -1,0 +1,80 @@
+name: Temporary Final Dependency Convergence
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/tmp-final-dependency-convergence.yml
+
+permissions:
+  contents: write
+
+jobs:
+  converge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24.19.0'
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Apply remaining dependency manifests
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const edit = (path, fn) => {
+            const json = JSON.parse(fs.readFileSync(path, 'utf8'));
+            fn(json);
+            fs.writeFileSync(path, JSON.stringify(json, null, 2) + '\n');
+          };
+          edit('package.json', (pkg) => {
+            pkg.dependencies['@vitejs/plugin-react'] = '^6.0.0';
+            pkg.dependencies.archiver = '^8.0.0';
+            pkg.dependencies.express = '^5.0.0';
+            pkg.devDependencies['@types/archiver'] = '^8.0.0';
+            pkg.devDependencies['@types/express'] = '5.0.6';
+          });
+          edit('artifacts/mockup-sandbox/package.json', (pkg) => {
+            if (pkg.devDependencies?.['@vitejs/plugin-react'] !== undefined) {
+              pkg.devDependencies['@vitejs/plugin-react'] = '^6.0.0';
+            } else if (pkg.dependencies?.['@vitejs/plugin-react'] !== undefined) {
+              pkg.dependencies['@vitejs/plugin-react'] = '^6.0.0';
+            }
+          });
+          NODE
+
+      - name: Apply GitHub Actions v7 digest updates
+        run: |
+          find .github/workflows -type f \( -name '*.yml' -o -name '*.yaml' \) -print0 | xargs -0 sed -i \
+            -e 's#actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6#actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7#g' \
+            -e 's#actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4#actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7#g' \
+            -e 's#actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4#actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7#g'
+
+      - name: Regenerate npm lockfile
+        env:
+          npm_config_registry: https://registry.npmjs.org/
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Regenerate pnpm lockfile
+        env:
+          npm_config_registry: https://registry.npmjs.org/
+        run: npx --yes pnpm@10.17.1 install --lockfile-only --ignore-scripts
+
+      - name: Push convergence branch
+        run: |
+          rm -f .github/workflows/tmp-final-dependency-convergence.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -B convergence/deps-remaining
+          git add -- package.json package-lock.json pnpm-lock.yaml artifacts/mockup-sandbox/package.json .github/workflows
+          git commit -m 'fix(deps): converge remaining major upgrades'
+          git push --force origin HEAD:refs/heads/convergence/deps-remaining
