@@ -37,6 +37,7 @@ jobs:
             pkg.devDependencies['@typescript/native'] = 'npm:typescript@7.0.2';
             pkg.devDependencies.typescript = 'npm:@typescript/typescript6@^6.0.2';
             pkg.devDependencies['eslint-plugin-react-hooks'] = '^7.1.1';
+            pkg.scripts.check = 'node --max-old-space-size=4096 node_modules/@typescript/native/bin/tsc --noEmit';
           });
           edit('artifacts/mockup-sandbox/package.json', (pkg) => {
             pkg.devDependencies.vite = '^8.0.0';
