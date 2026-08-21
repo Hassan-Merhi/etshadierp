@@ -56,6 +56,15 @@ config.totals = { ...(config.totals ?? {}), typeEscapeCeiling: measured };
 fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
 console.log(`WAVE5_TYPE_CEILING total=${measured}`);
 
+const qualityDocPath = path.join(root, "docs/system-quality-program.md");
+let qualityDoc = fs.readFileSync(qualityDocPath, "utf8");
+const priorFormatted = (measured + 1).toLocaleString("en-US");
+const nextFormatted = measured.toLocaleString("en-US");
+qualityDoc = qualityDoc.replaceAll(priorFormatted, nextFormatted);
+qualityDoc = qualityDoc.replaceAll(String(measured + 1), String(measured));
+fs.writeFileSync(qualityDocPath, qualityDoc);
+console.log(`WAVE5_TYPE_DOC_CEILING total=${nextFormatted}`);
+
 const lintFix = spawnSync(process.execPath, ["scripts/tmp-god-files-wave5-lint-fix.mjs"], {
   cwd: root,
   stdio: "inherit",
