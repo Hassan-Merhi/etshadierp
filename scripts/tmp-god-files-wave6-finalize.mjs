@@ -55,15 +55,23 @@ const report = JSON.parse(audit.stdout);
 const measured = Number(report.summary.typeEscapeTotal);
 if (measured > priorCeiling) throw new Error(`Wave 6 would raise type escapes ${priorCeiling} -> ${measured}`);
 const counts = new Map(report.files.map((file) => [file.path, file]));
-const wave6Generated = [
-  "client/src/pages/baleproducts/useBaleProductsModel.tsx",
-  "client/src/pages/containerdetail/useContainerDetailModel.tsx",
-  "client/src/pages/factory/factorystockallocationv5/useFactoryStockAllocationV5Model.tsx",
-];
-for (const rel of wave6Generated) {
+const wave6Affected = new Set(wave6Targets);
+for (const file of report.files) {
+  if (
+    file.path.startsWith("client/src/pages/baleproducts/") ||
+    file.path.startsWith("client/src/pages/containerdetail/") ||
+    file.path.startsWith("client/src/pages/factory/factorystockallocationv5/")
+  ) wave6Affected.add(file.path);
+}
+for (const rel of wave6Affected) {
   const file = counts.get(rel);
-  if (file && file.total > 0) typeConfig.scan.baseline[rel] = [file.explicitAny, file.asAny, file.suppressions];
-  else delete typeConfig.scan.baseline[rel];
+  if (file && file.total > 0) {
+    typeConfig.scan.baseline[rel] = [file.explicitAny, file.asAny, file.suppressions];
+    console.log(`WAVE6_TYPE_BASELINE ${rel}=${file.total}`);
+  } else {
+    delete typeConfig.scan.baseline[rel];
+    console.log(`WAVE6_TYPE_BASELINE ${rel}=0`);
+  }
 }
 for (const rel of Object.keys(typeConfig.scan.baseline)) if (!fs.existsSync(path.join(root, rel))) delete typeConfig.scan.baseline[rel];
 typeConfig.totals = { ...(typeConfig.totals ?? {}), typeEscapeCeiling: measured };
