@@ -282,8 +282,8 @@ jobs:
           }
           trap cleanup EXIT
 
-          for attempt in $(seq 1 180); do
-            if curl --fail --silent --show-error http://127.0.0.1:${PORT}/api/health/db > health-db-ci.json; then
+          for _attempt in $(seq 1 180); do
+            if curl --fail --silent --show-error "http://127.0.0.1:${PORT}/api/health/db" > health-db-ci.json; then
               cat health-db-ci.json
               exit 0
             fi
@@ -350,8 +350,8 @@ jobs:
           }
           trap cleanup EXIT
 
-          for attempt in $(seq 1 180); do
-            if curl --fail --silent http://127.0.0.1:${PORT}/api/health/db | grep -q '"status":"ok"'; then
+          for _attempt in $(seq 1 180); do
+            if curl --fail --silent "http://127.0.0.1:${PORT}/api/health/db" | grep -q '"status":"ok"'; then
               break
             fi
             if ! kill -0 "$app_pid" 2>/dev/null; then
