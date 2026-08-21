@@ -1,11 +1,8 @@
-# trigger: final dependency convergence
 name: Temporary Final Dependency Convergence
 
 on:
-  push:
+  pull_request:
     branches: [main]
-    paths:
-      - .github/workflows/tmp-final-dependency-convergence.yml
 
 permissions:
   contents: write
@@ -15,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout current main
+      - name: Checkout PR head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: main
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -70,12 +67,16 @@ jobs:
           npm_config_registry: https://registry.npmjs.org/
         run: npx --yes pnpm@10.17.1 install --lockfile-only --ignore-scripts
 
-      - name: Push convergence branch
+      - name: Commit converged state to PR branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          rm -f .github/workflows/tmp-final-dependency-convergence.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git checkout -B convergence/deps-remaining
           git add -- package.json package-lock.json pnpm-lock.yaml artifacts/mockup-sandbox/package.json .github/workflows
+          if git diff --cached --quiet; then
+            echo 'Dependency state already converged.'
+            exit 0
+          fi
           git commit -m 'fix(deps): converge remaining major upgrades'
-          git push --force origin HEAD:refs/heads/convergence/deps-remaining
+          git push origin HEAD:"$HEAD_REF"
