@@ -1,0 +1,60 @@
+name: TEMP God Files Fresh Reaudit
+
+on:
+  push:
+    branches:
+      - tmp/god-files-fresh-reaudit
+
+permissions:
+  contents: read
+
+jobs:
+  reaudit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 48ea5dac8aec7f72342c0c40cc3e022e84053de6
+          fetch-depth: 1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 22.23.2
+      - name: Authoritative God-file audit
+        run: node scripts/audit-god-file-boundaries.mjs
+      - name: Fresh raw repository scan
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const cfg = JSON.parse(fs.readFileSync('config/god-file-boundaries.json','utf8'));
+          const roots = cfg.repositoryScan.roots;
+          const exts = new Set(cfg.repositoryScan.extensions);
+          const excludedDirs = new Set(cfg.repositoryScan.excludeDirectories);
+          const excludedFiles = new Set(cfg.repositoryScan.excludeFiles);
+          const limit = cfg.repositoryScan.softMaxLines;
+          const rows=[];
+          function walk(p){
+            if(!fs.existsSync(p)) return;
+            for(const ent of fs.readdirSync(p,{withFileTypes:true})){
+              const full=path.join(p,ent.name);
+              const rel=full.split(path.sep).join('/');
+              if(ent.isDirectory()){
+                if(excludedDirs.has(ent.name)) continue;
+                walk(full);
+              } else {
+                if(!exts.has(path.extname(ent.name))) continue;
+                if(excludedFiles.has(rel)) continue;
+                const text=fs.readFileSync(full,'utf8');
+                const lines=text.length===0?0:text.split(/\r?\n/).length;
+                if(lines>limit) rows.push({path:rel,lines,excess:lines-limit});
+              }
+            }
+          }
+          for(const root of roots) walk(root);
+          rows.sort((a,b)=>b.lines-a.lines || a.path.localeCompare(b.path));
+          console.log(`FRESH_GOD_FILE_COUNT=${rows.length}`);
+          console.log(`FRESH_GOD_FILE_LIMIT=${limit}`);
+          console.log(`FRESH_GOD_FILE_TOTAL_EXCESS=${rows.reduce((s,r)=>s+r.excess,0)}`);
+          for(const r of rows) console.log(`GOD_FILE ${r.lines} ${r.excess} ${r.path}`);
+          NODE
