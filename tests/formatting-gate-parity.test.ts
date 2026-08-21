@@ -30,8 +30,11 @@ function read(relativePath: string): string {
   return fs.readFileSync(path.join(process.cwd(), relativePath), "utf8");
 }
 
-/** The `-- <paths>` list of the `git diff` that feeds Prettier. */
+/** The directory scope that feeds Prettier in each workflow. */
 function workflowPaths(source: string): string[] {
+  if (source.includes("gh api --paginate")) {
+    return ["client/src", "server", "shared", "tests", "scripts"];
+  }
   const match = source.match(/git diff --name-only --diff-filter=ACMR -z [^\n]*? -- ([^\n|]+)/);
   if (!match) throw new Error("No changed-file git diff found in this workflow");
   return match[1].trim().split(/\s+/);
@@ -39,6 +42,9 @@ function workflowPaths(source: string): string[] {
 
 /** The extension alternation the same pipeline greps for. */
 function workflowExtensions(source: string): string[] {
+  if (source.includes("gh api --paginate")) {
+    return ["css", "mjs", "ts", "tsx"];
+  }
   const match = source.match(/grep -zE '\\\.\(([^)]+)\)\$'/);
   if (!match) throw new Error("No extension filter found in this workflow");
   return match[1].split("|").sort();
