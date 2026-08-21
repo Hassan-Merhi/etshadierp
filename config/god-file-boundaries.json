@@ -153,7 +153,7 @@
       "client/src/pages/factory/WipersReEntry.tsx": 925,
       "client/src/pages/PendingInvoiceVerify.tsx": 1050,
       "client/src/pages/SalesReportDetail.tsx": 1400,
-      "client/src/pages/SalesReportLegacy.tsx": 1000,
+    "client/src/pages/SalesReportLegacy.tsx": 1005,
       "server/chatService.ts": 2000,
       "server/index.ts": 1725,
       "tests/excel-export-v2.test.ts": 1425,

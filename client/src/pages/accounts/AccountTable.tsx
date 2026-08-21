@@ -24,7 +24,7 @@ export function AccountTable({
   toggleParent,
   handleAccountChange,
   hideBalances,
-  formatAmount,
+  formatAmount: _formatAmount,
   onEdit,
 }: AccountTableProps) {
   const { formatHistoricalBaseAmount } = useCurrencyContext();

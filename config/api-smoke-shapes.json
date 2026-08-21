@@ -5,25 +5,7 @@
     "/api/reports/net-profit-excel",
     "/api/stats/net-position-excel"
   ],
-  "skippedFailing": [
-    "/api/accounts/multi-currency/unresolved-openings",
-    "/api/auth/passkey/list",
-    "/api/factory/bale-ledger",
-    "/api/git/agent-duty-wa-settings",
-    "/api/git/containers-wa-settings",
-    "/api/git/transfer-wa-settings",
-    "/api/location-inventory/whatsapp/groups",
-    "/api/sessions",
-    "/api/whatsapp/chats",
-    "/api/whatsapp/chats/pos",
-    "/api/whatsapp/instance-state/main",
-    "/api/whatsapp/instance-state/pos",
-    "/api/whatsapp/np-settings",
-    "/api/whatsapp/recipients",
-    "/api/whatsapp/settings",
-    "/api/whatsapp/settings/pos",
-    "/api/whatsapp/stock-settings"
-  ],
+  "skippedFailing": [],
   "routes": {
     "/api/accounts/all": {
       "status": 200,
@@ -41,6 +23,10 @@
       "status": 200,
       "shape": "{asOfDate:scalar,ready:scalar,sampleVoucherIds:[],unresolvedBankOpeningCount:scalar,unresolvedCustomerOpeningCount:scalar,unresolvedEmployeeOpeningCount:scalar,unresolvedEntryCount:scalar,unresolvedFixedAssetCount:scalar,unresolvedLedgerOpeningCount:scalar,unresolvedSupplierOpeningCount:scalar,unresolvedVoucherCount:scalar}"
     },
+    "/api/accounts/multi-currency/unresolved-openings": {
+      "status": 200,
+      "shape": "[]"
+    },
     "/api/accounts/payables": {
       "status": 200,
       "shape": "[]"
@@ -52,6 +38,10 @@
     "/api/admin/containers-for-diagnostics": {
       "status": 200,
       "shape": "[]"
+    },
+    "/api/admin/convergence-reconciliation": {
+      "status": 200,
+      "shape": "{accountingSnapshots:scalar,clean:scalar,companyId:scalar,discrepancies:[],stockSnapshots:scalar}"
     },
     "/api/admin/deployment-diagnostics": {
       "status": 403,
@@ -113,6 +103,10 @@
       "status": 200,
       "shape": "{assignedLocationId:scalar,canAccessCustomers:scalar,canDeleteRecords:scalar,canSellNegativeStock:scalar,cashAccountId:scalar,currentCompanyId:scalar,currentLocationId:scalar,currentPOSStation:scalar,currentRole:scalar,daybookEditDays:scalar,id:scalar,posStation:scalar,posViewOnly:scalar,role:scalar,username:scalar}"
     },
+    "/api/auth/passkey/list": {
+      "status": 200,
+      "shape": "[]"
+    },
     "/api/auth/session-company": {
       "status": 200,
       "shape": "{companyId:scalar}"
@@ -155,7 +149,7 @@
     },
     "/api/chat/users": {
       "status": 200,
-      "shape": "[]"
+      "shape": "[{active:scalar,hasMessages:scalar,id:scalar,isOnline:scalar,lastSeen:scalar,unreadCount:scalar,username:scalar}]"
     },
     "/api/chatbot/alerts": {
       "status": 200,
@@ -369,6 +363,10 @@
       "status": 403,
       "shape": "{code:scalar,message:scalar}"
     },
+    "/api/factory/bale-ledger": {
+      "status": 403,
+      "shape": "{code:scalar,message:scalar}"
+    },
     "/api/factory/bale-ledger/details": {
       "status": 403,
       "shape": "{code:scalar,message:scalar}"
@@ -462,6 +460,14 @@
       "shape": "{code:scalar,message:scalar}"
     },
     "/api/factory/containers/freight-status": {
+      "status": 403,
+      "shape": "{code:scalar,message:scalar}"
+    },
+    "/api/factory/customer-loading/history": {
+      "status": 403,
+      "shape": "{code:scalar,message:scalar}"
+    },
+    "/api/factory/customer-loading/products": {
       "status": 403,
       "shape": "{code:scalar,message:scalar}"
     },
@@ -845,6 +851,22 @@
       "status": 403,
       "shape": "{code:scalar,message:scalar}"
     },
+    "/api/factory/waste-dispatch/history-summary": {
+      "status": 403,
+      "shape": "{code:scalar,message:scalar}"
+    },
+    "/api/factory/waste-dispatch/scan": {
+      "status": 403,
+      "shape": "{code:scalar,message:scalar}"
+    },
+    "/api/factory/waste-dispatch/select-all": {
+      "status": 403,
+      "shape": "{code:scalar,message:scalar}"
+    },
+    "/api/factory/waste-dispatch/summary": {
+      "status": 403,
+      "shape": "{code:scalar,message:scalar}"
+    },
     "/api/factory/weekly-report-wa-settings": {
       "status": 403,
       "shape": "{code:scalar,message:scalar}"
@@ -913,6 +935,10 @@
       "status": 200,
       "shape": "{agents:[],asOf:scalar,companyId:scalar,companyName:scalar,mode:scalar}"
     },
+    "/api/git/agent-duty-wa-settings": {
+      "status": 200,
+      "shape": "{groups:{},hasCredentials:scalar,waEnabled:scalar}"
+    },
     "/api/git/at-port": {
       "status": 200,
       "shape": "{asOf:scalar,companyId:scalar,companyName:scalar,containers:[],facets:{agents:[],companies:[],containerNumbers:[],etaDates:[],hasContainersWithNoEta:scalar,locations:[],suppliers:[],transporters:[],trucks:[]},hasMore:scalar,mode:scalar,page:scalar,pageSize:scalar,summary:{arrived:scalar,atPort:scalar,atSea:scalar,delayed:scalar,inTransit:scalar,leftDar:scalar,overdue:scalar,total:scalar,totalCost:scalar,totalTransportDuty:scalar},total:scalar,totalPages:scalar}"
@@ -921,9 +947,17 @@
       "status": 200,
       "shape": "{asOf:scalar,companyId:scalar,companyName:scalar,containers:[],facets:{agents:[],companies:[],containerNumbers:[],etaDates:[],hasContainersWithNoEta:scalar,locations:[],suppliers:[],transporters:[],trucks:[]},hasMore:scalar,mode:scalar,page:scalar,pageSize:scalar,summary:{arrived:scalar,atPort:scalar,atSea:scalar,delayed:scalar,inTransit:scalar,leftDar:scalar,overdue:scalar,total:scalar,totalCost:scalar,totalTransportDuty:scalar},total:scalar,totalPages:scalar}"
     },
+    "/api/git/containers-wa-settings": {
+      "status": 200,
+      "shape": "{groupChatId:scalar,hasCredentials:scalar,lastSentAt:scalar,scheduleEnabled:scalar,scheduleHour:scalar,waEnabled:scalar}"
+    },
     "/api/git/summary": {
       "status": 200,
       "shape": "{asOf:scalar,companyId:scalar,companyName:scalar,mode:scalar,summary:{byStatus:{},delayed:scalar,docsReadyNotSent:scalar,overdue:scalar,total:scalar,withTruck:scalar,withoutTruck:scalar}}"
+    },
+    "/api/git/transfer-wa-settings": {
+      "status": 200,
+      "shape": "{companies:[{companyId:scalar,companyName:scalar,groupChatId:scalar}],hasCredentials:scalar,waEnabled:scalar}"
     },
     "/api/git/truck-location": {
       "status": 200,
@@ -1021,6 +1055,10 @@
       "status": 200,
       "shape": "{canSendWithCost:scalar}"
     },
+    "/api/location-inventory/whatsapp/groups": {
+      "status": 400,
+      "shape": "{message:scalar}"
+    },
     "/api/location-price-groups": {
       "status": 200,
       "shape": "[]"
@@ -1055,7 +1093,7 @@
     },
     "/api/notification-rules": {
       "status": 200,
-      "shape": "[]"
+      "shape": "[{createdAt:scalar,eventType:scalar,id:scalar,isEnabled:scalar,recipientUserId:scalar,updatedAt:scalar}]"
     },
     "/api/notification-users": {
       "status": 200,
@@ -1111,6 +1149,10 @@
     },
     "/api/pos-transfer-detail": {
       "status": 400,
+      "shape": "{message:scalar}"
+    },
+    "/api/pos/containers-otw": {
+      "status": 403,
       "shape": "{message:scalar}"
     },
     "/api/pos/customers": {
@@ -1257,6 +1299,10 @@
       "status": 400,
       "shape": "{errors:{fieldErrors:{endDate:[…],startDate:[…]},formErrors:[]},message:scalar}"
     },
+    "/api/reports/stock-in-sales/movements": {
+      "status": 400,
+      "shape": "{errors:{fieldErrors:{endDate:[…],startDate:[…]},formErrors:[]},message:scalar}"
+    },
     "/api/reports/stock-movement": {
       "status": 200,
       "shape": "{filters:{endDate:scalar,locationId:scalar,startDate:scalar,stockGroupId:scalar},items:[{locations:[…],stockItemCode:scalar,stockItemId:scalar,stockItemName:scalar,totalQuantity:scalar,totalValue:scalar}],summary:{grandTotalQuantity:scalar,grandTotalValue:scalar,totalItems:scalar}}"
@@ -1312,6 +1358,10 @@
     "/api/screen-feed/live/status": {
       "status": 200,
       "shape": "{fast:scalar,watched:scalar}"
+    },
+    "/api/sessions": {
+      "status": 200,
+      "shape": "[]"
     },
     "/api/settings/role-permissions": {
       "status": 200,
@@ -1427,7 +1477,7 @@
     },
     "/api/stats/net-profit": {
       "status": 200,
-      "shape": "{currencyRevaluation:{appliedToCurrentSnapshotOnly:scalar,currentCfaPerUsd:scalar,unresolvedAccountCount:scalar,unresolvedAccounts:[]},expenses:{accounts:[],breakdown:[],total:scalar},expensesTotal:scalar,forUs:{accounts:[{…}],breakdown:[{…}],total:scalar},forUsTotal:scalar,income:{accounts:[],breakdown:[],total:scalar},incomeTotal:scalar,netPosition:scalar,netPositionBreakdown:{assets:{breakdown:[…],total:scalar},expenses:{breakdown:[],total:scalar},income:{breakdown:[],total:scalar},liabilities:{breakdown:[],total:scalar},netPosition:scalar},netPositionLabel:scalar,netProfit:scalar,netWorth:scalar,onUs:{accounts:[],breakdown:[],total:scalar},onUsTotal:scalar,ownersCapital:scalar,spPosProfit:scalar,totalExpenses:scalar,totalIncome:scalar}"
+      "shape": "{currency:{currentCashBankTranslationApplied:scalar,historicalBaseCreditTotal:scalar,historicalBaseDebitTotal:scalar,historicalValuesLocked:scalar,nativeCreditByCurrency:{},nativeDebitByCurrency:{},provisionalReason:scalar,rateConvention:scalar,totalsProvisional:scalar,unresolvedLegacyEntryCount:scalar,unresolvedLegacyRawNet:scalar},currencyRevaluation:{appliedToCurrentSnapshotOnly:scalar,currentCfaPerUsd:scalar,reportTotalsProvisional:scalar,unresolvedAccountCount:scalar,unresolvedAccounts:[]},expenses:{accounts:[],breakdown:[],total:scalar},expensesTotal:scalar,forUs:{accounts:[{…}],breakdown:[{…}],total:scalar},forUsTotal:scalar,income:{accounts:[],breakdown:[],total:scalar},incomeTotal:scalar,netPosition:scalar,netPositionBreakdown:{assets:{breakdown:[…],total:scalar},expenses:{breakdown:[],total:scalar},income:{breakdown:[],total:scalar},liabilities:{breakdown:[],total:scalar},netPosition:scalar},netPositionLabel:scalar,netProfit:scalar,netWorth:scalar,onUs:{accounts:[],breakdown:[],total:scalar},onUsTotal:scalar,ownersCapital:scalar,spPosProfit:scalar,totalExpenses:scalar,totalIncome:scalar}"
     },
     "/api/stats/stock-summary": {
       "status": 200,
@@ -1564,6 +1614,42 @@
     "/api/waste-dispatches": {
       "status": 200,
       "shape": "[]"
+    },
+    "/api/whatsapp/chats": {
+      "status": 400,
+      "shape": "{message:scalar}"
+    },
+    "/api/whatsapp/chats/pos": {
+      "status": 400,
+      "shape": "{message:scalar}"
+    },
+    "/api/whatsapp/instance-state/main": {
+      "status": 200,
+      "shape": "{state:scalar}"
+    },
+    "/api/whatsapp/instance-state/pos": {
+      "status": 200,
+      "shape": "{state:scalar}"
+    },
+    "/api/whatsapp/np-settings": {
+      "status": 200,
+      "shape": "{autoSend:scalar,enabled:scalar,frequency:scalar,lastSentAt:scalar,recipientId:scalar,recipientName:scalar,sendDayOfWeek:scalar,sendHour:scalar}"
+    },
+    "/api/whatsapp/recipients": {
+      "status": 200,
+      "shape": "[]"
+    },
+    "/api/whatsapp/settings": {
+      "status": 200,
+      "shape": "{apiToken:scalar,dailyAutoSend:scalar,dailyRecipientId:scalar,dailyRecipientName:scalar,enabled:scalar,hasCredentials:scalar,instanceId:scalar,monthlyAutoSend:scalar}"
+    },
+    "/api/whatsapp/settings/pos": {
+      "status": 200,
+      "shape": "{apiToken:scalar,enabled:scalar,hasCredentials:scalar,instanceId:scalar}"
+    },
+    "/api/whatsapp/stock-settings": {
+      "status": 200,
+      "shape": "{autoSend:scalar,companyId:scalar,enabled:scalar,frequency:scalar,lastSentAt:scalar,recipientId:scalar,sendDayOfWeek:scalar,sendHour:scalar}"
     },
     "/api/worker-groups": {
       "status": 200,

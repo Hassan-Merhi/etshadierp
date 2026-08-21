@@ -217,8 +217,7 @@ export default function Suppliers() {
       "Historical Base Credit": txn.baseCreditAmount ?? "",
       "Historical Exchange Rate": txn.historicalExchangeRate ?? "",
       "Balance (Historical Base)": txn.historicalBaseBalance ?? txn.balance,
-      "Currency Status":
-        txn.currencyStatus || (txn.baseDebitAmount != null ? "HISTORICAL_BASE" : "LEGACY_BASE"),
+      "Currency Status": txn.currencyStatus || (txn.baseDebitAmount != null ? "HISTORICAL_BASE" : "LEGACY_BASE"),
     }));
     const worksheet = utils.json_to_sheet(exportData);
     const workbook = utils.book_new();
@@ -226,7 +225,6 @@ export default function Suppliers() {
     const fileName = `${selectedSupplier.legalName}_Ledger_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
     await writeFile(workbook, fileName);
   };
-
   const openingEntry = unifiedLedger.find((t) => t.type === "opening");
   const ledgerRows = unifiedLedger.filter((t) => t.type !== "opening");
 

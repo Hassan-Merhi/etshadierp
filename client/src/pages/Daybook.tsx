@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AuditLog } from "@/pages/settings/AuditLog";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
@@ -43,6 +43,7 @@ import { isReadonlyMigratedVoucher } from "@/lib/migratedVoucherGuard";
 import { isBlockingQueryError } from "@/lib/abortError";
 import { utils, writeFile } from "@/lib/excelHelper";
 import { useDateJump } from "@/hooks/use-date-jump";
+import { buildDetailedDaybookRows } from "@/lib/daybook-export";
 import { createVoucherSchema } from "./daybook/types";
 import type {
   LedgerAccount,
@@ -91,15 +92,14 @@ export default function Daybook({ user }: { user?: any } = {}) {
     hasActiveFilters: hasActiveDaybookFilters,
   } = useDaybookFilterState(selectedCompany?.id);
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
-
-  const shiftDay = (delta: number) => {
+  const shiftDay = useCallback((delta: number) => {
     const fmt = "yyyy-MM-dd";
     setPeriodFilter((prev) => ({
       fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), delta), fmt),
       toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), delta), fmt),
       preset: "custom",
     }));
-  };
+  }, [setPeriodFilter]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -118,7 +118,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     };
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, []);
+  }, [shiftDay]);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
   const [selectedDialogRow, setSelectedDialogRow] = useState<number | null>(null);
@@ -666,40 +666,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
     utils.book_append_sheet(wb, ws, "Daybook");
     await writeFile(wb, `Daybook_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
   };
-
   const handleExportDetailedToExcel = async () => {
     const exportVouchers = await loadAllVouchers();
-    const detailRows = exportVouchers.flatMap((v: any) => {
-      const entries = Array.isArray(v.entries) ? v.entries : [];
-      if (entries.length === 0) {
-        return [{
-          "Voucher Number": v.voucherNumber,
-          Date: formatDisplayDate(v.voucherDate),
-          Type: v.voucherType,
-          Description: v.description || "",
-          Currency: v.currency || v.transactionCurrency || "USD",
-          "Native Debit": v.transactionDebitAmount ?? "",
-          "Native Credit": v.transactionCreditAmount ?? "",
-          "Historical Base Debit": v.baseDebitAmount ?? "",
-          "Historical Base Credit": v.baseCreditAmount ?? "",
-          "Currency Status": v.currencyStatus || "LEGACY_BASE",
-        }];
-      }
-      return entries.map((entry: any) => ({
-        "Voucher Number": v.voucherNumber,
-        Date: formatDisplayDate(v.voucherDate),
-        Type: v.voucherType,
-        Description: entry.narration || v.description || "",
-        Account: entry.accountName || "",
-        Currency: entry.transactionCurrency || v.currency || "USD",
-        "Native Debit": entry.transactionDebitAmount ?? entry.debitAmount ?? "",
-        "Native Credit": entry.transactionCreditAmount ?? entry.creditAmount ?? "",
-        "Historical Base Debit": entry.baseDebitAmount ?? "",
-        "Historical Base Credit": entry.baseCreditAmount ?? "",
-        "Historical Exchange Rate": entry.historicalExchangeRate ?? v.exchangeRate ?? "",
-        "Currency Status": entry.currencyStatus || (entry.baseDebitAmount != null ? "HISTORICAL_BASE" : "LEGACY_BASE"),
-      }));
-    });
+    const detailRows = buildDetailedDaybookRows(
+      exportVouchers as unknown as Array<Record<string, unknown>>,
+      formatDisplayDate
+    );
     const ws = utils.json_to_sheet(detailRows);
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, "Daybook Detail");

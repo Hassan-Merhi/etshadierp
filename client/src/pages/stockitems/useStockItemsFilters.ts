@@ -19,19 +19,20 @@ export function useStockItemsFilters(companyId: number | undefined) {
     storageKey: companyId ? `erp-stock-items-filters-v1:${companyId}` : undefined,
   });
   const { searchTerm, selectedGroupFilter, selectedGradeFilter, selectedCategoryFilter } = state.filters;
+  const { setPage } = state;
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
-      state.setPage(1);
+      setPage(1);
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchTerm, state.setPage]);
+  }, [searchTerm, setPage]);
 
   useEffect(() => {
-    state.setPage(1);
-  }, [selectedGroupFilter, selectedGradeFilter, selectedCategoryFilter, state.setPage]);
+    setPage(1);
+  }, [selectedGroupFilter, selectedGradeFilter, selectedCategoryFilter, setPage]);
 
   return {
     ...state,

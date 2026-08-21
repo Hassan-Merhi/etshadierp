@@ -46,7 +46,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
         companyRecord,
         companyAccounts,
         parentCompanyId,
-        hasMigratedEntries,
+        hasMigratedEntries: _hasMigratedEntries,
         companyBaseCurrency,
         accountBalances,
         supplierBalances,

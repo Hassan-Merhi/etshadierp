@@ -24,7 +24,7 @@ export async function trackDueContainers(): Promise<void> {
   // ── Quota and per-run budget ───────────────────────────────────────────────
   const { used, limit } = await getParcelsAppUsageStats();
   const remaining = Math.max(0, limit - used);
-  const { remainingDays, dailyBudget, perRunBudget } = calcPerRunBudget(remaining, now);
+  const { perRunBudget } = calcPerRunBudget(remaining, now);
 
   logger.info("[ContainerTracking] Provider quota evaluated for this scheduler run.");
 
