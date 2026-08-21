@@ -1,28 +1,37 @@
 /**
- * Server build script — wraps esbuild CLI behaviour with one addition:
- * decimal.js is bundled inline (not left as an external runtime import).
+ * Server build script — wraps esbuild CLI behaviour with targeted runtime
+ * dependency bundling for packages that are unsafe to leave as external ESM
+ * imports on Render.
  *
- * Why: package-lock.json resolved URLs point to the Replit-internal package
- * firewall (package-firewall.replit.local), which is unreachable on Render.
- * That causes `node dist/index.js` to throw
- *   "Cannot find package … decimal.js/index.js"
- * at startup. By bundling decimal.js into the output we remove the runtime
- * dependency entirely — the package only needs to exist in local node_modules
- * at BUILD time, which it does.
+ * decimal.js is bundled because historical package-lock registry URLs can make
+ * the runtime dependency unavailable on Render.
  *
- * All other npm packages remain external (they are already cached in Render's
- * node_modules from previous deploys, or installed normally via npm install).
+ * xlsx-js-style is bundled because it is CommonJS. Leaving it external while
+ * source files use named imports makes Node evaluate emitted code such as
+ *   import { read } from "xlsx-js-style";
+ * and crash at startup with "Named export 'read' not found". Bundling lets
+ * esbuild apply the CommonJS interop wrapper at build time instead.
+ *
+ * All other npm packages remain external.
  */
 
 import { readFile, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+
+const require = createRequire(import.meta.url);
 
 // Resolve decimal.js to its ESM entry file (decimal.mjs) so esbuild can
 // bundle it as a native ESM chunk rather than wrapping a CJS module.
 const pkgRoot = fileURLToPath(new URL("../node_modules/decimal.js/", import.meta.url));
 const decimalEntry = resolve(pkgRoot, "decimal.mjs");
+
+// Resolve xlsx-js-style to its actual CommonJS entry. Returning an absolute
+// path from onResolve overrides packages:"external" for this dependency and
+// forces esbuild to generate the correct CJS↔ESM interop inside dist/index.js.
+const xlsxJsStyleEntry = require.resolve("xlsx-js-style");
 
 const result = await build({
   entryPoints: ["server/index.ts"],
@@ -40,12 +49,18 @@ const result = await build({
   metafile: true,
   plugins: [
     {
-      name: "bundle-decimal-js",
+      name: "bundle-render-runtime-dependencies",
       setup(buildContext) {
         // Intercept every import from decimal.js and redirect it to the local
         // ESM file so esbuild includes it instead of emitting a runtime import.
         buildContext.onResolve({ filter: /^decimal\.js$/ }, () => ({
           path: decimalEntry,
+        }));
+
+        // xlsx-js-style is CommonJS. Bundle it so source-level named imports are
+        // translated by esbuild rather than being emitted as invalid Node ESM.
+        buildContext.onResolve({ filter: /^xlsx-js-style$/ }, () => ({
+          path: xlsxJsStyleEntry,
         }));
       },
     },
@@ -54,12 +69,14 @@ const result = await build({
 
 await writeFile("dist/server-build-meta.json", JSON.stringify(result.metafile), "utf8");
 
-// Refuse to publish an artifact that can reproduce the Render startup crash.
-// Keep this check separate from the resolver implementation so future build
-// refactors cannot silently reintroduce a runtime decimal.js dependency.
+// Refuse to publish an artifact that can reproduce either known Render startup
+// crash. Keep these checks separate from the resolver implementation so future
+// build refactors cannot silently reintroduce broken runtime imports.
 const output = await readFile("dist/index.js", "utf8");
 const unresolvedDecimalImport =
   /(?:from\s*["']decimal\.js["']|import\s*\(\s*["']decimal\.js["']\s*\)|node_modules\/decimal\.js\/index\.js)/;
+const unresolvedXlsxJsStyleImport =
+  /(?:from\s*["']xlsx-js-style["']|import\s*\(\s*["']xlsx-js-style["']\s*\))/;
 
 if (unresolvedDecimalImport.test(output)) {
   throw new Error(
@@ -67,4 +84,10 @@ if (unresolvedDecimalImport.test(output)) {
   );
 }
 
-console.log("Server bundle verified: decimal.js is embedded in dist/index.js");
+if (unresolvedXlsxJsStyleImport.test(output)) {
+  throw new Error(
+    "Production bundle still contains a runtime xlsx-js-style import; refusing to publish a broken Render artifact.",
+  );
+}
+
+console.log("Server bundle verified: decimal.js and xlsx-js-style are embedded in dist/index.js");
