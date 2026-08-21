@@ -48,11 +48,34 @@ jobs:
       - name: Apply Wave 5 model splits
         run: node scripts/tmp-god-files-wave5.mjs split
 
+      - name: Preserve render-local pending-proforma dialog
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const file = 'scripts/tmp-god-files-wave5-dialogs.mjs';
+          let source = fs.readFileSync(file, 'utf8');
+          const needle = '    const usedModel = modelNames.filter((name) => referenced(text, name));';
+          const replacement = `    if (\n      target.path.endsWith("FactoryPendingInvoiceVerify.tsx") &&\n      /\\b(?:activeProformaName|activeProformaId|proformaLines)\\b/.test(text)\n    ) {\n      console.log(\`WAVE5_DIALOG_SKIP ${target.path}: render-local proforma values\`);\n      continue;\n    }\n${needle}`;
+          if (!source.includes(needle)) throw new Error('Wave 5 dialog insertion point not found');
+          source = source.replace(needle, replacement);
+          fs.writeFileSync(file, source);
+          NODE
+
       - name: Extract Wave 5 dialog presentation blocks
         run: node scripts/tmp-god-files-wave5-dialogs.mjs
 
       - name: Extract Wave 5 tail presentation blocks
         run: node scripts/tmp-god-files-wave5-tail.mjs
+
+      - name: Rebase relative imports moved into Wave 5 modules
+        shell: bash
+        run: |
+          sed -i 's#"\./factoryinvoicedetail/#"./#g' client/src/pages/factory/factoryinvoicedetail/useFactoryInvoiceDetailModel.tsx
+          sed -i 's#"\./baleshistory/#"./#g' client/src/pages/factory/baleshistory/useBalesHistoryModel.tsx
+          sed -i 's#"\./factorypendinginvoiceverify/#"./#g' client/src/pages/factory/factorypendinginvoiceverify/useFactoryPendingInvoiceVerifyModel.tsx
+          find client/src/pages/factory/factoryinvoicedetail/components -type f -name '*.tsx' -print0 | xargs -0 -r sed -i 's#"\./factoryinvoicedetail/#"../#g'
+          find client/src/pages/factory/baleshistory/components -type f -name '*.tsx' -print0 | xargs -0 -r sed -i 's#"\./baleshistory/#"../#g'
+          find client/src/pages/factory/factorypendinginvoiceverify/components -type f -name '*.tsx' -print0 | xargs -0 -r sed -i 's#"\./factorypendinginvoiceverify/#"../#g'
 
       - name: Format cumulative changed source
         shell: bash
@@ -136,7 +159,8 @@ jobs:
             .wave5-trigger-3 \
             .wave5-trigger-4 \
             .wave5-trigger-5 \
-            .wave5-trigger-6
+            .wave5-trigger-6 \
+            .wave5-trigger-7
           git add -A
           git commit -m "refactor(god-files): complete cumulative wave 5 on current main"
           git push origin HEAD:agent/god-files-final-wave1-tests
