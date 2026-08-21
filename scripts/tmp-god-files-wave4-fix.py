@@ -65,5 +65,29 @@ anchor = 'import { SalesReportSummaryCards } from "./salesreportdetail/component
 if anchor not in text:
     raise RuntimeError("Missing SalesReportSummaryCards import anchor")
 text = text.replace(anchor, anchor + 'import { SalesReportItemMobileView } from "./salesreportdetail/components/SalesReportItemMobileView";\n', 1)
+if 'import { Badge } from "@/components/ui/badge";' not in text:
+    card_import = 'import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";\n'
+    if card_import not in text:
+        raise RuntimeError("Missing SalesReportDetail card import anchor")
+    text = text.replace(card_import, card_import + 'import { Badge } from "@/components/ui/badge";\n', 1)
 page.write_text(text)
-print("WAVE4_SALES_MOBILE_EXTRACTED")
+
+page = Path("client/src/pages/factory/FactoryProformas.tsx")
+text = page.read_text()
+if '  Users,\n' not in text:
+    icon_anchor = '  ChevronRight,\n'
+    if icon_anchor not in text:
+        raise RuntimeError("Missing FactoryProformas lucide import anchor")
+    text = text.replace(icon_anchor, icon_anchor + '  Users,\n', 1)
+page.write_text(text)
+
+page = Path("client/src/pages/factory/createproformav5drawer/useCreateProformaV5Model.ts")
+text = page.read_text()
+type_import = 'import type { ArticleRow, BaleProduct, Draft, Props } from "./types";'
+if type_import in text:
+    text = text.replace(type_import, 'import type { ArticleRow, BaleProduct, Draft, FactoryCustomer, Props } from "./types";', 1)
+elif 'FactoryCustomer' not in text:
+    raise RuntimeError("Missing CreateProformaV5 model type import anchor")
+page.write_text(text)
+
+print("WAVE4_SALES_MOBILE_AND_IMPORT_FIXES_APPLIED")
