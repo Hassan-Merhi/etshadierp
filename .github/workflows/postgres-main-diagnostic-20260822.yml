@@ -5,10 +5,14 @@ on:
 permissions:
   contents: read
 jobs:
-  postgres-regression:
+  postgres-shard:
     if: github.event.pull_request.head.ref == 'diagnostic/postgres-main-20260822'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 35
     services:
       postgres:
         image: postgres:16.15
@@ -46,27 +50,36 @@ jobs:
         run: node node_modules/drizzle-kit/bin.cjs push --force
       - name: Verify disposable database schema
         run: node scripts/verify-ci-disposable-schema.mjs
-      - name: Integration backend tests
+      - name: Integration backend shard
         shell: bash
+        env:
+          SHARD: ${{ matrix.shard }}
         run: |
           set +e
-          mapfile -t integration_test_files < <(
+          mapfile -t all_test_files < <(
             find tests -type f -name '*.test.ts' \
               ! -path 'tests/ui/*' \
               ! -path 'tests/api-smoke-sweep.test.ts' \
               | sort
           )
+          shard_files=()
+          for i in "${!all_test_files[@]}"; do
+            if (( i % 4 == SHARD )); then
+              shard_files+=("${all_test_files[$i]}")
+            fi
+          done
+          printf 'Shard %s running %s files\n' "$SHARD" "${#shard_files[@]}"
           node node_modules/vitest/vitest.mjs run \
-            "${integration_test_files[@]}" \
+            "${shard_files[@]}" \
             --maxWorkers=1 \
-            --no-file-parallelism 2>&1 | tee backend-vitest.log
+            --no-file-parallelism 2>&1 | tee "backend-vitest-shard-${SHARD}.log"
           status=${PIPESTATUS[0]}
           echo "backend_status=$status" >> "$GITHUB_ENV"
           exit 0
       - name: Upload backend report
         uses: actions/upload-artifact@v6
         with:
-          name: backend-vitest-report
-          path: backend-vitest.log
+          name: backend-vitest-report-${{ matrix.shard }}
+          path: backend-vitest-shard-${{ matrix.shard }}.log
       - name: Fail if backend tests failed
         run: test "${backend_status}" -eq 0
