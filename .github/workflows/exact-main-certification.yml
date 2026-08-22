@@ -83,7 +83,7 @@ jobs:
         run: |
           npm run verify:lockfile
           npm run verify:production-dependencies
-          npm run format:check
+           npm run format:check:changed -- --base HEAD^
           npm run lint
           npm run audit:lint-ratchet
           npm run check
