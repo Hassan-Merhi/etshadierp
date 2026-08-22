@@ -118,6 +118,7 @@ export async function insertInfrastructureVoucherTx(
 
   const [marker] = await tx
     .select({
+      id: accountingPostingRequests.id,
       sourceType: accountingPostingRequests.sourceType,
       sourceId: accountingPostingRequests.sourceId,
       requestFingerprint: accountingPostingRequests.requestFingerprint,
@@ -133,7 +134,6 @@ export async function insertInfrastructureVoucherTx(
     .limit(1);
 
   if (marker) {
-    assertStoredIdentityMatches({ source, requestFingerprint, stored: marker });
     const [existing] = await tx
       .select()
       .from(vouchers)
@@ -145,6 +145,48 @@ export async function insertInfrastructureVoucherTx(
         `Idempotency marker ${source.idempotencyKey} references a missing voucher`
       );
     }
+
+    // Historical failed infrastructure writes can leave a voucher shell and
+    // durable idempotency marker behind with zero voucher entries. A corrected
+    // retry then has a different fingerprint and would otherwise be blocked
+    // forever. Self-heal only that provably orphaned state: same deterministic
+    // source identity, changed fingerprint, and no posted entry rows. Real
+    // posted vouchers keep strict conflict protection.
+    if (
+      marker.sourceType === source.sourceType &&
+      marker.sourceId === source.sourceId &&
+      marker.requestFingerprint !== requestFingerprint
+    ) {
+      const [entry] = await tx
+        .select({ id: voucherEntries.id })
+        .from(voucherEntries)
+        .where(eq(voucherEntries.voucherId, existing.id))
+        .limit(1);
+
+      if (!entry) {
+        const { id: _id, ...replacement } = voucher as VoucherInsert & { id?: unknown };
+        const [repaired] = await tx
+          .update(vouchers)
+          .set(replacement)
+          .where(and(eq(vouchers.id, existing.id), eq(vouchers.companyId, companyId)))
+          .returning();
+
+        await tx
+          .update(accountingPostingRequests)
+          .set({ requestFingerprint })
+          .where(eq(accountingPostingRequests.id, marker.id));
+
+        if (!repaired) {
+          throw new PostingValidationError(
+            "POSTING_IDEMPOTENCY_CORRUPT",
+            `Idempotency marker ${source.idempotencyKey} could not repair its empty voucher shell`
+          );
+        }
+        return { voucher: repaired, replayed: true };
+      }
+    }
+
+    assertStoredIdentityMatches({ source, requestFingerprint, stored: marker });
     if (options.replaceEntriesOnReplay !== false) {
       await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, existing.id));
     }
