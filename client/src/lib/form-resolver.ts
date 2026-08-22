@@ -1,4 +1,5 @@
 import { zodResolver as baseZodResolver } from "@hookform/resolvers/zod";
+import type { FieldValues, Resolver } from "react-hook-form";
 
 /**
  * Zod 4's input/output distinction is intentionally broader than the
@@ -6,5 +7,15 @@ import { zodResolver as baseZodResolver } from "@hookform/resolvers/zod";
  * applied by the resolver). Keep that runtime behavior while exposing the
  * screen's explicit form type to react-hook-form.
  */
-export const zodResolver = ((schema: any, schemaOptions?: any, resolverOptions?: any) =>
-  baseZodResolver(schema, schemaOptions, resolverOptions)) as (...args: any[]) => any;
+type CompatibleResolver = <Input extends FieldValues, Context = object>(
+  schema: Parameters<typeof baseZodResolver>[0],
+  schemaOptions?: Parameters<typeof baseZodResolver>[1],
+  resolverOptions?: Parameters<typeof baseZodResolver>[2],
+) => Resolver<Input, Context, Input>;
+
+export const zodResolver = ((
+  schema: Parameters<typeof baseZodResolver>[0],
+  schemaOptions: Parameters<typeof baseZodResolver>[1],
+  resolverOptions: Parameters<typeof baseZodResolver>[2],
+) =>
+  baseZodResolver(schema, schemaOptions, resolverOptions)) as unknown as CompatibleResolver;
