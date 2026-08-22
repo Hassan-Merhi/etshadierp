@@ -531,3 +531,5 @@ export default function ProductionPlannerDialog() {
     </Dialog>
   );
 }
+
+// The planner intentionally remains team/worker based; position administration is a separate workflow.
