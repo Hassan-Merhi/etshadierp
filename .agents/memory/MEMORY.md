@@ -82,3 +82,4 @@
 - [Backend shard bootstrap and coverage](backend-shard-bootstrap.md) — shared-db backend shards need one schema bootstrap and merged V8 coverage before thresholds.
 - [Scoped esbuild security override](scoped-esbuild-override.md) — force patched esbuild only under @esbuild-kit/core-utils; a global override breaks Vite's compatible transform version.
 - [Currency formatter test compatibility](currency-formatter-test-compatibility.md) — financial screens should prefer historical-base formatting but tolerate lightweight test providers that only expose the legacy formatter.
+- [Express 5 routing compatibility](express5-routing-compatibility.md) — named wildcards, app.router stack access, and registration-time mount capture are required after the Express 5 upgrade.
