@@ -38,7 +38,8 @@ export function StockTransferHeader({ model }: { model: StockTransferFormModel }
             <Select
               value={posSelectedSourceId?.toString() || ""}
               onValueChange={(v) => {
-                const newId = parseInt(v);
+                const newId = Number(v);
+                if (!Number.isInteger(newId) || newId <= 0) return;
                 const newName = locations.find((l) => l.id === newId)?.name || "";
                 setPosSelectedSourceId(newId);
                 setTransferInventorySource(newId);
@@ -71,31 +72,38 @@ export function StockTransferHeader({ model }: { model: StockTransferFormModel }
       <FormField
         control={stockTransferForm.control}
         name="destinationLocationId"
-        render={({ field }) => (
-          <FormItem className="flex items-center gap-2 space-y-0">
-            <FormLabel className="text-sm text-muted-foreground whitespace-nowrap">To:</FormLabel>
-            <Select
-              value={field.value > 0 ? field.value.toString() : ""}
-              onValueChange={(value) => field.onChange(parseInt(value))}
-            >
-              <FormControl>
-                <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-destination-location">
-                  <SelectValue placeholder="Select destination..." />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {[...locations]
-                  .filter((l) => l.id !== transferInventorySource)
-                  .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
-                  .map((location) => (
-                    <SelectItem key={location.id} value={location.id.toString()}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </FormItem>
-        )}
+        render={({ field }) => {
+          const destinationId = Number(field.value);
+          return (
+            <FormItem className="flex items-center gap-2 space-y-0">
+              <FormLabel className="text-sm text-muted-foreground whitespace-nowrap">To:</FormLabel>
+              <Select
+                value={Number.isInteger(destinationId) && destinationId > 0 ? String(destinationId) : ""}
+                onValueChange={(value) => {
+                  const nextLocationId = Number(value);
+                  if (!Number.isInteger(nextLocationId) || nextLocationId <= 0) return;
+                  field.onChange(nextLocationId);
+                }}
+              >
+                <FormControl>
+                  <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-destination-location">
+                    <SelectValue placeholder="Select destination..." />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {[...locations]
+                    .filter((l) => l.id !== transferInventorySource)
+                    .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+                    .map((location) => (
+                      <SelectItem key={location.id} value={location.id.toString()}>
+                        {location.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </FormItem>
+          );
+        }}
       />
       <FormField
         control={stockTransferForm.control}
