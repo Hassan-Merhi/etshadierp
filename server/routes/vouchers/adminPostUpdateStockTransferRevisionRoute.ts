@@ -28,11 +28,21 @@ const revisionSchema = z.object({
     .min(1),
 });
 
-function rows<T = Record<string, unknown>>(result: any): T[] {
-  return (result?.rows ?? result ?? []) as T[];
+/**
+ * Drizzle's `db.execute` returns a driver result object on node-postgres and a
+ * bare array on other drivers, so the row list lives in either shape. Narrowing
+ * from `unknown` keeps the helper honest without an `any` escape.
+ */
+type QueryResultLike = { rows?: unknown } | readonly unknown[] | null | undefined;
+
+function rows<T = Record<string, unknown>>(result: QueryResultLike): T[] {
+  if (Array.isArray(result)) return [...result] as T[];
+  const carried = result && typeof result === "object" ? (result as { rows?: unknown }).rows : undefined;
+  if (Array.isArray(carried)) return [...carried] as T[];
+  return [];
 }
 
-function firstRow<T = Record<string, unknown>>(result: any): T | undefined {
+function firstRow<T = Record<string, unknown>>(result: QueryResultLike): T | undefined {
   return rows<T>(result)[0];
 }
 

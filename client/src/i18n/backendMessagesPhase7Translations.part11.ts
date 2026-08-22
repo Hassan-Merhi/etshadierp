@@ -132,4 +132,34 @@ export const backendMessagesPhase7TranslationsPart11: readonly Phase7BackendMess
     ar: "أعاد إنشاء كشف الحساب PDF ملف PDF غير صالح أو فارغ",
     fr: "La génération du relevé PDF a renvoyé un PDF invalide ou vide",
   },
+  {
+    en: "Stock transfer belongs to a different company",
+    ar: "تحويل المخزون يخص شركة أخرى",
+    fr: "Le transfert de stock appartient à une autre société",
+  },
+  {
+    en: "Revision item or source location is outside the current company",
+    ar: "صنف المراجعة أو موقع المصدر خارج نطاق الشركة الحالية",
+    fr: "L’article de la révision ou l’emplacement source se trouve en dehors de la société actuelle",
+  },
+  {
+    en: "Transfer changed while saving the revision. Reload the transfer and try again.",
+    ar: "تغيّر التحويل أثناء حفظ المراجعة. أعد تحميل التحويل وحاول مرة أخرى.",
+    fr: "Le transfert a changé pendant l’enregistrement de la révision. Rechargez le transfert et réessayez.",
+  },
+  {
+    en: "Revision is stale for item ${result.stockItemId} at source ${result.sourceLocationId}. Expected ${result.expected} or saved value ${result.proposed}, current transfer quantity is ${result.current}.",
+    ar: "المراجعة قديمة للصنف {0} في المصدر {1}. المتوقع {2} أو القيمة المحفوظة {3}، وكمية التحويل الحالية هي {4}.",
+    fr: "La révision est obsolète pour l’article {0} à la source {1}. Attendu {2} ou valeur enregistrée {3}, la quantité de transfert actuelle est {4}.",
+  },
+  {
+    en: "Failed to save stock transfer revision",
+    ar: "فشل حفظ مراجعة تحويل المخزون",
+    fr: "Échec de l’enregistrement de la révision du transfert de stock",
+  },
+  {
+    en: "Failed to create stock transfer revision",
+    ar: "فشل إنشاء مراجعة تحويل المخزون",
+    fr: "Échec de la création de la révision du transfert de stock",
+  },
 ];

@@ -63,7 +63,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
-          node-version-file: .node-version
+          node-version: "24.19.0"
           cache: npm
 
       - name: Normalize package registry URLs
@@ -122,12 +122,14 @@ jobs:
           npm run test:frontend
           npm run test:frontend:coverage
 
-      - name: I18n and security gates
+      # The phase-9 i18n baseline stays a release-only check: the script
+      # inventory contract requires it to remain manual, and Release
+      # Verification already runs it for every main push.
+      - name: Security gates
         id: security
         if: always() && steps.install.outcome == 'success'
         continue-on-error: true
         run: |
-          node scripts/verify-phase9-final-i18n-baseline.mjs
           npm run check:security
           npm audit --omit=dev --audit-level=critical
 
