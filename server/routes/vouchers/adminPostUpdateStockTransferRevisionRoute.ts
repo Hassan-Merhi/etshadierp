@@ -106,14 +106,18 @@ export function registerAdminPostUpdateStockTransferRevisionRoute(app: Express) 
           const validSources = await tx
             .select({ id: locations.id })
             .from(locations)
-            .where(and(eq(locations.companyId, companyId), inArray(locations.id, sourceIds), isNull(locations.deletedAt)));
+            .where(
+              and(eq(locations.companyId, companyId), inArray(locations.id, sourceIds), isNull(locations.deletedAt))
+            );
           if (validSources.length !== sourceIds.length) return { mode: "scope" as const };
 
           const itemIds = Array.from(new Set(normalized.map((item) => item.stockItemId)));
           const validItems = await tx
             .select({ id: stockItems.id })
             .from(stockItems)
-            .where(and(eq(stockItems.companyId, companyId), inArray(stockItems.id, itemIds), isNull(stockItems.deletedAt)));
+            .where(
+              and(eq(stockItems.companyId, companyId), inArray(stockItems.id, itemIds), isNull(stockItems.deletedAt))
+            );
           if (validItems.length !== itemIds.length) return { mode: "scope" as const };
 
           const current = rows(
@@ -224,8 +228,10 @@ export function registerAdminPostUpdateStockTransferRevisionRoute(app: Express) 
 
         if (result.mode === "canonical") return next();
         if (result.mode === "not-found") return res.status(404).json({ message: "Stock transfer not found" });
-        if (result.mode === "forbidden") return res.status(403).json({ message: "Stock transfer belongs to a different company" });
-        if (result.mode === "deleted") return res.status(400).json({ message: "Deleted stock transfers cannot be revised" });
+        if (result.mode === "forbidden")
+          return res.status(403).json({ message: "Stock transfer belongs to a different company" });
+        if (result.mode === "deleted")
+          return res.status(400).json({ message: "Deleted stock transfers cannot be revised" });
         if (result.mode === "scope") {
           return res.status(403).json({ message: "Revision item or source location is outside the current company" });
         }
