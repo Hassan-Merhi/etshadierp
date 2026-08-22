@@ -44,6 +44,24 @@ let actual: SerializedRouteManifest;
 
 async function buildManifest(): Promise<SerializedRouteManifest> {
   const app = express();
+  const capturedApp = app as unknown as {
+    use: (...args: unknown[]) => unknown;
+    router?: { stack?: Array<{ mountPath?: string }> };
+    _router?: { stack?: Array<{ mountPath?: string }> };
+  };
+  const originalUse = capturedApp.use.bind(app);
+  capturedApp.use = (...args: unknown[]) => {
+    const first = args[0];
+    const mountPath = typeof first === "string" ? first : first instanceof RegExp ? `re:${first.source}` : "/";
+    const stack = capturedApp.router?.stack ?? capturedApp._router?.stack;
+    const before = stack?.length ?? 0;
+    const result = originalUse(...args);
+    const updatedStack = capturedApp.router?.stack ?? capturedApp._router?.stack;
+    for (const layer of updatedStack?.slice(before) ?? []) {
+      layer.mountPath = mountPath;
+    }
+    return result;
+  };
   const server = await registerRoutes(app);
   server.close();
   return serializeRouteManifest(extractRouteManifest(app));

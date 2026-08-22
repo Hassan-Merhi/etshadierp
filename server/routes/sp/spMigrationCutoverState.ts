@@ -216,7 +216,11 @@ export function installCutoverWriteGuard(app: Express): void {
   guardInstalled = true;
   app.use(cutoverWriteGuard);
 
-  const routerStack = app?._router?.stack as any[] | undefined;
+  const expressApp = app as unknown as {
+    router?: { stack?: Array<{ route?: unknown }> };
+    _router?: { stack?: Array<{ route?: unknown }> };
+  };
+  const routerStack = expressApp.router?.stack ?? expressApp._router?.stack;
   if (!routerStack?.length) {
     logger.warn("[SP Cutover Guard] Express router stack was unavailable; guard remained at registration order");
     return;

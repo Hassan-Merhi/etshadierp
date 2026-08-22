@@ -50,7 +50,10 @@ export interface RouteManifest {
 /** Express layers expose no public type; these are the fields we rely on. */
 interface ExpressLayer {
   name?: string;
+  mountPath?: string;
   regexp?: RegExp & { fast_slash?: boolean };
+  slash?: boolean;
+  matchers?: Array<(input: string) => false | { path?: string }>;
   handle?: { name?: string };
   route?: {
     path?: unknown;
@@ -78,6 +81,21 @@ function handlerName(candidate: { name?: string; handle?: { name?: string } } | 
   if (!name || name === "<anonymous>") return ANONYMOUS;
   // Express prefixes bound handlers; the underlying identity is what matters.
   return name.startsWith("bound ") ? name.slice("bound ".length) : name;
+}
+
+function express5MountPath(layer: ExpressLayer, candidates: string[]): string | undefined {
+  if (layer.slash) return "/";
+  const matcher = layer.matchers?.[0];
+  if (!matcher) return undefined;
+
+  let best: string | undefined;
+  for (const candidate of candidates) {
+    const match = matcher(`${candidate}/__route_manifest_probe__`);
+    if (match && match.path && (!best || match.path.length > best.length)) {
+      best = match.path;
+    }
+  }
+  return best;
 }
 
 /**
@@ -113,11 +131,34 @@ export function decodeMountPath(regexp: (RegExp & { fast_slash?: boolean }) | un
  * being protected, not an incidental detail.
  */
 export function extractRouteManifest(app: Express): RouteManifest {
-  const stack = (app as unknown as { _router?: { stack?: ExpressLayer[] } })._router?.stack;
+  const expressApp = app as unknown as {
+    router?: { stack?: ExpressLayer[] };
+    _router?: { stack?: ExpressLayer[] };
+  };
+  const stack = expressApp.router?.stack ?? expressApp._router?.stack;
   if (!stack) {
     throw new Error("Express router stack unavailable - the app was not configured before manifest extraction.");
   }
 
+  const routePaths = stack.flatMap((layer) => {
+    if (!layer.route) return [];
+    const rawPath = layer.route.path;
+    return (Array.isArray(rawPath) ? rawPath : [rawPath]).filter((path): path is string => typeof path === "string");
+  });
+  const mountCandidates = new Set<string>(["/"]);
+  for (const routePath of routePaths) {
+    const segments = routePath.split("/").filter(Boolean);
+    for (let count = 1; count <= segments.length; count += 1) {
+      const prefix = `/${segments.slice(0, count).join("/")}`.replace(/:([^/]+)/g, "1");
+      if (!prefix.includes(":") && !/[\\^$*+?()[\]{}|]/.test(prefix)) {
+        mountCandidates.add(prefix);
+      }
+    }
+    const concreteRoutePath = routePath.replace(/:([^/]+)/g, "1");
+    if (!/[\\^$*+?()[\]{}|]/.test(concreteRoutePath)) {
+      mountCandidates.add(concreteRoutePath);
+    }
+  }
   const routes: RouteEntry[] = [];
   const middlewareMounts: MiddlewareMount[] = [];
 
@@ -159,7 +200,10 @@ export function extractRouteManifest(app: Express): RouteManifest {
     const name = handlerName(layer.handle ?? { name: layer.name });
     if (IGNORED_MIDDLEWARE.has(name) || IGNORED_MIDDLEWARE.has(layer.name ?? "")) continue;
 
-    middlewareMounts.push({ path: decodeMountPath(layer.regexp), name });
+    middlewareMounts.push({
+      path: layer.mountPath ?? express5MountPath(layer, [...mountCandidates]) ?? decodeMountPath(layer.regexp),
+      name,
+    });
   }
 
   return { routes, middlewareMounts };

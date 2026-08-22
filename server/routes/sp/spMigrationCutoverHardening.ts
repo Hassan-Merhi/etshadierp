@@ -91,7 +91,11 @@ export function installExplicitCompanyWriteGuard(app: Express): void {
   installedApps.add(app);
   app.use(explicitCompanyWriteGuard);
 
-  const stack = app?._router?.stack as any[] | undefined;
+  const expressApp = app as unknown as {
+    router?: { stack?: Array<{ route?: unknown }> };
+    _router?: { stack?: Array<{ route?: unknown }> };
+  };
+  const stack = expressApp.router?.stack ?? expressApp._router?.stack;
   if (!stack?.length) return;
   const layer = stack.pop();
   const firstRouteIndex = stack.findIndex((entry) => Boolean(entry.route));

@@ -192,7 +192,11 @@ function installPhase4WriteGuard(app: Express): void {
   if (installedApps.has(app)) return;
   installedApps.add(app);
   app.use(phase4WriteGuard);
-  const stack = app?._router?.stack as any[] | undefined;
+  const expressApp = app as unknown as {
+    router?: { stack?: Array<{ route?: unknown }> };
+    _router?: { stack?: Array<{ route?: unknown }> };
+  };
+  const stack = expressApp.router?.stack ?? expressApp._router?.stack;
   if (!stack?.length) return;
   const layer = stack.pop();
   const firstRouteIndex = stack.findIndex((entry) => Boolean(entry.route));
@@ -300,7 +304,9 @@ async function targetLiveActivity(targetId: number, activatedAt?: string | null)
 
 async function normalizedVerification(sourceId: number, targetId: number, requireUnusedTarget = true): Promise<any> {
   const verification = await buildFinalMigrationVerification(sourceId, targetId);
-  verification.blockers = (verification.blockers ?? []).filter((issue: { code: string }) => issue.code !== "TARGET_ALREADY_LIVE");
+  verification.blockers = (verification.blockers ?? []).filter(
+    (issue: { code: string }) => issue.code !== "TARGET_ALREADY_LIVE"
+  );
   const activity = await targetLiveActivity(targetId);
   if (requireUnusedTarget && activity.total > 0) {
     verification.blockers.push({
