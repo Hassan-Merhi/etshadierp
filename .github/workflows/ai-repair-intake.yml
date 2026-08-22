@@ -40,6 +40,9 @@ jobs:
     timeout-minutes: 5
     env:
       GH_TOKEN: ${{ github.token }}
+      # Neither job checks the repository out, so `gh issue` has no git remote
+      # to infer the repository from and exits with "not a git repository".
+      GH_REPO: ${{ github.repository }}
       REPAIR_WORKFLOW: ${{ github.event.workflow_run.name }}
       REPAIR_SHA: ${{ github.event.workflow_run.head_sha }}
       REPAIR_URL: ${{ github.event.workflow_run.html_url }}
@@ -101,6 +104,7 @@ jobs:
     timeout-minutes: 5
     env:
       GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
       REPAIR_SUMMARY: ${{ inputs.summary }}
       REPAIR_EVIDENCE_URL: ${{ inputs.evidence_url }}
       REPAIR_BASE_BRANCH: ${{ inputs.base_branch }}
