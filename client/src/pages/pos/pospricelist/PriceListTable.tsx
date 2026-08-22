@@ -39,8 +39,17 @@ function PriceEditor({
         type="number"
         step="0.01"
         className={cn(width, "h-8 text-right tabular-nums")}
-        value={model.editingItem!.value}
-        onChange={(e) => model.setEditingItem((prev) => (prev ? { ...prev, value: e.target.value } : null))}
+        defaultValue={model.editingItem!.value}
+        onChange={(e) => {
+          // Keep the browser in charge of the draft value while typing. Updating
+          // `editingItem` state on every keystroke retriggers the model's focus/
+          // select effect, which selects the entire field and makes each next
+          // digit replace the previous one. The editor owns this object for the
+          // lifetime of the active cell, so mutating its draft value keeps save,
+          // blur, and keyboard navigation reading the latest value without a
+          // rerender/select cycle.
+          model.editingItem!.value = e.target.value;
+        }}
         onKeyDown={model.handleKeyDown}
         onBlur={model.handleBlur}
         disabled={isSaving}
