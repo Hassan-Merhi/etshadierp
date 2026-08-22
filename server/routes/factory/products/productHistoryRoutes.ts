@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response } from "express";
+import type { Express, NextFunction, Request, Response } from "express";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -225,12 +225,13 @@ export function registerFactoryProductHistoryRoutes(app: Express) {
 
   // 3-segment route: year in path — this is what the frontend actually calls
   // e.g. GET /api/factory/bale-product-history/3538/142/2026
-  // NOTE: constrained to digits-only (\d+) so static 3-segment routes like
-  // /:productId/:locationId/all-bales are NOT consumed by this handler.
+  // Express 5 no longer accepts inline regex constraints in route paths.
+  // Explicitly pass the static all-bales route through below instead.
   app.get(
-    "/api/factory/bale-product-history/:productId/:locationId/:year(\\d+)",
+    "/api/factory/bale-product-history/:productId/:locationId/:year",
     requireAuth,
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
+      if (req.params.year === "all-bales") return next();
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const productId = parseId(req.params.productId);
