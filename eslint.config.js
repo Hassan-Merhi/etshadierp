@@ -29,7 +29,11 @@ export default tseslint.config(
       "unused-imports": unusedImports,
     },
     rules: {
-      ...reactHooks.configs.recommended.rules,
+      // Keep the repository's established React Hooks contract explicit. Newer
+      // eslint-plugin-react-hooks releases add React Compiler rules to the
+      // recommended preset; enabling those is a separate source-migration lane.
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
       // Type escapes have their own zero-tolerance gate in
       // config/type-escape-boundaries.json. Keeping this ESLint rule enabled
       // would double-count the same backlog and bypass the 33-warning lint
@@ -69,8 +73,6 @@ export default tseslint.config(
       "no-useless-assignment": "warn",
       "no-control-regex": "warn",
       "no-extra-boolean-cast": "warn",
-      "react-hooks/rules-of-hooks": "error",
-      "react-hooks/exhaustive-deps": "warn",
     },
   },
   configPrettier
