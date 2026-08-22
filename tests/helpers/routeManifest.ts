@@ -113,7 +113,15 @@ export function decodeMountPath(regexp: (RegExp & { fast_slash?: boolean }) | un
  * being protected, not an incidental detail.
  */
 export function extractRouteManifest(app: Express): RouteManifest {
-  const stack = (app as unknown as { _router?: { stack?: ExpressLayer[] } })._router?.stack;
+  const expressApp = app as unknown as {
+    _router?: { stack?: ExpressLayer[] };
+    router?: { stack?: ExpressLayer[] };
+  };
+  // Express 4 stores the configured router on the private `_router` field.
+  // Express 5 removed that field and exposes the router through `app.router`.
+  // Prefer the Express 4 field so this helper remains compatible with both
+  // versions without touching Express 4's deprecated `app.router` getter.
+  const stack = expressApp._router?.stack ?? expressApp.router?.stack;
   if (!stack) {
     throw new Error("Express router stack unavailable - the app was not configured before manifest extraction.");
   }
