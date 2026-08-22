@@ -206,7 +206,18 @@ function isUint8Array(value: unknown): value is Uint8Array {
 }
 
 function toBytes(data: ArrayBuffer | Uint8Array): Uint8Array {
-  return isUint8Array(data) ? Uint8Array.from(data) : new Uint8Array(data);
+  const bytes = isUint8Array(data) ? Uint8Array.from(data) : new Uint8Array(data);
+  if (isXlsxZip(bytes)) return bytes;
+
+  // Node's Buffer#buffer may expose its larger pooled ArrayBuffer, including
+  // bytes before the Buffer's actual XLSX payload. Recover that payload when
+  // callers pass the ArrayBuffer directly (the browser path is unaffected).
+  for (let index = 1; index <= bytes.length - 4; index += 1) {
+    if (bytes[index] === 0x50 && bytes[index + 1] === 0x4b && bytes[index + 2] === 0x03 && bytes[index + 3] === 0x04) {
+      return bytes.slice(index);
+    }
+  }
+  return bytes;
 }
 
 function isXlsxZip(bytes: Uint8Array): boolean {
