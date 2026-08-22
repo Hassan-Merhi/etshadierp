@@ -41,6 +41,22 @@ requireMarkers("docs/operations/database-backup-rollback-recovery.md", [
   "/api/health/ready",
 ]);
 
+requireMarkers(".github/workflows/resilience-rehearsal.yml", [
+  "pg_dump",
+  "verify-database-backup.mjs",
+  "Restore into fresh disposable database",
+  "pg_restore",
+  "verify-ci-disposable-schema.mjs",
+  "ENABLE_SCHEDULERS: \"false\"",
+  "scheduler-tick-guard.test.ts",
+]);
+
+requireMarkers("tests/scheduler-tick-guard.test.ts", [
+  "skips a tick that arrives while the previous run is still going",
+  "releases the guard when a run throws",
+  "absorbs the failure instead of rejecting into cron",
+]);
+
 requireMarkers("docs/archive/program-3c-database-tenant-guards.md", [
   "tenant-control-integrity-audit.mjs",
   "0013_tenant_control_integrity_guards",
