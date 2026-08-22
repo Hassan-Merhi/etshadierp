@@ -10,9 +10,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:16.15
@@ -64,7 +64,7 @@ jobs:
           )
           shard_files=()
           for i in "${!all_test_files[@]}"; do
-            if (( i % 4 == SHARD )); then
+            if (( i % 12 == SHARD )); then
               shard_files+=("${all_test_files[$i]}")
             fi
           done
