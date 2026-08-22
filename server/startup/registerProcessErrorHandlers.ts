@@ -4,9 +4,7 @@ export function registerProcessErrorHandlers() {
   const isProduction = process.env.NODE_ENV === "production";
 
   process.on("unhandledRejection", (reason: unknown) => {
-    const detail =
-      reason instanceof Error ? { reason: reason.message, stack: reason.stack ?? "" } : { reason, stack: "" };
-    logger.error("[UnhandledRejection]", detail);
+    logger.error("[UnhandledRejection]", { error: reason });
     if (isProduction) process.exit(1);
   });
 
