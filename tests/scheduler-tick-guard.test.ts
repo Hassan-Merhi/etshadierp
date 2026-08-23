@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createSchedulerTick } from "../server/services/scheduler/schedulerTickGuard";
 import { logger } from "../server/lib/logger";
+import { getSchedulerCallbackName } from "../server/lib/schedulerObservability";
 
 function deferred() {
   let resolve!: () => void;
@@ -33,6 +34,11 @@ afterEach(() => {
 });
 
 describe("scheduler tick guard", () => {
+  it("carries a stable observability name into node-cron", () => {
+    const tick = createSchedulerTick("probeJob", async () => undefined);
+    expect(getSchedulerCallbackName(tick)).toBe("probeJob");
+  });
+
   it("skips a tick that arrives while the previous run is still going", async () => {
     const gate = deferred();
     const run = vi.fn(() => gate.promise);

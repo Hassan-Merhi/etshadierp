@@ -1,5 +1,5 @@
 import type { ClientErrorLike } from "@/lib/clientError";
-import { useState, useMemo } from "react";
+import { useDeferredValue, useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -25,6 +25,17 @@ type Entry = {
   voucherDate: string;
   voucherDescription: string | null;
 };
+type EntryPage = {
+  items: Entry[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+};
+
+const ENTRY_PAGE_SIZE = 100;
 
 function fmtMoney(v: string | number | null | undefined) {
   if (!v || v === "0" || v === "0.00") return null;
@@ -142,19 +153,33 @@ export default function AccountTransfer() {
   const [toAccountId, setToAccountId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [searchEntries, setSearchEntries] = useState("");
+  const [entryPage, setEntryPage] = useState(1);
   const [done, setDone] = useState<{ moved: number; toAccount: string } | null>(null);
+  const deferredEntrySearch = useDeferredValue(searchEntries.trim());
 
   const { data: accounts = [] } = useQuery<Account[]>({
     queryKey: ["/api/ledger-accounts"],
     enabled: !!selectedCompany,
   });
 
-  const { data: entries = [], isLoading: loadingEntries } = useQuery<Entry[]>({
-    queryKey: ["/api/voucher-entries/by-account", fromAccountId],
-    queryFn: () =>
-      fetch(`/api/voucher-entries/by-account/${fromAccountId}`, { credentials: "include" }).then((r) => r.json()),
+  const { data: entryData, isLoading: loadingEntries } = useQuery<EntryPage>({
+    queryKey: ["/api/voucher-entries/by-account", fromAccountId, entryPage, deferredEntrySearch],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        pagination: "1",
+        page: String(entryPage),
+        pageSize: String(ENTRY_PAGE_SIZE),
+      });
+      if (deferredEntrySearch) params.set("search", deferredEntrySearch);
+      const response = await fetch(`/api/voucher-entries/by-account/${fromAccountId}?${params}`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error(response.statusText || String(response.status));
+      return response.json();
+    },
     enabled: !!fromAccountId,
   });
+  const entries = useMemo(() => entryData?.items ?? [], [entryData?.items]);
 
   const filteredEntries = useMemo(() => {
     if (!searchEntries.trim()) return entries;
@@ -215,7 +240,8 @@ export default function AccountTransfer() {
       queryClient.invalidateQueries({ queryKey: ["/api/voucher-entries/by-account", fromAccountId] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
     },
-    onError: (e: ClientErrorLike) => toast({ title: "Transfer failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) =>
+      toast({ title: "Transfer failed", description: e.message, variant: "destructive" }),
   });
 
   function resetAll() {
@@ -223,6 +249,7 @@ export default function AccountTransfer() {
     setToAccountId(null);
     setSelectedIds(new Set());
     setSearchEntries("");
+    setEntryPage(1);
     setDone(null);
   }
 
@@ -271,6 +298,8 @@ export default function AccountTransfer() {
               onChange={(id) => {
                 setFromAccountId(id);
                 setSelectedIds(new Set());
+                setEntryPage(1);
+                setSearchEntries("");
                 setDone(null);
               }}
               placeholder="Select source account…"
@@ -310,7 +339,7 @@ export default function AccountTransfer() {
                   Entries under <span className="text-primary">{fromAccount?.name}</span>
                   {!loadingEntries && (
                     <Badge variant="secondary" className="ml-2">
-                      {entries.length}
+                      {entryData?.total ?? entries.length}
                     </Badge>
                   )}
                 </CardTitle>
@@ -323,7 +352,11 @@ export default function AccountTransfer() {
                     className="pl-8 h-8 text-sm w-52"
                     placeholder="Filter entries…"
                     value={searchEntries}
-                    onChange={(e) => setSearchEntries(e.target.value)}
+                    onChange={(e) => {
+                      setSearchEntries(e.target.value);
+                      setEntryPage(1);
+                      setSelectedIds(new Set());
+                    }}
                     data-testid="input-search-entries"
                   />
                 </div>
@@ -413,6 +446,39 @@ export default function AccountTransfer() {
                     })}
                   </tbody>
                 </table>
+                {entryData && entryData.totalPages > 1 && (
+                  <div className="flex items-center justify-between gap-3 border-t px-4 py-3">
+                    <p className="text-xs text-muted-foreground">
+                      Page {entryData.page} of {entryData.totalPages} · {entryData.total} entries
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!entryData.hasPreviousPage}
+                        onClick={() => {
+                          setSelectedIds(new Set());
+                          setEntryPage((page) => Math.max(1, page - 1));
+                        }}
+                        data-testid="button-entries-previous-page"
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!entryData.hasNextPage}
+                        onClick={() => {
+                          setSelectedIds(new Set());
+                          setEntryPage((page) => page + 1);
+                        }}
+                        data-testid="button-entries-next-page"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

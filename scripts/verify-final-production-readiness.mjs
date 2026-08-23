@@ -57,6 +57,36 @@ requireMarkers("tests/scheduler-tick-guard.test.ts", [
   "absorbs the failure instead of rejecting into cron",
 ]);
 
+requireMarkers("server/lib/schedulerObservability.ts", [
+  "erp.scheduler.job-name",
+  "resolveSchedulerMetricName",
+  "cron-expression:",
+]);
+
+requireMarkers("server/lib/observabilityBootstrap.ts", [
+  "resolveSchedulerMetricName(expression, callback)",
+  "captureRuntimeFailures",
+]);
+
+const overdueQuerySource = requireMarkers("server/services/scheduler/overdueCustomerQuery.ts", [
+  "cb.debit_amount",
+  "cb.credit_amount",
+  "cb.transaction_date",
+  "cb.company_id = c.company_id",
+]);
+for (const forbiddenColumn of ["cb.entry_type", "cb.entry_date", "cb.amount"]) {
+  if (overdueQuerySource.includes(forbiddenColumn)) {
+    failures.push(`Overdue-customer scheduler still references removed column: ${forbiddenColumn}`);
+  }
+}
+
+requireMarkers("server/routes/voucher-entries/by-account.ts", [
+  "wantsBoundedPagination",
+  ".limit(limit)",
+  ".offset(offset)",
+  "Cache-Control",
+]);
+
 requireMarkers("docs/archive/program-3c-database-tenant-guards.md", [
   "tenant-control-integrity-audit.mjs",
   "0013_tenant_control_integrity_guards",

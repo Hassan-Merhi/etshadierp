@@ -31,9 +31,7 @@ export function startScheduler(): void {
     quiet: true,
   });
 
-  cron.schedule("* * * * *", () => {
-    void locationStockTick();
-  });
+  cron.schedule("* * * * *", locationStockTick);
 
   logger.info("Location stock WhatsApp scheduler registered", {
     module: "scheduler",
