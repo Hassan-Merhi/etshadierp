@@ -6,6 +6,15 @@ import { pathToFileURL } from "node:url";
 const sourcePath = path.join(process.cwd(), "scripts/complete-phase3-translations-v2.mjs");
 let source = fs.readFileSync(sourcePath, "utf8");
 
+const onlineEndpoint = 'const GOOGLE_ENDPOINT = "https://translate.googleapis.com/translate_a/single";';
+if (!source.includes(onlineEndpoint)) {
+  throw new Error("Unable to locate the Phase 3 translation endpoint");
+}
+source = source.replace(
+  onlineEndpoint,
+  'const GOOGLE_ENDPOINT = "http://127.0.0.1:8765/translate_a/single";',
+);
+
 const unbalancedThrow = '    if (depth !== 0) throw new Error(`Unbalanced template expression in: ${value}`);';
 if (!source.includes(unbalancedThrow)) {
   throw new Error("Unable to locate the Phase 3 partial-template guard");
