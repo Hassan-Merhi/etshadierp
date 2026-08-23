@@ -29,11 +29,11 @@ jobs:
           node-version: "24.19.0"
           cache: npm
 
-      - name: Verify generator syntax
-        run: node --check scripts/complete-phase3-translations-v2.mjs
+      - name: Verify generator bootstrap syntax
+        run: node --check scripts/complete-phase3-translations-v3.mjs
 
       - name: Generate complete French and Arabic coverage
-        run: node scripts/complete-phase3-translations-v2.mjs
+        run: node scripts/complete-phase3-translations-v3.mjs
 
       - name: Normalize package registry URLs
         run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
@@ -73,6 +73,7 @@ jobs:
         run: |
           rm -f scripts/complete-phase3-translations.mjs
           rm -f scripts/complete-phase3-translations-v2.mjs
+          rm -f scripts/complete-phase3-translations-v3.mjs
           rm -f .github/workflows/phase3-translation-completion.yml
           rm -f artifacts/phase3-translation-source.json
           rm -f artifacts/phase3-translation-final.json
