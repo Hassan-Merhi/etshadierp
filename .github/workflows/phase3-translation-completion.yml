@@ -29,6 +29,28 @@ jobs:
           node-version: "24.19.0"
           cache: npm
 
+      - name: Start offline French and Arabic translation engine
+        run: |
+          python3 -m venv "$RUNNER_TEMP/phase3-argos"
+          "$RUNNER_TEMP/phase3-argos/bin/python" -m pip install --disable-pip-version-check --quiet argostranslate
+          "$RUNNER_TEMP/phase3-argos/bin/python" scripts/phase3-argos-server.py > "$RUNNER_TEMP/phase3-argos.log" 2>&1 &
+          echo "PHASE3_ARGOS_PID=$!" >> "$GITHUB_ENV"
+          for attempt in $(seq 1 180); do
+            if curl --fail --silent http://127.0.0.1:8765/health >/dev/null; then
+              echo "Offline translation engine is ready."
+              exit 0
+            fi
+            if ! kill -0 "$!" 2>/dev/null; then
+              echo "Offline translation engine exited before readiness."
+              cat "$RUNNER_TEMP/phase3-argos.log"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "Timed out starting the offline translation engine."
+          cat "$RUNNER_TEMP/phase3-argos.log"
+          exit 1
+
       - name: Verify generator bootstrap syntax
         run: node --check scripts/complete-phase3-translations-v3.mjs
 
@@ -69,17 +91,31 @@ jobs:
           npm run lint
           node scripts/verify-program7d-accessibility-responsive.mjs
 
+      - name: Stop offline translation engine
+        if: always()
+        run: |
+          if [ -n "${PHASE3_ARGOS_PID:-}" ]; then
+            kill "$PHASE3_ARGOS_PID" 2>/dev/null || true
+            wait "$PHASE3_ARGOS_PID" 2>/dev/null || true
+          fi
+          if [ -f "$RUNNER_TEMP/phase3-argos.log" ]; then
+            tail -n 80 "$RUNNER_TEMP/phase3-argos.log" || true
+          fi
+
       - name: Remove one-time generation machinery
+        if: success()
         run: |
           rm -f scripts/complete-phase3-translations.mjs
           rm -f scripts/complete-phase3-translations-v2.mjs
           rm -f scripts/complete-phase3-translations-v3.mjs
+          rm -f scripts/phase3-argos-server.py
           rm -f .github/workflows/phase3-translation-completion.yml
           rm -f artifacts/phase3-translation-source.json
           rm -f artifacts/phase3-translation-final.json
           rm -f artifacts/phase3-translation-baseline.json
 
       - name: Commit completed Phase 3
+        if: success()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
