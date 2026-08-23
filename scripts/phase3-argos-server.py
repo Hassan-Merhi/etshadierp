@@ -19,13 +19,6 @@ def install_models():
     argostranslate.package.update_package_index()
     packages = argostranslate.package.get_available_packages()
     for target in ("fr", "ar"):
-        installed = {
-            (language.code, translated.code)
-            for language in argostranslate.translate.get_installed_languages()
-            for translated in language.translations_to
-        }
-        if ("en", target) in installed:
-            continue
         package = next(
             (
                 candidate
