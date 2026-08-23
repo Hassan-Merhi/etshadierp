@@ -1,16 +1,16 @@
 name: Phase 1 Format Self-Heal
 
 on:
-  push:
-    branches: [phase1-testing-coverage-expansion]
-    paths:
-      - .github/workflows/phase1-format-selfheal.yml
+  pull_request:
+    branches: [main]
+    types: [ready_for_review]
 
 permissions:
   contents: write
 
 jobs:
   format:
+    if: github.event.pull_request.head.ref == 'phase1-testing-coverage-expansion'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
