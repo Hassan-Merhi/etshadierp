@@ -1,44 +1,55 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   getSchedulerCallbackName,
   nameSchedulerCallback,
   resolveSchedulerMetricName,
 } from "../server/lib/schedulerObservability";
-
-function source(path: string): string {
-  return readFileSync(resolve(process.cwd(), path), "utf8");
-}
+import {
+  parseBoundedPagination,
+  wantsBoundedPagination,
+} from "../server/lib/boundedPagination";
+import { loadOverdueCustomerBalances } from "../server/services/scheduler/overdueCustomerQuery";
 
 describe("Phase 5 performance and operations", () => {
   it("records cron metrics under a stable business job name", () => {
-    const callback = nameSchedulerCallback(async () => undefined, "overdue customer check");
+    const callback = nameSchedulerCallback(
+      async () => undefined,
+      "overdue customer check",
+    );
 
     expect(getSchedulerCallbackName(callback)).toBe("overdue-customer-check");
-    expect(resolveSchedulerMetricName("0 9 * * *", callback)).toBe("cron:overdue-customer-check");
-    expect(resolveSchedulerMetricName("0 9 * * *", async () => undefined)).toBe("cron-expression:0 9 * * *");
+    expect(resolveSchedulerMetricName("0 9 * * *", callback)).toBe(
+      "cron:overdue-customer-check",
+    );
+    expect(resolveSchedulerMetricName("0 9 * * *", async () => undefined)).toBe(
+      "cron-expression:0 9 * * *",
+    );
   });
 
-  it("queries the current customer balance schema for overdue reminders", () => {
-    const overdueQuery = source("server/services/scheduler/overdueCustomerQuery.ts");
+  it("executes the overdue-customer balance query against the current schema", async () => {
+    const rows = await loadOverdueCustomerBalances();
 
-    expect(overdueQuery).toContain("cb.debit_amount");
-    expect(overdueQuery).toContain("cb.credit_amount");
-    expect(overdueQuery).toContain("cb.transaction_date");
-    expect(overdueQuery).toContain("cb.company_id = c.company_id");
-    expect(overdueQuery).not.toMatch(/cb\.(entry_type|entry_date|amount)\b/);
+    expect(Array.isArray(rows)).toBe(true);
+    for (const row of rows) {
+      expect(Number.isInteger(row.id)).toBe(true);
+      expect(Number.isInteger(row.company_id)).toBe(true);
+      expect(Number.isFinite(Number(row.net_balance))).toBe(true);
+    }
   });
 
-  it("uses native bounded SQL pagination for account-transfer entries", () => {
-    const route = source("server/routes/voucher-entries/by-account.ts");
-    const client = source("client/src/pages/AccountTransfer.tsx");
+  it("keeps account-transfer pagination bounded while preserving legacy opt-in", () => {
+    expect(wantsBoundedPagination({})).toBe(false);
+    expect(wantsBoundedPagination({ pagination: "1" })).toBe(true);
+    expect(wantsBoundedPagination({ page: "3" })).toBe(true);
 
-    expect(route).toContain("wantsBoundedPagination");
-    expect(route).toContain("await Promise.all");
-    expect(route).toContain(".limit(limit)");
-    expect(route).toContain(".offset(offset)");
-    expect(client).toContain('pagination: "1"');
-    expect(client).toContain("pageSize: String(ENTRY_PAGE_SIZE)");
+    expect(
+      parseBoundedPagination({ page: "3", pageSize: "100" }),
+    ).toEqual({ page: 3, limit: 100, offset: 200 });
+    expect(
+      parseBoundedPagination(
+        { offset: "550", limit: "5000" },
+        { defaultLimit: 100, maxLimit: 250 },
+      ),
+    ).toEqual({ page: 3, limit: 250, offset: 550 });
   });
 });
