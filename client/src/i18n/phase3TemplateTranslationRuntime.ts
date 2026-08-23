@@ -2,7 +2,7 @@ import type { ApplicationLanguage } from "@shared/applicationLanguageContract";
 import type { Phase3SharedUiEntry } from "./sharedUiPhase3TranslationTypes";
 
 type TemplateMatcher = {
-  regex: RegExp;
+  parts: readonly string[];
   sourceTemplate: string;
   translations: Phase3SharedUiEntry;
 };
@@ -47,16 +47,44 @@ function splitTemplate(value: string): string[] {
   return parts;
 }
 
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function placeholderTemplate(parts: readonly string[]): string {
   let result = parts[0] ?? "";
   for (let index = 1; index < parts.length; index += 1) {
     result += `{{${index - 1}}}${parts[index]}`;
   }
   return result;
+}
+
+function captureTemplateValues(value: string, parts: readonly string[]): string[] | null {
+  if (parts.length < 2 || !value.startsWith(parts[0] ?? "")) return null;
+
+  const captures: string[] = [];
+  let cursor = (parts[0] ?? "").length;
+
+  for (let index = 1; index < parts.length; index += 1) {
+    const staticPart = parts[index] ?? "";
+    const isLast = index === parts.length - 1;
+
+    if (isLast) {
+      const suffixStart = value.length - staticPart.length;
+      if (suffixStart < cursor || !value.endsWith(staticPart)) return null;
+      captures.push(value.slice(cursor, suffixStart));
+      cursor = value.length;
+      continue;
+    }
+
+    if (staticPart.length === 0) {
+      captures.push("");
+      continue;
+    }
+
+    const staticStart = value.indexOf(staticPart, cursor);
+    if (staticStart < 0) return null;
+    captures.push(value.slice(cursor, staticStart));
+    cursor = staticStart + staticPart.length;
+  }
+
+  return cursor === value.length ? captures : null;
 }
 
 export function createPhase3TemplateTranslator(entries: readonly Phase3SharedUiEntry[]) {
@@ -66,12 +94,12 @@ export function createPhase3TemplateTranslator(entries: readonly Phase3SharedUiE
     const staticText = parts.join("");
 
     // A template containing only business values/separators should not become
-    // a broad regex that can capture arbitrary table data.
+    // a broad matcher that can capture arbitrary table data.
     if (!/[A-Za-z]/.test(staticText)) return [];
 
     return [
       {
-        regex: new RegExp(`^${parts.map(escapeRegex).join("(.*?)")}$`),
+        parts,
         sourceTemplate: placeholderTemplate(parts),
         translations: entry,
       },
@@ -81,7 +109,10 @@ export function createPhase3TemplateTranslator(entries: readonly Phase3SharedUiE
   return {
     matches(value: string): boolean {
       const normalized = value.trim();
-      return normalized.length > 0 && matchers.some(({ regex }) => regex.test(normalized));
+      return (
+        normalized.length > 0 &&
+        matchers.some(({ parts }) => captureTemplateValues(normalized, parts) !== null)
+      );
     },
 
     translate(
@@ -94,11 +125,11 @@ export function createPhase3TemplateTranslator(entries: readonly Phase3SharedUiE
       const normalized = value.trim();
 
       for (const matcher of matchers) {
-        const match = normalized.match(matcher.regex);
-        if (!match) continue;
+        const captures = captureTemplateValues(normalized, matcher.parts);
+        if (!captures) continue;
         const template = language === "en" ? matcher.sourceTemplate : matcher.translations[language];
         const translated = template.replace(/\{\{(\d+)\}\}/g, (_token, rawIndex: string) => {
-          const capture = match[Number(rawIndex) + 1] ?? "";
+          const capture = captures[Number(rawIndex)] ?? "";
           return translateCapture(capture);
         });
         return `${leading}${translated}${trailing}`;
