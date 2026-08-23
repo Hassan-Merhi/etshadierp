@@ -98,5 +98,9 @@ A change is complete only when all of the following apply to the same commit:
 - `phase3/exact-main-certification` is green on the exact merged `main` SHA;
 - coverage floors and all repository ratchets pass without widened allowances.
 
+For Phase 6 and other final-cleanup work, certify only a branch head whose merge
+base is the current `main`; if `main` advances, resync first and restart the
+exact-head checks rather than relying on a green run from the superseded base.
+
 PR checks certify the proposed head. After merge, inspect the new `main` SHA
 again; a green superseded commit is not final certification.
