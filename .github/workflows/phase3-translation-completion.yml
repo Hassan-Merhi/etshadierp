@@ -35,7 +35,7 @@ jobs:
           "$RUNNER_TEMP/phase3-argos/bin/python" -m pip install --disable-pip-version-check --quiet argostranslate
           "$RUNNER_TEMP/phase3-argos/bin/python" scripts/phase3-argos-server.py > "$RUNNER_TEMP/phase3-argos.log" 2>&1 &
           echo "PHASE3_ARGOS_PID=$!" >> "$GITHUB_ENV"
-          for attempt in $(seq 1 180); do
+          for _ in $(seq 1 180); do
             if curl --fail --silent http://127.0.0.1:8765/health >/dev/null; then
               echo "Offline translation engine is ready."
               exit 0
