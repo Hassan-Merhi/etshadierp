@@ -11,15 +11,12 @@
     "step": 500
   },
   "totals": {
-    "warningCeiling": 3,
+    "warningCeiling": 0,
     "errorCeiling": 0
   },
-  "perRule": {
-    "react-hooks/exhaustive-deps": 3,
-    "no-control-regex": 0
-  },
+  "perRule": {},
   "notes": {
     "errorCeiling": "Zero and permanent. ESLint errors are not part of the warning drawdown.",
-    "phase18": "The UX consistency release locked in the Phase 18 warning drawdown: 3 react-hooks/exhaustive-deps warnings remain and no-control-regex is at zero. Type escapes remain separately frozen at zero in config/type-escape-boundaries.json."
+    "phase2": "Phase 2 completed the warning drawdown: zero warnings remain and no rule allowance is retained. Type escapes remain separately frozen per file in config/type-escape-boundaries.json."
   }
 }
