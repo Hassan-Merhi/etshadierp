@@ -62,10 +62,7 @@ vi.mock("@simplewebauthn/browser", () => ({
   startRegistration: vi.fn(),
 }));
 
-import Login, {
-  clearBiometricCredentials,
-  saveBiometricCredentials,
-} from "@/pages/Login";
+import Login, { clearBiometricCredentials, saveBiometricCredentials } from "@/pages/Login";
 
 beforeEach(() => {
   vi.clearAllMocks();

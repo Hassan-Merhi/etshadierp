@@ -5,27 +5,19 @@ let underlyingFetch: ReturnType<typeof vi.fn>;
 let bandwidthModule: typeof import("../../client/src/lib/operationalPhase4BandwidthFetch");
 
 function compactResponse(value: unknown, dictionary: string[] = []): Response {
-  return new Response(
-    JSON.stringify({ __erpWire: 1, d: dictionary, v: value }),
-    {
-      status: 200,
-      headers: {
-        "content-type": "application/json",
-        "content-length": "100",
-        "x-erp-compact-response": "v1",
-      },
+  return new Response(JSON.stringify({ __erpWire: 1, d: dictionary, v: value }), {
+    status: 200,
+    headers: {
+      "content-type": "application/json",
+      "content-length": "100",
+      "x-erp-compact-response": "v1",
     },
-  );
+  });
 }
 
 function sentUrl(call: unknown[]): URL {
   const input = call[0];
-  const raw =
-    typeof input === "string"
-      ? input
-      : input instanceof URL
-        ? input.toString()
-        : (input as Request).url;
+  const raw = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
   return new URL(raw, "http://localhost");
 }
 
@@ -36,14 +28,11 @@ function sentHeaders(call: unknown[]): Headers {
 
 beforeAll(async () => {
   window.history.replaceState({}, "", "/factory/location-inventory");
-  delete (
-    window as Window & { __operationalPhase4BandwidthFetchInstalled?: boolean }
-  ).__operationalPhase4BandwidthFetchInstalled;
+  delete (window as Window & { __operationalPhase4BandwidthFetchInstalled?: boolean })
+    .__operationalPhase4BandwidthFetchInstalled;
   underlyingFetch = vi.fn(async () => compactResponse({ ok: true }));
   window.fetch = underlyingFetch as unknown as typeof window.fetch;
-  bandwidthModule = await import(
-    "../../client/src/lib/operationalPhase4BandwidthFetch"
-  );
+  bandwidthModule = await import("../../client/src/lib/operationalPhase4BandwidthFetch");
 });
 
 beforeEach(() => {
@@ -55,10 +44,7 @@ beforeEach(() => {
 describe("operational Phase 4 compact bandwidth fetch", () => {
   it("requests the compact location profile and decodes the response", async () => {
     underlyingFetch.mockImplementationOnce(async () =>
-      compactResponse(
-        { "~a": [["name", "status"], [["~0", "~1"]]] },
-        ["Warehouse", "available"],
-      ),
+      compactResponse({ "~a": [["name", "status"], [["~0", "~1"]]] }, ["Warehouse", "available"])
     );
 
     const response = await window.fetch(`${TARGET}?companyId=1`);
@@ -67,13 +53,9 @@ describe("operational Phase 4 compact bandwidth fetch", () => {
     expect(body).toEqual([{ name: "Warehouse", status: "available" }]);
     const call = underlyingFetch.mock.calls[0];
     const url = sentUrl(call);
-    expect(url.searchParams.get("_erpProfile")).toBe(
-      "location-inventory-summary-v1",
-    );
+    expect(url.searchParams.get("_erpProfile")).toBe("location-inventory-summary-v1");
     expect(sentHeaders(call).get("x-erp-compact-response")).toBe("v1");
-    expect(sentHeaders(call).get("x-erp-response-profile")).toBe(
-      "location-inventory-summary-v1",
-    );
+    expect(sentHeaders(call).get("x-erp-response-profile")).toBe("location-inventory-summary-v1");
     expect(response.headers.get("x-erp-compact-decoded")).toBe("v1");
     expect(response.headers.has("content-length")).toBe(false);
   });
@@ -105,9 +87,17 @@ describe("operational Phase 4 compact bandwidth fetch", () => {
         token: "~0",
         escaped: "~~0",
         nested: ["~1", { value: "~0" }],
-        rows: { "~a": [["name", "qty"], [["~0", 3], ["~1", 5]]] },
+        rows: {
+          "~a": [
+            ["name", "qty"],
+            [
+              ["~0", 3],
+              ["~1", 5],
+            ],
+          ],
+        },
       },
-      ["Alpha", "Beta"],
+      ["Alpha", "Beta"]
     );
 
     expect(decoded).toEqual({
@@ -127,7 +117,7 @@ describe("operational Phase 4 compact bandwidth fetch", () => {
         new Response(JSON.stringify({ __erpWire: 1, d: "not-a-dictionary", v: 1 }), {
           status: 200,
           headers: { "x-erp-compact-response": "v1" },
-        }),
+        })
     );
 
     const response = await window.fetch("/api/factory/daily-bale-scans");
@@ -143,9 +133,7 @@ describe("operational Phase 4 compact bandwidth fetch", () => {
     const { isTargetPath } = bandwidthModule.operationalPhase4BandwidthWireInternals;
     expect(isTargetPath("/api/factory/customer-proformas")).toBe(true);
     expect(isTargetPath("/api/factory/customer-orders/42")).toBe(true);
-    expect(
-      isTargetPath("/api/factory/customer-orders/42/verification-summary"),
-    ).toBe(true);
+    expect(isTargetPath("/api/factory/customer-orders/42/verification-summary")).toBe(true);
     expect(isTargetPath("/api/factory/location-inventory/42")).toBe(true);
     expect(isTargetPath("/api/factory/location-inventory/all")).toBe(false);
     expect(isTargetPath("/api/factory/customer-orders/all/details")).toBe(false);

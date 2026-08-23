@@ -23,10 +23,7 @@ vi.mock("../server/lib/logger", () => ({
   },
 }));
 
-import {
-  logAIAction,
-  requireAIActionPermission,
-} from "../server/lib/aiActionPermission";
+import { logAIAction, requireAIActionPermission } from "../server/lib/aiActionPermission";
 
 function request(session: Record<string, unknown>): Request {
   return { session } as unknown as Request;
@@ -46,10 +43,7 @@ beforeEach(() => {
 
 describe("AI action permission", () => {
   it("requires an authenticated session before touching the database", async () => {
-    const denial = await requireAIActionPermission(
-      request({ currentRole: "Admin" }),
-      "read",
-    );
+    const denial = await requireAIActionPermission(request({ currentRole: "Admin" }), "read");
 
     expect(denial).toEqual({ code: 401, message: "Unauthorized" });
     expect(harness.select).not.toHaveBeenCalled();
@@ -57,10 +51,7 @@ describe("AI action permission", () => {
 
   it("denies every action tier when the assistant is disabled", async () => {
     enableUser(false);
-    const denial = await requireAIActionPermission(
-      request({ userId: "u1", currentRole: "Admin" }),
-      "read",
-    );
+    const denial = await requireAIActionPermission(request({ userId: "u1", currentRole: "Admin" }), "read");
 
     expect(denial?.code).toBe(403);
     expect(harness.select).toHaveBeenCalledTimes(1);
@@ -68,39 +59,25 @@ describe("AI action permission", () => {
 
   it("allows chatbot-enabled read actions for a POS role", async () => {
     enableUser(true);
-    const denial = await requireAIActionPermission(
-      request({ userId: "u1", currentRole: "POS User" }),
-      "read",
-    );
+    const denial = await requireAIActionPermission(request({ userId: "u1", currentRole: "POS User" }), "read");
 
     expect(denial).toBeNull();
   });
 
   it("blocks draft and write actions for POS roles", async () => {
     enableUser(true);
-    const draftDenial = await requireAIActionPermission(
-      request({ userId: "u1", currentRole: "POS User" }),
-      "draft",
-    );
+    const draftDenial = await requireAIActionPermission(request({ userId: "u1", currentRole: "POS User" }), "draft");
     expect(draftDenial?.code).toBe(403);
 
     enableUser(true);
-    const writeDenial = await requireAIActionPermission(
-      request({ userId: "u1", currentRole: "POS User" }),
-      "write",
-    );
+    const writeDenial = await requireAIActionPermission(request({ userId: "u1", currentRole: "POS User" }), "write");
     expect(writeDenial?.code).toBe(403);
   });
 
   it("allows draft and write actions for approved non-POS roles", async () => {
     for (const role of ["Developer", "Admin", "Owner", "Manager", "Normal User"]) {
       enableUser(true);
-      expect(
-        await requireAIActionPermission(
-          request({ userId: "u1", currentRole: role }),
-          "write",
-        ),
-      ).toBeNull();
+      expect(await requireAIActionPermission(request({ userId: "u1", currentRole: role }), "write")).toBeNull();
     }
   });
 });
@@ -159,7 +136,7 @@ describe("AI action audit logging", () => {
         actionType: "draft",
         actionName: "po_import",
         status: "error",
-      }),
+      })
     ).resolves.toBeUndefined();
     expect(harness.loggerError).toHaveBeenCalledTimes(1);
   });

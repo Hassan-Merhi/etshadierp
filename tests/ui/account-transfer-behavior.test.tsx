@@ -71,12 +71,7 @@ function installFetch() {
     const raw = typeof input === "string" ? input : input.toString();
     const url = new URL(raw, "http://localhost");
     if (url.pathname.startsWith("/api/voucher-entries/by-account/")) {
-      return responseJson(
-        entryPage(
-          Number(url.searchParams.get("page") || 1),
-          url.searchParams.get("search") || "",
-        ),
-      );
+      return responseJson(entryPage(Number(url.searchParams.get("page") || 1), url.searchParams.get("search") || ""));
     }
     return responseJson([]);
   });
@@ -108,7 +103,7 @@ describe("account transfer behavior", () => {
     await selectSourceAccount();
 
     const statementCall = fetchMock.mock.calls.find(([input]) =>
-      String(input).includes("/api/voucher-entries/by-account/11"),
+      String(input).includes("/api/voucher-entries/by-account/11")
     );
     expect(statementCall).toBeDefined();
     const url = new URL(String(statementCall?.[0]), "http://localhost");

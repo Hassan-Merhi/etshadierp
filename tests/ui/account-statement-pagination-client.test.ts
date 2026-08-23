@@ -10,12 +10,7 @@ let paginationModule: typeof import("../../client/src/lib/accountStatementPagina
 
 function sentUrl(call: unknown[]): URL {
   const input = call[0];
-  const raw =
-    typeof input === "string"
-      ? input
-      : input instanceof URL
-        ? input.toString()
-        : (input as Request).url;
+  const raw = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
   return new URL(raw, "http://localhost");
 }
 
@@ -54,7 +49,9 @@ beforeAll(async () => {
   delete window.__erpAccountStatementPaginationInstalled;
   underlyingFetch = vi.fn(async () => pageResponse());
   window.fetch = underlyingFetch as unknown as typeof window.fetch;
-  intervalSpy = vi.spyOn(globalThis, "setInterval").mockImplementation(() => 1 as unknown as ReturnType<typeof setInterval>);
+  intervalSpy = vi
+    .spyOn(globalThis, "setInterval")
+    .mockImplementation(() => 1 as unknown as ReturnType<typeof setInterval>);
   invalidateSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue(undefined);
   paginationModule = await import("../../client/src/lib/accountStatementPaginationClient");
 });
@@ -172,9 +169,7 @@ describe("account statement pagination client", () => {
   });
 
   it("passes failed and malformed responses through without corrupting pagination state", async () => {
-    underlyingFetch.mockImplementationOnce(
-      async () => ({ ok: false, status: 503 }) as unknown as Response,
-    );
+    underlyingFetch.mockImplementationOnce(async () => ({ ok: false, status: 503 }) as unknown as Response);
     const failed = await window.fetch(ENDPOINT);
     expect(failed.status).toBe(503);
     expect(paginationModule.getAccountStatementPaginationSnapshot()).toBeNull();
@@ -190,7 +185,7 @@ describe("account statement pagination client", () => {
           json: async () => {
             throw new Error("invalid payload");
           },
-        }) as unknown as Response,
+        }) as unknown as Response
     );
     const malformed = await window.fetch(ENDPOINT);
     expect(malformed.ok).toBe(true);
