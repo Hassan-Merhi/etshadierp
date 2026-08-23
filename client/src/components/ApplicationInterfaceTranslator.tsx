@@ -20,6 +20,7 @@ import {
   isPhase7BackendMessageText,
   translatePhase7BackendMessageText,
 } from "@/i18n/backendMessagesPhase7Translations";
+import { translateFactoryProductionPlannerText } from "@/i18n/factoryProductionPlannerTranslations";
 
 const EXCLUDED_SELECTOR = [
   "code",
@@ -105,6 +106,7 @@ export function translateApprovedInterfaceText(value: string, language: Applicat
     translateTabsFiltersText(value, language) ??
     translateVoucherKpiText(value, language) ??
     translatePhase7BackendMessageText(value, language) ??
+    translateFactoryProductionPlannerText(value, language) ??
     translatePhase6ReportsExportsText(value, language) ??
     translatePhase5PropertiesRentalsText(value, language) ??
     translatePhase4SupplierPartnerText(value, language) ??
