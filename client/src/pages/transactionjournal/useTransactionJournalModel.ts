@@ -259,15 +259,15 @@ export function useTransactionJournalModel() {
       if (isBack) {
         e.preventDefault();
         setPeriodFilter((prev) => ({
-          fromDate: prev.fromDate ? format(addDays(new Date(prev.fromDate), -1), dateFmt) : prev.fromDate,
-          toDate: prev.toDate ? format(addDays(new Date(prev.toDate), -1), dateFmt) : prev.toDate,
+          fromDate: prev.fromDate ? format(addDays(new Date(`${prev.fromDate}T00:00:00`), -1), dateFmt) : prev.fromDate,
+          toDate: prev.toDate ? format(addDays(new Date(`${prev.toDate}T00:00:00`), -1), dateFmt) : prev.toDate,
           preset: "custom",
         }));
       } else if (isForward) {
         e.preventDefault();
         setPeriodFilter((prev) => ({
-          fromDate: prev.fromDate ? format(addDays(new Date(prev.fromDate), 1), dateFmt) : prev.fromDate,
-          toDate: prev.toDate ? format(addDays(new Date(prev.toDate), 1), dateFmt) : prev.toDate,
+          fromDate: prev.fromDate ? format(addDays(new Date(`${prev.fromDate}T00:00:00`), 1), dateFmt) : prev.fromDate,
+          toDate: prev.toDate ? format(addDays(new Date(`${prev.toDate}T00:00:00`), 1), dateFmt) : prev.toDate,
           preset: "custom",
         }));
       }

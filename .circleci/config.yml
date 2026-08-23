@@ -120,8 +120,6 @@ jobs:
           command: npm run lint
       - run:
           name: Lint warning ratchet
-          # Per-rule half of the gate the Lint step enforces in total. Reads the
-          # report that run wrote, so it adds no second lint pass.
           when: always
           command: npm run audit:lint-ratchet
       - run:
@@ -139,6 +137,7 @@ jobs:
             npm run verify:observability
             npm run verify:final-production-readiness
             npm run verify:bandwidth
+            node scripts/verify-bandwidth-phase-3-sales-report.mjs
       - store_artifacts:
           path: dist
           destination: production-build
@@ -157,6 +156,35 @@ jobs:
       - run:
           name: Verify disposable database schema
           command: node scripts/verify-ci-disposable-schema.mjs
+      - run:
+          name: Build application for startup migrations
+          command: npm run build
+      - run:
+          name: Run application startup migrations
+          command: |
+            node dist/index.js > /tmp/circleci-startup-migrations.txt 2>&1 &
+            app_pid=$!
+            cleanup() {
+              kill "$app_pid" 2>/dev/null || true
+              wait "$app_pid" 2>/dev/null || true
+            }
+            trap cleanup EXIT
+            for attempt in $(seq 1 180); do
+              if curl --fail --silent --show-error "http://127.0.0.1:${PORT}/api/health/db" > /tmp/circleci-health-db.json; then
+                cat /tmp/circleci-health-db.json
+                exit 0
+              fi
+              if ! kill -0 "$app_pid" 2>/dev/null; then
+                cat /tmp/circleci-startup-migrations.txt
+                exit 1
+              fi
+              sleep 1
+            done
+            cat /tmp/circleci-startup-migrations.txt
+            exit 1
+      - run:
+          name: Verify startup migration ratchet
+          command: HEALTH_REPORT=/tmp/circleci-health-db.json HEALTH_LABEL='CircleCI fresh schema' npm run verify:startup-migrations
       - run:
           name: Integration backend tests
           command: |
@@ -223,8 +251,6 @@ jobs:
 
 workflows:
   full-erp-verification:
-    # This is the canonical CircleCI path for pull-request branches and main.
-    # Verification jobs are independent so CircleCI can run them in parallel.
     jobs:
       - static-build
       - postgres-regression
