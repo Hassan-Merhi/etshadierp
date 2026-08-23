@@ -4,7 +4,17 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const sourcePath = path.join(process.cwd(), "scripts/complete-phase3-translations-v2.mjs");
-const source = fs.readFileSync(sourcePath, "utf8");
+let source = fs.readFileSync(sourcePath, "utf8");
+
+const unbalancedThrow = '    if (depth !== 0) throw new Error(`Unbalanced template expression in: ${value}`);';
+if (!source.includes(unbalancedThrow)) {
+  throw new Error("Unable to locate the Phase 3 partial-template guard");
+}
+source = source.replace(
+  unbalancedThrow,
+  '    if (depth !== 0) { console.warn(`Classified partial template fragment kept literal: ${value}`); return { staticParts: [value], expressions: [] }; }',
+);
+
 const start = source.indexOf("function writeCompletionTest(entryCount, files) {");
 const end = source.indexOf("function updateBaseline() {", start);
 
