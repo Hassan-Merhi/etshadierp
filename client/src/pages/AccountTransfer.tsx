@@ -174,7 +174,7 @@ export default function AccountTransfer() {
       const response = await fetch(`/api/voucher-entries/by-account/${fromAccountId}?${params}`, {
         credentials: "include",
       });
-      if (!response.ok) throw new Error("Failed to load account entries");
+      if (!response.ok) throw new Error(response.statusText || String(response.status));
       return response.json();
     },
     enabled: !!fromAccountId,
