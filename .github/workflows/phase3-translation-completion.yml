@@ -1,0 +1,82 @@
+name: Phase 3 Translation Completion
+
+on:
+  push:
+    branches: [phase3-translation-ui-polish]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase3-translation-completion
+  cancel-in-progress: false
+
+jobs:
+  complete:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout Phase 3 branch
+        uses: actions/checkout@v7
+        with:
+          ref: phase3-translation-ui-polish
+          fetch-depth: 2
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.19.0"
+          cache: npm
+
+      - name: Generate complete French and Arabic coverage
+        run: node scripts/complete-phase3-translations.mjs
+
+      - name: Normalize package registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        env:
+          SKIP_GIT_HOOKS: "1"
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Format generated Phase 3 work
+        run: |
+          npx prettier --write \
+            client/src/components/ApplicationInterfaceTranslator.tsx \
+            client/src/i18n/sharedUiPhase3Translations.ts \
+            client/src/i18n/phase3RemainingTemplateTranslations.ts \
+            'client/src/i18n/phase3RemainingTranslations.part*.ts' \
+            scripts/audit-i18n-phase14.mjs \
+            config/i18n-phase14-baseline.json \
+            tests/phase3-translation-completion.test.ts
+
+      - name: Certify translation contracts
+        run: |
+          node scripts/verify-i18n-audit-classifier.mjs
+          node scripts/audit-i18n-phase14.mjs
+          npx vitest run \
+            tests/phase3-translation-completion.test.ts \
+            tests/phase3-shared-interface-translations.test.ts \
+            tests/sidebar-stock-label-i18n.test.ts \
+            --maxWorkers=1 \
+            --no-file-parallelism
+          npm run check
+          npm run lint
+          node scripts/verify-program7d-accessibility-responsive.mjs
+
+      - name: Remove one-time generation machinery
+        run: |
+          rm -f scripts/complete-phase3-translations.mjs
+          rm -f .github/workflows/phase3-translation-completion.yml
+          rm -f artifacts/phase3-translation-source.json
+          rm -f artifacts/phase3-translation-final.json
+          rm -f artifacts/phase3-translation-baseline.json
+
+      - name: Commit completed Phase 3
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: complete Phase 3 translation and UI polish"
+          git push origin HEAD:phase3-translation-ui-polish
