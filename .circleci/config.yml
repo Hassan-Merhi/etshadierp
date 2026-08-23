@@ -139,6 +139,7 @@ jobs:
             npm run verify:observability
             npm run verify:final-production-readiness
             npm run verify:bandwidth
+            node scripts/verify-bandwidth-phase-3-sales-report.mjs
       - store_artifacts:
           path: dist
           destination: production-build
