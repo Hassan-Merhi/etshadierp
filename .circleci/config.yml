@@ -250,6 +250,7 @@ jobs:
           command: npm run verify:final-production-readiness
 
 workflows:
+  # Canonical exact-head Phase 6 gate: all five jobs must pass before merge.
   full-erp-verification:
     jobs:
       - static-build
