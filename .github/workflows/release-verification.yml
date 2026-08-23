@@ -170,7 +170,7 @@ jobs:
           trap cleanup EXIT
 
           for attempt in $(seq 1 180); do
-            if curl --fail --silent --show-error http://127.0.0.1:${PORT}/api/health/db > artifacts/phase9-startup/health-db.json; then
+            if curl --fail --silent --show-error "http://127.0.0.1:${PORT}/api/health/db" > artifacts/phase9-startup/health-db.json; then
               break
             fi
             if ! kill -0 "$app_pid" 2>/dev/null; then
@@ -184,8 +184,8 @@ jobs:
             sleep 1
           done
 
-          curl --fail --silent --show-error http://127.0.0.1:${PORT}/api/health > artifacts/phase9-startup/health.json
-          curl --fail --silent --show-error http://127.0.0.1:${PORT}/login > artifacts/phase9-startup/login.html
+          curl --fail --silent --show-error "http://127.0.0.1:${PORT}/api/health" > artifacts/phase9-startup/health.json
+          curl --fail --silent --show-error "http://127.0.0.1:${PORT}/login" > artifacts/phase9-startup/login.html
           node scripts/run-phase9-language-browser-smoke.mjs
 
       - name: Sharded backend tests and coverage
