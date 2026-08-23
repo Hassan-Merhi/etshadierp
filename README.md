@@ -12,7 +12,7 @@ PostgreSQL) that also ships as native mobile apps via Capacitor.
 
 | Layer | Technologies |
 |-------|--------------|
-| Frontend | React 18, TypeScript, Vite, TanStack Query, react-hook-form + Zod, wouter, shadcn/ui (Tailwind + Radix) |
+| Frontend | React 19, TypeScript, Vite, TanStack Query, react-hook-form + Zod, wouter, shadcn/ui (Tailwind + Radix) |
 | Backend | Express.js, TypeScript, Drizzle ORM, `pg`, Zod validation |
 | Database | PostgreSQL |
 | Auth / security | Passport (local), WebAuthn, Helmet, CSRF enforcement, rate limiting, per-tenant isolation |
@@ -34,12 +34,15 @@ npm ci
 cp .env.example .env
 # then edit .env and set DATABASE_URL and SESSION_SECRET
 
-# 3. Push the database schema
-npm run db:push
+# 3. Restore an approved development database snapshot (see docs/fresh-db-bootstrap.md)
+# Runtime startup migrations will bring that schema forward automatically.
 
 # 4. Start the dev server (client + API on http://localhost:5000)
 npm run dev
 ```
+
+Do not run `db:push` against a persistent or production database. The command is
+reserved for disposable CI/test databases while schema drift is being retired.
 
 ### Environment variables
 
@@ -69,7 +72,7 @@ documenting it.
 | `npm run format` | Prettier write |
 | `npm test` | Backend + frontend test suites (Vitest) |
 | `npm run test:backend` / `npm run test:frontend` | Run one suite |
-| `npm run db:push` | Apply the Drizzle schema to the database |
+| `npm run db:push` | Provision a disposable CI/test database only |
 | `npm run verify:env-docs` | Check `.env.example` covers every env var the server reads |
 | `npm run verify:dependency-audit` | Fail on unreviewed high/critical production vulnerabilities |
 | `npm run audit:coverage-ratchet` | Report coverage floors that measured coverage has outgrown |

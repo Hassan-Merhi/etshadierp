@@ -15,8 +15,6 @@ import { describe, expect, it } from "vitest";
 const GITHUB_CI = ".github/workflows/ci.yml";
 const CIRCLECI = ".circleci/config.yml";
 const SHADOW_CIRCLECI = ".github/workflows/circleci-parity.yml";
-const WAVE_H_COVERAGE = ".github/workflows/wave-h-ratchet-diagnostic.yml";
-const WAVE_H_STATIC_TAIL = ".github/workflows/wave-h-static-tail-diagnostic.yml";
 
 function read(relativePath: string): string {
   return fs.readFileSync(path.join(process.cwd(), relativePath), "utf8");
@@ -55,34 +53,5 @@ describe("CI ownership", () => {
     expect(circle).toContain("postgres-regression:");
     expect(circle).toContain("security-readiness:");
     expect(circle).not.toMatch(/branches:\s*\n\s*only:\s*main/);
-  });
-
-  it("keeps Wave H coverage diagnostics aligned with the certified gates", () => {
-    const workflow = read(WAVE_H_COVERAGE);
-
-    expect(workflow).toContain("workflow_dispatch:");
-    expect(workflow).toContain("pull_request:");
-    expect(workflow).toContain('node-version: "24.19.0"');
-    expect(workflow).toContain("npm run test:backend:verify:coverage");
-    expect(workflow).toContain("npm run test:frontend:coverage");
-    expect(workflow).toContain("npm run audit:coverage-ratchet");
-    expect(workflow).toContain("headroom as advisory");
-    expect(workflow).not.toContain("BACKEND_TEST_SHARD_INDEX");
-  });
-
-  it("keeps Wave H static-tail diagnostics read-only and current-main based", () => {
-    const workflow = read(WAVE_H_STATIC_TAIL);
-
-    expect(workflow).toContain("workflow_dispatch:");
-    expect(workflow).toContain("pull_request:");
-    expect(workflow).toContain('node-version: "24.19.0"');
-    expect(workflow).toContain("npm run verify:server-bundle");
-    expect(workflow).toContain("npm run verify:final-production-readiness");
-    expect(workflow).toContain("npm run verify:bandwidth");
-    expect(workflow).toContain("permissions:\n  contents: read");
-    expect(workflow).toContain("does not commit, delete, or push");
-    expect(workflow).not.toContain("git push");
-    expect(workflow).not.toContain("git commit");
-    expect(workflow).not.toContain("rm -f");
   });
 });

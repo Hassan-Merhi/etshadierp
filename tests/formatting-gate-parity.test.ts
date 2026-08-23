@@ -1,12 +1,11 @@
 /**
  * The formatting gates agree on what they check.
  *
- * Three jobs run Prettier over "the files this change touched", each with its
- * own copy of the file selection: CI, canonical CircleCI, and the bandwidth final
- * verification. They drifted — CI covered client/src, server and shared while
- * the other two also covered tests and scripts — and three unformatted test
- * files sailed through CI to fail in the parity job, because the job a
- * developer watches had never looked at them.
+ * The canonical GitHub Actions and CircleCI jobs run Prettier over "the files
+ * this change touched", each with its own copy of the file selection. They
+ * drifted — CI covered client/src, server and shared while CircleCI also
+ * covered tests and scripts — and three unformatted test files sailed through
+ * CI because the job a developer watches had never looked at them.
  *
  * A gate that only sometimes applies is worse than no gate: it teaches people
  * that green means formatted. These tests pin the three selections to each
@@ -18,11 +17,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const WORKFLOW_FILES = [
-  ".github/workflows/ci.yml",
-  ".circleci/config.yml",
-  ".github/workflows/bandwidth-phase5-final-verification.yml",
-] as const;
+const WORKFLOW_FILES = [".github/workflows/ci.yml", ".circleci/config.yml"] as const;
 
 const LOCAL_SCRIPT = "scripts/check-changed-file-formatting.mjs";
 
@@ -70,6 +65,20 @@ describe("formatting gate parity", () => {
       expect(extensions, `${file} checks a different set of extensions`).toEqual(reference);
     }
     expect(reference).toEqual(["css", "mjs", "ts", "tsx"]);
+  });
+
+  it("does not pass deleted files to Prettier", () => {
+    const github = read(WORKFLOW_FILES[0]);
+    const circle = read(WORKFLOW_FILES[1]);
+    const local = read(LOCAL_SCRIPT);
+
+    const excludesRemovedGithubFiles = github.includes('select(.status != "removed")');
+    const filtersCircleDiffToPresentFiles = circle.includes("--diff-filter=ACMR");
+    const filtersLocalDiffToPresentFiles = local.includes('"--diff-filter=ACMR"');
+
+    expect(excludesRemovedGithubFiles).toBe(true);
+    expect(filtersCircleDiffToPresentFiles).toBe(true);
+    expect(filtersLocalDiffToPresentFiles).toBe(true);
   });
 
   it("gives developers a local check with the same selection", () => {
