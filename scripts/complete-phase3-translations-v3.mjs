@@ -1,10 +1,14 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
-const sourcePath = path.join(process.cwd(), "scripts/complete-phase3-translations-v2.mjs");
-let source = fs.readFileSync(sourcePath, "utf8");
+let source = execFileSync(
+  "git",
+  ["show", "HEAD^:scripts/complete-phase3-translations-v2.mjs"],
+  { cwd: process.cwd(), encoding: "utf8", maxBuffer: 10 * 1024 * 1024 },
+);
 
 const onlineEndpoint = 'const GOOGLE_ENDPOINT = "https://translate.googleapis.com/translate_a/single";';
 if (!source.includes(onlineEndpoint)) {
