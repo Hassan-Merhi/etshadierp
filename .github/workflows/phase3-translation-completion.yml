@@ -1,19 +1,19 @@
 name: Phase 3 Translation Completion
 
 on:
-  push:
-    branches: [phase3-translation-ui-polish]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
 
 concurrency:
   group: phase3-translation-completion
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   complete:
-    if: github.actor != 'github-actions[bot]'
+    if: github.head_ref == 'phase3-translation-ui-polish' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
