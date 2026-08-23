@@ -67,6 +67,16 @@ describe("formatting gate parity", () => {
     expect(reference).toEqual(["css", "mjs", "ts", "tsx"]);
   });
 
+  it("does not pass deleted files to Prettier", () => {
+    const github = read(WORKFLOW_FILES[0]);
+    const circle = read(WORKFLOW_FILES[1]);
+    const local = read(LOCAL_SCRIPT);
+
+    expect(github).toContain('select(.status != "removed")');
+    expect(circle).toContain("--diff-filter=ACMR");
+    expect(local).toContain('"--diff-filter=ACMR"');
+  });
+
   it("gives developers a local check with the same selection", () => {
     const script = read(LOCAL_SCRIPT);
     const directories = script.match(/const DIRECTORIES = \[([^\]]+)\]/);

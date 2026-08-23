@@ -237,7 +237,7 @@ jobs:
           mapfile -t changed_files < <(
             gh api --paginate \
               "repos/${GITHUB_REPOSITORY}/compare/${base_sha}...${GITHUB_SHA}" \
-              --jq '.files[].filename' |
+              --jq '.files[] | select(.status != "removed") | .filename' |
               grep -E '^(client/src|server|shared|tests|scripts)/.*\.(ts|tsx|css|mjs)$' || true
           )
 
