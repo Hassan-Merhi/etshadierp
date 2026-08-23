@@ -179,7 +179,7 @@ export default function AccountTransfer() {
     },
     enabled: !!fromAccountId,
   });
-  const entries = entryData?.items ?? [];
+  const entries = useMemo(() => entryData?.items ?? [], [entryData?.items]);
 
   const filteredEntries = useMemo(() => {
     if (!searchEntries.trim()) return entries;
