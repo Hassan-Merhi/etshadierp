@@ -72,9 +72,13 @@ describe("formatting gate parity", () => {
     const circle = read(WORKFLOW_FILES[1]);
     const local = read(LOCAL_SCRIPT);
 
-    expect(github).toContain('select(.status != "removed")');
-    expect(circle).toContain("--diff-filter=ACMR");
-    expect(local).toContain('"--diff-filter=ACMR"');
+    const excludesRemovedGithubFiles = github.includes('select(.status != "removed")');
+    const filtersCircleDiffToPresentFiles = circle.includes("--diff-filter=ACMR");
+    const filtersLocalDiffToPresentFiles = local.includes('"--diff-filter=ACMR"');
+
+    expect(excludesRemovedGithubFiles).toBe(true);
+    expect(filtersCircleDiffToPresentFiles).toBe(true);
+    expect(filtersLocalDiffToPresentFiles).toBe(true);
   });
 
   it("gives developers a local check with the same selection", () => {
