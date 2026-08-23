@@ -4,9 +4,10 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
+const generatorSourceCommit = "43184553de543d41729f14400dc57dba3f2712e7";
 let source = execFileSync(
   "git",
-  ["show", "HEAD^:scripts/complete-phase3-translations-v2.mjs"],
+  ["show", `${generatorSourceCommit}:scripts/complete-phase3-translations-v2.mjs`],
   { cwd: process.cwd(), encoding: "utf8", maxBuffer: 10 * 1024 * 1024 },
 );
 
