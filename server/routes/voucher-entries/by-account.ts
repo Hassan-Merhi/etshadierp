@@ -9,8 +9,9 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { vouchers, voucherEntries, ledgerAccounts } from "@shared/schema";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
+import { parseBoundedPagination, wantsBoundedPagination } from "../../lib/boundedPagination";
 
 export function registerVoucherEntryByAccountRoutes(app: Express) {
   // ── ACCOUNT TRANSFER: fetch all entries for a ledger account ──
@@ -27,24 +28,72 @@ export function registerVoucherEntryByAccountRoutes(app: Express) {
         .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, companyId)));
       if (!account) return res.status(404).json({ message: "Account not found" });
 
-      const rows = await db
-        .select({
-          id: voucherEntries.id,
-          voucherId: voucherEntries.voucherId,
-          narration: voucherEntries.narration,
-          debitAmount: voucherEntries.debitAmount,
-          creditAmount: voucherEntries.creditAmount,
-          voucherNumber: vouchers.voucherNumber,
-          voucherType: vouchers.voucherType,
-          voucherDate: vouchers.voucherDate,
-          voucherDescription: vouchers.description,
-        })
-        .from(voucherEntries)
-        .innerJoin(vouchers, eq(vouchers.id, voucherEntries.voucherId))
-        .where(and(eq(voucherEntries.ledgerAccountId, accountId), eq(vouchers.companyId, companyId)))
-        .orderBy(desc(vouchers.voucherDate), desc(vouchers.id));
+      const selection = {
+        id: voucherEntries.id,
+        voucherId: voucherEntries.voucherId,
+        narration: voucherEntries.narration,
+        debitAmount: voucherEntries.debitAmount,
+        creditAmount: voucherEntries.creditAmount,
+        voucherNumber: vouchers.voucherNumber,
+        voucherType: vouchers.voucherType,
+        voucherDate: vouchers.voucherDate,
+        voucherDescription: vouchers.description,
+      };
+      const conditions: SQL[] = [eq(voucherEntries.ledgerAccountId, accountId), eq(vouchers.companyId, companyId)];
+      const search = typeof req.query.search === "string" ? req.query.search.trim().slice(0, 200) : "";
+      if (search) {
+        const pattern = `%${search}%`;
+        const searchCondition = or(
+          ilike(vouchers.voucherNumber, pattern),
+          ilike(vouchers.voucherType, pattern),
+          ilike(vouchers.description, pattern),
+          ilike(voucherEntries.narration, pattern)
+        );
+        if (searchCondition) conditions.push(searchCondition);
+      }
+      const where = and(...conditions);
 
-      res.json(rows);
+      // Preserve the established array contract for old callers. The account
+      // transfer page opts into this native database page so PostgreSQL no
+      // longer materializes an account's entire history on every selection.
+      if (!wantsBoundedPagination(req.query as Record<string, unknown>)) {
+        const rows = await db
+          .select(selection)
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(vouchers.id, voucherEntries.voucherId))
+          .where(where)
+          .orderBy(desc(vouchers.voucherDate), desc(vouchers.id));
+        return res.json(rows);
+      }
+
+      const { page, limit, offset } = parseBoundedPagination(req.query as Record<string, unknown>);
+      const [countRows, items] = await Promise.all([
+        db
+          .select({ total: sql<number>`count(*)::int` })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(vouchers.id, voucherEntries.voucherId))
+          .where(where),
+        db
+          .select(selection)
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(vouchers.id, voucherEntries.voucherId))
+          .where(where)
+          .orderBy(desc(vouchers.voucherDate), desc(vouchers.id))
+          .limit(limit)
+          .offset(offset),
+      ]);
+      const total = countRows[0]?.total ?? 0;
+      const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+      res.setHeader("Cache-Control", "private, max-age=15, stale-while-revalidate=15");
+      return res.json({
+        items,
+        total,
+        page,
+        pageSize: limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1 && totalPages > 0,
+      });
     } catch (e: unknown) {
       res.status(500).json({ message: getErrorMessage(e) });
     }

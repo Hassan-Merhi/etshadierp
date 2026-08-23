@@ -15,6 +15,7 @@ const knownHeavyPaths = new Set([
   "/api/factory/bales",
   "/api/factory/v5/stock-allocation",
   "/api/factory/bales/stock-entry-history",
+  "/api/voucher-entries/by-account/:accountId",
 ]);
 
 async function walk(dir) {

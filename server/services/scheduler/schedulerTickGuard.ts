@@ -1,4 +1,5 @@
 import { logger } from "../../lib/logger";
+import { nameSchedulerCallback } from "../../lib/schedulerObservability";
 
 /**
  * Wraps a scheduled job so a slow run cannot be overtaken by the next tick.
@@ -35,7 +36,7 @@ export function createSchedulerTick(
 ): () => Promise<void> {
   let startedAt: number | null = null;
 
-  return async function tick(): Promise<void> {
+  const tick = async function tick(): Promise<void> {
     if (startedAt !== null) {
       logger.warn("cron tick skipped: previous run still in progress", {
         module: "scheduler",
@@ -73,4 +74,6 @@ export function createSchedulerTick(
       startedAt = null;
     }
   };
+
+  return nameSchedulerCallback(tick, action);
 }
