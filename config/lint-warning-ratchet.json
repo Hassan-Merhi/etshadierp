@@ -17,6 +17,6 @@
   "perRule": {},
   "notes": {
     "errorCeiling": "Zero and permanent. ESLint errors are not part of the warning drawdown.",
-    "phase18": "The final cleanup locked the completed warning drawdown at zero. Any new ESLint warning or error is now a regression. Type escapes remain governed separately by config/type-escape-boundaries.json."
+    "phase2": "Phase 2 completed the warning drawdown: zero warnings remain and no rule allowance is retained. Type escapes remain separately frozen per file in config/type-escape-boundaries.json."
   }
 }

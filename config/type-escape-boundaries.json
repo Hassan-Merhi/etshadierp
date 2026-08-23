@@ -1904,11 +1904,6 @@
         0,
         0
       ],
-      "server/chat/erpContext.ts": [
-        35,
-        0,
-        0
-      ],
       "server/chat/lookupDrafts.ts": [
         3,
         0,
@@ -1916,11 +1911,6 @@
       ],
       "server/chat/persistence.ts": [
         1,
-        0,
-        0
-      ],
-      "server/chat/prompts.ts": [
-        21,
         0,
         0
       ],
@@ -2016,11 +2006,6 @@
       ],
       "server/lib/accountStatementPdfGenerator.ts": [
         5,
-        0,
-        0
-      ],
-      "server/lib/aiSnapshots.ts": [
-        2,
         0,
         0
       ],
@@ -4002,6 +3987,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 3171
+    "typeEscapeCeiling": 3113
   }
 }

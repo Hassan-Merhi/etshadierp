@@ -17,7 +17,7 @@ audit fails instead of allowing the reference to drift.
 
 | Signal | Now | Command |
 |---|---|---|
-| Type escapes (AST) | 3,171 total | `npm run audit:type-escapes` |
+| Type escapes (AST) | 3,113 total | `npm run audit:type-escapes` |
 | ESLint warnings | 0 total | `npm run lint` |
 | Startup migration failures | 0 on a fresh database | `npm run verify:startup-migrations` |
 | Backend coverage floor (lines) | 33% | `config/coverage-thresholds.json` |
@@ -95,26 +95,24 @@ The ceiling now lives in `config/lint-warning-ratchet.json`, alongside the
 coverage floors and type-escape baselines. `scripts/run-lint.mjs` reads it, so
 `npm run lint` has no number of its own, and the ratchet is a two-part gate:
 
-- **`totals.warningCeiling`** is the repository total, currently 9,441, and may
-  only fall. `totals.errorCeiling` is 0 and permanent — errors are not part of
-  the drawdown.
+- **`totals.warningCeiling`** is the repository total, now 0 and permanent.
+  `totals.errorCeiling` is also 0 and permanent — errors are not part of the
+  drawdown.
 - **`perRule`** freezes each rule at its own count, checked by
-  `npm run audit:lint-ratchet`. This is the part that matters: 8,815 of the
-  9,441 warnings are `no-explicit-any`, so a total-only gate is a count of
-  `any` wearing a lint badge. Under one, deleting 500 `any` annotations pays for
-  500 new `react-hooks/exhaustive-deps` warnings — stale-closure bugs — and the
-  total reports the trade as flat. Per-rule ceilings make it fail.
+  `npm run audit:lint-ratchet`. Before the warning cleanup, 8,815 of 9,441
+  warnings were `no-explicit-any`; a total-only gate would have allowed those
+  removals to pay for new `react-hooks/exhaustive-deps` warnings. Per-rule
+  ceilings prevented that trade. The object is now empty because every warning
+  rule is at zero.
 
-`scan.step` is 500. When measured warnings sit a full step under the ceiling,
-both scripts ask for the gain to be locked in; the ceilings are lowered in the
-same change that removes the warnings, never after.
+`scan.step` is 500. It remains as historical ratchet metadata, but with the
+warning ceiling at zero every new warning fails immediately.
 
-`no-explicit-any` is the one rule whose real gate is elsewhere:
-`config/type-escape-boundaries.json` freezes it per file, which is strictly
-stronger than any repository total. Its `perRule` entry exists so the two cannot
-drift apart, and the audit fails if they disagree — the ESLint count must always
-equal the type-escape ceiling minus its ts-comment suppressions, which are not a
-rule (8,815 = 8,817 − 2).
+`no-explicit-any` is gated by `config/type-escape-boundaries.json`, which freezes
+the backlog per file and is strictly stronger than a repository-wide ESLint
+count. The lint rule allowances are now empty because every enabled lint rule
+is clean; a warning from any rule is therefore both above the total ceiling and
+missing an authorised per-rule ceiling.
 
 ---
 
