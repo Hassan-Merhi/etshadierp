@@ -89,8 +89,8 @@ function writeOutput(file, content) {
 function decodeCompatibilityValue(quote, rawValue) {
   // Generated translation inventories serialize their English source with
   // JSON.stringify. Decode that one serialization layer before comparing it
-  // with scanner findings so literal escapes such as \\n, \\uXXXX, and \\${...}
-  // match the actual source value instead of its TypeScript file encoding.
+  // with scanner findings so escaped newlines, Unicode escapes, and escaped
+  // template markers match the actual source value rather than file encoding.
   if (quote === '"') {
     try {
       return JSON.parse(`"${rawValue}"`);
