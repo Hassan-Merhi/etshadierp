@@ -59,14 +59,14 @@ export function FactoryLocationInventoryLocationView({ inventory }: { inventory:
             Select Location
           </div>
         </div>
-        <div className="flex flex-col gap-4 border-b px-4 py-4 sm:px-5 md:flex-row md:items-center md:justify-between">
+        <div className="border-b px-4 py-4 sm:px-5">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Your Locations</h2>
+            <h2 className="text-lg font-semibold tracking-tight">Location Inventory</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
               {locations.length} location{locations.length !== 1 ? "s" : ""} available
             </p>
           </div>
-          <div className="relative w-full md:max-w-sm">
+          <div className="relative mt-4 w-full sm:max-w-sm">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Search locations..."
