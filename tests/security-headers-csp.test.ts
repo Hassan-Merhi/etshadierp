@@ -29,6 +29,7 @@ describe("security headers CSP", () => {
     expect(cspDirective(csp, "object-src")).toBe("object-src 'none'");
     expect(cspDirective(csp, "base-uri")).toBe("base-uri 'self'");
     expect(cspDirective(csp, "frame-ancestors")).toBe("frame-ancestors 'self'");
+    expect(cspDirective(csp, "frame-src")).toBe("frame-src 'self' blob:");
     expect(cspDirective(csp, "upgrade-insecure-requests")).toBe("upgrade-insecure-requests");
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
     expect(response.headers["x-frame-options"]).toBe("SAMEORIGIN");
@@ -44,6 +45,7 @@ describe("security headers CSP", () => {
     expect(scriptDirective).toContain("'unsafe-inline'");
     expect(scriptDirective).toContain("'unsafe-eval'");
     expect(cspDirective(csp, "script-src-attr")).toBe("script-src-attr 'none'");
+    expect(cspDirective(csp, "frame-src")).toBe("frame-src 'self' blob:");
     expect(cspDirective(csp, "upgrade-insecure-requests")).toBeUndefined();
   });
 });
