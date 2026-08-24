@@ -129,6 +129,9 @@ export function logPoolStats(trigger: string) {
 
 export const db = drizzle(pool, { schema });
 
+/** The application's drizzle database handle. */
+export type Database = typeof db;
+
 /**
  * The transaction handle drizzle hands to a `db.transaction` callback.
  *

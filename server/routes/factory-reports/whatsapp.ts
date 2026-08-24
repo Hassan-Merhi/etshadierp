@@ -7,10 +7,10 @@
 import type { Express, Request, Response, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { pool } from "../../db";
+import { pool, type Database } from "../../db";
 import { logAudit } from "../_helpers";
 
-export function registerFactoryMixBatchWhatsappRoutes(app: Express, requireAuth: RequestHandler, _db: any) {
+export function registerFactoryMixBatchWhatsappRoutes(app: Express, requireAuth: RequestHandler, _db: Database) {
   // ── Send mix batch image to WhatsApp ─────────────────────────────────────
   app.post("/api/factory/send-mix-batch-image-whatsapp", requireAuth, async (req: Request, res: Response) => {
     try {

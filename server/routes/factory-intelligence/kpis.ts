@@ -4,6 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
+import type { Database } from "../../db";
 import type { Express, Request, Response, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -16,7 +17,7 @@ import {
   factoryWorkers,
 } from "@shared/schema";
 
-export function registerFactoryKpiRoutes(app: Express, requireAuth: RequestHandler, db: any) {
+export function registerFactoryKpiRoutes(app: Express, requireAuth: RequestHandler, db: Database) {
   app.get("/api/factory/kpis/daily", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;

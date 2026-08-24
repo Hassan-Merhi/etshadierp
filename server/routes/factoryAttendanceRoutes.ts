@@ -1,3 +1,4 @@
+import type { Database } from "../db";
 import { parseId } from "../lib/parseId";
 import { getErrorMessage } from "../lib/httpHandlers";
 import type { Express, Request, Response, RequestHandler } from "express";
@@ -9,7 +10,7 @@ function getFactoryCompanyId(req: import("express").Request): number | undefined
   return req.session.factoryCompanyId || req.session.currentCompanyId;
 }
 
-export function registerFactoryAttendanceRoutes(app: Express, requireAuth: RequestHandler, db: any) {
+export function registerFactoryAttendanceRoutes(app: Express, requireAuth: RequestHandler, db: Database) {
   // GET /api/factory/attendance?date=YYYY-MM-DD&shift=
   // Returns active workers + merged attendance for that date
   app.get("/api/factory/attendance", requireAuth, async (req: Request, res: Response) => {

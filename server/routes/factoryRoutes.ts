@@ -1,3 +1,4 @@
+import type { Database } from "../db";
 import type { Express, RequestHandler } from "express";
 import { eq, and, or } from "drizzle-orm";
 import { companies, userCompanyRoles } from "@shared/schema";
@@ -44,7 +45,7 @@ import {
 import { chooseAuthorizedFactoryCompany } from "../services/security/factoryCompanyScopePolicy";
 import { isFactoryCompanyOptionalRoute } from "../services/security/companyResourceRoutePolicy";
 
-export function registerFactoryRoutes(app: Express, requireAuth: RequestHandler, db: any) {
+export function registerFactoryRoutes(app: Express, requireAuth: RequestHandler, db: Database) {
   app.use("/api/factory", async (req: import("express").Request, res: import("express").Response, next) => {
     try {
       const session = req.session;

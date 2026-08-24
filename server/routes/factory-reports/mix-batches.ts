@@ -7,10 +7,10 @@
 import type { Express, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { pool } from "../../db";
+import { pool, type Database } from "../../db";
 import {} from "@shared/schema";
 
-export function registerFactoryMixBatchesByDateRoutes(app: Express, requireAuth: RequestHandler, _db: any) {
+export function registerFactoryMixBatchesByDateRoutes(app: Express, requireAuth: RequestHandler, _db: Database) {
   // ── Mix batches by date ───────────────────────────────────────────────────
   app.get(
     "/api/factory/mix-batches-by-date",

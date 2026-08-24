@@ -8,14 +8,14 @@ import type { Express, Request, Response, RequestHandler } from "express";
 import { parseOptionalId } from "../../lib/parseId";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { pool } from "../../db";
+import { pool, type Database } from "../../db";
 import { eq, and, sql, ilike, isNotNull } from "drizzle-orm";
 import { factoryWorkers, factoryPayrolls, factoryWorkerDocuments, factoryWorkerAdvances } from "@shared/schema";
 
 import { getFactoryCompanyId } from "./_helpers";
 import { parseListPagination, setListPaginationHeaders } from "../../lib/listPagination";
 
-export function registerFactoryWorkerListRoutes(app: Express, requireAuth: RequestHandler, db: any) {
+export function registerFactoryWorkerListRoutes(app: Express, requireAuth: RequestHandler, db: Database) {
   // GET /api/factory/workers/with-balances - List active workers with computed current balances
   // Balance = total advances (debit) minus total paid payroll net salary (credit), all-time
   app.get("/api/factory/workers/with-balances", requireAuth, async (req: Request, res: Response) => {

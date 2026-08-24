@@ -5,6 +5,7 @@
  * Express resolves first-match, so reordering these calls can change which
  * handler serves a request - config/route-manifest.json pins the result.
  */
+import type { Database } from "../../db";
 import type { Express, RequestHandler } from "express";
 import { registerFactoryWorkerListRoutes } from "./lists";
 import { registerFactoryWorkerImportExportRoutes } from "./import-export";
@@ -14,7 +15,7 @@ import { registerFactoryWorkerPhotoRoutes } from "./photos";
 import { registerFactoryWorkerDocumentRoutes } from "./documents";
 import { registerFactoryWorkerBaleSettleRoutes } from "./bales-settle";
 
-export function registerFactoryWorkerRoutes(app: Express, requireAuth: RequestHandler, db: unknown) {
+export function registerFactoryWorkerRoutes(app: Express, requireAuth: RequestHandler, db: Database) {
   registerFactoryWorkerListRoutes(app, requireAuth, db);
   registerFactoryWorkerImportExportRoutes(app, requireAuth, db);
   registerFactoryWorkerPayrollDelegation(app, requireAuth, db);

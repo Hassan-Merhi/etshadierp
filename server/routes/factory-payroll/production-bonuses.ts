@@ -1,3 +1,4 @@
+import type { Database } from "../../db";
 import type { DbTransaction } from "../../db";
 import type { Express, Request, Response, RequestHandler } from "express";
 import { sql } from "drizzle-orm";
@@ -45,7 +46,7 @@ const emptyTotals = () => ({
   rejectedCount: 0,
 });
 
-export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: RequestHandler, db: any) {
+export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: RequestHandler, db: Database) {
   app.get("/api/factory/payroll/:id/production-bonuses", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseId(req.params.id);
