@@ -151,8 +151,8 @@ interface SupplierDialogsProps {
   obEditValue: string;
   setObEditValue: (val: string) => void;
   obEditMutation: FactorySuppliersModel["obEditMutation"];
-  dueDialogSupplier: { name: string; containers: unknown[] } | null;
-  setDueDialogSupplier: React.Dispatch<React.SetStateAction<{ name: string; containers: unknown[] } | null>>;
+  dueDialogSupplier: FactorySuppliersModel["dueDialogSupplier"];
+  setDueDialogSupplier: FactorySuppliersModel["setDueDialogSupplier"];
   formatDate: (val: string) => string;
   formatNum: (val: string) => string;
 

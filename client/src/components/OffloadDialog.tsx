@@ -274,7 +274,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
   let poChargesTotal = 0;
   if (containerData?.charges && Array.isArray(containerData.charges)) {
     containerData.charges.forEach((charge) => {
-      const amount = parseFloat(charge.amount || "0");
+      const amount = parseFloat(String(charge.amount ?? "0"));
       if (amount > 0) poChargesTotal += amount;
     });
   }
@@ -282,7 +282,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
   const erpManualCharges =
     parseFloat(duties || "0") +
     parseFloat(transportFees || "0") +
-    additionalCharges.reduce((sum, charge) => sum + parseFloat(charge.amount || "0"), 0);
+    additionalCharges.reduce((sum, charge) => sum + parseFloat(String(charge.amount ?? "0")), 0);
 
   const spManualCharges = parseFloat(spDutiesAmount || "0") + parseFloat(spTransportAmount || "0");
 

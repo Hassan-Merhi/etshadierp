@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 
-function fmt2(v: number) {
+function fmt2(v: string | number | null | undefined) {
   const n = parseFloat(String(v ?? "0"));
   return isNaN(n) ? "$0.00" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -132,6 +132,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
   // unreachable while the guard is returning null.
   const offloadMutation = useMutation({
     mutationFn: () => {
+      if (!container) return Promise.reject(new Error("No container selected"));
       if (!selectedLocationId) {
         toast({ title: "Select a location", variant: "destructive" });
         return Promise.reject(new Error("Select a location"));
@@ -157,15 +158,15 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
 
   if (!container) return null;
 
-  const discountFactor = 1 - parseFloat(container.discountPct || "0") / 100;
-  const totalQty = (container.lines || []).reduce((s, l) => s + parseFloat(l.qty || "0"), 0);
+  const discountFactor = 1 - parseFloat(String(container.discountPct ?? "0")) / 100;
+  const totalQty = (container.lines || []).reduce((s, l) => s + parseFloat(String(l.qty ?? "0")), 0);
   const totalBaseCost = (container.lines || []).reduce(
-    (s, l) => s + parseFloat(l.qty || "0") * parseFloat(l.unitRateUsd || "0") * discountFactor,
+    (s, l) => s + parseFloat(String(l.qty ?? "0")) * parseFloat(String(l.unitRateUsd ?? "0")) * discountFactor,
     0
   );
   const totalLandedCost = chargeLines.reduce((s, c) => s + parseFloat(c.amountUsd || "0"), 0);
   const totalFinalCost = totalBaseCost + totalLandedCost;
-  const invoiceTotal = parseFloat(container.invoiceTotalUsd || "0");
+  const invoiceTotal = parseFloat(String(container.invoiceTotalUsd ?? "0"));
 
   const otwAcct = (statusData?.spAccounts || []).find((a) => a.subType === "sp_goods_otw");
   const otwClrAcct = (statusData?.spAccounts || []).find((a) => a.subType === "sp_otw_clearing");

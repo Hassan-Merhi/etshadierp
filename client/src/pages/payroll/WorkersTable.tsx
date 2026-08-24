@@ -63,7 +63,7 @@ export function WorkersTable({
 
   return (
     <div className="space-y-2 p-3">
-      {workers.map((worker: Employee) => {
+      {workers.map((worker) => {
         const advanceInfo = worker.advanceInfo ?? { total: 0, count: 0 };
         const deductionInfo = worker.deductionInfo ?? { total: 0, count: 0 };
         const monthlySalary = parseFloat(worker.monthlySalary || "0");

@@ -224,18 +224,10 @@ export function BulkAdvanceDialog({
             </div>
             {bulkSelected.size > 0 && (
               <p className="text-xs text-muted-foreground text-right">
-                {
-                  Array.from(bulkSelected as Set<string>).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0)
-                    .length
-                }{" "}
-                worker(s) with valid amounts
+                {Array.from(bulkSelected).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0).length} worker(s)
+                with valid amounts
                 {" — "}Total:{" "}
-                {fmt(
-                  Array.from(bulkSelected as Set<string>).reduce(
-                    (s: number, wid) => s + parseFloat(bulkAmounts[wid] || "0"),
-                    0
-                  )
-                )}
+                {fmt(Array.from(bulkSelected).reduce((s: number, wid) => s + parseFloat(bulkAmounts[wid] || "0"), 0))}
               </p>
             )}
           </div>
@@ -248,14 +240,13 @@ export function BulkAdvanceDialog({
             onClick={() => bulkMutation.mutate()}
             disabled={
               bulkMutation.isPending ||
-              Array.from(bulkSelected as Set<string>).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0)
-                .length === 0
+              Array.from(bulkSelected).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0).length === 0
             }
             data-testid="button-submit-bulk-advance"
           >
             {bulkMutation.isPending
               ? "Saving..."
-              : `Record ${Array.from(bulkSelected as Set<string>).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0).length || ""} Advance(s)`}
+              : `Record ${Array.from(bulkSelected).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0).length || ""} Advance(s)`}
           </Button>
         </DialogFooter>
       </DialogContent>
