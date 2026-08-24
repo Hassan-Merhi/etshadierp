@@ -48,7 +48,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
         return res.status(400).json({ message: "No active workers found for this company" });
       }
 
-      const _workerIds = workers.map((w: any) => w.id);
+      const _workerIds = workers.map((w) => w.id);
 
       const balesInRange = await db
         .select()

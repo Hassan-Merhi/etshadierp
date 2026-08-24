@@ -45,14 +45,14 @@ export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: Reque
         .where(and(eq(factoryBales.finalizedBy, id), eq(factoryBales.companyId, companyId)));
 
       const totalBales = bales.length;
-      const totalKg = bales.reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0);
+      const totalKg = bales.reduce((sum: number, b) => sum + parseFloat(b.weightKg || "0"), 0);
 
       const payrolls = await db
         .select()
         .from(factoryPayrolls)
         .where(and(eq(factoryPayrolls.workerId, id), eq(factoryPayrolls.companyId, companyId)));
 
-      const totalEarnings = payrolls.reduce((sum: number, p: any) => sum + parseFloat(p.netSalary || "0"), 0);
+      const totalEarnings = payrolls.reduce((sum: number, p) => sum + parseFloat(p.netSalary || "0"), 0);
 
       res.json({
         ...worker,

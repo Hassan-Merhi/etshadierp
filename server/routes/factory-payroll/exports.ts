@@ -71,7 +71,7 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: Re
 
       const productionTotals = await getProductionBonusTotalsForPayrollIds(
         db,
-        payrollData.map((row: any) => row.payroll.id)
+        payrollData.map((row) => row.payroll.id)
       );
 
       const doc = new PDFDocument({ margin: 30, size: "A4", layout: "landscape" });
@@ -239,7 +239,7 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: Re
 
       const productionTotals = await getProductionBonusTotalsForPayrollIds(
         db,
-        payrollData.map((row: any) => row.payroll.id)
+        payrollData.map((row) => row.payroll.id)
       );
 
       const workbook = new ExcelJS.Workbook();

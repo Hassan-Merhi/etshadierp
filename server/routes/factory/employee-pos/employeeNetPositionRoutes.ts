@@ -79,7 +79,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         ORDER BY currency_code, effective_date DESC
       `);
       const configFxRates: Record<string, number> = {};
-      for (const row of fxRateRows.rows as any[]) {
+      for (const row of fxRateRows.rows) {
         configFxRates[row.currency_code as string] = parseFloat(row.rate_to_usd as string);
       }
       // Only use manually configured rates — no hardcoded fallbacks
@@ -122,7 +122,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           : [];
 
       const accBalances = new Map<number, { debit: number; credit: number }>();
-      for (const e of factoryEntries as any[]) {
+      for (const e of factoryEntries) {
         if (!e.ledgerAccountId) continue;
         const cur = accBalances.get(e.ledgerAccountId) || { debit: 0, credit: 0 };
         accBalances.set(e.ledgerAccountId, {
@@ -168,7 +168,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // Build a set of ledger account IDs owned by customers so we can strip them
       // from the ledger classification output (prevents double-counting).
       const customerLedgerIds = new Set<number>(
-        (allCustomersForNP as any[]).filter((c) => c.ledgerAccountId).map((c) => c.ledgerAccountId as number)
+        allCustomersForNP.filter((c) => c.ledgerAccountId).map((c) => c.ledgerAccountId as number)
       );
 
       // Strip customer-linked accounts from the classifier output.
@@ -205,8 +205,8 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
 
       const customerItems: { name: string; balanceUsd: number; ledgerAccountId?: number }[] = [];
 
-      if ((allCustomersForNP as any[]).length > 0) {
-        const cIds = (allCustomersForNP as any[]).map((c) => c.id);
+      if (allCustomersForNP.length > 0) {
+        const cIds = allCustomersForNP.map((c) => c.id);
         const custLedgerIds = [...customerLedgerIds];
 
         // ── Customer balance formula — mirrors GET /api/factory/customers exactly ──
@@ -279,9 +279,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
                 .where(inArray(voucherEntries.ledgerAccountId, custLedgerIds))
                 .groupBy(voucherEntries.ledgerAccountId)
             : [];
-        const cLedgerVoucherMap = new Map(
-          (cLedgerVoucherRows as any[]).map((r) => [r.ledgerAccountId, parseFloat(r.net || "0")])
-        );
+        const cLedgerVoucherMap = new Map(cLedgerVoucherRows.map((r) => [r.ledgerAccountId, parseFloat(r.net || "0")]));
 
         // 4. Voucher entries directly linked via customerId — EXCLUDE CHARGE-* AND INV-* (matches Customers page).
         const cVoucherRows = await db
@@ -303,7 +301,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           .where(and(inArray(voucherEntries.customerId, cIds), isNull(voucherEntries.ledgerAccountId)))
           .groupBy(voucherEntries.customerId);
 
-        const cVoucherMap = new Map((cVoucherRows as any[]).map((r) => [r.customerId, parseFloat(r.net || "0")]));
+        const cVoucherMap = new Map(cVoucherRows.map((r) => [r.customerId, parseFloat(r.net || "0")]));
 
         for (const c of allCustomersForNP as any[]) {
           const cbNet = cCbNetMap.get(c.id) ?? 0;
@@ -373,11 +371,9 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         totalQtyBales: r.totalQtyBales ?? 0,
       });
 
-      const pendingOrders = (pendingVerifiedRows as any[])
-        .filter((r) => r.status === "PENDING_VERIFICATION")
-        .map(mapOrder);
-      const verifiedOrders = (pendingVerifiedRows as any[]).filter((r) => r.status === "VERIFIED").map(mapOrder);
-      const loadingOrders = (pendingVerifiedRows as any[]).filter((r) => r.status === "LOADING").map(mapOrder);
+      const pendingOrders = pendingVerifiedRows.filter((r) => r.status === "PENDING_VERIFICATION").map(mapOrder);
+      const verifiedOrders = pendingVerifiedRows.filter((r) => r.status === "VERIFIED").map(mapOrder);
+      const loadingOrders = pendingVerifiedRows.filter((r) => r.status === "LOADING").map(mapOrder);
 
       const pendingTotal = round2(pendingOrders.reduce((s, o) => s + o.grandTotal, 0));
       const verifiedTotal = round2(verifiedOrders.reduce((s, o) => s + o.grandTotal, 0));

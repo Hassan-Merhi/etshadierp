@@ -137,7 +137,7 @@ export async function rebuildPayrollGenVoucher(
     );
 
   if (existingGenVouchers.length > 0) {
-    const vIds = existingGenVouchers.map((v: any) => v.id);
+    const vIds = existingGenVouchers.map((v) => v.id);
     for (const voucherId of vIds) {
       await deleteInfrastructurePostingIdentityForVoucherTx(tx, voucherId);
     }

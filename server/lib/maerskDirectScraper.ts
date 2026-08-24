@@ -374,7 +374,7 @@ export function extractFromJson(
   }
   if (!etaRaw) {
     // Top-level portCalls (some API shapes put them here)
-    const dPortCalls: any[] = Array.isArray(d.portCalls) ? d.portCalls : [];
+    const dPortCalls = Array.isArray(d.portCalls) ? d.portCalls : [];
     const dDestCall =
       dPortCalls.find((p) => p.isDestination === true || p.isDestination === "true") ??
       (dPortCalls.length > 0 ? dPortCalls[dPortCalls.length - 1] : null);

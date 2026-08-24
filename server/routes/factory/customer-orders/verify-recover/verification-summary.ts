@@ -68,7 +68,7 @@ export function registerOrderVerificationSummaryRoutes(app: Express) {
       };
 
       const rawBalesResult = await db.execute(sql`SELECT * FROM customer_order_bales WHERE order_id = ${orderId}`);
-      const rawBaleRows: any[] = resultRows(rawBalesResult);
+      const rawBaleRows = resultRows(rawBalesResult);
       const orderBales = rawBaleRows.map((r) => ({
         id: r.id,
         order_id: r.order_id,

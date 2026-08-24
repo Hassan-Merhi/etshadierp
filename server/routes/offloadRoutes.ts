@@ -634,7 +634,7 @@ export function registerOffloadRoutes(app: Express) {
               AND ve.credit_amount::numeric > 0
             LIMIT 1
           `);
-            const existingRows: any[] = resultRows(existingCheck);
+            const existingRows = resultRows(existingCheck);
             if (existingRows.length > 0) {
               skippedExisting++;
               continue;

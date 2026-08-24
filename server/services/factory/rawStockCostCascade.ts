@@ -253,7 +253,7 @@ export async function cascadeContainerCostChange(
   const affectedBales: CascadeResult["affectedBales"] = [];
 
   if (mixSourcesWithStatus.length > 0) {
-    const allSources = mixSourcesWithStatus.map((row: any) => row.src);
+    const allSources = mixSourcesWithStatus.map((row) => row.src);
     const containerWeightByBatch = new Map<number, Decimal>();
     for (const source of allSources) {
       const previous = containerWeightByBatch.get(source.mixBatchId) || new Decimal(0);
@@ -285,7 +285,7 @@ export async function cascadeContainerCostChange(
       ...new Set(
         mixSourcesWithStatus
           .filter((row: { batchStatus: string }) => cascadeStatuses.includes(row.batchStatus))
-          .map((row: any) => row.src.mixBatchId as number)
+          .map((row) => row.src.mixBatchId as number)
       ),
     ] as number[];
 
@@ -309,7 +309,7 @@ export async function cascadeContainerCostChange(
       ...new Set(
         mixSourcesWithStatus
           .filter((row: { batchStatus: string }) => !cascadeStatuses.includes(row.batchStatus))
-          .map((row: any) => row.src.mixBatchId as number)
+          .map((row) => row.src.mixBatchId as number)
       ),
     ] as number[];
 

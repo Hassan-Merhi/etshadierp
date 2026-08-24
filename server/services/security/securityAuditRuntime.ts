@@ -76,7 +76,7 @@ export async function loadCompanySecurityAnomalies(
     )
     .orderBy(desc(auditLog.createdAt))
     .limit(limit);
-  const events = rows.map((row: any) => row.changes).filter(isSecurityAuditRecord);
+  const events = rows.map((row) => row.changes).filter(isSecurityAuditRecord);
   return {
     windowMs,
     eventCount: events.length,
