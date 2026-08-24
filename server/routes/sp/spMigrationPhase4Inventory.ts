@@ -263,7 +263,11 @@ export async function buildExactInventoryPlan(sourceId: number, targetId: number
   };
 }
 
-async function snapshotDelta(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], cutoverId: number, entry: InventoryPlanEntry): Promise<void> {
+async function snapshotDelta(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  cutoverId: number,
+  entry: InventoryPlanEntry
+): Promise<void> {
   await tx.execute(sql`
     INSERT INTO sp_migration_cutover_stock_deltas
       (cutover_id, delta_key, source_inventory_id, target_inventory_id,
@@ -280,11 +284,7 @@ async function snapshotDelta(tx: Parameters<Parameters<typeof db.transaction>[0]
   `);
 }
 
-export async function synchronizeExactCutoverStock(
-  cutoverId: number,
-  sourceId: number,
-  targetId: number
-) {
+export async function synchronizeExactCutoverStock(cutoverId: number, sourceId: number, targetId: number) {
   const plan = await buildExactInventoryPlan(sourceId, targetId);
   if (plan.blockers.length > 0) {
     throw new Error(

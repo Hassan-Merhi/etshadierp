@@ -62,11 +62,7 @@ async function existingSourceLinks(
   return new Map(resultRows(result).map((row) => [pn(row.source_id), pn(row.target_id)]));
 }
 
-export async function reconcileHistoricalSalesCopy(params: {
-  runId: string;
-  sourceId: number;
-  targetId: number;
-}) {
+export async function reconcileHistoricalSalesCopy(params: { runId: string; sourceId: number; targetId: number }) {
   const { runId, sourceId, targetId } = params;
   const stockMap = await loadStockItemMap(sourceId, targetId);
   const sourceAccounts = await loadSourceAccounts(sourceId);

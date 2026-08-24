@@ -5,6 +5,7 @@
  * Credit-sale customer receivable linkage: stamps the customerId on the
  * receivable voucher entry so customer ledgers/statements can attribute it.
  */
+import type { DbTransaction } from "../../db";
 import { customers } from "@shared/schema";
 import { logger } from "../../lib/logger";
 import { eq, and } from "drizzle-orm";
@@ -15,7 +16,11 @@ import { eq, and } from "drizzle-orm";
  * Without this, the customer ledger / statement views can't
  * attribute the entry to the customer.
  */
-export async function findLinkedCustomerId(tx: any, companyId: number, accountId: number): Promise<number | undefined> {
+export async function findLinkedCustomerId(
+  tx: DbTransaction,
+  companyId: number,
+  accountId: number
+): Promise<number | undefined> {
   try {
     const [linkedCust] = await tx
       .select({ id: customers.id })

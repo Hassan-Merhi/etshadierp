@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../db";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { salesItems, vouchers } from "@shared/schema";
 
@@ -27,7 +28,7 @@ export function buildPosSaleAdvisoryLockKey(companyId: number, clientSaleId: str
  * on commit or rollback and requires no schema migration.
  */
 export async function lockAndFindExistingPosSaleTx(input: {
-  tx: any;
+  tx: DbTransaction;
   companyId: number;
   clientSaleId: unknown;
 }): Promise<ExistingPosSale | null> {
@@ -52,10 +53,7 @@ export async function lockAndFindExistingPosSaleTx(input: {
 
   if (!voucher) return null;
 
-  const saleItemsRows = await input.tx
-    .select()
-    .from(salesItems)
-    .where(eq(salesItems.voucherId, voucher.id));
+  const saleItemsRows = await input.tx.select().from(salesItems).where(eq(salesItems.voucherId, voucher.id));
 
   return { voucher, saleItems: saleItemsRows };
 }

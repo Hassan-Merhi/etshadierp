@@ -4,6 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
+import type { DbTransaction } from "../../db";
 import type { Express, Request, Response, RequestHandler } from "express";
 import { logAudit } from "../helpers/auditHelpers";
 import { getErrorMessage } from "../../lib/httpHandlers";
@@ -37,7 +38,7 @@ export function registerFactoryPayrollDeleteRoutes(app: Express, requireAuth: Re
       if (existing.status !== "DRAFT")
         return res.status(400).json({ message: "Only draft payroll records can be deleted" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: DbTransaction) => {
         // Restore advance balances that were settled at generate time
         const advDeducted = parseFloat(existing.advances || "0");
         if (advDeducted > 0) {

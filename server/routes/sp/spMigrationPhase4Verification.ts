@@ -24,12 +24,7 @@ function addUnique(target: VerificationIssue[], issue: VerificationIssue): void 
   if (!target.some((existing) => existing.code === issue.code)) target.push(issue);
 }
 
-async function completedPairLinks(
-  sourceId: number,
-  targetId: number,
-  sourceTable: string,
-  targetTable: string
-) {
+async function completedPairLinks(sourceId: number, targetId: number, sourceTable: string, targetTable: string) {
   const result = await db.execute(sql`
     SELECT DISTINCT ON (l.source_id) l.source_id, l.target_id
     FROM sp_migration_source_links l

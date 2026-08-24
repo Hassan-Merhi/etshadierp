@@ -129,6 +129,15 @@ export function logPoolStats(trigger: string) {
 
 export const db = drizzle(pool, { schema });
 
+/**
+ * The transaction handle drizzle hands to a `db.transaction` callback.
+ *
+ * Derived from `db` rather than written out, so it tracks the schema and the
+ * driver automatically. Route and service helpers that take a transaction
+ * should use this instead of `any`.
+ */
+export type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 // Lightweight pool snapshot exposed on globalThis so mjs lifecycle/health
 // modules can read it without creating a circular import dependency.
 (

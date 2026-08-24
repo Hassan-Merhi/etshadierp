@@ -3,6 +3,7 @@
  *
  * PHASE 20 structural split — moved from server/routes/pos/posEditSaleRoutes.ts.
  */
+import type { DbTransaction } from "../../../db";
 import { salesItems, inventory, stockItemLocationPrices } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { adjustInventory } from "../../../inventoryHelper";
@@ -27,7 +28,7 @@ export interface RebuildSaleItemsResult {
 }
 
 export async function rebuildSaleItems(
-  tx: any,
+  tx: DbTransaction,
   params: {
     voucherId: number;
     targetLocationId: number;
@@ -41,7 +42,9 @@ export async function rebuildSaleItems(
   const { voucherId, targetLocationId, items, oldItemsMap, canSellNegativeStock, companyId, canonicalRevision } =
     params;
 
-  const sortedNewItems = [...items].sort((a: { stockItemId: number }, b: { stockItemId: number }) => a.stockItemId - b.stockItemId);
+  const sortedNewItems = [...items].sort(
+    (a: { stockItemId: number }, b: { stockItemId: number }) => a.stockItemId - b.stockItemId
+  );
   let grandTotal = toInventoryDecimal(0);
   let totalSupplierCostEdit = toInventoryDecimal(0);
   let totalQtySoldEdit = toInventoryDecimal(0);

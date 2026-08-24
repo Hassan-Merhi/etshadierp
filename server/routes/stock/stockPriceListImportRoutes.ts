@@ -309,8 +309,7 @@ export function registerStockPriceListImportRoutes(app: Express) {
           `),
         ]);
         for (const r of dubaiCostRes.rows) dubaiMap.set(Number(r.stockItemId), String(r.costDubai ?? "0"));
-        for (const r of offloadCostRes.rows)
-          offloadMap.set(Number(r.stockItemId), String(r.offloadingCost ?? "0"));
+        for (const r of offloadCostRes.rows) offloadMap.set(Number(r.stockItemId), String(r.offloadingCost ?? "0"));
       }
 
       const result = items.map((item) => {

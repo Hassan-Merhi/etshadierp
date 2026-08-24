@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../db";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   accountingPostingRequests,
@@ -80,7 +81,7 @@ export function collectPostingTargetIds(entries: VoucherEntryInsertFields[]): Po
 }
 
 async function assertCompanyOwnedIds(input: {
-  tx: any;
+  tx: DbTransaction;
   companyId: number;
   ids: number[];
   table: any;
@@ -151,7 +152,7 @@ function assertStoredIdentityMatches(input: {
 }
 
 async function loadVoucherWithEntries(input: {
-  tx: any;
+  tx: DbTransaction;
   companyId: number;
   voucherId: number;
   idempotencyKey: string;

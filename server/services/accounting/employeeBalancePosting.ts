@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../db";
 import Decimal from "decimal.js";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { employees, ledgerAccounts } from "@shared/schema";
@@ -120,7 +121,7 @@ export function collectEmployeeBalanceDeltas(input: {
 }
 
 async function applyDeltaByEmployeeId(
-  tx: any,
+  tx: DbTransaction,
   companyId: number,
   employeeId: number,
   delta: EmployeeBalanceDelta,
@@ -142,7 +143,7 @@ async function applyDeltaByEmployeeId(
 }
 
 async function applyDeltaByEmployeeCode(
-  tx: any,
+  tx: DbTransaction,
   companyId: number,
   employeeCode: string,
   delta: EmployeeBalanceDelta
@@ -165,30 +166,27 @@ async function applyDeltaByEmployeeCode(
 }
 
 export async function applyEmployeeBalanceDeltasTx(input: {
-  tx: any;
+  tx: DbTransaction;
   companyId: number;
   entries: EmployeeBalancePostingEntry[];
   direction?: EmployeeBalancePostingDirection;
   missingEmployeeBehavior?: MissingEmployeeBehavior;
 }): Promise<void> {
-  const ledgerIds = [...new Set(
-    input.entries
-      .filter((entry) => entry.employeeId == null && entry.ledgerAccountId != null)
-      .map((entry) => Number(entry.ledgerAccountId))
-      .filter((id) => Number.isInteger(id) && id > 0)
-  )];
+  const ledgerIds = [
+    ...new Set(
+      input.entries
+        .filter((entry) => entry.employeeId == null && entry.ledgerAccountId != null)
+        .map((entry) => Number(entry.ledgerAccountId))
+        .filter((id) => Number.isInteger(id) && id > 0)
+    ),
+  ];
 
   const employeeCodeByLedgerId = new Map<number, string>();
   if (ledgerIds.length > 0) {
     const rows = await input.tx
       .select({ id: ledgerAccounts.id, code: ledgerAccounts.code })
       .from(ledgerAccounts)
-      .where(
-        and(
-          eq(ledgerAccounts.companyId, input.companyId),
-          inArray(ledgerAccounts.id, ledgerIds)
-        )
-      );
+      .where(and(eq(ledgerAccounts.companyId, input.companyId), inArray(ledgerAccounts.id, ledgerIds)));
 
     for (const row of rows) {
       if (row.code?.startsWith("EMP-")) {
@@ -205,13 +203,7 @@ export async function applyEmployeeBalanceDeltasTx(input: {
 
   const missingEmployeeBehavior = input.missingEmployeeBehavior ?? "throw";
   for (const [employeeId, delta] of deltas.byEmployeeId) {
-    await applyDeltaByEmployeeId(
-      input.tx,
-      input.companyId,
-      employeeId,
-      delta,
-      missingEmployeeBehavior
-    );
+    await applyDeltaByEmployeeId(input.tx, input.companyId, employeeId, delta, missingEmployeeBehavior);
   }
 
   for (const [employeeCode, delta] of deltas.byEmployeeCode) {

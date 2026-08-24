@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../db";
 import type { Express, Request, Response, RequestHandler } from "express";
 import { sql } from "drizzle-orm";
 import { checkFactoryAdmin } from "../factory/_helpers";
@@ -83,7 +84,7 @@ export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: 
       const note = typeof req.body?.note === "string" ? req.body.note.trim().slice(0, 1000) || null : null;
       const decidedBy = req.session?.userId ? String(req.session.userId) : null;
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: DbTransaction) => {
         const payrollResult = await tx.execute(sql`
           SELECT id, company_id AS "companyId", worker_id AS "workerId",
                  period_start::text AS "periodStart", period_end::text AS "periodEnd", status

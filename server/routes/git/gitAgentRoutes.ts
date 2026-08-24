@@ -165,7 +165,7 @@ export function registerGitAgentRoutes(app: Express) {
             WHERE company_id = ${companyId} AND agent_name = ${agentName}
             ORDER BY created_at ASC`
       );
-      res.json({ designations: (result.rows).map((r) => ({ containerId: r.container_id })) });
+      res.json({ designations: result.rows.map((r) => ({ containerId: r.container_id })) });
     } catch (err: unknown) {
       res.status(500).json({ message: getErrorMessage(err) });
     }

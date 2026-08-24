@@ -202,20 +202,18 @@ export function deepScanForEta(obj: unknown, depth = 0): { path: string; value: 
 function parseEvents(rawEvents: unknown[]): TrackingEvent[] {
   if (!Array.isArray(rawEvents)) return [];
   return rawEvents
-    .map(
-      (e: any): TrackingEvent => ({
-        date: parseDate(e.eventDateTime ?? e.eventDate ?? e.timestamp ?? e.date ?? null),
-        status: e.transportEventTypeCode ?? e.activityName ?? e.eventCode ?? e.activity ?? e.status ?? null,
-        location:
-          e.location?.portName ??
-          e.location?.locationName ??
-          e.location?.city ??
-          e.portName ??
-          e.locationName ??
-          (typeof e.location === "string" ? e.location : null),
-        description: e.description ?? e.eventDescription ?? e.activityName ?? null,
-      })
-    )
+    .map((e: any): TrackingEvent => ({
+      date: parseDate(e.eventDateTime ?? e.eventDate ?? e.timestamp ?? e.date ?? null),
+      status: e.transportEventTypeCode ?? e.activityName ?? e.eventCode ?? e.activity ?? e.status ?? null,
+      location:
+        e.location?.portName ??
+        e.location?.locationName ??
+        e.location?.city ??
+        e.portName ??
+        e.locationName ??
+        (typeof e.location === "string" ? e.location : null),
+      description: e.description ?? e.eventDescription ?? e.activityName ?? null,
+    }))
     .filter((e) => e.date !== null || e.status !== null)
     .sort((a, b) => {
       if (!a.date) return 1;
