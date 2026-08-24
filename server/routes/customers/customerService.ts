@@ -162,6 +162,16 @@ export const customerService = {
     }
 
     const parsed = insertCustomerSchema.omit({ companyId: true }).partial().parse(body);
+    if (parsed.ledgerAccountId !== undefined) {
+      const [linkedLedger] = await db
+        .select({ id: ledgerAccounts.id })
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.id, parsed.ledgerAccountId), eq(ledgerAccounts.companyId, companyId)))
+        .limit(1);
+      if (!linkedLedger) {
+        throw new CustomerRouteError(400, "Linked ledger account must belong to the customer company");
+      }
+    }
     const updated = await storage.updateCustomer(customerId, parsed);
     await writeCustomerAudit({
       ...actor,

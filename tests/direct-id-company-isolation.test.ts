@@ -437,6 +437,34 @@ describe("cross-company mutation isolation", () => {
     expect(localAfter.rows).toEqual(localBefore.rows);
   });
 
+  it("rejects customer updates with a foreign linked ledger before changing customer accounting data", async () => {
+    const before = await pool.query(
+      "SELECT code, legal_name, ledger_account_id, opening_balance, opening_balance_side FROM customers WHERE id = $1",
+      [customerId],
+    );
+    const response = await agent.put(`/api/customers/${customerId}`).send({
+      legalName: `${TEST_PREFIX} Should Not Change`,
+      ledgerAccountId: foreignLedgerAccountId,
+      openingBalance: "999.00",
+      openingBalanceSide: "Cr",
+    });
+    expect(response.status).toBe(400);
+
+    const after = await pool.query(
+      "SELECT code, legal_name, ledger_account_id, opening_balance, opening_balance_side FROM customers WHERE id = $1",
+      [customerId],
+    );
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it("allows customer updates with a same-company linked ledger", async () => {
+    const response = await agent
+      .put(`/api/customers/${customerId}`)
+      .send({ ledgerAccountId: ctx.cashAccountId });
+    expect(response.status).toBe(200);
+    expect(response.body.ledgerAccountId).toBe(ctx.cashAccountId);
+  });
+
   it("rejects factory mix-batch POSTs that claim or source another company", async () => {
     const before = await pool.query(
       "SELECT batch_code, total_weight_kg, used_kg, status FROM mix_batches WHERE id = $1",
