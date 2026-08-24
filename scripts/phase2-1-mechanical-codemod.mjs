@@ -16,11 +16,7 @@ const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, root);
 const program = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options });
 const checker = program.getTypeChecker();
 
-const TARGET_PREFIXES = [
-  "server/",
-  "shared/",
-  "client/src/lib/",
-];
+const TARGET_PREFIXES = ["server/", "shared/", "client/src/lib/"];
 
 const EXPRESS_PARAM_TYPES = new Map([
   ["req", "import(\"express\").Request"],
@@ -94,16 +90,14 @@ for (const sourceFile of program.getSourceFiles()) {
       } else {
         const contextual = contextualParameterType(node);
         if (contextual && !isAnyOrUnknown(contextual)) {
-          const start = node.name.end;
-          const end = node.type.end;
-          addEdit(sourceFile, start, end, "", "contextual-callback");
+          addEdit(sourceFile, node.name.end, node.type.end, "", "contextual-callback");
         }
       }
     }
 
     if (
       ts.isVariableDeclaration(node) &&
-      node.parent.parent.flags & ts.NodeFlags.Const &&
+      Boolean(node.parent.flags & ts.NodeFlags.Const) &&
       node.type?.kind === ts.SyntaxKind.AnyKeyword &&
       node.initializer &&
       !node.exclamationToken
