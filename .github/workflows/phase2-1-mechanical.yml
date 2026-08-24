@@ -34,13 +34,41 @@ jobs:
         run: npm run audit:type-escapes
       - name: Apply surgical mechanical codemod
         run: node scripts/phase2-1-mechanical-codemod.mjs | tee phase2-1-codemod-report.json
+      - name: Filter compiler-unsafe files
+        shell: bash
+        run: |
+          set +e
+          npm run check 2>&1 | tee phase2-1-initial-tsc.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "All generated mechanical files compile cleanly."
+            exit 0
+          fi
+
+          grep -oE '^(server|shared|client/src/lib)/[^(:]+\.(ts|tsx)' phase2-1-initial-tsc.log | sort -u > phase2-1-failing-files.txt || true
+          if [ ! -s phase2-1-failing-files.txt ]; then
+            echo "TypeScript failed, but no attributable target file was found."
+            exit "$status"
+          fi
+
+          echo "Reverting generated edits in compiler-unsafe files:"
+          cat phase2-1-failing-files.txt
+          while IFS= read -r file; do
+            if ! git diff --quiet -- "$file"; then
+              git checkout -- "$file"
+            fi
+          done < phase2-1-failing-files.txt
+
+          echo "Rechecking after conservative file-level reverts..."
+          npm run check
       - name: Lock exact lowered baseline
         env:
           UPDATE_TYPE_ESCAPE_BASELINE: "1"
         run: node scripts/audit-type-escapes.mjs
       - name: Reject whitespace damage
         run: git diff --check
-      - name: TypeScript
+      - name: TypeScript final
         run: npm run check
       - name: Lint
         run: npm run lint
@@ -56,12 +84,12 @@ jobs:
         shell: bash
         run: |
           if git diff --quiet; then
-            echo "No additional mechanical edits generated."
+            echo "No additional compiler-safe mechanical edits generated."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add server shared client/src/lib config/type-escape-boundaries.json
-          git commit -m "refactor(types): remove mechanical type escapes"
+          git commit -m "refactor(types): remove compiler-safe mechanical type escapes"
           git pull --rebase origin phase-2-1-mechanical-type-escapes-clean
           git push origin HEAD:phase-2-1-mechanical-type-escapes-clean
