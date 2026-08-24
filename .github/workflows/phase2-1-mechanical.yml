@@ -1,0 +1,67 @@
+name: Phase 2.1 Mechanical Type Cleanup
+
+on:
+  push:
+    branches:
+      - phase-2-1-mechanical-type-escapes-clean
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase-2-1-mechanical-clean-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  mechanical-cleanup:
+    if: github.event_name == 'push' || github.head_ref == 'phase-2-1-mechanical-type-escapes-clean'
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: phase-2-1-mechanical-type-escapes-clean
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Measure starting scanner state
+        run: npm run audit:type-escapes
+      - name: Apply surgical mechanical codemod
+        run: node scripts/phase2-1-mechanical-codemod.mjs | tee phase2-1-codemod-report.json
+      - name: Lock exact lowered baseline
+        env:
+          UPDATE_TYPE_ESCAPE_BASELINE: "1"
+        run: node scripts/audit-type-escapes.mjs
+      - name: Reject whitespace damage
+        run: git diff --check
+      - name: TypeScript
+        run: npm run check
+      - name: Lint
+        run: npm run lint
+      - name: Type-escape ratchet
+        run: npm run audit:type-escapes
+      - name: Changed-file formatting
+        run: npm run format:check:changed
+      - name: Backend tests
+        run: npm run test:backend
+      - name: Build
+        run: npm run build
+      - name: Persist green mechanical batch
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No additional mechanical edits generated."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server shared client/src/lib config/type-escape-boundaries.json
+          git commit -m "refactor(types): remove mechanical type escapes"
+          git pull --rebase origin phase-2-1-mechanical-type-escapes-clean
+          git push origin HEAD:phase-2-1-mechanical-type-escapes-clean
