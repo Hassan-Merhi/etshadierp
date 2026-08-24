@@ -109,10 +109,7 @@ export function createPhase3TemplateTranslator(entries: readonly Phase3SharedUiE
   return {
     matches(value: string): boolean {
       const normalized = value.trim();
-      return (
-        normalized.length > 0 &&
-        matchers.some(({ parts }) => captureTemplateValues(normalized, parts) !== null)
-      );
+      return normalized.length > 0 && matchers.some(({ parts }) => captureTemplateValues(normalized, parts) !== null);
     },
 
     translate(
