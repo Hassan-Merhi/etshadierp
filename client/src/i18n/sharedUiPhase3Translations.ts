@@ -7,6 +7,28 @@ import { phase3SharedUiTranslationsPart4 } from "./sharedUiPhase3Translations.pa
 import { phase3SharedUiTranslationsPart5 } from "./sharedUiPhase3Translations.part5";
 import { phase3SharedUiTranslationsPart6 } from "./sharedUiPhase3Translations.part6";
 import { phase3SharedUiTranslationsPart7 } from "./sharedUiPhase3Translations.part7";
+import { phase3RemainingTranslationsPart01 } from "./phase3RemainingTranslations.part01";
+import { phase3RemainingTranslationsPart02 } from "./phase3RemainingTranslations.part02";
+import { phase3RemainingTranslationsPart03 } from "./phase3RemainingTranslations.part03";
+import { phase3RemainingTranslationsPart04 } from "./phase3RemainingTranslations.part04";
+import { phase3RemainingTranslationsPart05 } from "./phase3RemainingTranslations.part05";
+import { phase3RemainingTranslationsPart06 } from "./phase3RemainingTranslations.part06";
+import { phase3RemainingTranslationsPart07 } from "./phase3RemainingTranslations.part07";
+import { phase3RemainingTranslationsPart08 } from "./phase3RemainingTranslations.part08";
+import { phase3RemainingTranslationsPart09 } from "./phase3RemainingTranslations.part09";
+import { phase3RemainingTranslationsPart10 } from "./phase3RemainingTranslations.part10";
+import { phase3RemainingTranslationsPart11 } from "./phase3RemainingTranslations.part11";
+import { phase3RemainingTranslationsPart12 } from "./phase3RemainingTranslations.part12";
+import { phase3RemainingTranslationsPart13 } from "./phase3RemainingTranslations.part13";
+import { phase3RemainingTranslationsPart14 } from "./phase3RemainingTranslations.part14";
+import { phase3RemainingTranslationsPart15 } from "./phase3RemainingTranslations.part15";
+import { phase3RemainingTranslationsPart16 } from "./phase3RemainingTranslations.part16";
+import { phase3RemainingTranslationsPart17 } from "./phase3RemainingTranslations.part17";
+import { phase3RemainingTranslationsPart18 } from "./phase3RemainingTranslations.part18";
+import { phase3RemainingTranslationsPart19 } from "./phase3RemainingTranslations.part19";
+import { phase3RemainingTranslationsPart20 } from "./phase3RemainingTranslations.part20";
+import { phase3RemainingTranslationsPart21 } from "./phase3RemainingTranslations.part21";
+import { createPhase3TemplateTranslator } from "./phase3TemplateTranslationRuntime";
 
 export const phase3SharedUiTranslations: readonly Phase3SharedUiEntry[] = [
   ...phase3SharedUiTranslationsPart1,
@@ -16,14 +38,41 @@ export const phase3SharedUiTranslations: readonly Phase3SharedUiEntry[] = [
   ...phase3SharedUiTranslationsPart5,
   ...phase3SharedUiTranslationsPart6,
   ...phase3SharedUiTranslationsPart7,
+  ...phase3RemainingTranslationsPart01,
+  ...phase3RemainingTranslationsPart02,
+  ...phase3RemainingTranslationsPart03,
+  ...phase3RemainingTranslationsPart04,
+  ...phase3RemainingTranslationsPart05,
+  ...phase3RemainingTranslationsPart06,
+  ...phase3RemainingTranslationsPart07,
+  ...phase3RemainingTranslationsPart08,
+  ...phase3RemainingTranslationsPart09,
+  ...phase3RemainingTranslationsPart10,
+  ...phase3RemainingTranslationsPart11,
+  ...phase3RemainingTranslationsPart12,
+  ...phase3RemainingTranslationsPart13,
+  ...phase3RemainingTranslationsPart14,
+  ...phase3RemainingTranslationsPart15,
+  ...phase3RemainingTranslationsPart16,
+  ...phase3RemainingTranslationsPart17,
+  ...phase3RemainingTranslationsPart18,
+  ...phase3RemainingTranslationsPart19,
+  ...phase3RemainingTranslationsPart20,
+  ...phase3RemainingTranslationsPart21,
 ];
 
+const canonicalEnglishText = new Set(phase3SharedUiTranslations.map((entry) => entry.en));
 const exactEntryByVisibleText = new Map<string, Phase3SharedUiEntry>();
 for (const entry of phase3SharedUiTranslations) {
   exactEntryByVisibleText.set(entry.en, entry);
-  exactEntryByVisibleText.set(entry.ar, entry);
-  exactEntryByVisibleText.set(entry.fr, entry);
+  for (const alias of [entry.ar, entry.fr]) {
+    if (/\{\{\d+\}\}/.test(alias)) continue;
+    if (alias !== entry.en && canonicalEnglishText.has(alias)) continue;
+    if (!exactEntryByVisibleText.has(alias)) exactEntryByVisibleText.set(alias, entry);
+  }
 }
+
+const generatedTemplateTranslator = createPhase3TemplateTranslator(phase3SharedUiTranslations);
 
 type DynamicCaptures = readonly string[];
 type DynamicRule = {
@@ -193,8 +242,10 @@ export function isPhase3SharedUiText(value: string): boolean {
   const normalized = value.trim();
   if (!normalized) return false;
   if (exactEntryByVisibleText.has(normalized)) return true;
-  return dynamicRules.some((rule) =>
-    (["en", "ar", "fr"] as const).some((language) => rule.patterns[language].test(normalized))
+  return (
+    dynamicRules.some((rule) =>
+      (["en", "ar", "fr"] as const).some((language) => rule.patterns[language].test(normalized))
+    ) || generatedTemplateTranslator.matches(normalized)
   );
 }
 
@@ -204,6 +255,13 @@ export function translatePhase3SharedUiText(value: string, language: Application
   const normalized = value.trim();
   if (!normalized) return null;
   const exactEntry = exactEntryByVisibleText.get(normalized);
-  const translated = exactEntry?.[language] ?? findDynamicTranslation(normalized, language);
+  const translated =
+    exactEntry?.[language] ??
+    findDynamicTranslation(normalized, language) ??
+    generatedTemplateTranslator.translate(
+      normalized,
+      language,
+      (capture) => exactEntryByVisibleText.get(capture)?.[language] ?? capture
+    );
   return translated ? `${leading}${translated}${trailing}` : null;
 }
