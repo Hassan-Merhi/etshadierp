@@ -4,22 +4,27 @@ on:
   push:
     branches:
       - phase-2-1-mechanical-type-escapes
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 concurrency:
-  group: phase-2-1-mechanical-type-escapes
+  group: phase-2-1-mechanical-type-escapes-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
   mechanical-cleanup:
+    if: github.event_name == 'push' || github.head_ref == 'phase-2-1-mechanical-type-escapes'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: phase-2-1-mechanical-type-escapes
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -49,11 +54,11 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add server shared client/src/lib config/type-escape-boundaries.json
           git commit -m "refactor(types): apply Phase 2.1 mechanical cleanup"
-          git push
+          git push origin HEAD:phase-2-1-mechanical-type-escapes
           echo "changed=true" >> "$GITHUB_OUTPUT"
       - name: Stop after generated commit
         if: steps.persist.outputs.changed == 'true'
-        run: echo "Generated cleanup committed; validation will run on the resulting push."
+        run: echo "Generated cleanup committed; validation will run on the resulting push/PR synchronization."
       - name: TypeScript
         if: steps.persist.outputs.changed != 'true'
         run: npm run check
