@@ -19,7 +19,7 @@ jobs:
   mechanical-cleanup:
     if: github.event_name == 'push' || github.head_ref == 'phase-2-1-mechanical-type-escapes-clean'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
         with:
@@ -32,47 +32,85 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Measure starting scanner state
         run: npm run audit:type-escapes
-      - name: Apply surgical mechanical codemod
-        run: node scripts/phase2-1-mechanical-codemod.mjs | tee phase2-1-codemod-report.json
-      - name: Filter compiler-unsafe files
+      - name: Apply compiler-gated categories independently
         shell: bash
         run: |
-          set +e
-          npm run check 2>&1 | tee phase2-1-initial-tsc.log
-          status=${PIPESTATUS[0]}
-          set -e
-          if [ "$status" -eq 0 ]; then
-            echo "All generated mechanical files compile cleanly."
-            exit 0
-          fi
+          set -euo pipefail
+          : > phase2-1-category-summary.txt
 
-          grep -oE '^(server|shared|client/src/lib)/[^(:]+\.(ts|tsx)' phase2-1-initial-tsc.log | sort -u > phase2-1-failing-files.txt || true
-          if [ ! -s phase2-1-failing-files.txt ]; then
-            echo "TypeScript failed, but no attributable target file was found."
-            exit "$status"
-          fi
-
-          echo "Reverting generated edits in compiler-unsafe files:"
-          cat phase2-1-failing-files.txt
-          while IFS= read -r file; do
-            if ! git diff --quiet -- "$file"; then
-              git checkout -- "$file"
+          run_category() {
+            category="$1"
+            echo "=== $category ===" | tee -a phase2-1-category-summary.txt
+            PHASE21_CATEGORY="$category" node scripts/phase2-1-mechanical-codemod.mjs | tee "phase2-1-${category}.json"
+            git diff --name-only -- server shared client/src/lib | sort -u > phase2-1-category-files.txt
+            if [ ! -s phase2-1-category-files.txt ]; then
+              echo "no candidates survived generation" | tee -a phase2-1-category-summary.txt
+              return 0
             fi
-          done < phase2-1-failing-files.txt
 
-          echo "Rechecking after conservative file-level reverts..."
-          npm run check
-      - name: Snapshot compiler-safe mechanical batch
-        shell: bash
-        run: |
-          git diff --name-only -- server shared client/src/lib | sort -u > phase2-1-compiler-safe-files.txt
-          cat phase2-1-compiler-safe-files.txt
+            cp phase2-1-category-files.txt "phase2-1-${category}-files.txt"
+            set +e
+            npm run check 2>&1 | tee "phase2-1-${category}-tsc.log"
+            status=${PIPESTATUS[0]}
+            set -e
+
+            if [ "$status" -ne 0 ]; then
+              grep -oE '^(server|shared|client/src/lib)/[^(:]+\.(ts|tsx)' "phase2-1-${category}-tsc.log" | sort -u > phase2-1-error-files.txt || true
+              while IFS= read -r file; do
+                [ -n "$file" ] || continue
+                if grep -Fxq "$file" phase2-1-category-files.txt && ! git diff --quiet -- "$file"; then
+                  echo "reverting compiler-unsafe $category edit: $file" | tee -a phase2-1-category-summary.txt
+                  git checkout -- "$file"
+                fi
+              done < phase2-1-error-files.txt
+
+              set +e
+              npm run check 2>&1 | tee "phase2-1-${category}-recheck.log"
+              recheck_status=${PIPESTATUS[0]}
+              set -e
+              if [ "$recheck_status" -ne 0 ]; then
+                echo "cross-file/nondiagnostic failure; reverting remaining $category edits conservatively" | tee -a phase2-1-category-summary.txt
+                while IFS= read -r file; do
+                  [ -n "$file" ] || continue
+                  if ! git diff --quiet -- "$file"; then
+                    git checkout -- "$file"
+                  fi
+                done < phase2-1-category-files.txt
+                npm run check
+              fi
+            fi
+
+            git diff --name-only -- server shared client/src/lib | sort -u > phase2-1-surviving-files.txt
+            survivor_count=$(wc -l < phase2-1-surviving-files.txt | tr -d ' ')
+            echo "surviving files: $survivor_count" | tee -a phase2-1-category-summary.txt
+            if [ -s phase2-1-surviving-files.txt ]; then
+              git add server shared client/src/lib
+            fi
+          }
+
+          run_category contextual-callback
+          run_category default-parameter-inference
+          run_category local-variable-inference
+          run_category module-variable-inference
+          run_category catch-unknown-narrowing
+          run_category local-return-inference
+          run_category private-property-inference
+          run_category module-class-property-inference
+          run_category redundant-local-as-any
+
+          echo "=== staged mechanical result ==="
+          git diff --cached --name-only -- server shared client/src/lib
+          cat phase2-1-category-summary.txt
       - name: Lock exact lowered baseline
         env:
           UPDATE_TYPE_ESCAPE_BASELINE: "1"
-        run: node scripts/audit-type-escapes.mjs
+        run: |
+          node scripts/audit-type-escapes.mjs
+          git add config/type-escape-boundaries.json
       - name: Reject whitespace damage
-        run: git diff --check
+        run: |
+          git diff --check
+          git diff --cached --check
       - name: TypeScript final
         run: npm run check
       - name: Lint
@@ -86,13 +124,13 @@ jobs:
       - name: Persist green mechanical batch
         shell: bash
         run: |
-          if git diff --quiet; then
+          if git diff --cached --quiet && git diff --quiet; then
             echo "No additional compiler-safe mechanical edits generated."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add server shared client/src/lib config/type-escape-boundaries.json
-          git commit -m "refactor(types): remove compiler-safe mechanical type escapes"
+          git commit -m "refactor(types): exhaust compiler-safe mechanical escapes"
           git pull --rebase origin phase-2-1-mechanical-type-escapes-clean
           git push origin HEAD:phase-2-1-mechanical-type-escapes-clean
