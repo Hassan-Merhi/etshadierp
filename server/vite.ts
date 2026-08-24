@@ -21,9 +21,15 @@ export function log(message: string, source = "express") {
 }
 
 export async function setupVite(app: Express, server: Server) {
+  const appPort = Number(process.env.PORT || 5000);
+  const isReplitPreview = process.env.REPL_ID !== undefined;
   const serverOptions = {
     middlewareMode: true,
-    hmr: { server },
+    // Replit's preview proxy does not reliably forward websocket upgrades.
+    // Keeping Vite HMR enabled there produces a persistent 400 console error
+    // on every reload. Local development retains HMR with the app's port
+    // pinned instead of Vite's default 5173.
+    hmr: isReplitPreview ? false : { server, clientPort: appPort, port: appPort },
     allowedHosts: true as const,
   };
 

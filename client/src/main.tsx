@@ -206,6 +206,29 @@ window.addEventListener("unhandledrejection", (event) => {
 });
 
 if ("serviceWorker" in navigator) {
+  // Service workers cache Vite's /src and /node_modules/.vite requests. In
+  // development that can mix modules from different HMR generations (most
+  // visibly as duplicate React invalid-hook warnings), so only install the
+  // production worker.
+  if (!import.meta.env.DEV) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker
+        .register("/sw.js", { updateViaCache: "none" })
+        .catch(() => navigator.serviceWorker.register("/sw.js"))
+        .catch(() => undefined);
+    });
+  } else {
+    // Remove workers installed by older preview builds. Merely stopping new
+    // registration is not enough: an existing worker continues intercepting
+    // requests until it is explicitly unregistered.
+    void navigator.serviceWorker
+      .getRegistrations()
+      .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+      .then(() => ("caches" in window ? caches.keys() : []))
+      .then((keys) => Promise.all(keys.filter((key) => key.startsWith("erp-")).map((key) => caches.delete(key))))
+      .catch(() => undefined);
+  }
+
   navigator.serviceWorker.addEventListener("message", (event) => {
     if (event?.data?.type === "SW_UPDATED") {
       // Do not reload every controlled tab. The existing production version

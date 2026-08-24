@@ -43,6 +43,10 @@ export default defineConfig({
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
     },
+    // Keep React and its renderer on the same module instance when lazy
+    // remote-support chunks are reloaded by Vite. Without this, a resolved
+    // path variation can produce the classic invalid-hook-call warning.
+    dedupe: ["react", "react-dom"],
   },
   root: path.resolve(import.meta.dirname, "client"),
   build: {
