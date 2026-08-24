@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useAdvancesModel } from "../advances/useAdvancesModel";
+
+type AdvancesModel = ReturnType<typeof useAdvancesModel>;
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,12 +30,12 @@ export function CashAccountAdjustmentDialog({
   setCashAdjForm,
   setCashAdjOpen,
 }: {
-  cashAccounts: any;
-  cashAdjForm: any;
-  cashAdjMutation: any;
-  cashAdjOpen: any;
-  setCashAdjForm: any;
-  setCashAdjOpen: any;
+  cashAccounts: AdvancesModel["cashAccounts"];
+  cashAdjForm: AdvancesModel["cashAdjForm"];
+  cashAdjMutation: AdvancesModel["cashAdjMutation"];
+  cashAdjOpen: AdvancesModel["cashAdjOpen"];
+  setCashAdjForm: AdvancesModel["setCashAdjForm"];
+  setCashAdjOpen: AdvancesModel["setCashAdjOpen"];
 }) {
   return (
     <Dialog
@@ -56,13 +59,13 @@ export function CashAccountAdjustmentDialog({
             </Label>
             <Select
               value={cashAdjForm.cashAccountId}
-              onValueChange={(v) => setCashAdjForm((p: any) => ({ ...p, cashAccountId: v }))}
+              onValueChange={(v) => setCashAdjForm((p) => ({ ...p, cashAccountId: v }))}
             >
               <SelectTrigger data-testid="select-cadj-account">
                 <SelectValue placeholder="Select cash account" />
               </SelectTrigger>
               <SelectContent>
-                {(cashAccounts || []).map((a: any) => (
+                {(cashAccounts || []).map((a) => (
                   <SelectItem key={a.id} value={String(a.id)}>
                     {a.name} ({a.code})
                   </SelectItem>
@@ -82,7 +85,7 @@ export function CashAccountAdjustmentDialog({
                 step="0.01"
                 placeholder="0.00"
                 value={cashAdjForm.amount}
-                onChange={(e) => setCashAdjForm((p: any) => ({ ...p, amount: e.target.value }))}
+                onChange={(e) => setCashAdjForm((p) => ({ ...p, amount: e.target.value }))}
                 data-testid="input-cadj-amount"
               />
             </div>
@@ -90,7 +93,7 @@ export function CashAccountAdjustmentDialog({
               <Label>Direction</Label>
               <Select
                 value={cashAdjForm.direction}
-                onValueChange={(v) => setCashAdjForm((p: any) => ({ ...p, direction: v }))}
+                onValueChange={(v) => setCashAdjForm((p) => ({ ...p, direction: v }))}
               >
                 <SelectTrigger data-testid="select-cadj-direction">
                   <SelectValue />
@@ -110,7 +113,7 @@ export function CashAccountAdjustmentDialog({
             <Input
               type="date"
               value={cashAdjForm.date}
-              onChange={(e) => setCashAdjForm((p: any) => ({ ...p, date: e.target.value }))}
+              onChange={(e) => setCashAdjForm((p) => ({ ...p, date: e.target.value }))}
               data-testid="input-cadj-date"
             />
           </div>
@@ -119,7 +122,7 @@ export function CashAccountAdjustmentDialog({
             <Label>Narration</Label>
             <Input
               value={cashAdjForm.narration}
-              onChange={(e) => setCashAdjForm((p: any) => ({ ...p, narration: e.target.value }))}
+              onChange={(e) => setCashAdjForm((p) => ({ ...p, narration: e.target.value }))}
               data-testid="input-cadj-narration"
             />
           </div>
@@ -129,7 +132,7 @@ export function CashAccountAdjustmentDialog({
             cashAdjForm.amount &&
             parseFloat(cashAdjForm.amount) > 0 &&
             (() => {
-              const acct = (cashAccounts || []).find((a: any) => String(a.id) === cashAdjForm.cashAccountId);
+              const acct = (cashAccounts || []).find((a) => String(a.id) === cashAdjForm.cashAccountId);
               const isCredit = cashAdjForm.direction === "credit";
               return (
                 <div className="rounded-md border overflow-hidden text-sm">

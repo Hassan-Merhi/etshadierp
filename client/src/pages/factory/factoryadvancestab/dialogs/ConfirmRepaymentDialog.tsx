@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useAdvancesModel } from "../advances/useAdvancesModel";
+
+type AdvancesModel = ReturnType<typeof useAdvancesModel>;
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,12 +27,12 @@ export function ConfirmRepaymentDialog({
   setConfirmRepay,
   setRepayingMonth,
 }: {
-  cashAccounts: any;
-  confirmRepay: any;
-  repayByMonthForm: any;
-  repayByMonthMutation: any;
-  setConfirmRepay: any;
-  setRepayingMonth: any;
+  cashAccounts: AdvancesModel["cashAccounts"];
+  confirmRepay: AdvancesModel["confirmRepay"];
+  repayByMonthForm: AdvancesModel["repayByMonthForm"];
+  repayByMonthMutation: AdvancesModel["repayByMonthMutation"];
+  setConfirmRepay: AdvancesModel["setConfirmRepay"];
+  setRepayingMonth: AdvancesModel["setRepayingMonth"];
 }) {
   return (
     <Dialog
@@ -56,7 +59,7 @@ export function ConfirmRepaymentDialog({
           <div className="flex justify-between items-center py-2 px-3 rounded-md bg-muted/40 font-medium">
             <span>Cash account</span>
             <span>
-              {(cashAccounts || []).find((a: any) => String(a.id) === repayByMonthForm.cashAccountId)?.name ?? "—"}
+              {(cashAccounts || []).find((a) => String(a.id) === repayByMonthForm.cashAccountId)?.name ?? "—"}
             </span>
           </div>
         </div>
@@ -69,7 +72,7 @@ export function ConfirmRepaymentDialog({
             <span className="text-right">Will repay</span>
           </div>
           <div className="divide-y">
-            {(confirmRepay?.items || []).map((adv: any) => (
+            {(confirmRepay?.items || []).map((adv) => (
               <div key={adv.id} className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 text-sm">
                 <span className="font-medium">{adv.workerName}</span>
                 <span className="font-mono text-right text-muted-foreground">{fmt(adv.amount)}</span>

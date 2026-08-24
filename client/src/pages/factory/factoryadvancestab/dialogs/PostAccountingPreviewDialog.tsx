@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useAdvancesModel } from "../advances/useAdvancesModel";
+
+type AdvancesModel = ReturnType<typeof useAdvancesModel>;
 import { Fragment } from "react";
 import { BookOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,15 +34,15 @@ export function PostAccountingPreviewDialog({
   unvouchered,
   unvoucheredLoading,
 }: {
-  cashAccounts: any;
-  formatDate: any;
-  postAccountingMutation: any;
-  postAccountingOpen: any;
-  postCashAccountId: any;
-  setPostAccountingOpen: any;
-  setPostCashAccountId: any;
-  unvouchered: any;
-  unvoucheredLoading: any;
+  cashAccounts: AdvancesModel["cashAccounts"];
+  formatDate: AdvancesModel["formatDate"];
+  postAccountingMutation: AdvancesModel["postAccountingMutation"];
+  postAccountingOpen: AdvancesModel["postAccountingOpen"];
+  postCashAccountId: AdvancesModel["postCashAccountId"];
+  setPostAccountingOpen: AdvancesModel["setPostAccountingOpen"];
+  setPostCashAccountId: AdvancesModel["setPostCashAccountId"];
+  unvouchered: AdvancesModel["unvouchered"];
+  unvoucheredLoading: AdvancesModel["unvoucheredLoading"];
 }) {
   return (
     <Dialog
@@ -69,7 +72,7 @@ export function PostAccountingPreviewDialog({
                 <SelectValue placeholder="Select cash account" />
               </SelectTrigger>
               <SelectContent>
-                {(cashAccounts || []).map((a: any) => (
+                {(cashAccounts || []).map((a) => (
                   <SelectItem key={a.id} value={String(a.id)}>
                     {a.name} ({a.code})
                   </SelectItem>
@@ -92,7 +95,7 @@ export function PostAccountingPreviewDialog({
             </div>
           ) : (
             (() => {
-              const selectedAcct = (cashAccounts || []).find((a: any) => String(a.id) === postCashAccountId);
+              const selectedAcct = (cashAccounts || []).find((a) => String(a.id) === postCashAccountId);
               const grandTotal = unvouchered.reduce((s: any, a: any) => s + parseFloat(a.amount || "0"), 0);
               const grouped: Record<string, typeof unvouchered> = {};
               for (const adv of unvouchered) {
@@ -140,7 +143,7 @@ export function PostAccountingPreviewDialog({
                               {fmt(advs.reduce((s: any, a: any) => s + parseFloat(a.amount || "0"), 0))}
                             </span>
                           </div>
-                          {advs.map((adv: any) => (
+                          {advs.map((adv) => (
                             <div
                               key={adv.id}
                               className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-4 py-2 text-sm items-center"

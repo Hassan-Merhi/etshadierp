@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useAdvancesModel } from "../advances/useAdvancesModel";
+
+type AdvancesModel = ReturnType<typeof useAdvancesModel>;
 import { Fragment } from "react";
 import { Loader2, SearchCheck, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,17 +38,17 @@ export function RepaymentAuditDialog({
   setRepayAuditForm,
   setRepayAuditOpen,
 }: {
-  auditCashBalance: any;
-  auditData: any;
-  auditLoading: any;
-  cashAccounts: any;
-  formatDate: any;
-  refetchAudit: any;
-  repayAuditForm: any;
-  repayAuditMutation: any;
-  repayAuditOpen: any;
-  setRepayAuditForm: any;
-  setRepayAuditOpen: any;
+  auditCashBalance: AdvancesModel["auditCashBalance"];
+  auditData: AdvancesModel["auditData"];
+  auditLoading: AdvancesModel["auditLoading"];
+  cashAccounts: AdvancesModel["cashAccounts"];
+  formatDate: AdvancesModel["formatDate"];
+  refetchAudit: AdvancesModel["refetchAudit"];
+  repayAuditForm: AdvancesModel["repayAuditForm"];
+  repayAuditMutation: AdvancesModel["repayAuditMutation"];
+  repayAuditOpen: AdvancesModel["repayAuditOpen"];
+  setRepayAuditForm: AdvancesModel["setRepayAuditForm"];
+  setRepayAuditOpen: AdvancesModel["setRepayAuditOpen"];
 }) {
   return (
     <Dialog
@@ -124,13 +127,13 @@ export function RepaymentAuditDialog({
                         </Label>
                         <Select
                           value={repayAuditForm.cashAccountId}
-                          onValueChange={(v) => setRepayAuditForm((p: any) => ({ ...p, cashAccountId: v }))}
+                          onValueChange={(v) => setRepayAuditForm((p) => ({ ...p, cashAccountId: v }))}
                         >
                           <SelectTrigger data-testid="select-audit-cash-account">
                             <SelectValue placeholder="Select cash account" />
                           </SelectTrigger>
                           <SelectContent>
-                            {(cashAccounts || []).map((a: any) => (
+                            {(cashAccounts || []).map((a) => (
                               <SelectItem key={a.id} value={String(a.id)}>
                                 {a.name} ({a.code})
                               </SelectItem>
@@ -145,7 +148,7 @@ export function RepaymentAuditDialog({
                         <Input
                           type="date"
                           value={repayAuditForm.repaymentDate}
-                          onChange={(e) => setRepayAuditForm((p: any) => ({ ...p, repaymentDate: e.target.value }))}
+                          onChange={(e) => setRepayAuditForm((p) => ({ ...p, repaymentDate: e.target.value }))}
                           data-testid="input-audit-date"
                         />
                       </div>
