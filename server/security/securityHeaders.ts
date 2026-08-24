@@ -28,9 +28,7 @@ export function buildSecurityHeaderOptions(nodeEnv = process.env.NODE_ENV): Helm
         frameAncestors: ["'self'"],
         frameSrc: ["'self'", "blob:"],
         formAction: ["'self'"],
-        scriptSrc: isProduction
-          ? ["'self'"]
-          : ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        scriptSrc: isProduction ? ["'self'"] : ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         scriptSrcAttr: ["'none'"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
