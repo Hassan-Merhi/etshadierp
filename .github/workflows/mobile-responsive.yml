@@ -88,7 +88,7 @@ jobs:
           trap cleanup EXIT
 
           for attempt in $(seq 1 180); do
-            if curl --fail --silent --show-error http://127.0.0.1:${PORT}/api/health/db \
+            if curl --fail --silent --show-error "http://127.0.0.1:${PORT}/api/health/db" \
               > artifacts/ux-regression-startup/health-db.json; then
               break
             fi
