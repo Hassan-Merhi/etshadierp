@@ -19,6 +19,29 @@ const compatibilityTranslationFiles = [
   "client/src/i18n/sharedUiPhase3Translations.part5.ts",
   "client/src/i18n/sharedUiPhase3Translations.part6.ts",
   "client/src/i18n/sharedUiPhase3Translations.part7.ts",
+  "client/src/i18n/phase3RemainingTranslations.part01.ts",
+  "client/src/i18n/phase3RemainingTranslations.part02.ts",
+  "client/src/i18n/phase3RemainingTranslations.part03.ts",
+  "client/src/i18n/phase3RemainingTranslations.part04.ts",
+  "client/src/i18n/phase3RemainingTranslations.part05.ts",
+  "client/src/i18n/phase3RemainingTranslations.part06.ts",
+  "client/src/i18n/phase3RemainingTranslations.part07.ts",
+  "client/src/i18n/phase3RemainingTranslations.part08.ts",
+  "client/src/i18n/phase3RemainingTranslations.part09.ts",
+  "client/src/i18n/phase3RemainingTranslations.part10.ts",
+  "client/src/i18n/phase3RemainingTranslations.part11.ts",
+  "client/src/i18n/phase3RemainingTranslations.part12.ts",
+  "client/src/i18n/phase3RemainingTranslations.part13.ts",
+  "client/src/i18n/phase3RemainingTranslations.part14.ts",
+  "client/src/i18n/phase3RemainingTranslations.part15.ts",
+  "client/src/i18n/phase3RemainingTranslations.part16.ts",
+  "client/src/i18n/phase3RemainingTranslations.part17.ts",
+  "client/src/i18n/phase3RemainingTranslations.part18.ts",
+  "client/src/i18n/phase3RemainingTranslations.part19.ts",
+  "client/src/i18n/phase3RemainingTranslations.part20.ts",
+  "client/src/i18n/phase3RemainingTranslations.part21.ts",
+  "client/src/i18n/phase3RemainingTranslations.part22.ts",
+  "client/src/i18n/phase3RemainingTranslations.part23.ts",
   "client/src/i18n/supplierPartnerPhase4Translations.part1.ts",
   "client/src/i18n/supplierPartnerPhase4Translations.part2.ts",
   "client/src/i18n/supplierPartnerPhase4Translations.part3.ts",
@@ -87,13 +110,28 @@ function writeOutput(file, content) {
   fs.writeFileSync(file, content);
 }
 
+function decodeCompatibilityValue(quote, rawValue) {
+  // Generated translation inventories serialize their English source with
+  // JSON.stringify. Decode that one serialization layer before comparing it
+  // with scanner findings so escaped newlines, Unicode escapes, and escaped
+  // template markers match the actual source value rather than file encoding.
+  if (quote === '"') {
+    try {
+      return JSON.parse(`"${rawValue}"`);
+    } catch {
+      // Fall through to the legacy quote decoder for hand-authored entries.
+    }
+  }
+  return rawValue.replace(/\\(["'`\\])/g, "$1");
+}
+
 function loadCompatibilityCoveredValues() {
   const values = new Set();
   for (const file of compatibilityTranslationFiles) {
     if (!fs.existsSync(file)) continue;
     const source = fs.readFileSync(file, "utf8");
     for (const match of source.matchAll(/\ben\s*:\s*(["'`])((?:\\.|(?!\1).)*)\1/g)) {
-      values.add(match[2].replace(/\\(["'`])/g, "$1").trim());
+      values.add(decodeCompatibilityValue(match[1], match[2]).trim());
     }
   }
   return values;
