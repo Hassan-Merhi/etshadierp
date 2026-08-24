@@ -353,7 +353,7 @@ export function registerVoucherJournalRoutes(app: Express) {
         let waAccountId = mainAccountId ? Number(mainAccountId) : null;
         let waAccountType = mainAccountType ? String(mainAccountType) : "ledger";
         if (!waAccountId) {
-          const firstLedgerDr = (entries as any[]).find(
+          const firstLedgerDr = (entries).find(
             (e) => e.accountType === "ledger" && e.type === "DR" && Number(e.accountId) > 0
           );
           if (firstLedgerDr) {
@@ -662,7 +662,7 @@ export function registerVoucherJournalRoutes(app: Express) {
         let waAccountId = mainAccountIdPatch ? Number(mainAccountIdPatch) : null;
         let waAccountType = mainAccountTypePatch ? String(mainAccountTypePatch) : "ledger";
         if (!waAccountId) {
-          const firstLedgerDr = (entries as any[]).find(
+          const firstLedgerDr = (entries).find(
             (e) => e.accountType === "ledger" && e.type === "DR" && Number(e.accountId) > 0
           );
           if (firstLedgerDr) {

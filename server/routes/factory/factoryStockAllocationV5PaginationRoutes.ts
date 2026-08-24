@@ -425,7 +425,7 @@ export function registerFactoryStockAllocationV5PaginationRoutes(app: Express): 
         const pageMap = new Map(pageRows.map((row) => [row.articleCode, row]));
         const proformaMaps = new Map<string, Map<number, ProformaDetail>>();
 
-        for (const detail of detailsResult.rows as any[]) {
+        for (const detail of detailsResult.rows) {
           const articleCode = String(detail.articleCode);
           const target = pageMap.get(articleCode);
           if (!target) continue;

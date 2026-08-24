@@ -75,7 +75,7 @@ function applyPaginationHeaders(
   );
 }
 
-function sanitizeForPos(rows: Record<string, unknown>[]): any[] {
+function sanitizeForPos(rows: Record<string, unknown>[]) {
   return rows.map((voucher) => {
     const voucherType = String(voucher.voucherType || "").toLowerCase();
     if (

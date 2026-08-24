@@ -70,7 +70,7 @@ export function isMaerskDirectScraperAvailable(): boolean {
 let _sharedBrowser: any = null;
 let _stealthRegistered = false;
 
-async function getSharedBrowser(): Promise<any> {
+async function getSharedBrowser() {
   // If we already have a live browser, verify it's still responsive
   if (_sharedBrowser) {
     try {
@@ -235,7 +235,7 @@ const normContainer = (v: unknown): string =>
  * found — never blindly trusts index 0, since a response can carry several
  * containers (e.g. a bill-of-lading lookup) and [0] may be a different box.
  */
-function pickContainer(list: any[], wantContainer?: string): any {
+function pickContainer(list: any[], wantContainer?: string) {
   if (!Array.isArray(list) || list.length === 0) return null;
   const wanted = wantContainer ? normContainer(wantContainer) : "";
   if (wanted) {

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { eq, and } from "drizzle-orm";
 import { db, pool } from "../../db";
@@ -21,7 +21,7 @@ import {
 
 export function registerPayrollRunMigrationRoutes(app: Express) {
   // ── Migrate old PAID runs to per-group Salary Expense - {Group} accounts ──
-  app.post("/api/payroll/runs/migrate-group-expenses", requireAuth, requireNonPOS, async (req: any, res: import("express").Response) => {
+  app.post("/api/payroll/runs/migrate-group-expenses", requireAuth, requireNonPOS, async (req: any, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -269,7 +269,10 @@ export function registerPayrollRunMigrationRoutes(app: Express) {
         // Determine what kind of debit entries exist on this voucher
         const hasOldOrGenericDebit = debitRes.rows.some((e) => oldBonusIds.has(e.ledger_account_id));
         const hasPerGroupDebit = debitRes.rows.some((e) => perGroupBonusIds.has(e.ledger_account_id));
-        const creditTotal = creditRes.rows.reduce((s: number, e: { credit_amount: string }) => s + parseFloat(e.credit_amount), 0);
+        const creditTotal = creditRes.rows.reduce(
+          (s: number, e: { credit_amount: string }) => s + parseFloat(e.credit_amount),
+          0
+        );
 
         // Skip only when per-group debits exist AND no old/generic debit remains
         // (vouchers with NO debit entries at all must be processed — previous migration may have

@@ -143,7 +143,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
             activeLocIds.map((locId: number) => calculateHistoricalLocationInventory(locId, companyId, toDate))
           );
           for (const items of allHistorical) {
-            for (const inv of items as any[]) {
+            for (const inv of items) {
               const qty = parseFloat(inv.quantity || "0");
               const rate = parseFloat(inv.averageRate || "0");
               if (qty > 0) stockOnFloor += qty * rate;

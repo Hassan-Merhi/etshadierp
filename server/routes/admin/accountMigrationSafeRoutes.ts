@@ -79,7 +79,7 @@ async function lockCompanies(tx: Parameters<Parameters<typeof db.transaction>[0]
   }
 }
 
-function deepestError(error: unknown): any {
+function deepestError(error: unknown) {
   let current: any = error;
   const seen = new Set();
   while (current?.cause && !seen.has(current.cause)) {

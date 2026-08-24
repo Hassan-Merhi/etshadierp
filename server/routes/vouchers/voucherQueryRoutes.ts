@@ -82,7 +82,7 @@ export function registerVoucherQueryRoutes(app: Express) {
         }
       }
 
-      const filteredVouchers = filterAndSortVouchers(sanitizedVouchers as any[], listQuery);
+      const filteredVouchers = filterAndSortVouchers(sanitizedVouchers, listQuery);
       res.setHeader("Cache-Control", "private, max-age=30, stale-while-revalidate=30");
       if (!listQuery.paginated) return res.json(filteredVouchers);
       return res.json(buildVoucherPage(filteredVouchers, listQuery.page, listQuery.pageSize));

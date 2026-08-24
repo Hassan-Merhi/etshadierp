@@ -124,7 +124,7 @@ export function registerRawStockRecalculateUsedRoutes(app: Express) {
       let totalValidSourceWeight = new Decimal(0);
       let totalExcludedWeight = new Decimal(0);
 
-      for (const rs of allRawStock as any[]) {
+      for (const rs of allRawStock) {
         const valid = validByContainer.get(rs.containerId) || { used: 0, count: 0 };
         const excluded = excludedByContainer.get(rs.containerId) || { weight: 0, count: 0 };
         const oldUsedKg = new Decimal(rs.usedKg || "0").toDecimalPlaces(3);

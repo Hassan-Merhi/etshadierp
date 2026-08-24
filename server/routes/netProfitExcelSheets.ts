@@ -466,7 +466,7 @@ export function writeSummarySheet(
   };
 
   const writeSectionHdr = (label: string, color: string) => {
-    const rowData: any[] = [label];
+    const rowData = [label];
     for (let i = 0; i <= numMonths; i++) rowData.push("");
     const row = ws.addRow(rowData);
     row.eachCell((cell: any) => {

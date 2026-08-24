@@ -44,7 +44,7 @@ function guessWidth(key: string): number {
   return 16;
 }
 
-function formatValue(val: any): any {
+function formatValue(val: any) {
   if (val === null || val === undefined) return "";
   if (val instanceof Date) return val.toISOString().substring(0, 19).replace("T", " ");
   // Stringify objects/arrays (e.g. JSONB columns)

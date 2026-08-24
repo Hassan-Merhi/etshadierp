@@ -464,9 +464,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
               });
               return;
             }
-            const uniqueSrcIds = [
-              ...new Set(itemsWithRate.map((i) => Number(i.sourceLocationId)).filter(Boolean)),
-            ];
+            const uniqueSrcIds = [...new Set(itemsWithRate.map((i) => Number(i.sourceLocationId)).filter(Boolean))];
             let sourceName = "Multiple Sources";
             if (uniqueSrcIds.length === 1) {
               const [srcLoc] = await db

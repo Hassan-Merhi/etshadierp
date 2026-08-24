@@ -480,7 +480,7 @@ export function registerBalesReportRoutes(app: Express) {
 
       let results = [];
 
-      const baseConditions: any[] = [
+      const baseConditions = [
         eq(factoryBales.companyId, companyId),
         or(
           eq(factoryBales.referenceNumber, barcode),

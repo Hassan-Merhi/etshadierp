@@ -203,7 +203,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           );
         }
 
-        const bales: any[] = insertedBales.map((b, idx: number) => {
+        const bales = insertedBales.map((b, idx: number) => {
           const attribution = baleAttributionRefs[idx];
           return {
             ...b,

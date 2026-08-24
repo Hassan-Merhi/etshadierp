@@ -238,9 +238,9 @@ export function registerFactoryProductImportRoutes(app: Express) {
           const XLSX = await import("xlsx-js-style");
           const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
           const sheetName = workbook.SheetNames[0];
-          const rows: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+          const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-          const getVal = (row: any, ...keys: string[]): any => {
+          const getVal = (row: any, ...keys: string[]) => {
             const rowKeys = Object.keys(row);
             for (const k of keys) {
               const found = rowKeys.find((rk) => rk.trim().toLowerCase() === k.toLowerCase());
@@ -383,7 +383,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
           const sheetName = workbook.SheetNames[0];
           const rows: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-          const getVal = (row: any, ...keys: string[]): any => {
+          const getVal = (row: any, ...keys: string[]) => {
             const rowKeys = Object.keys(row);
             for (const k of keys) {
               const found = rowKeys.find((rk) => rk.trim().toLowerCase() === k.toLowerCase());

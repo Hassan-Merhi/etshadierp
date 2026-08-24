@@ -29,7 +29,7 @@ async function completedPairLinks(
   targetId: number,
   sourceTable: string,
   targetTable: string
-): Promise<any[]> {
+) {
   const result = await db.execute(sql`
     SELECT DISTINCT ON (l.source_id) l.source_id, l.target_id
     FROM sp_migration_source_links l
@@ -439,7 +439,7 @@ async function verifyUserMappings(
   };
 }
 
-export async function buildFinalMigrationVerification(sourceId: number, targetId: number): Promise<any> {
+export async function buildFinalMigrationVerification(sourceId: number, targetId: number) {
   const base = await buildCutoverReadiness(sourceId, targetId);
   const blockers: VerificationIssue[] = (base.blockers ?? []).filter(
     (issue: VerificationIssue) => !["UNMAPPED_INVENTORY", "TARGET_ALREADY_LIVE"].includes(issue.code)
