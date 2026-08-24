@@ -28,7 +28,13 @@ jobs:
         run: UPDATE_TYPE_ESCAPE_BASELINE=1 npm run audit:type-escapes
       - name: Refresh boundary inventory
         run: node scripts/phase23-boundary-inventory.mjs --write
-      - name: Commit batch for PR certification
+      - name: TypeScript certification
+        run: npm run check
+      - name: ESLint certification
+        run: npm run lint
+      - name: Verify exact type-escape audit
+        run: npm run audit:type-escapes
+      - name: Commit certified batch for PR
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -38,9 +44,3 @@ jobs:
           fi
           git commit -m "refactor(types): type route service boundaries [phase23-autofix]"
           git push
-      - name: TypeScript certification
-        run: npm run check
-      - name: ESLint certification
-        run: npm run lint
-      - name: Verify exact type-escape audit
-        run: npm run audit:type-escapes
