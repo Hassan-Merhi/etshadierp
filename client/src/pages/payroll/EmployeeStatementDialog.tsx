@@ -1,3 +1,6 @@
+import type { usePayrollModel } from "./usePayrollModel";
+
+type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -7,13 +10,13 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 
 interface EmployeeStatementDialogProps {
-  statementEmployee: any;
-  setStatementEmployee: (v: any) => void;
+  statementEmployee: PayrollModel["statementEmployee"];
+  setStatementEmployee: PayrollModel["setStatementEmployee"];
   transactionsLoading: boolean;
-  employeeTransactions: any[];
+  employeeTransactions: PayrollModel["employeeTransactions"];
   statementExpanded: boolean;
-  setStatementExpanded: (fn: (prev: boolean) => boolean) => void;
-  cleanTxnDesc: (desc: string) => string;
+  setStatementExpanded: PayrollModel["setStatementExpanded"];
+  cleanTxnDesc: PayrollModel["cleanTxnDesc"];
 }
 
 export function EmployeeStatementDialog({
@@ -56,22 +59,14 @@ export function EmployeeStatementDialog({
             <div className="rounded-md border bg-muted/30 p-3">
               <p className="text-xs text-muted-foreground">Total Deposited</p>
               <p className="font-mono font-semibold text-sm mt-1">
-                {formatAmount(
-                  employeeTransactions
-                    .filter((t) => !t.isDebit)
-                    .reduce((s: number, t) => s + parseFloat(t.amount || "0"), 0)
-                )}
+                {formatAmount(employeeTransactions.filter((t) => !t.isDebit).reduce((s, t) => s + Number(t.amount || 0), 0))}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">Credits</p>
             </div>
             <div className="rounded-md border bg-muted/30 p-3">
               <p className="text-xs text-muted-foreground">Total Withdrawn</p>
               <p className="font-mono font-semibold text-sm mt-1">
-                {formatAmount(
-                  employeeTransactions
-                    .filter((t) => t.isDebit)
-                    .reduce((s: number, t) => s + parseFloat(t.amount || "0"), 0)
-                )}
+                {formatAmount(employeeTransactions.filter((t) => t.isDebit).reduce((s, t) => s + Number(t.amount || 0), 0))}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">Debits</p>
             </div>
@@ -97,16 +92,10 @@ export function EmployeeStatementDialog({
           ) : (
             (() => {
               const sorted = [...employeeTransactions].sort(
-                (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+                (a, b) => new Date(a.date || "").getTime() - new Date(b.date || "").getTime()
               );
-              const totalDebit = sorted.reduce(
-                (s: number, t) => s + (t.isDebit ? parseFloat(t.amount || "0") : 0),
-                0
-              );
-              const totalCredit = sorted.reduce(
-                (s: number, t) => s + (!t.isDebit ? parseFloat(t.amount || "0") : 0),
-                0
-              );
+              const totalDebit = sorted.reduce((s, t) => s + (t.isDebit ? Number(t.amount || 0) : 0), 0);
+              const totalCredit = sorted.reduce((s, t) => s + (!t.isDebit ? Number(t.amount || 0) : 0), 0);
               const currentBalance = parseFloat(statementEmployee?.calculatedBalance || "0");
               const openingBalance = currentBalance - totalCredit + totalDebit;
               return (
@@ -170,14 +159,14 @@ export function EmployeeStatementDialog({
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-sm">
                                   {txn.isDebit ? (
-                                    formatAmount(parseFloat(txn.amount || "0"))
+                                    formatAmount(Number(txn.amount || 0))
                                   ) : (
                                     <span className="text-muted-foreground">—</span>
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-sm">
                                   {!txn.isDebit ? (
-                                    formatAmount(parseFloat(txn.amount || "0"))
+                                    formatAmount(Number(txn.amount || 0))
                                   ) : (
                                     <span className="text-muted-foreground">—</span>
                                   )}
@@ -191,9 +180,7 @@ export function EmployeeStatementDialog({
                                 Total
                               </TableCell>
                               <TableCell className="text-right font-mono text-sm">{formatAmount(totalDebit)}</TableCell>
-                              <TableCell className="text-right font-mono text-sm">
-                                {formatAmount(totalCredit)}
-                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">{formatAmount(totalCredit)}</TableCell>
                             </TableRow>
                             <TableRow className="font-semibold bg-muted/20">
                               <TableCell colSpan={3} className="text-sm text-muted-foreground">
@@ -228,12 +215,10 @@ export function EmployeeStatementDialog({
                               </div>
                               <div className="text-right shrink-0">
                                 {txn.isDebit ? (
-                                  <p className="font-mono text-sm font-medium">
-                                    {formatAmount(parseFloat(txn.amount || "0"))}
-                                  </p>
+                                  <p className="font-mono text-sm font-medium">{formatAmount(Number(txn.amount || 0))}</p>
                                 ) : (
                                   <p className="font-mono text-sm font-medium text-green-600 dark:text-green-400">
-                                    {formatAmount(parseFloat(txn.amount || "0"))}
+                                    {formatAmount(Number(txn.amount || 0))}
                                   </p>
                                 )}
                                 <p className="text-xs text-muted-foreground">{txn.isDebit ? "Dr" : "Cr"}</p>
