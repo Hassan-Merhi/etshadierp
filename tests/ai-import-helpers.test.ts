@@ -11,13 +11,19 @@ const harness = vi.hoisted(() => ({
   insertedValues: vi.fn(),
 }));
 
-function terminal(result: unknown[]) {
-  return {
-    limit: vi.fn().mockResolvedValue(result),
+function selectChain(result: unknown[]) {
+  const chain = {
+    from: vi.fn(),
+    where: vi.fn(),
+    limit: vi.fn(),
     then(resolve: (value: unknown[]) => unknown, reject: (reason: unknown) => unknown) {
       return Promise.resolve(result).then(resolve, reject);
     },
   };
+  chain.from.mockReturnValue(chain);
+  chain.where.mockReturnValue(chain);
+  chain.limit.mockResolvedValue(result);
+  return chain;
 }
 
 vi.mock("../server/db", () => ({
@@ -47,14 +53,7 @@ import {
 beforeEach(() => {
   vi.clearAllMocks();
   harness.selectResults.length = 0;
-  harness.select.mockImplementation(() => {
-    const result = harness.selectResults.shift() ?? [];
-    return {
-      from: vi.fn(() => ({
-        where: vi.fn(() => terminal(result)),
-      })),
-    };
-  });
+  harness.select.mockImplementation(() => selectChain(harness.selectResults.shift() ?? []));
   harness.updateWhere.mockResolvedValue(undefined);
   harness.updatedValues.mockReturnValue({ where: harness.updateWhere });
   harness.update.mockReturnValue({ set: harness.updatedValues });
