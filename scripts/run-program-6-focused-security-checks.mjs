@@ -19,6 +19,9 @@ const commands = [
       "tests/program-4-end-to-end-enforcement.test.ts",
       "tests/protected-asset-download-adapter.test.ts",
       "tests/security-audit-runtime.test.ts",
+      "tests/security-headers-csp.test.ts",
+      "tests/transaction-company-scope-request-binding.test.ts",
+      "tests/phase4-tenant-surface-regression.test.ts",
       "--maxWorkers=1",
       "--no-file-parallelism",
     ],
@@ -46,4 +49,4 @@ for (const [command, args] of commands) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-console.log("\nProgram 6 focused security checks passed.");
+console.log("\nProgram 6 + Phase 4 focused security checks passed.");
