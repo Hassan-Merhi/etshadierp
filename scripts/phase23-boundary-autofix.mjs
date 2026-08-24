@@ -9,14 +9,10 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const routeRoot = path.join(projectRoot, "server/routes");
 const helperPath = path.join(routeRoot, "routeBoundaryTypes.ts");
 
-const TARGET_PREFIXES = [
-  "factory-intelligence/",
-  "factory-payroll/",
-  "factory-workers/",
-  "factory-reports/",
-  "container-loaded-items/",
-  "supplier-profit-check/",
-];
+// Apply only where a route registrar explicitly injects both auth and db as
+// untyped dependencies. The transform is intentionally pattern-gated rather
+// than rewriting arbitrary `any` throughout route code.
+const TARGET_PREFIXES = [""];
 
 const CALLBACK_METHODS = [
   "map",
