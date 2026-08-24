@@ -7,22 +7,38 @@ Run these checks before every push to `main` or before opening a pull request.
 ## Automated Checks
 
 ```bash
-# 1. TypeScript type-check (slow — 2-5 min, skip in Replit sandbox if needed; runs in CI)
+# 1. Repository contracts and static ratchets
+npm run verify:env-docs
+npm run audit:type-escapes
+npm run audit:doc-index
+npm run audit:write-routes
+npm run audit:write-evidence
+npm run audit:toolchain
+npm run audit:scripts
+
+# 2. TypeScript type-check
 npm run check
 
-# 2. Build (full frontend + backend bundle)
+# 3. Build (full frontend + backend bundle and runtime dependency verification)
 npm run build
 
-# 3. Lint (ESLint across client/src, server, shared)
+# 4. Lint plus the per-rule warning ratchet
 npm run lint
+npm run audit:lint-ratchet
 
-# 4. Format check (Prettier)
-npm run format:check
+# 5. Format only the files changed from the intended base
+npm run format:check:changed -- --base origin/main
+
+# 6. Backend and frontend regression suites
+npm run test:backend:verify
+npm run test:frontend
 ```
 
-If `format:check` fails, run `npm run format` to auto-fix, then re-run the check.
+If the format check fails, format the named files and re-run the same changed-file
+check. The canonical CI and CircleCI gates use this changed-file scope.
 
-If `lint` reports errors (severity 2 violations from ESLint recommended rules), fix them before pushing. Warnings are acceptable.
+Lint errors are blocking. Warnings are also ratcheted by total and by rule; they
+may decrease but may not exceed `config/lint-warning-ratchet.json`.
 
 ---
 
@@ -89,9 +105,10 @@ After starting the dev server (`npm run dev`), manually verify:
 
 ## Schema / Migration Check (if you changed `shared/schema/`)
 
-- [ ] Added an idempotent `ALTER TABLE` / `CREATE TABLE IF NOT EXISTS` statement to the migration array in `server/index.ts`
+- [ ] Added an idempotent migration in `server/startup-schema/` and registered it in `server/startup-schema/index.ts`
+- [ ] Ran `npm run verify:migrations`
 - [ ] Server starts and logs `✓ Database tables and columns verified/migrated` without errors
-- [ ] Did **not** run `drizzle-kit push` (it is currently blocked due to schema drift)
+- [ ] Did **not** run `drizzle-kit push` against a persistent database
 
 ---
 
@@ -114,10 +131,8 @@ After starting the dev server (`npm run dev`), manually verify:
 
 ## CI
 
-The GitHub Actions CI workflow (`.github/workflows/ci.yml`) runs automatically on push/PR to `main`:
-- Type-check
-- Build
-- Lint
-- Format check
-
-A green CI run covers the automated checks above. Manual functional tests still need to be done locally.
+`main` is certified by the canonical GitHub Actions suite, the five CircleCI
+lanes (`static-build`, `postgres-regression`, `backend-core-regression`,
+`frontend-regression`, and `security-readiness`), Release Verification, and the
+exact-main certification status. A green PR is necessary but not sufficient:
+after merging, verify the checks again on the exact merged `main` SHA.
