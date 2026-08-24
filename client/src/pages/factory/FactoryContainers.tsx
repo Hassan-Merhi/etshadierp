@@ -232,7 +232,11 @@ export default function FactoryContainers() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <PageHeader title="Factory Containers" subtitle="Track incoming containers (separate from ERP containers)" />
+          <PageHeader
+            title="Factory Containers"
+            subtitle="Track incoming containers (separate from ERP containers)"
+            backTarget="/factory/production-report"
+          />
         </div>
         <div className="flex gap-2 flex-wrap">
           {selectedIds.size > 0 && (

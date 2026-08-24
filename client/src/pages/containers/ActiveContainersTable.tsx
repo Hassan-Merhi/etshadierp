@@ -100,8 +100,7 @@ export function ActiveContainersTable({
                       value={editingNumberValue}
                       onChange={(e) => onEditNumberChange(e.target.value.toUpperCase())}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter")
-                          onEditNumberSave(container.id, editingNumberValue);
+                        if (e.key === "Enter") onEditNumberSave(container.id, editingNumberValue);
                         if (e.key === "Escape") onEditNumberCancel();
                       }}
                       autoFocus
@@ -155,6 +154,14 @@ export function ActiveContainersTable({
               <div className="text-right hidden sm:block">
                 <p className="text-xs text-muted-foreground">Import date</p>
                 <p className="text-sm font-mono">{formatDisplayDate(container.importDate)}</p>
+                {container.status === "OFFLOADED" && container.offloadDate && (
+                  <div className="mt-1">
+                    <p className="text-xs font-medium text-green-700 dark:text-green-300">Offloaded date</p>
+                    <p className="text-sm font-mono text-green-700 dark:text-green-300">
+                      {formatDisplayDate(container.offloadDate)}
+                    </p>
+                  </div>
+                )}
               </div>
               {!hideContainerCosts && (
                 <div className="text-right">

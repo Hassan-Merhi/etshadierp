@@ -10,7 +10,7 @@ export function useContainerFilters(allContainers: Container[], soldContainers: 
   const debouncedSearch = useDebounce(searchTerm, 300);
   const debouncedSoldSearch = useDebounce(soldSearchTerm, 300);
   const debouncedOtwSearch = useDebounce(otwSearchTerm, 300);
-  const [statusFilter, setStatusFilter] = useState("OTW");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [supplierFilter, setSupplierFilter] = useState<string[]>([]);
   // OTW Tracking filters
   const [otwLocationFilter, setOtwLocationFilter] = useState("ALL");
@@ -47,13 +47,11 @@ export function useContainerFilters(allContainers: Container[], soldContainers: 
     // Search filter
     if (debouncedOtwSearch) {
       const search = (debouncedOtwSearch || "").toLowerCase();
-      if (
-        !(
-          (c.containerNumber || "").toLowerCase().includes(search) ||
-          (c.shopName?.toLowerCase() || "").includes(search) ||
-          (c.agent?.toLowerCase() || "").includes(search)
-        )
-      ) {
+      if (!(
+        (c.containerNumber || "").toLowerCase().includes(search) ||
+        (c.shopName?.toLowerCase() || "").includes(search) ||
+        (c.agent?.toLowerCase() || "").includes(search)
+      )) {
         return false;
       }
     }

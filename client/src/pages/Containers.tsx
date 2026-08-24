@@ -9,7 +9,6 @@ import { AddContainerDialog } from "../components/AddContainerDialog";
 // Split-out hooks
 import { useContainerQueries } from "./containers/useContainerQueries";
 import { useContainerSyncAll } from "./containers/useContainerSyncAll";
-import { useContainerTracking } from "./containers/useContainerTracking";
 import { useContainerNumberEdit } from "./containers/useContainerNumberEdit";
 import { useContainerImportExport } from "./containers/useContainerImportExport";
 import { useJsonCargoEta } from "./containers/useJsonCargoEta";
@@ -17,8 +16,6 @@ import { useJsonCargoEta } from "./containers/useJsonCargoEta";
 import { useContainerFilters } from "./containers/useContainerFilters";
 import { ContainerFilters } from "./containers/ContainerFilters";
 import { ActiveContainersTable } from "./containers/ActiveContainersTable";
-import { OtwContainersTable } from "./containers/OtwContainersTable";
-import { SoldContainersTable } from "./containers/SoldContainersTable";
 import { ContainerToolbar } from "./containers/ContainerToolbar";
 import { ContainerConfirmDialogs } from "./containers/ContainerConfirmDialogs";
 import { ContainerLoadingState } from "./containers/ContainerLoadingState";
@@ -26,46 +23,34 @@ import { ContainerSpView } from "./containers/ContainerSpView";
 
 export default function Containers() {
   const { formatDisplayDate } = useDateFormat();
-  const [activeTab, setActiveTab] = useState("active");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
   const [, setLocation] = useLocation();
 
   const isSupplierPartner = selectedCompany?.companyType === "supplier_partner";
-  const isFactory =
-    selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
+  const isFactory = selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
 
   const {
     allContainers,
     soldContainers,
     spContainersList,
     suppliers,
-    freightStatusMap,
     isLoading,
-    isSoldLoading,
     spContainersLoading,
     hideContainerCosts,
     isDeveloper,
   } = useContainerQueries(selectedCompany, isSupplierPartner, isFactory);
 
   const {
-    searchTerm, setSearchTerm,
-    soldSearchTerm, setSoldSearchTerm,
-    otwSearchTerm, setOtwSearchTerm,
-    statusFilter, setStatusFilter,
-    supplierFilter, setSupplierFilter,
-    otwLocationFilter, setOtwLocationFilter,
-    otwSupplierFilter, setOtwSupplierFilter,
-    otwAgentFilter, setOtwAgentFilter,
-    otwTransporterFilter, setOtwTransporterFilter,
-    otwTruckFilter, setOtwTruckFilter,
-    otwDocReceivedFilter, setOtwDocReceivedFilter,
-    otwFreightStatusFilter, setOtwFreightStatusFilter,
-    otwNotesFilter, setOtwNotesFilter,
-    uniqueOtwLocations, uniqueOtwAgents, uniqueOtwTransporters, uniqueOtwSuppliers, uniqueOtwTrucks,
-    otwContainers, filteredOtwContainers, filteredSoldContainers,
-    containers, clearFilters,
+    searchTerm,
+    setSearchTerm,
+    statusFilter,
+    setStatusFilter,
+    supplierFilter,
+    setSupplierFilter,
+    containers,
+    clearFilters,
   } = useContainerFilters(allContainers, soldContainers);
 
   const getSupplierName = (supplierId: number) => {
@@ -74,12 +59,11 @@ export default function Containers() {
   };
 
   const syncAll = useContainerSyncAll();
-  const tracking = useContainerTracking(filteredOtwContainers);
   const jsonCargoEta = useJsonCargoEta();
   const numberEdit = useContainerNumberEdit();
   const importExport = useContainerImportExport({
     containers,
-    filteredOtwContainers,
+    filteredOtwContainers: containers.filter((container) => container.status === "OTW"),
     getSupplierName,
     formatDisplayDate,
   });
@@ -177,117 +161,42 @@ export default function Containers() {
         </div>
       )}
 
-      {/* Tab bar */}
-      <div className="flex gap-1 border-b pb-0">
-        {(["active", "otw", "sold"] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={[
-              "px-4 py-2 text-sm font-medium rounded-t-md border border-b-0 -mb-px transition-colors",
-              activeTab === tab
-                ? "bg-background border-border text-foreground"
-                : "bg-muted/40 border-transparent text-muted-foreground hover:text-foreground",
-            ].join(" ")}
-            data-testid={`tab-${tab}`}
-          >
-            {tab === "active" ? "Active" : tab === "otw" ? "OTW" : "Sold"}
-          </button>
-        ))}
-      </div>
+      <ContainerFilters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        statusFilter={statusFilter}
+        onStatusChange={setStatusFilter}
+        supplierFilter={supplierFilter}
+        onSupplierFilterChange={setSupplierFilter}
+        suppliers={suppliers}
+        getSupplierName={getSupplierName}
+        onClearFilters={clearFilters}
+      />
 
-      {activeTab === "active" && (
-        <>
-          <ContainerFilters
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
-            statusFilter={statusFilter}
-            onStatusChange={setStatusFilter}
-            supplierFilter={supplierFilter}
-            onSupplierFilterChange={setSupplierFilter}
-            suppliers={suppliers}
-            getSupplierName={getSupplierName}
-            onClearFilters={clearFilters}
-          />
-
-          <ActiveContainersTable
-            containers={containers}
-            allContainers={allContainers}
-            isLoading={isLoading}
-            hideContainerCosts={hideContainerCosts}
-            formatDisplayDate={formatDisplayDate}
-            formatAmount={formatAmount}
-            editingNumberId={numberEdit.editingNumberId}
-            editingNumberValue={numberEdit.editingNumberValue}
-            onEditNumberStart={(id, number) => {
-              numberEdit.setEditingNumberId(id);
-              numberEdit.setEditingNumberValue(number);
-            }}
-            onEditNumberChange={numberEdit.setEditingNumberValue}
-            onEditNumberSave={(id, containerNumber) =>
-              numberEdit.editContainerNumberMutation.mutate({ id, containerNumber })
-            }
-            onEditNumberCancel={() => {
-              numberEdit.setEditingNumberId(null);
-              numberEdit.setEditingNumberValue("");
-            }}
-            isEditNumberPending={numberEdit.editContainerNumberMutation.isPending}
-            getSupplierName={getSupplierName}
-          />
-        </>
-      )}
-
-      {activeTab === "otw" && (
-        <OtwContainersTable
-          filteredOtwContainers={filteredOtwContainers}
-          otwContainers={otwContainers}
-          otwSearchTerm={otwSearchTerm}
-          setOtwSearchTerm={setOtwSearchTerm}
-          otwSupplierFilter={otwSupplierFilter}
-          setOtwSupplierFilter={setOtwSupplierFilter}
-          otwLocationFilter={otwLocationFilter}
-          setOtwLocationFilter={setOtwLocationFilter}
-          otwTruckFilter={otwTruckFilter}
-          setOtwTruckFilter={setOtwTruckFilter}
-          otwAgentFilter={otwAgentFilter}
-          setOtwAgentFilter={setOtwAgentFilter}
-          otwTransporterFilter={otwTransporterFilter}
-          setOtwTransporterFilter={setOtwTransporterFilter}
-          otwDocReceivedFilter={otwDocReceivedFilter}
-          setOtwDocReceivedFilter={setOtwDocReceivedFilter}
-          otwFreightStatusFilter={otwFreightStatusFilter}
-          setOtwFreightStatusFilter={setOtwFreightStatusFilter}
-          otwNotesFilter={otwNotesFilter}
-          setOtwNotesFilter={setOtwNotesFilter}
-          uniqueOtwLocations={uniqueOtwLocations}
-          uniqueOtwSuppliers={uniqueOtwSuppliers}
-          uniqueOtwAgents={uniqueOtwAgents}
-          uniqueOtwTransporters={uniqueOtwTransporters}
-          uniqueOtwTrucks={uniqueOtwTrucks}
-          getSupplierName={getSupplierName}
-          formatAmount={formatAmount}
-          freightStatusMap={freightStatusMap}
-          getEditValue={tracking.getEditValue}
-          setEditValue={tracking.setEditValue}
-          hasChanges={tracking.hasChanges}
-          saveTracking={tracking.saveTracking}
-          savingIds={tracking.savingIds}
-          handleKeyDown={tracking.handleKeyDown}
-          autoSizeStyle={tracking.autoSizeStyle}
-        />
-      )}
-
-      {activeTab === "sold" && (
-        <SoldContainersTable
-          isSoldLoading={isSoldLoading}
-          soldContainers={soldContainers}
-          filteredSoldContainers={filteredSoldContainers}
-          soldSearchTerm={soldSearchTerm}
-          setSoldSearchTerm={setSoldSearchTerm}
-          formatDisplayDate={formatDisplayDate}
-          formatAmount={formatAmount}
-        />
-      )}
+      <ActiveContainersTable
+        containers={containers}
+        allContainers={allContainers}
+        isLoading={isLoading}
+        hideContainerCosts={hideContainerCosts}
+        formatDisplayDate={formatDisplayDate}
+        formatAmount={formatAmount}
+        editingNumberId={numberEdit.editingNumberId}
+        editingNumberValue={numberEdit.editingNumberValue}
+        onEditNumberStart={(id, number) => {
+          numberEdit.setEditingNumberId(id);
+          numberEdit.setEditingNumberValue(number);
+        }}
+        onEditNumberChange={numberEdit.setEditingNumberValue}
+        onEditNumberSave={(id, containerNumber) =>
+          numberEdit.editContainerNumberMutation.mutate({ id, containerNumber })
+        }
+        onEditNumberCancel={() => {
+          numberEdit.setEditingNumberId(null);
+          numberEdit.setEditingNumberValue("");
+        }}
+        isEditNumberPending={numberEdit.editContainerNumberMutation.isPending}
+        getSupplierName={getSupplierName}
+      />
 
       <AddContainerDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
 

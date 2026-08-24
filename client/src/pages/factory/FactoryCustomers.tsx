@@ -234,14 +234,20 @@ export default function FactoryCustomers() {
               onClick={() => setShowZeroBalance((visible) => !visible)}
               aria-pressed={showZeroBalance}
               data-testid="button-toggle-zero-balance"
-              className="gap-2"
+              size="sm"
+              className="h-9 gap-2 rounded-lg px-4"
             >
               {showZeroBalance ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               {showZeroBalance ? "Hide 0 Balance" : `Show 0 Balance (${zeroBalanceCount})`}
             </Button>
           )}
-          <Button onClick={openCreate} data-testid="button-add-customer">
-            <Plus className="h-4 w-4 mr-2" />
+          <Button
+            onClick={openCreate}
+            data-testid="button-add-customer"
+            size="sm"
+            className="h-9 gap-2 rounded-lg px-4 shadow-sm"
+          >
+            <Plus className="h-4 w-4" />
             Add Customer
           </Button>
         </div>
@@ -269,16 +275,13 @@ export default function FactoryCustomers() {
                 <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                   Balance
                 </TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
-                  Status
-                </TableHead>
                 <TableHead className="w-[90px] py-2"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {visibleCustomers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
                     {search
                       ? "No customers match your search"
                       : zeroBalanceCount > 0
@@ -310,14 +313,6 @@ export default function FactoryCustomers() {
                       ) : (
                         "-"
                       )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={customer.active ? "default" : "secondary"}
-                        data-testid={`badge-customer-status-${customer.id}`}
-                      >
-                        {customer.active ? "Active" : "Inactive"}
-                      </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">

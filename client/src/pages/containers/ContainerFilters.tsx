@@ -1,9 +1,4 @@
-import {
-  Search,
-  Filter,
-  X,
-  ChevronDown,
-} from "lucide-react";
+import { Search, Filter, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -53,7 +48,7 @@ export function ContainerFilters({
         />
       </div>
       <div className="flex gap-1 flex-wrap">
-        {(["ALL", "OTW", "ARRIVED", "OFFLOADED"] as const).map((s) => (
+        {(["ALL", "OTW", "OFFLOADED"] as const).map((s) => (
           <Button
             key={s}
             size="sm"
@@ -61,7 +56,7 @@ export function ContainerFilters({
             onClick={() => onStatusChange(s)}
             data-testid={`button-status-${s.toLowerCase()}`}
           >
-            {s === "ALL" ? "All" : s === "OTW" ? "OTW" : s === "ARRIVED" ? "Arrived" : "Offloaded"}
+            {s === "ALL" ? "All" : s === "OTW" ? "OTW" : "Offloaded"}
           </Button>
         ))}
       </div>
@@ -88,7 +83,9 @@ export function ContainerFilters({
                   className="flex items-center gap-2 cursor-pointer"
                   onSelect={(e) => {
                     e.preventDefault();
-                    onSupplierFilterChange(checked ? supplierFilter.filter((v) => v !== val) : [...supplierFilter, val]);
+                    onSupplierFilterChange(
+                      checked ? supplierFilter.filter((v) => v !== val) : [...supplierFilter, val]
+                    );
                   }}
                 >
                   <Checkbox checked={checked} className="pointer-events-none" />

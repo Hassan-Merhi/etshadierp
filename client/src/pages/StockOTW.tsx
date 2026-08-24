@@ -8,7 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Package, Search, Ship, AlertCircle, ChevronRight, ChevronDown, X, Layers, FileDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -54,8 +62,8 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
   const _modeApiRequest = getApiRequest(appMode);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGrade, setSelectedGrade] = useState<string>("all");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedSupplier, setSelectedSupplier] = useState<string>("all");
+  const [selectedCategory, setSelectedCategory] = useState<string[]>([]);
+  const [selectedSupplier, setSelectedSupplier] = useState<string[]>([]);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
 
@@ -166,8 +174,9 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
 
   const filteredItems = groupedItems.filter((item) => {
     if (selectedGrade !== "all" && item.gradeName !== selectedGrade) return false;
-    if (selectedCategory !== "all" && item.categoryName !== selectedCategory) return false;
-    if (selectedSupplier !== "all" && !item.containers.some((c) => c.supplierName === selectedSupplier)) return false;
+    if (selectedCategory.length > 0 && !selectedCategory.includes(item.categoryName ?? "")) return false;
+    if (selectedSupplier.length > 0 && !item.containers.some((c) => selectedSupplier.includes(c.supplierName)))
+      return false;
     if (searchTerm === "") return true;
     const search = searchTerm.toLowerCase();
     return (
@@ -198,17 +207,17 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
 
   const containerGrandTotal = otwContainers.reduce((sum, c) => sum + parseFloat(c.grandTotal || "0"), 0);
   const isFiltered =
-    searchTerm.trim() !== "" || selectedGrade !== "all" || selectedCategory !== "all" || selectedSupplier !== "all";
+    searchTerm.trim() !== "" || selectedGrade !== "all" || selectedCategory.length > 0 || selectedSupplier.length > 0;
   const displayTotal = isFiltered ? totalValue : containerGrandTotal;
 
   const hasActiveFilters =
-    searchTerm !== "" || selectedGrade !== "all" || selectedCategory !== "all" || selectedSupplier !== "all";
+    searchTerm !== "" || selectedGrade !== "all" || selectedCategory.length > 0 || selectedSupplier.length > 0;
 
   const clearFilters = () => {
     setSearchTerm("");
     setSelectedGrade("all");
-    setSelectedCategory("all");
-    setSelectedSupplier("all");
+    setSelectedCategory([]);
+    setSelectedSupplier([]);
   };
 
   const exportToExcel = async () => {
@@ -267,12 +276,12 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
       statsCell.font = { size: 10, color: { argb: "374151" } };
       statsCell.alignment = mid;
 
-      if (searchTerm || selectedGrade !== "all" || selectedCategory !== "all" || selectedSupplier !== "all") {
+      if (searchTerm || selectedGrade !== "all" || selectedCategory.length > 0 || selectedSupplier.length > 0) {
         const filters: string[] = [];
         if (searchTerm) filters.push(`Search: "${searchTerm}"`);
         if (selectedGrade !== "all") filters.push(`Grade: ${selectedGrade}`);
-        if (selectedCategory !== "all") filters.push(`Category: ${selectedCategory}`);
-        if (selectedSupplier !== "all") filters.push(`Supplier: ${selectedSupplier}`);
+        if (selectedCategory.length > 0) filters.push(`Categories: ${selectedCategory.join(", ")}`);
+        if (selectedSupplier.length > 0) filters.push(`Suppliers: ${selectedSupplier.join(", ")}`);
         ws.getRow(5).height = 16;
         ws.mergeCells(5, 1, 5, COLS);
         const fCell = ws.getCell("A5");
@@ -550,34 +559,112 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
             </Select>
           )}
           {categoryOptions.length > 0 && (
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-[150px]" data-testid="select-category-filter">
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categoryOptions.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-[170px] justify-between gap-2"
+                  data-testid="select-category-filter"
+                >
+                  <span className="truncate">
+                    {selectedCategory.length === 0
+                      ? "All Categories"
+                      : selectedCategory.length === 1
+                        ? selectedCategory[0]
+                        : `${selectedCategory.length} Categories`}
+                  </span>
+                  <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-[220px]">
+                {categoryOptions.map((category) => {
+                  const checked = selectedCategory.includes(category);
+                  return (
+                    <DropdownMenuItem
+                      key={category}
+                      className="cursor-pointer gap-2"
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        setSelectedCategory((current) =>
+                          checked ? current.filter((value) => value !== category) : [...current, category]
+                        );
+                      }}
+                    >
+                      <Checkbox checked={checked} className="pointer-events-none" />
+                      <span className="truncate">{category}</span>
+                    </DropdownMenuItem>
+                  );
+                })}
+                {selectedCategory.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="cursor-pointer justify-center text-xs text-muted-foreground"
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        setSelectedCategory([]);
+                      }}
+                    >
+                      Clear categories
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           {supplierOptions.length > 1 && (
-            <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
-              <SelectTrigger className="w-[160px]" data-testid="select-supplier-filter">
-                <SelectValue placeholder="All Suppliers" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Suppliers</SelectItem>
-                {supplierOptions.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-[180px] justify-between gap-2"
+                  data-testid="select-supplier-filter"
+                >
+                  <span className="truncate">
+                    {selectedSupplier.length === 0
+                      ? "All Suppliers"
+                      : selectedSupplier.length === 1
+                        ? selectedSupplier[0]
+                        : `${selectedSupplier.length} Suppliers`}
+                  </span>
+                  <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-[240px]">
+                {supplierOptions.map((supplier) => {
+                  const checked = selectedSupplier.includes(supplier);
+                  return (
+                    <DropdownMenuItem
+                      key={supplier}
+                      className="cursor-pointer gap-2"
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        setSelectedSupplier((current) =>
+                          checked ? current.filter((value) => value !== supplier) : [...current, supplier]
+                        );
+                      }}
+                    >
+                      <Checkbox checked={checked} className="pointer-events-none" />
+                      <span className="truncate">{supplier}</span>
+                    </DropdownMenuItem>
+                  );
+                })}
+                {selectedSupplier.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="cursor-pointer justify-center text-xs text-muted-foreground"
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        setSelectedSupplier([]);
+                      }}
+                    >
+                      Clear suppliers
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           {hasActiveFilters && (
             <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters">
