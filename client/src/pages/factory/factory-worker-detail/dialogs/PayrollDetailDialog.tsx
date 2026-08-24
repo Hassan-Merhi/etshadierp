@@ -178,13 +178,13 @@ export function PayrollDetailDialog({
             </div>
 
             {/* Extra stats (bales / kg / overtime) */}
-            {(parseFloat(payrollDetail.payroll.balesCount || "0") > 0 ||
-              parseFloat(payrollDetail.payroll.kgProcessed || "0") > 0 ||
-              parseFloat(payrollDetail.payroll.overtimeHours || "0") > 0) && (
+            {(Number(payrollDetail.payroll.balesCount ?? 0) > 0 ||
+              Number(payrollDetail.payroll.kgProcessed ?? 0) > 0 ||
+              Number(payrollDetail.payroll.overtimeHours ?? 0) > 0) && (
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Production</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {parseFloat(payrollDetail.payroll.balesCount || "0") > 0 && (
+                  {Number(payrollDetail.payroll.balesCount ?? 0) > 0 && (
                     <Card>
                       <CardContent className="p-3 text-center">
                         <p className="text-xl font-bold">{payrollDetail.payroll.balesCount}</p>
@@ -192,21 +192,19 @@ export function PayrollDetailDialog({
                       </CardContent>
                     </Card>
                   )}
-                  {parseFloat(payrollDetail.payroll.kgProcessed || "0") > 0 && (
+                  {Number(payrollDetail.payroll.kgProcessed ?? 0) > 0 && (
                     <Card>
                       <CardContent className="p-3 text-center">
-                        <p className="text-xl font-bold">
-                          {parseFloat(payrollDetail.payroll.kgProcessed || "0").toFixed(1)}
-                        </p>
+                        <p className="text-xl font-bold">{Number(payrollDetail.payroll.kgProcessed ?? 0).toFixed(1)}</p>
                         <p className="text-xs text-muted-foreground">KG</p>
                       </CardContent>
                     </Card>
                   )}
-                  {parseFloat(payrollDetail.payroll.overtimeHours || "0") > 0 && (
+                  {Number(payrollDetail.payroll.overtimeHours ?? 0) > 0 && (
                     <Card>
                       <CardContent className="p-3 text-center">
                         <p className="text-xl font-bold">
-                          {parseFloat(payrollDetail.payroll.overtimeHours || "0").toFixed(1)}
+                          {Number(payrollDetail.payroll.overtimeHours ?? 0).toFixed(1)}
                         </p>
                         <p className="text-xs text-muted-foreground">OT Hours</p>
                       </CardContent>

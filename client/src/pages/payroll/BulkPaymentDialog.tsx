@@ -12,11 +12,11 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 interface BulkPaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  selectedPayments: PayrollModel["selectedPayments"];
+  selectedPayments: PayrollModel["selectedPaymentsSummary"];
   totalAmount: number;
   workerStaff: PayrollModel["workerStaff"];
-  form: PayrollModel["form"];
-  mutation: PayrollModel["mutation"];
+  form: PayrollModel["bulkPaymentForm"];
+  mutation: PayrollModel["bulkPaymentMutation"];
   cashAccounts: PayrollModel["cashAccounts"];
   bankAccounts: PayrollModel["bankAccounts"];
   bankAccountsLoading: boolean;
@@ -68,7 +68,7 @@ export function BulkPaymentDialog({
         </div>
 
         <Form {...form}>
-          <form noValidate onSubmit={form.handleSubmit((data: unknown) => mutation.mutate(data))} className="space-y-4">
+          <form noValidate onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
             <FormField
               control={form.control}
               name="paymentAccountType"

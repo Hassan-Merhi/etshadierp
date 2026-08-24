@@ -59,7 +59,7 @@ export function PrintBarcodesDialog({
           <DialogDescription>
             {reprintLoading
               ? "Loading bales…"
-              : `${reprintBales.length} bale(s) in stock at ${selectedLocation.name}. Click Print to generate labels for all of them.`}
+              : `${reprintBales.length} bale(s) in stock at ${selectedLocation?.name ?? "selected location"}. Click Print to generate labels for all of them.`}
           </DialogDescription>
         </DialogHeader>
         {reprintLoading ? (
@@ -84,7 +84,7 @@ export function PrintBarcodesDialog({
                     <td className="px-3 font-mono text-xs text-muted-foreground">
                       {row.bale.referenceNumber || row.bale.baleCode}
                     </td>
-                    <td className="px-3 text-right font-mono text-xs">{parseFloat(row.bale.weightKg).toFixed(1)}</td>
+                    <td className="px-3 text-right font-mono text-xs">{Number(row.bale.weightKg ?? 0).toFixed(1)}</td>
                     <td className="px-3 text-right font-mono text-xs">{row.bale.quantity}</td>
                   </tr>
                 ))}

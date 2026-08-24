@@ -67,34 +67,6 @@ interface ContainerOffloadData {
   charges?: ContainerCharge[];
 }
 
-interface LedgerAccountOption {
-  id: string | number;
-  name: string;
-}
-
-interface SpSetupAccountOption {
-  id: string | number;
-  subType: string;
-  name?: string | null;
-}
-
-interface SpSetupStatusData {
-  spAccounts?: SpSetupAccountOption[];
-}
-
-interface ParentAgentOption {
-  ledger_account_id: string | number;
-  account_name: string;
-}
-
-interface ContainerCharge {
-  amount?: string | number | null;
-}
-
-interface ContainerOffloadData {
-  charges?: ContainerCharge[];
-}
-
 interface AccountComboboxProps {
   value: string;
   onValueChange: (value: string) => void;
@@ -291,8 +263,12 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
   });
 
   // ── Derived SP accounts ───────────────────────────────────────────────────
-  const spPrepaidExpAcct = (spStatusData?.spAccounts || []).find((a: { subType: string }) => a.subType === "sp_prepaid_expenses");
-  const spHadiIcAcct = (spStatusData?.spAccounts || []).find((a: { subType: string }) => a.subType === "sp_hadi_intercompany");
+  const spPrepaidExpAcct = (spStatusData?.spAccounts || []).find(
+    (a: { subType: string }) => a.subType === "sp_prepaid_expenses"
+  );
+  const spHadiIcAcct = (spStatusData?.spAccounts || []).find(
+    (a: { subType: string }) => a.subType === "sp_hadi_intercompany"
+  );
 
   // ── Charge calculations ───────────────────────────────────────────────────
   let poChargesTotal = 0;

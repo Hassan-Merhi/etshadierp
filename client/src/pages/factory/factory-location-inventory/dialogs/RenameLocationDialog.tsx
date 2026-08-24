@@ -147,11 +147,7 @@ export function RenameLocationDialog({
             </>
           ) : (
             <>
-              <Button
-                variant="destructive"
-                onClick={() => setDeleteMode(true)}
-                data-testid="button-delete-location"
-              >
+              <Button variant="destructive" onClick={() => setDeleteMode(true)} data-testid="button-delete-location">
                 Delete Location
               </Button>
               <div className="flex gap-2">

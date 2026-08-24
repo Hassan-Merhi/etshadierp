@@ -36,7 +36,7 @@ interface WorkerDialogsProps {
   workerGroupMembersDialogOpen: boolean;
   setWorkerGroupMembersDialogOpen: (open: boolean) => void;
   selectedWorkerGroupForMembers: PayrollModel["selectedWorkerGroupForMembers"];
-  allWorkerGroups: PayrollModel["allWorkerGroups"];
+  allWorkerGroups: PayrollModel["workerGroupsData"];
   allWorkers: Employee[];
   addWorkerToWorkerGroupMutation: PayrollModel["addWorkerToWorkerGroupMutation"];
   removeWorkerFromWorkerGroupMutation: PayrollModel["removeWorkerFromWorkerGroupMutation"];
@@ -207,7 +207,7 @@ export function WorkerDialogs({
               noValidate
               onSubmit={editWorkerForm.handleSubmit((data) => {
                 if (selectedWorkerForEdit) {
-                  updateWorkerMutation.mutate({ ...data, id: selectedWorkerForEdit.id });
+                  updateWorkerMutation.mutate(data);
                 }
               })}
               className="space-y-4"
@@ -324,9 +324,7 @@ export function WorkerDialogs({
         <DialogContent className="max-w-lg" data-testid="dialog-worker-group-members">
           <DialogHeader>
             <DialogTitle>Manage Group: {selectedWorkerGroupForMembers?.name}</DialogTitle>
-            <DialogDescription>
-              Toggle workers in or out of this group.
-            </DialogDescription>
+            <DialogDescription>Toggle workers in or out of this group.</DialogDescription>
           </DialogHeader>
           <div className="max-h-80 overflow-auto border rounded-md">
             <Table>

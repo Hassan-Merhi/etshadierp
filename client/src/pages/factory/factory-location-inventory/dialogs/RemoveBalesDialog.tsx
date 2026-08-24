@@ -70,8 +70,8 @@ export function RemoveBalesDialog({
             {deleteProduct && (
               <>
                 Remove bales of <strong>{deleteProduct.productName}</strong> from{" "}
-                <strong>{selectedLocation.name}</strong>. Current stock: <strong>{deleteProduct.baleCount}</strong>{" "}
-                bale(s).
+                <strong>{selectedLocation?.name ?? "selected location"}</strong>. Current stock:{" "}
+                <strong>{deleteProduct.baleCount}</strong> bale(s).
               </>
             )}
           </DialogDescription>

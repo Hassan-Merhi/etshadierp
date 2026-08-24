@@ -19,7 +19,7 @@ interface WorkersTabProps {
   selectedPayments: PayrollModel["selectedPayments"];
   totalAmount: number;
   workerStaff: Employee[];
-  workerGroups: PayrollModel["workerGroups"];
+  workerGroups: PayrollModel["workerGroupsData"];
   workerGroupsExpanded: Record<number, boolean>;
   setWorkerGroupsExpanded: PayrollModel["setWorkerGroupsExpanded"];
   workerPayments: PayrollModel["workerPayments"];
@@ -151,23 +151,30 @@ export function WorkersTab({
               <Collapsible
                 key={group.id}
                 open={isExpanded}
-                onOpenChange={(open) =>
-                  setWorkerGroupsExpanded((prev) => ({ ...prev, [group.id]: open }))
-                }
+                onOpenChange={(open) => setWorkerGroupsExpanded((prev) => ({ ...prev, [group.id]: open }))}
               >
                 <Card>
                   <CollapsibleTrigger asChild>
                     <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover-elevate rounded-t-md">
                       <div className="flex items-center gap-3">
                         <ChevronDown
-                          className={cn("h-4 w-4 text-muted-foreground transition-transform", isExpanded && "rotate-180")}
+                          className={cn(
+                            "h-4 w-4 text-muted-foreground transition-transform",
+                            isExpanded && "rotate-180"
+                          )}
                         />
                         <div>
                           <h3 className="font-semibold">{group.name}</h3>
                           <p className="text-xs text-muted-foreground">
                             {groupMembers.length} workers
                             {groupSelected > 0 && (
-                              <> · <span className="text-primary font-medium">{groupSelected} selected · {formatAmount(groupPayTotal)}</span></>
+                              <>
+                                {" "}
+                                ·{" "}
+                                <span className="text-primary font-medium">
+                                  {groupSelected} selected · {formatAmount(groupPayTotal)}
+                                </span>
+                              </>
                             )}
                           </p>
                         </div>
@@ -180,7 +187,9 @@ export function WorkersTab({
                             setSelectedWorkerGroupForMembers(group);
                             setWorkerGroupMembersDialogOpen(true);
                             const selections: Record<number, boolean> = {};
-                            groupMembers.forEach((m) => { selections[m.id] = true; });
+                            groupMembers.forEach((m) => {
+                              selections[m.id] = true;
+                            });
                             setWorkerGroupMemberSelections(selections);
                           }}
                           data-testid={`button-manage-group-${group.id}`}

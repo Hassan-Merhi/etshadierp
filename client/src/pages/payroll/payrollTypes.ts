@@ -6,6 +6,8 @@ export interface AccountOption {
   accountName?: string;
   bankName?: string;
   accountType?: string;
+  code?: string;
+  accountNumber?: string | null;
 }
 
 export interface EmployeeGroup {

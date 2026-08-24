@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SupplierWithBalance } from "./factorySupplierTypes";
 import { FactorySupplier } from "@shared/schema";
-import { UseMutationResult } from "@tanstack/react-query";
 
 interface SupplierFormDialogProps {
   createOpen: boolean;
@@ -52,10 +51,10 @@ export function SupplierFormDialog({
     // is always persisted, regardless of whether we're creating or editing.
     const rolePayload =
       formRole === "broker"
-        ? { isBroker: true,  parentId: null }
+        ? { isBroker: true, parentId: null }
         : formRole === "linked"
-        ? { isBroker: false, parentId: formData.parentId ?? null }
-        : { isBroker: false, parentId: null };
+          ? { isBroker: false, parentId: formData.parentId ?? null }
+          : { isBroker: false, parentId: null };
 
     if (editingSupplier) {
       updateMutation.mutate({ id: editingSupplier.id, ...formData, ...rolePayload });

@@ -24,7 +24,7 @@ interface EditEmployeeDialogProps {
   setEditBaleRates: PayrollModel["setEditBaleRates"];
   editBalePctRates: PayrollModel["editBalePctRates"];
   setEditBalePctRates: PayrollModel["setEditBalePctRates"];
-  pctLocations: PayrollModel["pctLocations"];
+  pctLocations: PayrollModel["allCompanyLocations"];
 }
 
 export function EditEmployeeDialog({

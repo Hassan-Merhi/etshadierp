@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UseMutationResult } from "@tanstack/react-query";
 import { Package } from "lucide-react";
 
 interface SupplierOtherDialogsProps {
@@ -21,7 +20,7 @@ interface SupplierOtherDialogsProps {
   obEditValue: string;
   setObEditValue: (val: string) => void;
   obEditMutation: FactorySuppliersModel["obEditMutation"];
-  dueDialogSupplier: { name: string; containers: any[] } | null;
+  dueDialogSupplier: FactorySuppliersModel["dueDialogSupplier"];
   setDueDialogSupplier: FactorySuppliersModel["setDueDialogSupplier"];
   formatDate: (val: string) => string;
 

@@ -280,8 +280,10 @@ export function BulkDialogs({
                 <Select
                   value={bulkWithdrawalAccountType}
                   onValueChange={(val) => {
-                    setBulkWithdrawalAccountType(val);
-                    setBulkWithdrawalAccountId("");
+                    if (val === "cash" || val === "bank") {
+                      setBulkWithdrawalAccountType(val);
+                      setBulkWithdrawalAccountId("");
+                    }
                   }}
                 >
                   <SelectTrigger data-testid="select-withdrawal-account-type">

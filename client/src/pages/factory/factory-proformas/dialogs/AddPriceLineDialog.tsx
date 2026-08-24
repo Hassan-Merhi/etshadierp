@@ -118,8 +118,7 @@ export function AddPriceLineDialog({
                         const q = catalogSearch.toLowerCase().trim();
                         const filtered = q
                           ? allStockItems.filter(
-                              (item) =>
-                                item.name?.toLowerCase().includes(q) || item.code?.toLowerCase().includes(q)
+                              (item) => item.name?.toLowerCase().includes(q) || item.code?.toLowerCase().includes(q)
                             )
                           : allStockItems;
                         if (filtered.length === 0)

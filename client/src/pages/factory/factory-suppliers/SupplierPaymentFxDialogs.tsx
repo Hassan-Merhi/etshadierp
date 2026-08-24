@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowRightLeft, Globe, Info } from "lucide-react";
-import { UseMutationResult } from "@tanstack/react-query";
 import { SupplierWithBalance } from "./factorySupplierTypes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 

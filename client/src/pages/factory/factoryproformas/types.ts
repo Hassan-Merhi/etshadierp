@@ -4,6 +4,14 @@
  * Extracted from FactoryProformas.tsx during the Phase 4 god-file split.
  */
 
+export interface CatalogStockItem {
+  id: number;
+  code?: string | null;
+  name: string;
+  uom?: string | null;
+  stockGroup?: { name?: string | null } | null;
+}
+
 export interface ProformaLine {
   id: number;
   proformaId: number;

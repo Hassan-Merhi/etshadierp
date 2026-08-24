@@ -91,60 +91,6 @@ interface ParentAgentOption {
   account_name: string;
 }
 
-interface SpContainerLine {
-  qty?: string | number | null;
-  unitRateUsd?: string | number | null;
-}
-
-interface SpPrepaidCharge {
-  id: string | number;
-  chargeType: string;
-  amountPaidUsd: string | number;
-}
-
-interface SpOffloadContainer {
-  id: number;
-  supplierName?: string | null;
-  containerNumber?: string | null;
-  invoiceNumber?: string | null;
-  discountPct?: string | number | null;
-  invoiceTotalUsd?: string | number | null;
-  lines?: SpContainerLine[];
-  prepaid?: SpPrepaidCharge[];
-}
-
-interface SpSetupAccount {
-  id: string | number;
-  subType: string;
-  name?: string | null;
-}
-
-interface SpBankAccount {
-  id: string | number;
-  bankName: string;
-}
-
-interface SpSetupStatus {
-  spAccounts?: SpSetupAccount[];
-  bankAccounts?: SpBankAccount[];
-}
-
-interface SpLedgerAccount {
-  id: string | number;
-  code?: string | null;
-  name: string;
-}
-
-interface SpLocationOption {
-  id: string | number;
-  name: string;
-}
-
-interface ParentAgentOption {
-  ledger_account_id: string | number;
-  account_name: string;
-}
-
 interface SpOffloadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -580,9 +526,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                     creditLabel = a ? `${a.name}` : "Ledger Account";
                   } else if (c.chargeType === "parent_agent") {
                     creditLabel = prepaidExpAcct?.name ?? "Prepaid Expenses";
-                    const agent = parentAgents.find(
-                      (x) => String(x.ledger_account_id) === c.parentAgentAccountId
-                    );
+                    const agent = parentAgents.find((x) => String(x.ledger_account_id) === c.parentAgentAccountId);
                     if (agent) creditLabel += ` (via ${agent.account_name})`;
                   } else {
                     creditLabel = `${costClrAcct?.name ?? "Cost Clearing"} — freight`;
@@ -620,9 +564,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                     <span className="text-right">Dr / Cr</span>
                   </div>
                   {agentCharges.map((c, idx) => {
-                    const agent = parentAgents.find(
-                      (x) => String(x.ledger_account_id) === c.parentAgentAccountId
-                    );
+                    const agent = parentAgents.find((x) => String(x.ledger_account_id) === c.parentAgentAccountId);
                     return (
                       <div key={idx} className="grid grid-cols-3 text-xs py-0.5">
                         <span className="col-span-2 font-medium">

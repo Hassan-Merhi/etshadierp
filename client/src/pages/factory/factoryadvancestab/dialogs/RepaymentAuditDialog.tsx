@@ -208,10 +208,7 @@ export function RepaymentAuditDialog({
                             {wAdvances.map((a) => {
                               const missingAmt =
                                 a.caseType === "missing_voucher"
-                                  ? a.missingVoucherRepayments.reduce(
-                                      (s, r) => s + parseFloat(r.amount || "0"),
-                                      0
-                                    )
+                                  ? a.missingVoucherRepayments.reduce((s, r) => s + parseFloat(r.amount || "0"), 0)
                                   : parseFloat(a.amount || "0");
                               return (
                                 <div

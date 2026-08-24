@@ -58,6 +58,8 @@ export function EndContractDialog({
   setEndStep: FactoryWorkerDetailModel["setEndStep"];
   worker: FactoryWorkerDetailModel["worker"];
 }) {
+  if (!worker) return null;
+
   return (
     <Dialog
       open={endOpen}
