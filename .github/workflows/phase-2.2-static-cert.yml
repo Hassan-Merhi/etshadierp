@@ -23,6 +23,63 @@ jobs:
           node-version: 24.19.0
           cache: npm
       - run: npm ci --ignore-scripts
+      - name: Apply TypeScript fixups
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              "client/src/components/OffloadDialog.tsx": [
+                  ('parseFloat(charge.amount || "0")', 'parseFloat(String(charge.amount ?? "0"))'),
+              ],
+              "client/src/components/SpOffloadDialog.tsx": [
+                  ('function fmt2(v: number)', 'function fmt2(v: string | number | null | undefined)'),
+                  ('mutationFn: () => {\n      if (!selectedLocationId)', 'mutationFn: () => {\n      if (!container) return Promise.reject(new Error("No container selected"));\n      if (!selectedLocationId)'),
+                  ('parseFloat(container.discountPct || "0")', 'parseFloat(String(container.discountPct ?? "0"))'),
+                  ('parseFloat(l.qty || "0")', 'parseFloat(String(l.qty ?? "0"))'),
+                  ('parseFloat(l.unitRateUsd || "0")', 'parseFloat(String(l.unitRateUsd ?? "0"))'),
+                  ('parseFloat(container.invoiceTotalUsd || "0")', 'parseFloat(String(container.invoiceTotalUsd ?? "0"))'),
+              ],
+              "client/src/pages/factory/factory-suppliers/SupplierDialogs.tsx": [
+                  ('dueDialogSupplier: { name: string; containers: unknown[] } | null;', 'dueDialogSupplier: FactorySuppliersModel["dueDialogSupplier"];'),
+                  ('setDueDialogSupplier: React.Dispatch<React.SetStateAction<{ name: string; containers: unknown[] } | null>>;', 'setDueDialogSupplier: FactorySuppliersModel["setDueDialogSupplier"];'),
+              ],
+              "client/src/pages/factory/factoryadvancestab/dialogs/BulkAdvanceDialog.tsx": [
+                  ('bulkSelected as Set<string>', 'bulkSelected'),
+              ],
+              "client/src/pages/payroll/WorkersTable.tsx": [
+                  ('workers.map((worker: Employee) => {', 'workers.map((worker) => {'),
+              ],
+          }
+
+          for file_name, pairs in replacements.items():
+              path = Path(file_name)
+              text = path.read_text()
+              original = text
+              for old, new in pairs:
+                  if old not in text:
+                      raise SystemExit(f"Expected text not found in {file_name}: {old}")
+                  text = text.replace(old, new)
+              if text != original:
+                  path.write_text(text)
+          PY
+          npx prettier --write \
+            client/src/components/OffloadDialog.tsx \
+            client/src/components/SpOffloadDialog.tsx \
+            client/src/pages/factory/factory-suppliers/SupplierDialogs.tsx \
+            client/src/pages/factory/factoryadvancestab/dialogs/BulkAdvanceDialog.tsx \
+            client/src/pages/payroll/WorkersTable.tsx
+      - name: Commit fixups
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src
+          if ! git diff --cached --quiet; then
+            git commit -m "fix: resolve Phase 2.2 TypeScript contracts"
+            git push origin HEAD:phase-2.2-frontend-type-safety
+          fi
       - name: Capture static diagnostics
         shell: bash
         run: |
@@ -60,5 +117,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add phase-2.2-static-diagnostics.txt
-          git commit -m "chore: capture Phase 2.2 static diagnostics"
+          git commit -m "chore: refresh Phase 2.2 static diagnostics"
           git push origin HEAD:phase-2.2-frontend-type-safety
