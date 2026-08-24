@@ -31,7 +31,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
       const rawProformaRes = await db.execute(
         sql`SELECT * FROM customer_proformas WHERE id = ${id} AND company_id = ${companyId} AND deleted_at IS NULL LIMIT 1`
       );
-      const rawProformaRows = (rawProformaRes).rows ?? (rawProformaRes as unknown as unknown[]);
+      const rawProformaRows = rawProformaRes.rows ?? (rawProformaRes as unknown as unknown[]);
       if (!rawProformaRows.length) return res.status(404).json({ message: "Proforma not found" });
       const pr = rawProformaRows[0];
       const proforma = {
@@ -45,7 +45,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         updatedAt: pr.updated_at ?? pr.created_at,
       };
       const rawLinesRes = await db.execute(sql`SELECT * FROM customer_proforma_lines WHERE proforma_id = ${id}`);
-      const lines = ((rawLinesRes).rows ?? (rawLinesRes as unknown as unknown[])).map((l) => ({
+      const lines = (rawLinesRes.rows ?? (rawLinesRes as unknown as unknown[])).map((l) => ({
         id: l.id,
         proformaId: l.proforma_id,
         articleCode: l.article_code ?? "",
@@ -78,7 +78,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
           if (p.articleCode) weightMap.set(p.articleCode, p.weightPerBaleKg || "0");
         });
       }
-      const enrichedLines = lines.map((l: any) => ({ ...l, weightPerBaleKg: weightMap.get(l.articleCode) || "0" }));
+      const enrichedLines = lines.map((l) => ({ ...l, weightPerBaleKg: weightMap.get(l.articleCode) || "0" }));
       res.set("Cache-Control", "private, max-age=60");
       res.json({ ...proforma, lines: enrichedLines });
     } catch (error: unknown) {
@@ -137,7 +137,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
           GROUP BY cp.id, cp.company_id, cp.customer_id, cp.name, cp.is_active, cp.created_at
           ORDER BY cp.name ASC
         `);
-        const summaryRows = (rawSummary).rows ?? (rawSummary as unknown as unknown[]);
+        const summaryRows = rawSummary.rows ?? (rawSummary as unknown as unknown[]);
         const summaries = summaryRows.map((row) => ({
           id: row.id,
           companyId: row.company_id,
@@ -166,7 +166,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
               AND deleted_at IS NULL
             ORDER BY name ASC`
       );
-      const proformas = ((rawProformasRes).rows ?? (rawProformasRes as unknown as unknown[])).map((r) => ({
+      const proformas = (rawProformasRes.rows ?? (rawProformasRes as unknown as unknown[])).map((r) => ({
         id: r.id,
         companyId: r.company_id,
         customerId: r.customer_id,
@@ -177,7 +177,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         updatedAt: r.updated_at ?? r.created_at,
       }));
 
-      const proformaIds = proformas.map((p: any) => p.id);
+      const proformaIds = proformas.map((p) => p.id);
       let lines = [];
       if (proformaIds.length > 0) {
         const idList = sql.join(
@@ -245,7 +245,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         current.push(line);
         linesByProforma.set(line.proformaId, current);
       }
-      const result = proformas.map((p: any) => ({
+      const result = proformas.map((p) => ({
         ...p,
         lines: linesByProforma.get(p.id) || [],
       }));

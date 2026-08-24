@@ -27,10 +27,7 @@ export function registerBalesExportRoutes(app: Express) {
       const { date } = req.query;
       if (!date) return res.status(400).json({ message: "date query parameter is required (YYYY-MM-DD)" });
 
-      const conditions = [
-        eq(factoryBales.companyId, companyId),
-        sql`${factoryBales.finalizedAt}::date = ${date}`,
-      ];
+      const conditions = [eq(factoryBales.companyId, companyId), sql`${factoryBales.finalizedAt}::date = ${date}`];
 
       const bales = await db
         .select()
@@ -42,9 +39,9 @@ export function registerBalesExportRoutes(app: Express) {
         return res.status(404).json({ message: `No bales found for date ${date}` });
       }
 
-      const locIds = [...new Set(bales.map((b: any) => b.erpLocationId).filter(Boolean))];
+      const locIds = [...new Set(bales.map((b) => b.erpLocationId).filter(Boolean))];
       const locs = locIds.length > 0 ? await db.select().from(locations).where(inArray(locations.id, locIds)) : [];
-      const locMap = new Map(locs.map((l: any) => [l.id, l]));
+      const locMap = new Map(locs.map((l) => [l.id, l]));
 
       const [fCfgBale] = await db
         .select({ hideAvgCost: factorySettings.hideAvgCost })

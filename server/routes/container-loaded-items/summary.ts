@@ -218,7 +218,7 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
           const headerRowNum = sheet.rowCount + 1;
           const headerRow = sheet.addRow(columns.map((c) => c.header));
           headerRow.height = 24;
-          headerRow.eachCell((cell: any) => {
+          headerRow.eachCell((cell) => {
             cell.font = { bold: true, size: 10, color: { argb: sc.headerFont } };
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: sectionColor } };
             cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
@@ -242,7 +242,7 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
               const values = columns.map((c) => item[c.key]);
               const dataRow = sheet.addRow(values);
               const rowBg = statusColorFn ? statusColorFn(item) : i % 2 !== 0 ? sc.summaryBg : null;
-              dataRow.eachCell((cell: any) => {
+              dataRow.eachCell((cell) => {
                 cell.border = sThin;
                 cell.alignment = { vertical: "middle" };
                 if (rowBg) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
@@ -252,15 +252,12 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
             sheet.addRow([]);
             const totalValues = columns.map((c, i) => {
               if (i === 0) return "TOTAL";
-              const sum = data.reduce(
-                (s: number, item) => s + (typeof item[c.key] === "number" ? item[c.key] : 0),
-                0
-              );
+              const sum = data.reduce((s: number, item) => s + (typeof item[c.key] === "number" ? item[c.key] : 0), 0);
               return typeof data[0]?.[c.key] === "number" ? sum : "";
             });
             const totalRow = sheet.addRow(totalValues);
             totalRow.font = { bold: true, size: 10 };
-            totalRow.eachCell((cell: any, colN: number) => {
+            totalRow.eachCell((cell, colN: number) => {
               cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: sc.summaryBg } };
               cell.border = dblBorder;
               const col = columns[colN - 1];

@@ -155,7 +155,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
   });
 
   // ── Update a sheet ─────────────────────────────────────────────────────────
-  app.put("/api/factory/status-builder/sheets/:id", requireAuth, async (req: any, res) => {
+  app.put("/api/factory/status-builder/sheets/:id", requireAuth, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session.currentCompanyId!;
       const id = parseId(req.params.id);

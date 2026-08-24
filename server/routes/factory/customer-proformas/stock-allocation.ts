@@ -57,7 +57,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
       const inStockCountsRaw = await db.execute(
         sql`SELECT article_code as "articleCode", COUNT(*)::int as count FROM factory_bales WHERE company_id = ${companyId} AND status = 'IN_STOCK' GROUP BY article_code`
       );
-      const inStockCounts = (inStockCountsRaw.rows || ((inStockCountsRaw as unknown))).map((r) => ({
+      const inStockCounts = (inStockCountsRaw.rows || (inStockCountsRaw as unknown)).map((r) => ({
         articleCode: r.articleCode,
         count: Number(r.count),
       }));
@@ -77,7 +77,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
       const activeOrdersRaw = await db.execute(
         sql`SELECT id, proforma_id_used as "proformaIdUsed", status FROM customer_orders WHERE company_id = ${companyId} AND status IN ('LOADING','PENDING_VERIFICATION','VERIFIED')`
       );
-      const activeOrders = (activeOrdersRaw.rows || ((activeOrdersRaw as unknown))).map((o) => ({
+      const activeOrders = (activeOrdersRaw.rows || (activeOrdersRaw as unknown)).map((o) => ({
         id: o.id,
         proformaIdUsed: o.proformaIdUsed,
         status: o.status,
@@ -86,11 +86,11 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
       // For active orders, get bale article code counts from customer_order_bales
       let activeOrderBales: any[] = [];
       if (activeOrders.length > 0) {
-        const orderIds = activeOrders.map((o: any) => o.id);
+        const orderIds = activeOrders.map((o) => o.id);
         const activeOrderBalesRaw = await db.execute(
           sql`SELECT order_id as "orderId", article_code as "articleCode", COUNT(*)::int as count FROM customer_order_bales WHERE order_id = ANY(${sqlArray(orderIds)}) GROUP BY order_id, article_code`
         );
-        activeOrderBales = (activeOrderBalesRaw.rows || ((activeOrderBalesRaw as unknown))).map((b) => ({
+        activeOrderBales = (activeOrderBalesRaw.rows || (activeOrderBalesRaw as unknown)).map((b) => ({
           orderId: b.orderId,
           articleCode: b.articleCode,
           count: Number(b.count),
@@ -123,7 +123,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
                 AND article_code = ANY(${sqlArray(allArticleCodes)})
               ORDER BY article_code`
         );
-        (prodRaw.rows || ((prodRaw as unknown))).forEach((r: any) => {
+        (prodRaw.rows || (prodRaw as unknown)).forEach((r) => {
           if (r.name) productNamesMap[r.articleCode] = r.name;
         });
       }
@@ -171,8 +171,8 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
             GROUP BY article_code`
       );
       const freeStockCounts: { articleCode: string; count: number }[] = (
-        freeStockRaw.rows || ((freeStockRaw as unknown))
-      ).map((r: any) => ({
+        freeStockRaw.rows || (freeStockRaw as unknown)
+      ).map((r) => ({
         articleCode: r.articleCode,
         count: Number(r.count),
       }));
@@ -192,7 +192,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
         containerNumber: string | null;
         status: string;
         proformaIdUsed: number | null;
-      }[] = (loadingsRaw.rows || ((loadingsRaw as unknown))).map((r: any) => ({
+      }[] = (loadingsRaw.rows || (loadingsRaw as unknown)).map((r) => ({
         id: r.id,
         customerId: r.customerId,
         containerNumber: r.containerNumber || null,
@@ -211,7 +211,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
               WHERE cob.order_id = ANY(${sqlArray(ids)})
               GROUP BY cob.order_id, fb.article_code`
         );
-        loadingBales = (balesRaw.rows || ((balesRaw as unknown))).map((r: any) => ({
+        loadingBales = (balesRaw.rows || (balesRaw as unknown)).map((r) => ({
           orderId: r.orderId,
           articleCode: r.articleCode,
           count: Number(r.count),
@@ -219,9 +219,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
       }
 
       // 3b. Proforma target quantities for each loading (via proformaIdUsed)
-      const proformaIds = [...new Set(loadings.map((l) => l.proformaIdUsed))].filter(
-        (id): id is number => id != null
-      );
+      const proformaIds = [...new Set(loadings.map((l) => l.proformaIdUsed))].filter((id): id is number => id != null);
       let proformaLines: { proformaId: number; articleCode: string; quantity: number }[] = [];
       if (proformaIds.length > 0) {
         const plRaw = await db
@@ -278,7 +276,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
                 AND fbp.article_code = ANY(${sqlArray(codes)})
               ORDER BY fbp.article_code`
         );
-        (prodRaw.rows || ((prodRaw as unknown))).forEach((r: any) => {
+        (prodRaw.rows || (prodRaw as unknown)).forEach((r) => {
           if (r.name) productNameByCode.set(r.articleCode, r.name);
         });
       }

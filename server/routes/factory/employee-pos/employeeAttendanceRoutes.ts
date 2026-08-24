@@ -142,7 +142,7 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
               AND worker_id = ANY(${sqlArray(workerIds)})
             ORDER BY attendance_date`
       );
-      const attRecords: { workerId: number; date: string; status: string }[] = resultRows(attRows).map((r: any) => ({
+      const attRecords: { workerId: number; date: string; status: string }[] = resultRows(attRows).map((r) => ({
         workerId: Number(r.workerId),
         date: typeof r.date === "string" ? r.date.substring(0, 10) : new Date(r.date).toISOString().substring(0, 10),
         status: r.status,
@@ -174,7 +174,7 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
               AND period_end   >= ${startDate}::date
               AND worker_id = ANY(${sqlArray(workerIds)})`
       );
-      const paidPayrollList: { workerId: number; netSalary: string }[] = resultRows(paidPayrollRows).map((r: any) => ({
+      const paidPayrollList: { workerId: number; netSalary: string }[] = resultRows(paidPayrollRows).map((r) => ({
         workerId: Number(r.workerId),
         netSalary: r.netSalary ?? "0",
       }));

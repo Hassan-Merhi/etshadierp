@@ -249,7 +249,7 @@ export function registerPayrollBulkAdjustmentRoutes(app: Express) {
 
       if (paymentAccountType === "bank") {
         // For bank accounts, find the corresponding ledger account
-        paymentLedgerAccount = allAccounts.find((a: any) => a.bankAccountId === paymentAccountId_num);
+        paymentLedgerAccount = allAccounts.find((a) => a.bankAccountId === paymentAccountId_num);
         if (!paymentLedgerAccount) {
           return res.status(404).json({ message: "Ledger account for bank account not found" });
         }

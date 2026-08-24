@@ -92,7 +92,7 @@ export function registerGitAgentRoutes(app: Express) {
             ORDER BY created_at ASC`
       );
       res.json(
-        result.rows.map((r: any) => ({
+        result.rows.map((r) => ({
           id: r.id,
           description: r.description,
           amount: parseFloat(r.amount),

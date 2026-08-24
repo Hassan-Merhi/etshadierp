@@ -172,8 +172,8 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       );
 
       // Strip customer-linked accounts from the classifier output.
-      const ledgerForUs = classified.forUsAccounts.filter((a: any) => !customerLedgerIds.has(a.id));
-      const ledgerOnUsRaw = classified.onUsAccounts.filter((a: any) => !customerLedgerIds.has(a.id));
+      const ledgerForUs = classified.forUsAccounts.filter((a) => !customerLedgerIds.has(a.id));
+      const ledgerOnUsRaw = classified.onUsAccounts.filter((a) => !customerLedgerIds.has(a.id));
 
       // ── Strip any ledger-based "Payroll Payable" accounts ─────────────────────
       // The authoritative source for payroll payable is employees.currentBalance

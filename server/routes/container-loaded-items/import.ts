@@ -94,9 +94,7 @@ export function registerContainerLoadedItemImportRoutes(app: Express, requireAut
           return res.status(400).json({ message: "No line items found in purchase orders" });
         }
 
-        const itemsWithBarcode = lineItems.filter(
-          (item) => item.stockItemCode && item.stockItemCode.trim() !== ""
-        );
+        const itemsWithBarcode = lineItems.filter((item) => item.stockItemCode && item.stockItemCode.trim() !== "");
         const skippedCount = lineItems.length - itemsWithBarcode.length;
 
         if (itemsWithBarcode.length === 0) {
@@ -105,7 +103,7 @@ export function registerContainerLoadedItemImportRoutes(app: Express, requireAut
           });
         }
 
-        const values = itemsWithBarcode.map((item: any) => ({
+        const values = itemsWithBarcode.map((item) => ({
           containerId,
           barcode: item.stockItemCode.trim(),
           itemName: item.itemName || null,

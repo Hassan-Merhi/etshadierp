@@ -72,10 +72,7 @@ export function registerFactoryCustomerProformaLoadingRoutes(app: Express) {
       );
       logger.info(`[create-loading] proformaId=${proformaId} companyId=${companyId}`);
       const alreadyLoadedMap = new Map<string, number>(
-        (resultRows(alreadyLoadedRaw) || ((alreadyLoadedRaw as unknown))).map((r: any) => [
-          r.articleCode,
-          Number(r.loaded),
-        ])
+        (resultRows(alreadyLoadedRaw) || (alreadyLoadedRaw as unknown)).map((r) => [r.articleCode, Number(r.loaded)])
       );
 
       // ── Validate: check if there is any remaining reservation capacity ──

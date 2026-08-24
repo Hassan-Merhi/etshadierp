@@ -23,7 +23,7 @@ export function registerGitImportRoutes(app: Express) {
     "/api/git/containers/eta-template.xlsx",
     requireAuth,
     requireRole("Admin", "Owner", "Developer"),
-    async (req: any, res: import("express").Response) => {
+    async (req: import("express").Request, res: import("express").Response) => {
       try {
         // Fetch all active containers for this company
         const rows = await db

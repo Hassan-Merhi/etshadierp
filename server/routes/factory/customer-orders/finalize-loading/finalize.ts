@@ -39,7 +39,7 @@ export function registerOrderFinalizeRoutes(app: Express) {
 
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const [order] = await tx
           .select()
           .from(customerOrders)
@@ -338,12 +338,14 @@ export function registerOrderFinalizeRoutes(app: Express) {
           : [];
       const locationMap = new Map(locationRecords.map((l) => [l.id, l.name]));
 
-      const availableBales = baleRows.filter((b: { status: string }) => ["IN_STOCK", "RESERVED_FOR_ORDER"].includes(b.status));
+      const availableBales = baleRows.filter((b: { status: string }) =>
+        ["IN_STOCK", "RESERVED_FOR_ORDER"].includes(b.status)
+      );
 
       res.json({
         baleCount: availableBales.length,
         totalBalesInOrder: orderBales.length,
-        bales: availableBales.map((b: any) => ({
+        bales: availableBales.map((b) => ({
           id: b.id,
           baleReference: b.referenceNumber,
           productName: b.productName,

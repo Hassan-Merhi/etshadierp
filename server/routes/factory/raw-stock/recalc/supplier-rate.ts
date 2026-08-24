@@ -41,7 +41,7 @@ export function registerRawStockSupplierRateRoutes(app: Express) {
     "/api/factory/raw-stock/supplier-rate/recompute",
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: import("express").Response) => {
+    async (req: import("express").Request, res: import("express").Response) => {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { supplierId, dryRun } = req.body;
@@ -249,7 +249,7 @@ export function registerRawStockSupplierRateRoutes(app: Express) {
     "/api/factory/raw-stock/supplier-rate/restore-from-audit",
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: import("express").Response) => {
+    async (req: import("express").Request, res: import("express").Response) => {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 

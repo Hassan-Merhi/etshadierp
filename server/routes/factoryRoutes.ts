@@ -121,7 +121,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerCentralGlobalTransactionRoutes(app, requireAuth);
   registerPerformanceReadMicrocache(app);
 
-  app.use("/api/factory", async (req: any, res: import("express").Response, next) => {
+  app.use("/api/factory", async (req: import("express").Request, res: import("express").Response, next) => {
     if (!["PUT", "PATCH", "DELETE"].includes(req.method)) return next();
     if (!req.session?.userId) return next();
     if (req.method === "DELETE" && /^\/bales\/\d+$/.test(req.path)) return next();

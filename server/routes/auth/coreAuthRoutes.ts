@@ -196,31 +196,35 @@ export function registerCoreAuthRoutes(app: Express) {
     });
   });
 
-  app.patch("/api/me/password", requireLogin, async (req: any, res: import("express").Response) => {
-    try {
-      const userId: string = req.session.userId;
-      const { currentPassword, newPassword, confirmPassword } = req.body;
-      if (!currentPassword || !newPassword || !confirmPassword)
-        return res.status(400).json({ message: "All password fields are required." });
-      if (newPassword.trim().length < 6)
-        return res.status(400).json({ message: "New password must be at least 6 characters." });
-      if (newPassword !== confirmPassword)
-        return res.status(400).json({ message: "New password and confirmation do not match." });
+  app.patch(
+    "/api/me/password",
+    requireLogin,
+    async (req: import("express").Request, res: import("express").Response) => {
+      try {
+        const userId: string = req.session.userId;
+        const { currentPassword, newPassword, confirmPassword } = req.body;
+        if (!currentPassword || !newPassword || !confirmPassword)
+          return res.status(400).json({ message: "All password fields are required." });
+        if (newPassword.trim().length < 6)
+          return res.status(400).json({ message: "New password must be at least 6 characters." });
+        if (newPassword !== confirmPassword)
+          return res.status(400).json({ message: "New password and confirmation do not match." });
 
-      const [user] = await db.select().from(users).where(eq(users.id, userId));
-      if (!user) return res.status(404).json({ message: "User not found." });
-      const { valid } = await verifyPassword(currentPassword, user.password);
-      if (!valid) return res.status(400).json({ message: "Current password is incorrect." });
-      await db
-        .update(users)
-        .set({ password: await hashPassword(newPassword) })
-        .where(eq(users.id, userId));
-      res.json({ ok: true });
-    } catch (error: unknown) {
-      logger.error("Error changing password:", { error });
-      res.status(500).json({ message: getErrorMessage(error) });
+        const [user] = await db.select().from(users).where(eq(users.id, userId));
+        if (!user) return res.status(404).json({ message: "User not found." });
+        const { valid } = await verifyPassword(currentPassword, user.password);
+        if (!valid) return res.status(400).json({ message: "Current password is incorrect." });
+        await db
+          .update(users)
+          .set({ password: await hashPassword(newPassword) })
+          .where(eq(users.id, userId));
+        res.json({ ok: true });
+      } catch (error: unknown) {
+        logger.error("Error changing password:", { error });
+        res.status(500).json({ message: getErrorMessage(error) });
+      }
     }
-  });
+  );
 
   app.post("/api/auth/confirm-password", requireAuth, async (req, res) => {
     try {

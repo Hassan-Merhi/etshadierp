@@ -209,7 +209,7 @@ function installPhase4WriteGuard(app: Express): void {
 
 async function invokeMigrationHandler(
   handler: (req: Request, res: Response) => Promise<any>,
-  req: any,
+  req: import("express").Request,
   body: any
 ): Promise<any> {
   let statusCode = 200;

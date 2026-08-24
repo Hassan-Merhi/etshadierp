@@ -470,7 +470,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         SELECT bale_id FROM factory_v3_load_bales
         WHERE load_id = ${id} AND removed_at IS NULL
       `);
-      const baleIds: number[] = baleRows.rows.map((r: any) => r.bale_id ?? r.baleId);
+      const baleIds: number[] = baleRows.rows.map((r) => r.bale_id ?? r.baleId);
 
       // Mark each bale as SOLD in factory_bales (same end-state as existing finalization)
       if (baleIds.length > 0) {

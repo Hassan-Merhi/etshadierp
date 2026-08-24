@@ -448,25 +448,69 @@ export function registerOrderExcelExportRoutes(app: Express) {
 
       const baleLinks = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
       const baleIds = baleLinks.map((b) => b.baleId).filter(Boolean);
-      const baleRows: Array<{ id: number; companyId: number; mixBatchId: number | null; productId: number | null; pressingBatchId: number | null; erpLocationId: number | null; baleCode: string; referenceNumber: string; articleCode: string | null; productName: string | null; productNameAr: string | null; category: string | null; categoryAr: string | null; grade: string | null; quantity: number; weightKg: string; costPerKg: string; totalCost: string; status: string; pressedAt: Date | null; finalizedAt: Date | null; finalizedBy: number | null; workerName: string | null; stockEntryDate: string | null; importBatchId: number | null; deletedAt: Date | null; createdAt: Date; updatedAt: Date; }> =
-        baleIds.length > 0 ? await db.select().from(factoryBales).where(inArray(factoryBales.id, baleIds)) : [];
+      const baleRows: Array<{
+        id: number;
+        companyId: number;
+        mixBatchId: number | null;
+        productId: number | null;
+        pressingBatchId: number | null;
+        erpLocationId: number | null;
+        baleCode: string;
+        referenceNumber: string;
+        articleCode: string | null;
+        productName: string | null;
+        productNameAr: string | null;
+        category: string | null;
+        categoryAr: string | null;
+        grade: string | null;
+        quantity: number;
+        weightKg: string;
+        costPerKg: string;
+        totalCost: string;
+        status: string;
+        pressedAt: Date | null;
+        finalizedAt: Date | null;
+        finalizedBy: number | null;
+        workerName: string | null;
+        stockEntryDate: string | null;
+        importBatchId: number | null;
+        deletedAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+      }> = baleIds.length > 0 ? await db.select().from(factoryBales).where(inArray(factoryBales.id, baleIds)) : [];
       const orderCharges = await db
         .select()
         .from(customerOrderCharges)
         .where(eq(customerOrderCharges.orderId, orderId));
 
       const productIds = [...new Set(baleRows.map((b) => b.productId).filter((id) => id != null))];
-      const productRecords: Array<{ id: number; companyId: number; code: string; articleCode: string | null; name: string; nameAr: string | null; description: string | null; descriptionAr: string | null; weightPerBaleKg: string | null; categoryId: number | null; sellingPrice: string | null; productionPrice: string | null; labelDesignColor: string | null; active: boolean; deletedAt: Date | null; createdAt: Date; updatedAt: Date; }> =
+      const productRecords: Array<{
+        id: number;
+        companyId: number;
+        code: string;
+        articleCode: string | null;
+        name: string;
+        nameAr: string | null;
+        description: string | null;
+        descriptionAr: string | null;
+        weightPerBaleKg: string | null;
+        categoryId: number | null;
+        sellingPrice: string | null;
+        productionPrice: string | null;
+        labelDesignColor: string | null;
+        active: boolean;
+        deletedAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+      }> =
         productIds.length > 0
           ? await db
               .select()
               .from(factoryBaleProducts)
               .where(inArray(factoryBaleProducts.id, productIds as number[]))
           : [];
-      const productMap = new Map(productRecords.map((p: any) => [p.id, p]));
-      const balePriceMap = new Map<number, number>(
-        baleLinks.map((l) => [l.baleId, parseFloat(l.priceUsed || "0")])
-      );
+      const productMap = new Map(productRecords.map((p) => [p.id, p]));
+      const balePriceMap = new Map<number, number>(baleLinks.map((l) => [l.baleId, parseFloat(l.priceUsed || "0")]));
 
       // Also read order lines for pricing mode metadata
       const orderLinesForXls = await db
@@ -652,7 +696,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
       }
 
       const lines = rawLines
-        .map((l: any) => ({
+        .map((l) => ({
           articleCode: l.articleCode || "",
           productName: productNameMap.get(l.articleCode) || l.baleName || l.articleCode || "",
           qty: parseInt(l.qty || "0"),

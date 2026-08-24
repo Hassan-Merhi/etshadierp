@@ -63,7 +63,7 @@ export function registerRawStockRecalcApplyAllRoutes(app: Express) {
     "/api/factory/raw-stock/recalc/apply-all-safe",
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: import("express").Response) => {
+    async (req: import("express").Request, res: import("express").Response) => {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 

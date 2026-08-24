@@ -97,8 +97,8 @@ export function registerBalesCrudRoutes(app: Express) {
           : Promise.resolve(null as null),
       ]);
 
-      const productIds: number[] = Array.from(new Set(bales.map((b: any) => b.productId).filter(Boolean)));
-      const batchIds: number[] = Array.from(new Set(bales.map((b: any) => b.mixBatchId).filter(Boolean)));
+      const productIds: number[] = Array.from(new Set(bales.map((b) => b.productId).filter(Boolean)));
+      const batchIds: number[] = Array.from(new Set(bales.map((b) => b.mixBatchId).filter(Boolean)));
 
       const products =
         productIds.length > 0
@@ -156,7 +156,7 @@ export function registerBalesCrudRoutes(app: Express) {
 
       // Paginated response when ?page= is given; legacy array shape for backward-compat callers.
       if (page !== null && countResult) {
-        const total = Number(((countResult))[0]?.count ?? 0);
+        const total = Number(countResult[0]?.count ?? 0);
         const totalPages = Math.max(1, Math.ceil(total / rowLimit));
         res.set("Cache-Control", "private, max-age=60");
         res.json({ items: results, total, page, limit: rowLimit, totalPages });

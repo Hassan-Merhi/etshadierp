@@ -22,7 +22,7 @@ const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 export async function executeContainerOffloadLifecycle(
   input: ContainerOffloadLifecycleInput
 ): Promise<ContainerOffloadLifecycleResult> {
-  return db.transaction(async (tx: any) => {
+  return db.transaction(async (tx) => {
     const [container] = await tx
       .select()
       .from(schema.containers)

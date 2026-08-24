@@ -40,7 +40,7 @@ export function registerWorkerAdvanceAdminRoutes(app: Express) {
         if (!acct) return res.status(400).json({ message: "Cash account not found for this company" });
       }
 
-      const results = await db.transaction(async (tx: any) => {
+      const results = await db.transaction(async (tx) => {
         // Resolve or create the "Factory Worker Advances" ledger account once
         let advancesAccountId: number | null = null;
         if (cashAccountId) {

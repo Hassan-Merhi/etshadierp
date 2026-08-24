@@ -73,7 +73,7 @@ export async function buildOrderExcelBuffer(
   }
 
   const helperLines = rawLines
-    .map((l: any) => ({
+    .map((l) => ({
       articleCode: l.articleCode || "",
       productName: productNameMap.get(l.articleCode) || l.baleName || l.articleCode || "",
       qty: parseInt(l.qty || "0"),

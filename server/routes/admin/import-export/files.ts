@@ -41,7 +41,7 @@ export function registerFileRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/file-folders/:id", requireAuth, async (req: any, res) => {
+  app.patch("/api/file-folders/:id", requireAuth, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
       const folderId = parseInt(req.params.id);
@@ -59,7 +59,7 @@ export function registerFileRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/file-folders/:id", requireAuth, async (req: any, res) => {
+  app.delete("/api/file-folders/:id", requireAuth, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
       const folderId = parseInt(req.params.id);
@@ -138,7 +138,7 @@ export function registerFileRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/files/:id", requireAuth, async (req: any, res) => {
+  app.patch("/api/files/:id", requireAuth, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
       const fileId = parseInt(req.params.id);
@@ -159,7 +159,7 @@ export function registerFileRoutes(app: Express) {
     }
   });
 
-  app.get("/api/files/:id/download", requireAuth, async (req: any, res) => {
+  app.get("/api/files/:id/download", requireAuth, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
       const fileId = parseInt(req.params.id);
@@ -179,7 +179,7 @@ export function registerFileRoutes(app: Express) {
     }
   });
 
-  app.get("/api/files/:id/preview", requireAuth, async (req: any, res) => {
+  app.get("/api/files/:id/preview", requireAuth, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
       const fileId = parseInt(req.params.id);
@@ -198,7 +198,7 @@ export function registerFileRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/files/:id", requireAuth, async (req: any, res) => {
+  app.delete("/api/files/:id", requireAuth, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
       const fileId = parseInt(req.params.id);

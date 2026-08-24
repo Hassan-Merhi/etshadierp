@@ -487,7 +487,7 @@ export async function recalculateContainerCosts(
  * Use in POST handlers that aren't covered by the global PUT/PATCH/DELETE guard:
  *   if (!checkFactoryAdmin(req, res)) return;
  */
-export function checkFactoryAdmin(req: any, res: import("express").Response): boolean {
+export function checkFactoryAdmin(req: import("express").Request, res: import("express").Response): boolean {
   const role = req.session?.currentRole as string | undefined;
   if (["Admin", "Owner", "Developer"].includes(role || "")) return true;
   const overrideUntil = req.session?.factoryAdminOverrideUntil as number | undefined;

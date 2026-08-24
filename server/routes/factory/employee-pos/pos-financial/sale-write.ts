@@ -85,7 +85,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
       const nextNum = (Number(seqRow?.count || 0) + 1).toString().padStart(4, "0");
       const saleNumber = `FPOS-${nextNum}`;
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         // 1. Create sale record
         const [sale] = await tx
           .insert(factoryPosSales)

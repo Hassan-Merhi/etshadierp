@@ -434,7 +434,7 @@ export function registerOrderChargesRoutes(app: Express) {
         .where(and(eq(customerOrderCharges.orderId, orderId), eq(customerOrderCharges.id, chargeId)));
       if (!chargeBeforeUpdate) return res.status(404).json({ message: "Charge not found" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         await tx
           .update(customerOrderCharges)
           .set(updateData)

@@ -36,7 +36,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
 
       const names: string[] = Array.isArray(containerNames) ? containerNames.filter(Boolean) : [];
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const [proforma] = await tx
           .insert(customerProformas)
           .values({ companyId, customerId: Number(customerId), name, isActive: isActive ?? false })
