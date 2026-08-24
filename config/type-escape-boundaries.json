@@ -79,11 +79,6 @@
         0,
         0
       ],
-      "client/src/hooks/use-admin-override.tsx": [
-        1,
-        0,
-        0
-      ],
       "client/src/hooks/useLabelDesignColors.ts": [
         1,
         0,
@@ -829,16 +824,6 @@
         0,
         0
       ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/PostAccountingPreviewDialog.tsx": [
-        6,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/RepaymentAuditDialog.tsx": [
-        8,
-        0,
-        0
-      ],
       "client/src/pages/factory/factorycontainerloadingscan/ProformaProgressPanel.tsx": [
         1,
         0,
@@ -1081,26 +1066,6 @@
       ],
       "client/src/pages/payroll/AdvancesTab.tsx": [
         3,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/DepositDialog.tsx": [
-        2,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/EmployeeStatementDialog.tsx": [
-        3,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/PayrollDialogs.tsx": [
-        1,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/WithdrawalDialog.tsx": [
-        4,
         0,
         0
       ],
@@ -3807,6 +3772,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 2638
+    "typeEscapeCeiling": 2613
   }
 }
