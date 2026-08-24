@@ -140,11 +140,10 @@ async function rollbackMigrationRun(req: Request, res: Response): Promise<unknow
 }
 
 export function registerSpMigrationPhase2Routes(app: Express): void {
-  void ensurePhase2Schema().catch((error) => {
-    logger.warn("[SP Phase 2] Charge-review schema creation deferred until migration is used", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  });
+  // Phase 2's auxiliary charge-review table depends on startup-migration tables
+  // such as sp_migration_rehearsal_runs. Create it lazily from the handlers that
+  // use it, after server startup migrations have completed, rather than racing
+  // those ordered migrations while routes are being registered.
 
   // registerSpRoutes runs before the legacy migration router, so these focused
   // handlers replace the older incomplete Step 6/7 and rollback implementations.
