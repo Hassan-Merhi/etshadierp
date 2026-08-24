@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Compiler-gated Phase 2.3 transform: start with the factory-intelligence route boundary cluster.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,9 +8,7 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const routeRoot = path.join(projectRoot, "server/routes");
 const helperPath = path.join(routeRoot, "routeBoundaryTypes.ts");
 
-const TARGET_PREFIXES = [
-  "factory-intelligence/",
-];
+const TARGET_PREFIXES = ["factory-intelligence/"];
 
 const CALLBACK_METHODS = [
   "map",
@@ -78,9 +77,6 @@ function transformRouteFile(filePath, source) {
     dependencyTyped = true;
   }
 
-  // Composition roots previously used `unknown` only to avoid leaking `any`.
-  // Once every child registration function has a real dependency contract, the
-  // root can carry that contract as well.
   const compositionPattern = /requireAuth:\s*unknown\s*,\s*db:\s*unknown/g;
   if (compositionPattern.test(next)) {
     next = next.replace(compositionPattern, "requireAuth: AuthMiddleware, db: AppDb");
