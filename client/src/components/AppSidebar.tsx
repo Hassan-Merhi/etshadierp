@@ -92,10 +92,8 @@ export const ERP_NAV_SECTIONS: NavSection[] = [
     color: NAV_COLOR.accounting,
     items: [
       { title: "Accounts", url: "/accounts", icon: Wallet },
-      { title: "Account Groups", url: "/account-groups", icon: Layers },
       { title: "Parties", url: "/parties", icon: Handshake },
       { title: "Payroll", url: "/payroll", icon: UserCheck },
-      { title: "Company Transfer", url: "/company-transfer", icon: ArrowLeftRight },
     ],
   },
   {
@@ -105,7 +103,6 @@ export const ERP_NAV_SECTIONS: NavSection[] = [
       { title: "Sales Report", url: "/sales-report", icon: PieChart },
       { title: "Stock In & Sales", url: "/stock-in-sales-report", icon: BarChart3 },
       { title: "Analytics", url: "/analytics", icon: BarChart3 },
-      { title: "Net Profit Report", url: "/net-profit-report", icon: TrendingUp },
     ],
   },
   {
@@ -384,7 +381,10 @@ export function AppSidebar({ user }: { user?: SidebarUser }) {
         </div>
       </SidebarContent>
 
-      <ModuleFooter user={user ? { username: user.username ?? undefined, role: user.role ?? undefined } : undefined} accent={MODULE_ACCENT.erp} />
+      <ModuleFooter
+        user={user ? { username: user.username ?? undefined, role: user.role ?? undefined } : undefined}
+        accent={MODULE_ACCENT.erp}
+      />
     </Sidebar>
   );
 }

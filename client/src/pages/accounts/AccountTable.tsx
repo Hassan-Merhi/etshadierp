@@ -6,18 +6,6 @@ import { AccountTableProps } from "./accountTypes";
 import { cn } from "@/lib/utils";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
-const TYPE_LABELS: Record<string, string> = {
-  ledger: "Ledger",
-  supplier: "Supplier",
-  customer: "Customer",
-  bank: "Bank",
-  employee: "Employee",
-  fixedAsset: "Asset",
-  factoryWorker: "Worker",
-};
-
-const TYPE_ORDER = ["ledger", "supplier", "customer", "bank", "employee", "fixedAsset", "factoryWorker"];
-
 export function AccountTable({
   filteredAccounts,
   expandedParents,
@@ -33,21 +21,22 @@ export function AccountTable({
     void type;
     return formatHistoricalBaseAmount(amount);
   }
-  const [typeFilter, setTypeFilter] = useState("all");
+  const [showZeroBalances, setShowZeroBalances] = useState(false);
 
-  const presentTypes = useMemo(() => {
-    const types = new Set(filteredAccounts.map((a) => a.type as string));
-    return TYPE_ORDER.filter((t) => types.has(t));
-  }, [filteredAccounts]);
+  const visibleAccounts = useMemo(() => {
+    if (showZeroBalances) return filteredAccounts;
 
-  const typeFiltered = useMemo(() => {
-    if (typeFilter === "all") return filteredAccounts;
-    return filteredAccounts.filter((a) => a.type === typeFilter);
-  }, [filteredAccounts, typeFilter]);
+    const nonZeroAccounts = filteredAccounts.filter((account) => Math.abs(Number(account.balance) || 0) > 0.001);
+    const parentIdsWithVisibleChildren = new Set(nonZeroAccounts.map((account) => account.parentId).filter(Boolean));
 
-  const accountIds = new Set(typeFiltered.map((a) => a.accountId as number));
-  const parents = typeFiltered.filter((a) => !a.parentId || !accountIds.has(a.parentId));
-  const childrenList = typeFiltered.filter((a) => a.parentId && accountIds.has(a.parentId));
+    return filteredAccounts.filter(
+      (account) => Math.abs(Number(account.balance) || 0) > 0.001 || parentIdsWithVisibleChildren.has(account.accountId)
+    );
+  }, [filteredAccounts, showZeroBalances]);
+
+  const accountIds = new Set(visibleAccounts.map((a) => a.accountId as number));
+  const parents = visibleAccounts.filter((a) => !a.parentId || !accountIds.has(a.parentId));
+  const childrenList = visibleAccounts.filter((a) => a.parentId && accountIds.has(a.parentId));
   const childMap = new Map<number, any[]>();
   childrenList.forEach((c) => {
     if (!childMap.has(c.parentId)) childMap.set(c.parentId, []);
@@ -56,37 +45,17 @@ export function AccountTable({
 
   return (
     <div className="space-y-3">
-      {presentTypes.length > 1 && (
-        <div className="flex gap-1.5 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            className={cn(
-              "h-7 text-xs rounded-full px-3",
-              typeFilter === "all" && "bg-primary text-primary-foreground border-primary"
-            )}
-            onClick={() => setTypeFilter("all")}
-            data-testid="filter-type-all"
-          >
-            All
-          </Button>
-          {presentTypes.map((t) => (
-            <Button
-              key={t}
-              variant="outline"
-              size="sm"
-              className={cn(
-                "h-7 text-xs rounded-full px-3",
-                typeFilter === t && "bg-primary text-primary-foreground border-primary"
-              )}
-              onClick={() => setTypeFilter(t)}
-              data-testid={`filter-type-${t}`}
-            >
-              {TYPE_LABELS[t] || t}
-            </Button>
-          ))}
-        </div>
-      )}
+      <div className="flex items-center justify-end">
+        <Button
+          variant={showZeroBalances ? "default" : "outline"}
+          size="sm"
+          className="h-8 text-xs"
+          onClick={() => setShowZeroBalances((visible) => !visible)}
+          data-testid="button-show-zero-balances"
+        >
+          {showZeroBalances ? "Hide 0 Balance" : "Show 0 Balance"}
+        </Button>
+      </div>
 
       <div className="rounded-xl border overflow-hidden">
         <Table>

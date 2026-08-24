@@ -7,7 +7,7 @@
  * under ./accountslegacy. The account table, statement view and the existing
  * AccountDialogs bundle are unchanged.
  */
-import { Plus, Search, X } from "lucide-react";
+import { Layers, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -53,6 +53,15 @@ export default function Accounts() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <PageHeader title="Accounts Overview" subtitle="View all accounts, balances, and transaction history" />
         <div className="flex gap-2">
+          {(model.currentUser?.role === "Admin" || model.currentUser?.role === "Developer") && (
+            <Button
+              variant="outline"
+              data-testid="button-account-groups"
+              onClick={() => model.navigate("/account-groups")}
+            >
+              <Layers className="w-4 h-4 mr-2" /> Account Groups
+            </Button>
+          )}
           <Button
             data-testid="button-create-account"
             disabled={!model.selectedCompany}
