@@ -13,17 +13,38 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 describe("translation phases 8, 5 and 6", () => {
   it("supports French in the shared Factory resolver with safe fallback", () => {
     expect(FACTORY_CATALOG_LANGUAGES).toEqual(["en", "ar", "fr"]);
-    expect(resolveFactoryLocalizedText({ english: "English", arabic: "Arabic", french: "Français", articleCode: "A1" }, "fr")).toBe("Français");
-    expect(resolveFactoryLocalizedText({ english: "English", arabic: "Arabic", french: null, articleCode: "A1" }, "fr")).toBe("English");
+    expect(
+      resolveFactoryLocalizedText({ english: "English", arabic: "Arabic", french: "Français", articleCode: "A1" }, "fr")
+    ).toBe("Français");
+    expect(
+      resolveFactoryLocalizedText({ english: "English", arabic: "Arabic", french: null, articleCode: "A1" }, "fr")
+    ).toBe("English");
   });
 
   it("searches across English Arabic and French catalog values", () => {
-    expect(factorySearchValues({ articleCode: "A1", name: "English", nameAr: "Arabic", nameFr: "Français", categoryName: "Category", categoryNameAr: "فئة", categoryNameFr: "Catégorie" })).toEqual(expect.arrayContaining(["A1", "English", "Arabic", "Français", "Category", "فئة", "Catégorie"]));
+    expect(
+      factorySearchValues({
+        articleCode: "A1",
+        name: "English",
+        nameAr: "Arabic",
+        nameFr: "Français",
+        categoryName: "Category",
+        categoryNameAr: "فئة",
+        categoryNameFr: "Catégorie",
+      })
+    ).toEqual(expect.arrayContaining(["A1", "English", "Arabic", "Français", "Category", "فئة", "Catégorie"]));
   });
 
   it("keeps shared interface translation exact and excludes business inputs", () => {
     const bridge = read("client/src/components/ApplicationInterfaceTranslator.tsx");
-    expect(bridge).toContain("isProtected");
+    // Phase 3 split the single `isProtected` guard in two: hard protection
+    // still refuses to touch business values anywhere, while soft protection
+    // covers options and table cells, which approved UI copy may now opt into.
+    // Both are named in one pattern rather than two assertions, because the
+    // source-text assertion ratchet is one-way and counts each toContain and
+    // toMatch call — splitting this in two would spend a slot to say the same
+    // thing the single `isProtected` check used to say.
+    expect(bridge).toMatch(/isHardProtected[\s\S]*isSoftProtected/);
     expect(bridge).toContain('"[data-business-value]"');
     expect(bridge).toContain("translateApprovedInterfaceText");
   });

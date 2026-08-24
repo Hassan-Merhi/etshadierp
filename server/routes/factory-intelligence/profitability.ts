@@ -47,7 +47,7 @@ export function registerFactoryProfitabilityRoutes(app: Express, requireAuth: Re
 
       if (bales.length === 0) return res.json([]);
 
-      const mixBatchIds = Array.from(new Set(bales.map((b: any) => b.mixBatchId).filter(Boolean))) as number[];
+      const mixBatchIds = Array.from(new Set(bales.map((b) => b.mixBatchId).filter(Boolean))) as number[];
       const _sources =
         mixBatchIds.length > 0
           ? await db
@@ -66,7 +66,7 @@ export function registerFactoryProfitabilityRoutes(app: Express, requireAuth: Re
         .from(customerOrderBales)
         .where(
           sql`${customerOrderBales.baleId} IN (${sql.join(
-            bales.map((b: any) => sql`${b.id}`),
+            bales.map((b) => sql`${b.id}`),
             sql`, `
           )})`
         );
@@ -75,7 +75,7 @@ export function registerFactoryProfitabilityRoutes(app: Express, requireAuth: Re
 
       const _freightEntries = await db.select().from(containerFreight).where(eq(containerFreight.companyId, companyId));
 
-      const result = bales.map((bale: any) => {
+      const result = bales.map((bale) => {
         const weightKg = parseFloat(bale.weightKg || "0");
         const materialCost = parseFloat(bale.totalCost || "0");
         const laborCost = weightKg * laborCostPerKg;
@@ -132,7 +132,7 @@ export function registerFactoryProfitabilityRoutes(app: Express, requireAuth: Re
 
       if (containers.length === 0) return res.json([]);
 
-      const containerIds = containers.map((c: any) => c.id);
+      const containerIds = containers.map((c) => c.id);
 
       const rawStockEntries = await db
         .select()
@@ -181,22 +181,22 @@ export function registerFactoryProfitabilityRoutes(app: Express, requireAuth: Re
           )})`
         );
 
-      const result = containers.map((container: any) => {
-        const containerRawStock = rawStockEntries.filter((r: any) => r.containerId === container.id);
+      const result = containers.map((container) => {
+        const containerRawStock = rawStockEntries.filter((r) => r.containerId === container.id);
         const rawStockCost = containerRawStock.reduce(
-          (s: number, r: any) => s + parseFloat(r.receivedKg || "0") * parseFloat(r.costPerKg || "0"),
+          (s: number, r) => s + parseFloat(r.receivedKg || "0") * parseFloat(r.costPerKg || "0"),
           0
         );
 
         const containerFreightTotal = freightEntries
-          .filter((f: any) => f.containerId === container.id)
-          .reduce((s: number, f: any) => s + parseFloat(f.freightAmount || "0"), 0);
+          .filter((f) => f.containerId === container.id)
+          .reduce((s: number, f) => s + parseFloat(f.freightAmount || "0"), 0);
 
-        const containerMixSources = mixSources.filter((s: any) => s.containerId === container.id);
-        const mixBatchIds = Array.from(new Set(containerMixSources.map((s: any) => s.mixBatchId))) as number[];
+        const containerMixSources = mixSources.filter((s) => s.containerId === container.id);
+        const mixBatchIds = Array.from(new Set(containerMixSources.map((s) => s.mixBatchId))) as number[];
 
         const containerBales = allBales.filter((b: any) => mixBatchIds.includes(b.mixBatchId));
-        const baleTotalKg = containerBales.reduce((s: number, b: any) => s + parseFloat(b.weightKg || "0"), 0);
+        const baleTotalKg = containerBales.reduce((s: number, b) => s + parseFloat(b.weightKg || "0"), 0);
         const baleLaborCost = baleTotalKg * laborCostPerKg;
         const baleOverheadCost = baleTotalKg * overheadPerKg;
 

@@ -54,7 +54,7 @@ export async function getLastSoldPrices(companyId: number): Promise<Record<numbe
     [companyId]
   );
   const priceMap: Record<number, string> = {};
-  for (const row of result.rows as any[]) {
+  for (const row of result.rows) {
     priceMap[row.stock_item_id] = row.selling_price;
   }
   return priceMap;

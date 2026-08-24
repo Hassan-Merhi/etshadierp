@@ -131,7 +131,7 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
         let chargesScanned = 0;
         let commissionsScanned = 0;
 
-        for (const c of nonUsdContainers as any[]) {
+        for (const c of nonUsdContainers) {
           containersScanned++;
           const { looksSet } = resolveStoredFxRate(c.currencyCode, c.fxRateToUsd, c.fxRateConfirmed);
           if (!looksSet) {
@@ -175,7 +175,7 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
           }
         }
 
-        for (const cm of commissions as any[]) {
+        for (const cm of commissions) {
           commissionsScanned++;
           const { looksSet } = resolveStoredFxRate(cm.currencyCode, cm.fxRateToUsd, cm.fxRateConfirmed);
           if (!looksSet) {

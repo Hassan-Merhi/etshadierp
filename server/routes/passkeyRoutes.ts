@@ -150,7 +150,7 @@ export function registerPasskeyRoutes(app: Express) {
         LIMIT 1
       `);
 
-      if ((credRow.rows as any[]).length === 0) {
+      if (credRow.rows.length === 0) {
         return res.status(400).json({ message: "Passkey not found" });
       }
 

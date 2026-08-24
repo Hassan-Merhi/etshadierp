@@ -152,7 +152,7 @@ export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: Re
         advances !== undefined ||
         overtimePay !== undefined;
       if (financialChanged) {
-        await db.transaction(async (tx: any) => {
+        await db.transaction(async (tx) => {
           await rebuildPayrollGenVoucher(tx, current.companyId, current.periodStart, current.periodEnd);
         });
       }

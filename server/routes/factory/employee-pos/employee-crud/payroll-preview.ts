@@ -50,7 +50,7 @@ export function registerFactoryEmployeePayrollPreviewRoutes(app: Express) {
 
       // Build attendance map: employeeId -> { present: n, half: n, absent: n, late: n, leave: n }
       const attMap: Record<number, Record<string, number>> = {};
-      for (const row of attResult.rows as any[]) {
+      for (const row of attResult.rows) {
         const eid = Number(row.employee_id);
         if (!attMap[eid]) attMap[eid] = {};
         attMap[eid][(row.status as string).toLowerCase()] = Number(row.count);
