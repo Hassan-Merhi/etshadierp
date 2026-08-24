@@ -44,7 +44,9 @@ import {
 import { chooseAuthorizedFactoryCompany } from "../services/security/factoryCompanyScopePolicy";
 import { isFactoryCompanyOptionalRoute } from "../services/security/companyResourceRoutePolicy";
 
-export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
+import type { AppDb, AuthMiddleware } from "./routeBoundaryTypes";
+
+export function registerFactoryRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   app.use("/api/factory", async (req: import("express").Request, res: import("express").Response, next) => {
     try {
       const session = req.session;
@@ -64,7 +66,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         )
         .orderBy(companies.id);
 
-      let currentCompany = assignedFactories.find((company: any) => company.id === session.currentCompanyId) ?? null;
+      let currentCompany = assignedFactories.find((company) => company.id === session.currentCompanyId) ?? null;
       if (!currentCompany && session.currentRole === "Developer" && session.currentCompanyId) {
         const [developerCurrent] = await db
           .select({ id: companies.id, companyType: companies.companyType, active: companies.active })
@@ -83,7 +85,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const factoryCompanyId = chooseAuthorizedFactoryCompany({
         pinnedFactoryId: session.factoryCompanyId,
         currentCompany,
-        assignedFactoryIds: assignedFactories.map((company: any) => company.id),
+        assignedFactoryIds: assignedFactories.map((company) => company.id),
       });
 
       if (!factoryCompanyId) {

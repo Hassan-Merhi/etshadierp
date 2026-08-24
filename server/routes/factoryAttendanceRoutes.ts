@@ -5,11 +5,13 @@ import { eq, and, inArray, gte, lte } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import { factoryAttendance, factoryWorkers } from "@shared/schema";
 
+import type { AppDb, AuthMiddleware } from "./routeBoundaryTypes";
+
 function getFactoryCompanyId(req: import("express").Request): number | undefined {
   return req.session.factoryCompanyId || req.session.currentCompanyId;
 }
 
-export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryAttendanceRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   // GET /api/factory/attendance?date=YYYY-MM-DD&shift=
   // Returns active workers + merged attendance for that date
   app.get("/api/factory/attendance", requireAuth, async (req: Request, res: Response) => {
@@ -39,7 +41,7 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
 
       if (workers.length === 0) return res.json({ workers: [], attendance: [] });
 
-      const workerIds = workers.map((w: any) => w.id);
+      const workerIds = workers.map((w) => w.id);
 
       const existing = await db
         .select()
@@ -173,7 +175,7 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
 
       if (workers.length === 0) return res.json({ workers: [], attendance: [] });
 
-      const workerIds = workers.map((w: any) => w.id);
+      const workerIds = workers.map((w) => w.id);
 
       const attendance = await db
         .select()
@@ -214,7 +216,7 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
         .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)))
         .orderBy(factoryWorkers.fullName);
 
-      const workerIds = workers.map((w: any) => w.id);
+      const workerIds = workers.map((w) => w.id);
 
       const existing =
         workerIds.length > 0
@@ -233,7 +235,7 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
       const attendanceMap: Record<number, string> = {};
       for (const a of existing) attendanceMap[a.workerId] = a.status;
 
-      const rows = workers.map((w: any) => ({
+      const rows = workers.map((w) => ({
         ...w,
         status: attendanceMap[w.id] || "—",
       }));

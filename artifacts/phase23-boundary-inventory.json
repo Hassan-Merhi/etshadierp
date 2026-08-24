@@ -1,26 +1,26 @@
 {
-  "generatedAt": "2026-08-24T13:19:51.236Z",
+  "generatedAt": "2026-08-24T13:23:09.494Z",
   "repositorySummary": {
     "scannedFiles": 2980,
-    "filesWithEscapes": 737,
-    "explicitAny": 2392,
+    "filesWithEscapes": 736,
+    "explicitAny": 2382,
     "asAny": 89,
     "suppressions": 0,
     "drizzleRowCasts": 1,
-    "typeEscapeTotal": 2481,
-    "ceiling": 2481,
+    "typeEscapeTotal": 2471,
+    "ceiling": 2471,
     "improvedFiles": 0,
     "failedFiles": 0
   },
   "candidateSummary": {
-    "files": 386,
-    "escapes": 1348,
+    "files": 385,
+    "escapes": 1338,
     "drizzleRowCasts": 1
   },
   "bucketTotals": {
     "server-route": {
-      "files": 285,
-      "escapes": 952,
+      "files": 284,
+      "escapes": 942,
       "drizzleRowCasts": 1
     },
     "client-lib": {
@@ -1096,22 +1096,6 @@
       "signalTotal": 40
     },
     {
-      "path": "server/routes/factoryAttendanceRoutes.ts",
-      "bucket": "server-route",
-      "explicitAny": 6,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 6,
-      "signals": {
-        "http": 29,
-        "db": 1,
-        "dto": 0,
-        "errors": 5
-      },
-      "signalTotal": 35
-    },
-    {
       "path": "server/routes/vouchers/centralPaymentReceiptCreateRoute.ts",
       "bucket": "server-route",
       "explicitAny": 6,
@@ -1526,22 +1510,6 @@
         "errors": 18
       },
       "signalTotal": 20
-    },
-    {
-      "path": "server/routes/factoryRoutes.ts",
-      "bucket": "server-route",
-      "explicitAny": 5,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 5,
-      "signals": {
-        "http": 3,
-        "db": 1,
-        "dto": 0,
-        "errors": 13
-      },
-      "signalTotal": 17
     },
     {
       "path": "server/lib/accountStatementPdfGenerator.ts",
@@ -2614,6 +2582,38 @@
         "errors": 0
       },
       "signalTotal": 0
+    },
+    {
+      "path": "server/routes/productionBaleRoutes.ts",
+      "bucket": "server-route",
+      "explicitAny": 1,
+      "asAny": 1,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 2,
+      "signals": {
+        "http": 108,
+        "db": 8,
+        "dto": 0,
+        "errors": 108
+      },
+      "signalTotal": 224
+    },
+    {
+      "path": "server/routes/factory/customer-orders/orderCrudRoutes.ts",
+      "bucket": "server-route",
+      "explicitAny": 2,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 2,
+      "signals": {
+        "http": 87,
+        "db": 22,
+        "dto": 0,
+        "errors": 63
+      },
+      "signalTotal": 172
     }
   ]
 }

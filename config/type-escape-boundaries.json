@@ -2684,13 +2684,8 @@
         0,
         0
       ],
-      "server/routes/factoryAttendanceRoutes.ts": [
-        6,
-        0,
-        0
-      ],
       "server/routes/factoryRoutes.ts": [
-        5,
+        1,
         0,
         0
       ],
@@ -3707,6 +3702,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 2481
+    "typeEscapeCeiling": 2471
   }
 }
