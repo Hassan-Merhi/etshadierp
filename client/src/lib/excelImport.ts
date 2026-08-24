@@ -49,7 +49,7 @@ const V_ALIGN: Record<string, number> = {
 
 function cfStyleToFortune(style: any): any {
   if (!style) return {};
-  const result: any = {};
+  const result = {};
   if (style.fill?.fgColor?.argb) result.bg = argbToHex(style.fill.fgColor.argb);
   if (style.font?.color?.argb) result.fc = argbToHex(style.font.color.argb);
   if (style.font?.bold) result.bl = 1;
@@ -164,7 +164,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
   wb.eachSheet((ws, sheetId) => {
     const order = sheetId - 1;
     const celldata: any[] = [];
-    const config: any = {};
+    const config = {};
 
     // ── Cells ────────────────────────────────────────────────────────────
     ws.eachRow({ includeEmpty: false }, (row) => {
@@ -175,7 +175,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
         const r = (cell.row as unknown as number) - 1;
         const c = (cell.col as unknown as number) - 1;
 
-        const v: any = {};
+        const v = {};
 
         // Value / formula
         const val = cell.value;
@@ -239,7 +239,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
         // Borders
         const border = cell.border as any;
         if (border) {
-          const b: any = {};
+          const b = {};
           for (const [side, fsKey] of [
             ["left", "l"],
             ["right", "r"],
@@ -330,7 +330,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
     }
     if (maxColIdx > maxC) maxC = maxColIdx;
 
-    const sheet: any = {
+    const sheet = {
       id: String(order + 1),
       name: ws.name,
       status: order === 0 ? 1 : 0,

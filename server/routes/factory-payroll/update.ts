@@ -126,7 +126,7 @@ export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: an
         ).toFixed(2)
       );
 
-      const updateData: any = {
+      const updateData = {
         bonuses: updatedBonuses.toFixed(2),
         deductions: updatedDeductions.toFixed(2),
         advances: updatedAdvances.toFixed(2),

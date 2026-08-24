@@ -245,7 +245,7 @@ export function registerUserAccessRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid currency" });
       }
       const existing = await db.select().from(userPreferences).where(eq(userPreferences.userId, req.user.id));
-      const updateFields: any = { updatedAt: new Date() };
+      const updateFields = { updatedAt: new Date() };
       if (dateFormat) updateFields.dateFormat = dateFormat;
       if (preferredCurrency !== undefined) updateFields.preferredCurrency = preferredCurrency;
       if (showProfitComparisonOnPOS !== undefined) updateFields.showProfitComparisonOnPOS = showProfitComparisonOnPOS;

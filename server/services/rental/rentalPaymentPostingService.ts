@@ -460,7 +460,7 @@ export async function createRentalPaymentGroup(opts: RentalPaymentGroupOptions) 
   } = opts;
 
   if (paymentDate > clientDate && !scheduleFuturePayment) {
-    const err: any = new Error("Future payment dates require Schedule future payment.");
+    const err = new Error("Future payment dates require Schedule future payment.");
     err.status = 400;
     throw err;
   }

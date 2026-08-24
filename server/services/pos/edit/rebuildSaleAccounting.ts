@@ -133,7 +133,7 @@ export async function rebuildSaleAccountingEntries(
 
   // Debit entry (payment account) with dual-currency fields
   const normDR = normalizePosEntry(Math.abs(grandTotal), 0, voucherCurrency, voucherRate);
-  const newDebitEntry: any = {
+  const newDebitEntry = {
     voucherId,
     debitAmount: grandTotal >= 0 ? normDR.debitAmount : "0",
     creditAmount: grandTotal < 0 ? normDR.debitAmount : "0",

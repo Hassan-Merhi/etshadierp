@@ -515,7 +515,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
         const eligible = allAdvances.filter(
           (a: { cashAccountId: null; id: number }) => !alreadyPostedIds.has(a.id) || a.cashAccountId === null
         );
-        const eligibleIds = new Set(eligible.map((a: any) => a.id));
+        const eligibleIds = new Set(eligible.map((a) => a.id));
 
         if (eligibleIds.size === 0) {
           return { posted: 0, skipped: 0 };
@@ -653,7 +653,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
           .where(and(eq(factoryWorkerAdvances.companyId, companyId), inArray(factoryWorkerAdvances.id, ids)));
 
         // Load worker names for narration
-        const workerIds = [...new Set(advanceRows.map((a: any) => a.workerId))];
+        const workerIds = [...new Set(advanceRows.map((a) => a.workerId))];
         const workerRows =
           workerIds.length > 0
             ? await tx
@@ -661,7 +661,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
                 .from(factoryWorkers)
                 .where(inArray(factoryWorkers.id, workerIds as number[]))
             : [];
-        const workerMap = new Map<number, string>(workerRows.map((w: any) => [w.id, w.fullName]));
+        const workerMap = new Map<number, string>(workerRows.map((w) => [w.id, w.fullName]));
 
         // Find or create the "Factory Worker Advances" asset ledger account
         let [advancesAccount] = await tx
@@ -728,7 +728,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
               .where(eq(voucherEntries.voucherId, voucherId));
 
             const creditEntry = entries
-              .filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
+              .filter((e) => parseFloat(e.creditAmount || "0") > 0)
               .sort(
                 (a: { creditAmount: string }, b: { creditAmount: string }) =>
                   parseFloat(b.creditAmount) - parseFloat(a.creditAmount)

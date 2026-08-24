@@ -234,7 +234,7 @@ export async function computeOffloadCosting(ctx: OffloadCostingContext): Promise
   }));
 
   // Commission record: confirmed (rate was resolved above or is 1 for USD).
-  const commissionForHelper: any = commInsertValues
+  const commissionForHelper = commInsertValues
     ? {
         commissionTotal: String(commTotalVal),
         currencyCode: commInsertValues.currencyCode,

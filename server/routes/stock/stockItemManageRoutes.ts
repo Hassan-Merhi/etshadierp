@@ -32,7 +32,7 @@ export function registerStockItemManageRoutes(app: Express) {
       }
 
       // Trim and validate required fields
-      const updates: any = {};
+      const updates = {};
 
       if (req.body.code !== undefined) {
         const trimmedCode = String(req.body.code).trim();

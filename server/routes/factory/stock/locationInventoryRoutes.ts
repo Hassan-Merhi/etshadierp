@@ -460,7 +460,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
           headerColor: string,
           altColor: string
         ) => {
-          const cols: Array<{ header: string; key: string; width: number; }> = [
+          const cols: Array<{ header: string; key: string; width: number }> = [
             { header: "Article Code", key: "articleCode", width: 18 },
             { header: "Product Name", key: "productName", width: 38 },
             { header: "Category", key: "category", width: 22 },
@@ -492,7 +492,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
             totalCost += tc;
             totalSell += ts;
 
-            const rd: any = {
+            const rd = {
               articleCode: row.articleCode,
               productName: row.productName,
               category: row.category,
@@ -525,7 +525,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
           });
 
           ws.addRow({});
-          const td: any = {
+          const td = {
             articleCode: "",
             productName: `TOTAL — ${rows.length} ${label}`,
             category: "",
@@ -571,7 +571,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
         });
 
         const baleSheet = workbook.addWorksheet("Bale Details");
-        const baleCols: Array<{ header: string; key: string; width: number; }> = [
+        const baleCols: Array<{ header: string; key: string; width: number }> = [
           { header: "Bale Ref #", key: "referenceNumber", width: 24 },
           { header: "Article Code", key: "articleCode", width: 18 },
           { header: "Product Name", key: "productName", width: 38 },
@@ -588,7 +588,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
 
         mainBales.forEach((b, idx) => {
           const pid = b.productId ?? 0;
-          const rd: any = {
+          const rd = {
             referenceNumber: b.referenceNumber,
             articleCode: b.articleCode || "",
             productName: b.productName || "",
@@ -623,7 +623,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
         });
 
         const garbageDetailSheet = workbook.addWorksheet("Garbage & Wiper Details");
-        const garbageBaleCols: Array<{ header: string; key: string; width: number; }> = [
+        const garbageBaleCols: Array<{ header: string; key: string; width: number }> = [
           { header: "Bale Ref #", key: "referenceNumber", width: 24 },
           { header: "Bale Code", key: "baleCode", width: 18 },
           { header: "Article Code", key: "articleCode", width: 18 },
@@ -644,7 +644,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
           const pid = b.productId ?? 0;
           const w = parseFloat(String(b.weightKg || "0"));
           gbTotalKg += w;
-          const rd: any = {
+          const rd = {
             referenceNumber: b.referenceNumber,
             baleCode: b.baleCode || "",
             articleCode: b.articleCode || "",
@@ -669,7 +669,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
         // Totals row for garbage sheet
         if (garbageBales.length > 0) {
           garbageDetailSheet.addRow({});
-          const gtd: any = {
+          const gtd = {
             referenceNumber: "",
             baleCode: "",
             articleCode: "",

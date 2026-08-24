@@ -139,11 +139,11 @@ export function registerPosPriceListRoutes(app: Express) {
         ]);
 
         const dubaiMap = new Map<number, string>();
-        for (const r of (dubaiCostRes.rows)) {
+        for (const r of dubaiCostRes.rows) {
           dubaiMap.set(Number(r.stockItemId), String(r.costDubai ?? "0"));
         }
         const offloadMap = new Map<number, string>();
-        for (const r of (offloadCostRes.rows)) {
+        for (const r of offloadCostRes.rows) {
           offloadMap.set(Number(r.stockItemId), String(r.offloadingCost ?? "0"));
         }
 
@@ -254,9 +254,8 @@ export function registerPosPriceListRoutes(app: Express) {
             ORDER BY pli.stock_item_id, co.offloaded_at DESC
           `),
         ]);
-        for (const r of (dubaiCostRes.rows)) dubaiMap.set(Number(r.stockItemId), String(r.costDubai ?? "0"));
-        for (const r of (offloadCostRes.rows))
-          offloadMap.set(Number(r.stockItemId), String(r.offloadingCost ?? "0"));
+        for (const r of dubaiCostRes.rows) dubaiMap.set(Number(r.stockItemId), String(r.costDubai ?? "0"));
+        for (const r of offloadCostRes.rows) offloadMap.set(Number(r.stockItemId), String(r.offloadingCost ?? "0"));
       }
 
       const result = items.map((item) => {
@@ -265,7 +264,7 @@ export function registerPosPriceListRoutes(app: Express) {
           const custom = priceMap.get(item.stockItemId)?.get(mloc.id);
           itemPrices[mloc.id] = custom ?? item.baseSellingPrice ?? "0";
         }
-        const base: any = { ...item, masterPrices: itemPrices };
+        const base = { ...item, masterPrices: itemPrices };
         if (isPrivileged) {
           base.costPrice = dubaiMap.get(item.stockItemId) ?? null;
           base.offloadingCost = offloadMap.get(item.stockItemId) ?? null;

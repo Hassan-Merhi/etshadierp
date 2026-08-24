@@ -64,7 +64,7 @@ export async function findOrCreateLedger(
       .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
     const nextCode = String((parseInt((maxCodeRow as { maxCode: string })?.maxCode || "0") || 0) + 1 + attempt);
     try {
-      const insertVals: any = {
+      const insertVals = {
         companyId,
         code: nextCode,
         name,

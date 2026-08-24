@@ -34,7 +34,16 @@ function sanitizeDecimal(v: any): string {
  * Insert proforma lines in chunks inside a single transaction so partial imports
  * never leave orphan rows when a later chunk fails.
  */
-async function batchInsertProformaLines(rows: { proformaId: number; barcode: string; itemName: string; qty: number; weightPerBale: string; pricePerBale: string; }[]) {
+async function batchInsertProformaLines(
+  rows: {
+    proformaId: number;
+    barcode: string;
+    itemName: string;
+    qty: number;
+    weightPerBale: string;
+    pricePerBale: string;
+  }[]
+) {
   // Each row has 6 columns → 6 params; PostgreSQL limit is 65535.
   // 200 rows × 6 = 1200 params — well within limits.
   const CHUNK = 200;
@@ -141,7 +150,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       const proformaId = parseId(req.params.proformaId);
       if (proformaId === null) return res.status(400).json({ message: "Invalid id" });
       const { reference, notes } = req.body;
-      const updates: any = { updatedAt: new Date() };
+      const updates = { updatedAt: new Date() };
       if (reference !== undefined) updates.reference = reference;
       if (notes !== undefined) updates.notes = notes;
       const [updated] = await db
@@ -229,7 +238,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         .from(supplierProformas)
         .where(and(eq(supplierProformas.id, line.proformaId), eq(supplierProformas.companyId, companyId)));
       if (!proforma) return res.status(403).json({ message: "Access denied" });
-      const updates: any = {};
+      const updates = {};
       if (req.body.barcode !== undefined) updates.barcode = req.body.barcode;
       if (req.body.itemName !== undefined) updates.itemName = req.body.itemName;
       if (req.body.qty !== undefined) updates.qty = parseInt(req.body.qty) || 0;

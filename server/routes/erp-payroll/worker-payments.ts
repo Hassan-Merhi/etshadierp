@@ -194,7 +194,7 @@ export function registerPayrollWorkerPaymentRoutes(app: Express) {
       }
 
       // Create credit entry for bank/cash account
-      const creditEntry: any = {
+      const creditEntry = {
         voucherId: voucher.id,
         debitAmount: "0",
         creditAmount: totalAmount.toFixed(2),

@@ -150,7 +150,7 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
       }
 
       // Update the voucher
-      const voucherUpdates: any = {
+      const voucherUpdates = {
         totalAmount: totalAmount.toFixed(2),
       };
       if (voucherDate !== undefined) voucherUpdates.voucherDate = voucherDate;
@@ -367,7 +367,7 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
 
         // Update the main voucher
         const parsedLocationId = parseInt(locationId);
-        const voucherUpdates: any = {
+        const voucherUpdates = {
           totalAmount: totalAmount.toFixed(2),
           locationId: parsedLocationId,
         };

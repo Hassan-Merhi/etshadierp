@@ -111,7 +111,7 @@ export function registerFactorySettingsRoutes(app: Express, requireAuth: any, db
         hideAvgCost,
       } = req.body;
 
-      const updateData: any = { updatedAt: new Date() };
+      const updateData = { updatedAt: new Date() };
       if (dashboardEnabled !== undefined) updateData.dashboardEnabled = dashboardEnabled;
       if (kpisEnabled !== undefined) updateData.kpisEnabled = kpisEnabled;
       if (profitabilityEnabled !== undefined) updateData.profitabilityEnabled = profitabilityEnabled;

@@ -70,7 +70,7 @@ export function registerContainerTrackingRoutes(app: Express) {
         blDocs,
       } = parseResult.data;
 
-      const updateData: any = {};
+      const updateData = {};
       if (shopName !== undefined) updateData.shopName = shopName;
       if (eta !== undefined) updateData.eta = eta || null;
       if (etaSource !== undefined) updateData.etaSource = etaSource;
@@ -248,7 +248,7 @@ export function registerContainerTrackingRoutes(app: Express) {
           };
 
           // Build update object
-          const updateData: any = {};
+          const updateData = {};
           if (data.shopName && String(data.shopName) !== "[object Object]") updateData.shopName = String(data.shopName);
           const etaDate = normDate(data.eta);
           if (etaDate) updateData.eta = etaDate;

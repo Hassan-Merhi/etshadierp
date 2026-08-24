@@ -247,7 +247,7 @@ export function registerVoucherJournalRoutes(app: Express) {
           const narration = entry.narration || null;
 
           // Determine account field
-          const accountField: any = {};
+          const accountField = {};
           if (entry.accountType === "ledger") {
             accountField.ledgerAccountId = entry.accountId;
           } else if (entry.accountType === "bank") {
@@ -523,7 +523,7 @@ export function registerVoucherJournalRoutes(app: Express) {
           const narration = entry.narration || null;
 
           // Determine account field
-          const accountField: any = {};
+          const accountField = {};
           if (entry.accountType === "ledger") {
             accountField.ledgerAccountId = entry.accountId;
           } else if (entry.accountType === "bank") {

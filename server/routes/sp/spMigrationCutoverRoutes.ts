@@ -57,7 +57,7 @@ async function invokeMigrationHandler(
 ): Promise<any> {
   let statusCode = 200;
   let payload: any = null;
-  const captureResponse: any = {
+  const captureResponse = {
     status(code: number) {
       statusCode = code;
       return this;

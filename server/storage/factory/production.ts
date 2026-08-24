@@ -123,7 +123,7 @@ export async function getProductionBaleByBarcode(
 }
 
 export async function createProductionBale(bale: schema.InsertProductionBale): Promise<schema.ProductionBale> {
-  const baleData: any = { ...bale };
+  const baleData = { ...bale };
   if (bale.pressedAt) {
     baleData.pressedAt = new Date(bale.pressedAt);
   }
@@ -135,7 +135,7 @@ export async function updateProductionBale(
   id: number,
   updates: Partial<schema.InsertProductionBale>
 ): Promise<schema.ProductionBale> {
-  const updateData: any = { ...updates, updatedAt: sql`now()` };
+  const updateData = { ...updates, updatedAt: sql`now()` };
   if (updates.pressedAt) {
     updateData.pressedAt = new Date(updates.pressedAt);
   }
@@ -158,7 +158,7 @@ export async function bulkCreateProductionBales(
 ): Promise<schema.ProductionBale[]> {
   if (bales.length === 0) return [];
   const balesData = bales.map((bale) => {
-    const data: any = { ...bale };
+    const data = { ...bale };
     if (bale.pressedAt) {
       data.pressedAt = new Date(bale.pressedAt);
     }

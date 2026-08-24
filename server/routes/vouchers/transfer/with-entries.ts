@@ -148,7 +148,7 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
         oldEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, id));
 
         // Update voucher metadata
-        const voucherUpdates: any = {
+        const voucherUpdates = {
           voucherType: voucher.voucherType,
           voucherDate: voucher.voucherDate,
           description: voucher.description !== undefined ? voucher.description || null : existingVoucher.description,

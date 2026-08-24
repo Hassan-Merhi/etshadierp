@@ -195,7 +195,7 @@ export function registerPosImportRoutes(app: Express) {
         for (const item of items) {
           const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
           if (!stockItem) {
-            const inputError: any = new Error(`Stock item not found for barcode: ${item.barcode}`);
+            const inputError = new Error(`Stock item not found for barcode: ${item.barcode}`);
             inputError.httpStatus = 400;
             throw inputError;
           }

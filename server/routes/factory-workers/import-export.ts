@@ -279,7 +279,7 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
           const raw = rows[i];
           try {
             // Map raw keys to field names
-            const mapped: any = {};
+            const mapped = {};
             for (const [rawKey, rawVal] of Object.entries(raw)) {
               const key = colMap[normalize(rawKey)];
               if (key) mapped[key] = rawVal;

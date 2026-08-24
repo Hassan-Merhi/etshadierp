@@ -88,7 +88,7 @@ export function registerFactoryCustomerProformaLineRoutes(app: Express) {
         .limit(1);
       if (!existingLine) return res.status(404).json({ message: "Proforma line not found" });
 
-      const updateData: any = {};
+      const updateData = {};
       if (req.body.productName !== undefined) updateData.productName = req.body.productName;
       if (req.body.quantity !== undefined) updateData.quantity = parseInt(req.body.quantity);
       if (req.body.pricePerBale !== undefined) updateData.pricePerBale = req.body.pricePerBale;

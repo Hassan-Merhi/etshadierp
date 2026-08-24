@@ -192,7 +192,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
         } = req.body;
 
         await db.transaction(async (tx) => {
-          const userUpdates: any = {};
+          const userUpdates = {};
           if (password && password.length >= 4) {
             userUpdates.password = await bcrypt.hash(password, 10);
           }
@@ -210,7 +210,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
             await tx.update(users).set(userUpdates).where(eq(users.id, userId));
           }
 
-          const profileUpdates: any = { updatedAt: new Date() };
+          const profileUpdates = { updatedAt: new Date() };
           if (displayName !== undefined) profileUpdates.displayName = displayName;
           if (hasErpAccess !== undefined) profileUpdates.hasErpAccess = hasErpAccess;
           if (hasFactoryAccess !== undefined) profileUpdates.hasFactoryAccess = hasFactoryAccess;

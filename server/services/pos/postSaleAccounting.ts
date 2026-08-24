@@ -266,7 +266,7 @@ export async function insertSaleAccountingEntries(
 
   // Debit entry (cash / bank / receivable account)
   const normDR = normalizePosEntry(toTxAmt(Math.abs(grandTotal)), 0, currency || "USD", exchangeRate);
-  const debitEntry: any = {
+  const debitEntry = {
     voucherId: txVoucherId,
     debitAmount: grandTotal >= 0 ? normDR.debitAmount : "0",
     creditAmount: grandTotal < 0 ? normDR.debitAmount : "0", // reversals have opposite sign

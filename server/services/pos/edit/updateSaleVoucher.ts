@@ -27,7 +27,7 @@ export async function updateVoucherRecord(
 ): Promise<void> {
   const { voucherId, description, grandTotal, locationChanged, targetLocationId, oldLocationId, voucherDate } = params;
 
-  const voucherUpdate: any = {
+  const voucherUpdate = {
     description: description || null,
     totalAmount: grandTotal.toString(),
   };

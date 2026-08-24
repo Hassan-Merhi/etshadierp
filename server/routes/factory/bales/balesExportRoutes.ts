@@ -85,7 +85,7 @@ export function registerBalesExportRoutes(app: Express) {
 
       for (const bale of bales) {
         const loc = locMap.get(bale.erpLocationId);
-        const baleRowData: any = {
+        const baleRowData = {
           referenceNumber: bale.referenceNumber,
           articleCode: bale.articleCode ?? "",
           productName: bale.productName ?? "",

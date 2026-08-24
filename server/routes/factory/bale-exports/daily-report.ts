@@ -103,7 +103,7 @@ export function registerFactoryDailyReportRoutes(app: Express) {
         const ExcelJS = (await import("exceljs")).default;
         const workbook = new ExcelJS.Workbook();
         const sheet = workbook.addWorksheet("Production Report");
-        const columns: Array<{ header: string; key: string; width: number; }> = [
+        const columns: Array<{ header: string; key: string; width: number }> = [
           { header: "Date", key: "date", width: 14 },
           { header: "Batch Code", key: "batchCode", width: 18 },
           { header: "Batch Name", key: "batchName", width: 28 },
@@ -120,7 +120,7 @@ export function registerFactoryDailyReportRoutes(app: Express) {
         });
 
         for (const usage of usages) {
-          const rowData: any = {
+          const rowData = {
             date: usage.usedDate,
             batchCode: usage.batchCode,
             batchName: usage.batchName || "",
@@ -132,7 +132,7 @@ export function registerFactoryDailyReportRoutes(app: Express) {
           sheet.addRow(rowData);
         }
 
-        const totalRowData: any = {
+        const totalRowData = {
           date: "TOTAL",
           batchCode: "",
           batchName: "",

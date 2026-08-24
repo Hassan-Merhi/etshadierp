@@ -347,7 +347,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
           titleFont: "FFFFFF",
         };
 
-        const thinBorder: any = {
+        const thinBorder = {
           top: { style: "thin", color: { argb: "BDBDBD" } },
           left: { style: "thin", color: { argb: "BDBDBD" } },
           bottom: { style: "thin", color: { argb: "BDBDBD" } },

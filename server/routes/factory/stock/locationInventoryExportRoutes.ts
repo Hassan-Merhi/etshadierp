@@ -176,7 +176,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
 
       // Helper: build a summary sheet (location-grouped)
       const buildSheet = (ws: any, rows: GroupedLocRow[], label: string, headerColor: string, altColor: string) => {
-        const cols: Array<{ header: string; key: string; width: number; }> = [
+        const cols: Array<{ header: string; key: string; width: number }> = [
           { header: "Location", key: "locationName", width: 22 },
           { header: "Article Code", key: "articleCode", width: 18 },
           { header: "Product Name", key: "productName", width: 38 },
@@ -215,7 +215,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
           totalKg += row.totalWeight;
           totalValue += tv;
 
-          const rd: any = {
+          const rd = {
             locationName: row.locationName,
             articleCode: row.articleCode,
             productName: row.productName,
@@ -241,7 +241,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
         }
 
         ws.addRow({});
-        const td: any = {
+        const td = {
           locationName: "GRAND TOTAL",
           articleCode: "",
           productName: `${rows.length} ${label} across ${locationRecords.length} locations`,
@@ -277,7 +277,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
 
       // Sheet 3: Bale Details (main items only — no wipers/garbage)
       const baleSheet = workbook.addWorksheet("Bale Details");
-      const baleCols: Array<{ header: string; key: string; width: number; }> = [
+      const baleCols: Array<{ header: string; key: string; width: number }> = [
         { header: "Location", key: "locationName", width: 22 },
         { header: "Bale Ref #", key: "referenceNumber", width: 24 },
         { header: "Article Code", key: "articleCode", width: 18 },
@@ -302,7 +302,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
       mainBales.forEach((b, idx) => {
         const locId = b.erpLocationId ?? 0;
         const pid = b.productId ?? 0;
-        const rd: any = {
+        const rd = {
           locationName: locationMap.get(locId) || `Location #${locId}`,
           referenceNumber: b.referenceNumber,
           articleCode: b.articleCode || "",
@@ -339,7 +339,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
       });
 
       const garbageDetailSheetAll = workbook.addWorksheet("Garbage & Wiper Details");
-      const garbageBaleColsAll: Array<{ header: string; key: string; width: number; }> = [
+      const garbageBaleColsAll: Array<{ header: string; key: string; width: number }> = [
         { header: "Location", key: "locationName", width: 22 },
         { header: "Bale Ref #", key: "referenceNumber", width: 24 },
         { header: "Bale Code", key: "baleCode", width: 18 },
@@ -362,7 +362,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
         const pid = b.productId ?? 0;
         const w = parseFloat(String(b.weightKg || "0"));
         gbTotalKgAll += w;
-        const rd: any = {
+        const rd = {
           locationName: locationMap.get(locId) || `Location #${locId}`,
           referenceNumber: b.referenceNumber,
           baleCode: b.baleCode || "",
@@ -387,7 +387,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
 
       if (garbageBalesAll.length > 0) {
         garbageDetailSheetAll.addRow({});
-        const gtd: any = {
+        const gtd = {
           locationName: "GRAND TOTAL",
           referenceNumber: "",
           baleCode: "",

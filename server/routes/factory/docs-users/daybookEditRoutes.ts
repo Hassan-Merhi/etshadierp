@@ -49,7 +49,41 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
       const canEdit = ["admin", "owner", "developer"].includes(currentRole) || session.daybookEditDays > 0;
       if (!canEdit) return res.status(403).json({ message: "You do not have permission to edit daybook entries" });
 
-      let existing: ({ id: number; companyId: number; createdAt: Date; currencyCode: string; fxRateToUsd: string; description: string; effectiveDate: string | null; createdBy: string | null; referenceId: number | null; amountUsd: string; txDate: string; txType: string; referenceTable: string | null; metaJson: string | null; amountCurrency: string; }) | ({ id: number; companyId: number; txDate: string; txType: string; referenceId: number | null; referenceTable: string | null; description: string; metaJson: string | null; currencyCode: string; amountCurrency: string; fxRateToUsd: string; amountUsd: string; effectiveDate: string | null; createdAt: Date; createdBy: string | null; });
+      let existing:
+        | {
+            id: number;
+            companyId: number;
+            createdAt: Date;
+            currencyCode: string;
+            fxRateToUsd: string;
+            description: string;
+            effectiveDate: string | null;
+            createdBy: string | null;
+            referenceId: number | null;
+            amountUsd: string;
+            txDate: string;
+            txType: string;
+            referenceTable: string | null;
+            metaJson: string | null;
+            amountCurrency: string;
+          }
+        | {
+            id: number;
+            companyId: number;
+            txDate: string;
+            txType: string;
+            referenceId: number | null;
+            referenceTable: string | null;
+            description: string;
+            metaJson: string | null;
+            currencyCode: string;
+            amountCurrency: string;
+            fxRateToUsd: string;
+            amountUsd: string;
+            effectiveDate: string | null;
+            createdAt: Date;
+            createdBy: string | null;
+          };
       let realEntryId: number;
 
       if (rawEntryId < 0) {
@@ -113,7 +147,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
 
       const beforeJson = JSON.stringify(existing);
 
-      const updates: any = {};
+      const updates = {};
       if (description !== undefined) updates.description = description;
       if (amountCurrency !== undefined) updates.amountCurrency = String(amountCurrency);
       if (amountUsd !== undefined) updates.amountUsd = String(amountUsd);
@@ -138,7 +172,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
 
       // ── Sync description and date back to the source voucher so Accounts statements stay in sync ──
       if (updated.referenceTable === "vouchers" && updated.referenceId) {
-        const voucherUpdates: any = {};
+        const voucherUpdates = {};
         if (description !== undefined) voucherUpdates.description = description;
         if (txDate !== undefined) voucherUpdates.voucherDate = txDate;
         if (Object.keys(voucherUpdates).length > 0) {
@@ -272,12 +306,8 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
           if (newFxRate) {
             fx = String(newFxRate); // fresh explicit request input — trust it even if it equals 1
           } else {
-            const fallbackRaw = (container).fxRateToUsdOffload || container.fxRateToUsd;
-            const { fxRate: resolvedFx, looksSet } = resolveStoredFxRate(
-              ccy,
-              fallbackRaw,
-              (container).fxRateConfirmed
-            );
+            const fallbackRaw = container.fxRateToUsdOffload || container.fxRateToUsd;
+            const { fxRate: resolvedFx, looksSet } = resolveStoredFxRate(ccy, fallbackRaw, container.fxRateConfirmed);
             if (!looksSet) throw new UnresolvedExchangeRateError(ccy);
             fx = String(resolvedFx);
           }

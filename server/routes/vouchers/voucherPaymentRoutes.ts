@@ -534,7 +534,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
           const narration = notes || null;
 
           // Determine account field for entry account
-          const entryAccountField: any = {};
+          const entryAccountField = {};
           if (entry.accountType === "ledger") {
             entryAccountField.ledgerAccountId = entry.accountId;
           } else if (entry.accountType === "bank") {
@@ -552,7 +552,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
           }
 
           // Determine account field for payment account
-          const paymentAccountField: any = {};
+          const paymentAccountField = {};
           if (paymentAccountType === "ledger") {
             paymentAccountField.ledgerAccountId = paymentAccountId;
           } else if (paymentAccountType === "bank") {
