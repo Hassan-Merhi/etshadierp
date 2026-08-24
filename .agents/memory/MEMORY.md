@@ -84,3 +84,4 @@
 - [Currency formatter test compatibility](currency-formatter-test-compatibility.md) — financial screens should prefer historical-base formatting but tolerate lightweight test providers that only expose the legacy formatter.
 - [Express 5 routing compatibility](express5-routing-compatibility.md) — named wildcards, app.router stack access, and registration-time mount capture are required after the Express 5 upgrade.
 - [Replit preview HMR](replit-preview-hmr.md) — Replit's preview proxy can reject Vite websocket upgrades; disable HMR only in Replit preview and keep local HMR enabled.
+- [Duplicate posting audit](duplicate-posting-audit.md) — financial retries need stable company-scoped identity; timestamps, payload hashes, and display numbers are not identities.
