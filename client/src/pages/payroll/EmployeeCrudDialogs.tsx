@@ -1,3 +1,6 @@
+import type { usePayrollModel } from "./usePayrollModel";
+
+type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -20,11 +23,11 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 interface EmployeeCrudDialogsProps {
   createEmployeeDialogOpen: boolean;
   setCreateEmployeeDialogOpen: (open: boolean) => void;
-  createEmployeeForm: any;
-  createEmployeeMutation: any;
-  employeeGroups: any[];
-  deleteConflict: any;
-  setDeleteConflict: (v: any) => void;
+  createEmployeeForm: PayrollModel["createEmployeeForm"];
+  createEmployeeMutation: PayrollModel["createEmployeeMutation"];
+  employeeGroups: PayrollModel["employeeGroups"];
+  deleteConflict: PayrollModel["deleteConflict"];
+  setDeleteConflict: PayrollModel["setDeleteConflict"];
   handleForceDeleteEmployee: () => void;
   createGroupDialogOpen: boolean;
   setCreateGroupDialogOpen: (open: boolean) => void;
@@ -32,14 +35,14 @@ interface EmployeeCrudDialogsProps {
   setNewGroupName: (v: string) => void;
   newGroupDescription: string;
   setNewGroupDescription: (v: string) => void;
-  createGroupMutation: any;
+  createGroupMutation: PayrollModel["createGroupMutation"];
   groupMembersDialogOpen: boolean;
   setGroupMembersDialogOpen: (open: boolean) => void;
-  selectedGroupForMembers: any;
-  employeeStaff: any[];
-  groupMembers: any[];
-  addWorkerToGroupMutation: any;
-  removeWorkerFromGroupMutation: any;
+  selectedGroupForMembers: PayrollModel["selectedGroupForMembers"];
+  employeeStaff: PayrollModel["employeeStaff"];
+  groupMembers: PayrollModel["groupMembers"];
+  addWorkerToGroupMutation: PayrollModel["addWorkerToGroupMutation"];
+  removeWorkerFromGroupMutation: PayrollModel["removeWorkerFromGroupMutation"];
 }
 
 export function EmployeeCrudDialogs({
@@ -81,7 +84,7 @@ export function EmployeeCrudDialogs({
           <Form {...createEmployeeForm}>
             <form
               noValidate
-              onSubmit={createEmployeeForm.handleSubmit((data: any) => createEmployeeMutation.mutate(data))}
+              onSubmit={createEmployeeForm.handleSubmit((data) => createEmployeeMutation.mutate(data))}
               className="space-y-4"
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

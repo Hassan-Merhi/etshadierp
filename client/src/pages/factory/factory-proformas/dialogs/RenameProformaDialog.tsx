@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useFactoryProformasModel } from "../../factoryproformas/useFactoryProformasModel";
+
+type FactoryProformasModel = ReturnType<typeof useFactoryProformasModel>;
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -15,11 +18,11 @@ export function RenameProformaDialog({
   setRenameValue,
   setRenamingProforma,
 }: {
-  renameProformaMutation: any;
-  renameValue: any;
-  renamingProforma: any;
-  setRenameValue: any;
-  setRenamingProforma: any;
+  renameProformaMutation: FactoryProformasModel["renameProformaMutation"];
+  renameValue: FactoryProformasModel["renameValue"];
+  renamingProforma: FactoryProformasModel["renamingProforma"];
+  setRenameValue: FactoryProformasModel["setRenameValue"];
+  setRenamingProforma: FactoryProformasModel["setRenamingProforma"];
 }) {
   return (
     <Dialog

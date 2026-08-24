@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useFactoryLocationInventory } from "../../FactoryLocationInventoryModel";
+
+type FactoryLocationInventoryModel = ReturnType<typeof useFactoryLocationInventory>;
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -27,15 +30,15 @@ export function PrintBarcodesDialog({
   setReprintDialogOpen,
   setReprintProduct,
 }: {
-  handleDoPrint: any;
-  reprintBales: any;
-  reprintDialogOpen: any;
-  reprintLoading: any;
-  reprintProduct: any;
-  selectedLocation: any;
-  setReprintBales: any;
-  setReprintDialogOpen: any;
-  setReprintProduct: any;
+  handleDoPrint: FactoryLocationInventoryModel["handleDoPrint"];
+  reprintBales: FactoryLocationInventoryModel["reprintBales"];
+  reprintDialogOpen: FactoryLocationInventoryModel["reprintDialogOpen"];
+  reprintLoading: FactoryLocationInventoryModel["reprintLoading"];
+  reprintProduct: FactoryLocationInventoryModel["reprintProduct"];
+  selectedLocation: FactoryLocationInventoryModel["selectedLocation"];
+  setReprintBales: FactoryLocationInventoryModel["setReprintBales"];
+  setReprintDialogOpen: FactoryLocationInventoryModel["setReprintDialogOpen"];
+  setReprintProduct: FactoryLocationInventoryModel["setReprintProduct"];
 }) {
   return (
     <Dialog
@@ -76,7 +79,7 @@ export function PrintBarcodesDialog({
                 </tr>
               </thead>
               <tbody>
-                {reprintBales.map((row: any) => (
+                {reprintBales.map((row) => (
                   <tr key={row.bale.id} className="border-t h-9" data-testid={`row-reprint-bale-${row.bale.id}`}>
                     <td className="px-3 font-mono text-xs text-muted-foreground">
                       {row.bale.referenceNumber || row.bale.baleCode}

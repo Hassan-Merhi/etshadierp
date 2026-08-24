@@ -1,3 +1,6 @@
+import type { usePayrollModel } from "./usePayrollModel";
+
+type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -26,20 +29,20 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 interface AdvanceDialogsProps {
   advanceDialogOpen: boolean;
   setAdvanceDialogOpen: (open: boolean) => void;
-  advanceForm: any;
-  advanceMutation: any;
+  advanceForm: PayrollModel["advanceForm"];
+  advanceMutation: PayrollModel["advanceMutation"];
   advanceWorkerComboOpen: boolean;
   setAdvanceWorkerComboOpen: (open: boolean) => void;
-  workerStaff: any[];
-  cashAccounts: any[];
+  workerStaff: PayrollModel["workerStaff"];
+  cashAccounts: PayrollModel["cashAccounts"];
   deductionDialogOpen: boolean;
   setDeductionDialogOpen: (open: boolean) => void;
-  selectedAdvance: any;
-  deductionForm: any;
-  deductionMutation: any;
+  selectedAdvance: PayrollModel["selectedAdvance"];
+  deductionForm: PayrollModel["deductionForm"];
+  deductionMutation: PayrollModel["deductionMutation"];
   advanceToDelete: number | null;
   setAdvanceToDelete: (v: number | null) => void;
-  deleteAdvanceMutation: any;
+  deleteAdvanceMutation: PayrollModel["deleteAdvanceMutation"];
 }
 
 export function AdvanceDialogs({

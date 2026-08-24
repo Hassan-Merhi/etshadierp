@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useFactoryProformasModel } from "../../factoryproformas/useFactoryProformasModel";
+
+type FactoryProformasModel = ReturnType<typeof useFactoryProformasModel>;
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -25,20 +28,20 @@ export function AddPriceLineDialog({
   setIsAddLineOpen,
   setNewLine,
 }: {
-  addLineMode: any;
-  addLineMutation: any;
-  allStockItems: any;
-  catalogSearch: any;
-  catalogSelectedItem: any;
-  handleAddLine: any;
-  isAddLineOpen: any;
-  newLine: any;
-  priceListMap: any;
-  setAddLineMode: any;
-  setCatalogSearch: any;
-  setCatalogSelectedItem: any;
-  setIsAddLineOpen: any;
-  setNewLine: any;
+  addLineMode: FactoryProformasModel["addLineMode"];
+  addLineMutation: FactoryProformasModel["addLineMutation"];
+  allStockItems: FactoryProformasModel["allStockItems"];
+  catalogSearch: FactoryProformasModel["catalogSearch"];
+  catalogSelectedItem: FactoryProformasModel["catalogSelectedItem"];
+  handleAddLine: FactoryProformasModel["handleAddLine"];
+  isAddLineOpen: FactoryProformasModel["isAddLineOpen"];
+  newLine: FactoryProformasModel["newLine"];
+  priceListMap: FactoryProformasModel["priceListMap"];
+  setAddLineMode: FactoryProformasModel["setAddLineMode"];
+  setCatalogSearch: FactoryProformasModel["setCatalogSearch"];
+  setCatalogSelectedItem: FactoryProformasModel["setCatalogSelectedItem"];
+  setIsAddLineOpen: FactoryProformasModel["setIsAddLineOpen"];
+  setNewLine: FactoryProformasModel["setNewLine"];
 }) {
   return (
     <Dialog
@@ -115,7 +118,7 @@ export function AddPriceLineDialog({
                         const q = catalogSearch.toLowerCase().trim();
                         const filtered = q
                           ? allStockItems.filter(
-                              (item: any) =>
+                              (item) =>
                                 item.name?.toLowerCase().includes(q) || item.code?.toLowerCase().includes(q)
                             )
                           : allStockItems;
@@ -125,13 +128,13 @@ export function AddPriceLineDialog({
                               No items match "{catalogSearch}"
                             </p>
                           );
-                        return filtered.map((item: any) => (
+                        return filtered.map((item) => (
                           <button
                             key={item.id}
                             className="w-full flex items-center justify-between px-3 py-2.5 text-left hover-elevate border-b last:border-b-0"
                             onClick={() => {
                               setCatalogSelectedItem(item);
-                              setNewLine((prev: any) => ({
+                              setNewLine((prev) => ({
                                 ...prev,
                                 articleCode: item.code || "",
                                 productName: item.name || "",
@@ -177,7 +180,7 @@ export function AddPriceLineDialog({
                       onClick={() => {
                         setCatalogSelectedItem(null);
                         setCatalogSearch("");
-                        setNewLine((prev: any) => ({
+                        setNewLine((prev) => ({
                           ...prev,
                           articleCode: "",
                           productName: "",

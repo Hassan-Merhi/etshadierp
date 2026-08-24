@@ -1,3 +1,6 @@
+import type { usePayrollModel } from "./usePayrollModel";
+
+type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,13 +12,13 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 interface BulkPaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  selectedPayments: any[];
+  selectedPayments: PayrollModel["selectedPayments"];
   totalAmount: number;
-  workerStaff: any[];
-  form: any;
-  mutation: any;
-  cashAccounts: any[];
-  bankAccounts: any[] | undefined;
+  workerStaff: PayrollModel["workerStaff"];
+  form: PayrollModel["form"];
+  mutation: PayrollModel["mutation"];
+  cashAccounts: PayrollModel["cashAccounts"];
+  bankAccounts: PayrollModel["bankAccounts"];
   bankAccountsLoading: boolean;
 }
 

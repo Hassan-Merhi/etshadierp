@@ -1,3 +1,6 @@
+import type { usePayrollModel } from "./usePayrollModel";
+
+type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -11,27 +14,27 @@ import { WorkersTable } from "./WorkersTable";
 
 interface WorkersTabProps {
   setNewWorkerDialogOpen: (val: boolean) => void;
-  workerPaymentSummary: any;
+  workerPaymentSummary: PayrollModel["workerPaymentSummary"];
   setBulkPaymentDialogOpen: (val: boolean) => void;
-  selectedPayments: any[];
+  selectedPayments: PayrollModel["selectedPayments"];
   totalAmount: number;
   workerStaff: Employee[];
-  workerGroups: any[];
+  workerGroups: PayrollModel["workerGroups"];
   workerGroupsExpanded: Record<number, boolean>;
-  setWorkerGroupsExpanded: (val: any) => void;
-  workerPayments: Record<number, any>;
-  setWorkerOverrides: (val: any) => void;
+  setWorkerGroupsExpanded: PayrollModel["setWorkerGroupsExpanded"];
+  workerPayments: PayrollModel["workerPayments"];
+  setWorkerOverrides: PayrollModel["setWorkerOverrides"];
   setCreateWorkerGroupDialogOpen: (val: boolean) => void;
-  setSelectedWorkerGroupForMembers: (val: any) => void;
+  setSelectedWorkerGroupForMembers: PayrollModel["setSelectedWorkerGroupForMembers"];
   setWorkerGroupMembersDialogOpen: (val: boolean) => void;
-  setWorkerGroupMemberSelections: (val: any) => void;
-  deleteWorkerGroupMutation: any;
+  setWorkerGroupMemberSelections: PayrollModel["setWorkerGroupMemberSelections"];
+  deleteWorkerGroupMutation: PayrollModel["deleteWorkerGroupMutation"];
   handleToggleWorker: (id: number) => void;
   handleUpdateAmount: (id: number, val: string) => void;
   handleDeleteWorker: (worker: Employee) => void;
   setStatementEmployee: (val: Employee | null) => void;
   ungroupedWorkers: Employee[];
-  addWorkerToWorkerGroupMutation: any;
+  addWorkerToWorkerGroupMutation: PayrollModel["addWorkerToWorkerGroupMutation"];
   setWorkerDeductionTarget: (val: Employee | null) => void;
   setSelectedWorkerForEdit: (val: Employee | null) => void;
   setEditWorkerDialogOpen: (val: boolean) => void;
@@ -69,7 +72,7 @@ export function WorkersTab({
 
   const handleSelectAll = () => {
     const shouldSelectAll = !allSelected;
-    setWorkerOverrides((prev: any) => {
+    setWorkerOverrides((prev) => {
       const next = { ...prev };
       workerStaff.forEach((w) => {
         next[w.id] = { ...next[w.id], selected: shouldSelectAll };
@@ -149,7 +152,7 @@ export function WorkersTab({
                 key={group.id}
                 open={isExpanded}
                 onOpenChange={(open) =>
-                  setWorkerGroupsExpanded((prev: any) => ({ ...prev, [group.id]: open }))
+                  setWorkerGroupsExpanded((prev) => ({ ...prev, [group.id]: open }))
                 }
               >
                 <Card>

@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useFactoryWorkerDetailModel } from "../../factoryworkerdetail/useFactoryWorkerDetailModel";
+
+type FactoryWorkerDetailModel = ReturnType<typeof useFactoryWorkerDetailModel>;
 import { DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,10 +21,10 @@ export function PayrollDetailDialog({
   payrollDetailLoading,
   setDetailPayrollId,
 }: {
-  detailPayrollId: any;
-  payrollDetail: any;
-  payrollDetailLoading: any;
-  setDetailPayrollId: any;
+  detailPayrollId: FactoryWorkerDetailModel["detailPayrollId"];
+  payrollDetail: FactoryWorkerDetailModel["payrollDetail"];
+  payrollDetailLoading: FactoryWorkerDetailModel["payrollDetailLoading"];
+  setDetailPayrollId: FactoryWorkerDetailModel["setDetailPayrollId"];
 }) {
   return (
     <Dialog
@@ -145,7 +148,7 @@ export function PayrollDetailDialog({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {payrollDetail.attendance.map((att: any) => {
+                      {payrollDetail.attendance.map((att) => {
                         const d = new Date(att.attendanceDate + "T00:00:00");
                         const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
                         const statusColors: Record<string, string> = {

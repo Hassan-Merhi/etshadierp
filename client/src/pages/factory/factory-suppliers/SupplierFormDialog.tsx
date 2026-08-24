@@ -1,3 +1,6 @@
+import type { useFactorySuppliersModel } from "./useFactorySuppliersModel";
+
+type FactorySuppliersModel = ReturnType<typeof useFactorySuppliersModel>;
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,15 +15,15 @@ interface SupplierFormDialogProps {
   setCreateOpen: (val: boolean) => void;
   editingSupplier: FactorySupplier | null;
   setEditingSupplier: (val: FactorySupplier | null) => void;
-  formData: any;
-  setFormData: (val: any) => void;
+  formData: FactorySuppliersModel["formData"];
+  setFormData: FactorySuppliersModel["setFormData"];
   formRole: "broker" | "standalone" | "linked";
   setFormRole: (val: "broker" | "standalone" | "linked") => void;
   allSuppliers: SupplierWithBalance[];
   createSubAccountParentId: number | null;
   setCreateSubAccountParentId: (val: number | null) => void;
-  createMutation: UseMutationResult<any, any, any>;
-  updateMutation: UseMutationResult<any, any, any>;
+  createMutation: FactorySuppliersModel["createMutation"];
+  updateMutation: FactorySuppliersModel["updateMutation"];
   resetForm: () => void;
   wrapAdminAction: (fn: () => void, title: string) => void;
 }

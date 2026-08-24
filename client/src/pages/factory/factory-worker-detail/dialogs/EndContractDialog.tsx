@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useFactoryWorkerDetailModel } from "../../factoryworkerdetail/useFactoryWorkerDetailModel";
+
+type FactoryWorkerDetailModel = ReturnType<typeof useFactoryWorkerDetailModel>;
 import { UserX, Calculator, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,26 +37,26 @@ export function EndContractDialog({
   setEndStep,
   worker,
 }: {
-  cashAccounts: any;
-  endCalculating: any;
-  endCashAccountId: any;
-  endEnd: any;
-  endOpen: any;
-  endResult: any;
-  endStart: any;
-  endStep: any;
-  endSubmitting: any;
-  handleCalculate: any;
-  handleEndContract: any;
-  handleSkipAndEnd: any;
-  payrollBalance: any;
-  setEndCashAccountId: any;
-  setEndEnd: any;
-  setEndOpen: any;
-  setEndResult: any;
-  setEndStart: any;
-  setEndStep: any;
-  worker: any;
+  cashAccounts: FactoryWorkerDetailModel["cashAccounts"];
+  endCalculating: FactoryWorkerDetailModel["endCalculating"];
+  endCashAccountId: FactoryWorkerDetailModel["endCashAccountId"];
+  endEnd: FactoryWorkerDetailModel["endEnd"];
+  endOpen: FactoryWorkerDetailModel["endOpen"];
+  endResult: FactoryWorkerDetailModel["endResult"];
+  endStart: FactoryWorkerDetailModel["endStart"];
+  endStep: FactoryWorkerDetailModel["endStep"];
+  endSubmitting: FactoryWorkerDetailModel["endSubmitting"];
+  handleCalculate: FactoryWorkerDetailModel["handleCalculate"];
+  handleEndContract: FactoryWorkerDetailModel["handleEndContract"];
+  handleSkipAndEnd: FactoryWorkerDetailModel["handleSkipAndEnd"];
+  payrollBalance: FactoryWorkerDetailModel["payrollBalance"];
+  setEndCashAccountId: FactoryWorkerDetailModel["setEndCashAccountId"];
+  setEndEnd: FactoryWorkerDetailModel["setEndEnd"];
+  setEndOpen: FactoryWorkerDetailModel["setEndOpen"];
+  setEndResult: FactoryWorkerDetailModel["setEndResult"];
+  setEndStart: FactoryWorkerDetailModel["setEndStart"];
+  setEndStep: FactoryWorkerDetailModel["setEndStep"];
+  worker: FactoryWorkerDetailModel["worker"];
 }) {
   return (
     <Dialog
@@ -167,7 +170,7 @@ export function EndContractDialog({
                     <SelectValue placeholder="Select account..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {cashAccounts?.map((a: any) => (
+                    {cashAccounts?.map((a) => (
                       <SelectItem key={a.id} value={String(a.id)}>
                         {a.name} ({a.code})
                       </SelectItem>

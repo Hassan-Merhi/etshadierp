@@ -1,3 +1,6 @@
+import type { usePayrollModel } from "./usePayrollModel";
+
+type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,19 +12,19 @@ import { Plus, X } from "lucide-react";
 interface EditEmployeeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  setEditingEmployee: (v: any) => void;
-  editEmployeeForm: any;
-  editEmployeeMutation: any;
-  employeeGroups: any[];
-  otherCompanies: any[];
-  selectedCompany: any;
-  locations: any[];
-  allCompanyLocations: any[];
-  editBaleRates: any[];
-  setEditBaleRates: (fn: (prev: any[]) => any[]) => void;
-  editBalePctRates: any[];
-  setEditBalePctRates: (fn: (prev: any[]) => any[]) => void;
-  pctLocations: any[];
+  setEditingEmployee: PayrollModel["setEditingEmployee"];
+  editEmployeeForm: PayrollModel["editEmployeeForm"];
+  editEmployeeMutation: PayrollModel["editEmployeeMutation"];
+  employeeGroups: PayrollModel["employeeGroups"];
+  otherCompanies: PayrollModel["otherCompanies"];
+  selectedCompany: PayrollModel["selectedCompany"];
+  locations: PayrollModel["locations"];
+  allCompanyLocations: PayrollModel["allCompanyLocations"];
+  editBaleRates: PayrollModel["editBaleRates"];
+  setEditBaleRates: PayrollModel["setEditBaleRates"];
+  editBalePctRates: PayrollModel["editBalePctRates"];
+  setEditBalePctRates: PayrollModel["setEditBalePctRates"];
+  pctLocations: PayrollModel["pctLocations"];
 }
 
 export function EditEmployeeDialog({
@@ -58,7 +61,7 @@ export function EditEmployeeDialog({
         <Form {...editEmployeeForm}>
           <form
             noValidate
-            onSubmit={editEmployeeForm.handleSubmit((data: any) => editEmployeeMutation.mutate(data))}
+            onSubmit={editEmployeeForm.handleSubmit((data) => editEmployeeMutation.mutate(data))}
             className="space-y-4"
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -1,3 +1,6 @@
+import type { usePayrollModel } from "./usePayrollModel";
+
+type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -20,23 +23,23 @@ import type { Employee } from "@shared/schema";
 interface WorkerDialogsProps {
   newWorkerDialogOpen: boolean;
   setNewWorkerDialogOpen: (open: boolean) => void;
-  newWorkerForm: any;
-  createWorkerMutation: any;
+  newWorkerForm: PayrollModel["newWorkerForm"];
+  createWorkerMutation: PayrollModel["createWorkerMutation"];
   editWorkerDialogOpen: boolean;
   setEditWorkerDialogOpen: (open: boolean) => void;
-  selectedWorkerForEdit: any;
-  editWorkerForm: any;
-  updateWorkerMutation: any;
-  deleteWorkerConflict: any;
-  setDeleteWorkerConflict: (v: any) => void;
+  selectedWorkerForEdit: PayrollModel["selectedWorkerForEdit"];
+  editWorkerForm: PayrollModel["editWorkerForm"];
+  updateWorkerMutation: PayrollModel["updateWorkerMutation"];
+  deleteWorkerConflict: PayrollModel["deleteWorkerConflict"];
+  setDeleteWorkerConflict: PayrollModel["setDeleteWorkerConflict"];
   handleForceDeleteWorker: () => void;
   workerGroupMembersDialogOpen: boolean;
   setWorkerGroupMembersDialogOpen: (open: boolean) => void;
-  selectedWorkerGroupForMembers: any;
-  allWorkerGroups: any[];
+  selectedWorkerGroupForMembers: PayrollModel["selectedWorkerGroupForMembers"];
+  allWorkerGroups: PayrollModel["allWorkerGroups"];
   allWorkers: Employee[];
-  addWorkerToWorkerGroupMutation: any;
-  removeWorkerFromWorkerGroupMutation: any;
+  addWorkerToWorkerGroupMutation: PayrollModel["addWorkerToWorkerGroupMutation"];
+  removeWorkerFromWorkerGroupMutation: PayrollModel["removeWorkerFromWorkerGroupMutation"];
 }
 
 export function WorkerDialogs({
@@ -75,7 +78,7 @@ export function WorkerDialogs({
           <Form {...newWorkerForm}>
             <form
               noValidate
-              onSubmit={newWorkerForm.handleSubmit((data: any) => createWorkerMutation.mutate(data))}
+              onSubmit={newWorkerForm.handleSubmit((data) => createWorkerMutation.mutate(data))}
               className="space-y-4"
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -202,7 +205,7 @@ export function WorkerDialogs({
           <Form {...editWorkerForm}>
             <form
               noValidate
-              onSubmit={editWorkerForm.handleSubmit((data: any) => {
+              onSubmit={editWorkerForm.handleSubmit((data) => {
                 if (selectedWorkerForEdit) {
                   updateWorkerMutation.mutate({ ...data, id: selectedWorkerForEdit.id });
                 }

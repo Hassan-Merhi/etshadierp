@@ -1,3 +1,6 @@
+import type { usePayrollModel } from "./usePayrollModel";
+
+type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -18,15 +21,15 @@ import { getEmpAvatarColor, getEmpInitials } from "./payrollSchemas";
 
 interface WorkersTableProps {
   workers: Employee[];
-  workerPayments: Record<number, any>;
-  workerGroups: any[];
+  workerPayments: PayrollModel["workerPayments"];
+  workerGroups: PayrollModel["workerGroups"];
   handleToggleWorker: (id: number) => void;
   handleUpdateAmount: (id: number, val: string) => void;
   handleDeleteWorker: (worker: Employee) => void;
   setStatementEmployee: (val: Employee | null) => void;
   setWorkerOverrides: (val: Record<string, unknown>) => void;
   formatAmount: (amt: number) => string;
-  addWorkerToWorkerGroupMutation?: any;
+  addWorkerToWorkerGroupMutation?: PayrollModel["addWorkerToWorkerGroupMutation"];
   groupId?: number;
   setWorkerDeductionTarget?: (val: Employee | null) => void;
   setSelectedWorkerForEdit?: (val: Employee | null) => void;
