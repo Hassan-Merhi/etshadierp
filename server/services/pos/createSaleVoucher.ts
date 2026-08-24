@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../db";
 import { randomUUID } from "node:crypto";
 import {
   infrastructurePostingIdentity,
@@ -11,7 +12,7 @@ import {
  */
 
 export async function insertSaleVoucher(
-  tx: any,
+  tx: DbTransaction,
   params: {
     companyId: number;
     locationId: any;

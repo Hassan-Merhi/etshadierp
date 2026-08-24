@@ -21,6 +21,7 @@
  * Never throws — always returns a typed result.
  */
 
+import type { HTTPResponse } from "puppeteer";
 import { existsSync } from "fs";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "./logger";
@@ -70,7 +71,7 @@ export function isMaerskDirectScraperAvailable(): boolean {
 let _sharedBrowser: any = null;
 let _stealthRegistered = false;
 
-async function getSharedBrowser(): Promise<any> {
+async function getSharedBrowser() {
   // If we already have a live browser, verify it's still responsive
   if (_sharedBrowser) {
     try {
@@ -202,20 +203,18 @@ export function deepScanForEta(obj: unknown, depth = 0): { path: string; value: 
 function parseEvents(rawEvents: unknown[]): TrackingEvent[] {
   if (!Array.isArray(rawEvents)) return [];
   return rawEvents
-    .map(
-      (e: any): TrackingEvent => ({
-        date: parseDate(e.eventDateTime ?? e.eventDate ?? e.timestamp ?? e.date ?? null),
-        status: e.transportEventTypeCode ?? e.activityName ?? e.eventCode ?? e.activity ?? e.status ?? null,
-        location:
-          e.location?.portName ??
-          e.location?.locationName ??
-          e.location?.city ??
-          e.portName ??
-          e.locationName ??
-          (typeof e.location === "string" ? e.location : null),
-        description: e.description ?? e.eventDescription ?? e.activityName ?? null,
-      })
-    )
+    .map((e: any): TrackingEvent => ({
+      date: parseDate(e.eventDateTime ?? e.eventDate ?? e.timestamp ?? e.date ?? null),
+      status: e.transportEventTypeCode ?? e.activityName ?? e.eventCode ?? e.activity ?? e.status ?? null,
+      location:
+        e.location?.portName ??
+        e.location?.locationName ??
+        e.location?.city ??
+        e.portName ??
+        e.locationName ??
+        (typeof e.location === "string" ? e.location : null),
+      description: e.description ?? e.eventDescription ?? e.activityName ?? null,
+    }))
     .filter((e) => e.date !== null || e.status !== null)
     .sort((a, b) => {
       if (!a.date) return 1;
@@ -235,7 +234,7 @@ const normContainer = (v: unknown): string =>
  * found — never blindly trusts index 0, since a response can carry several
  * containers (e.g. a bill-of-lading lookup) and [0] may be a different box.
  */
-function pickContainer(list: any[], wantContainer?: string): any {
+function pickContainer(list: any[], wantContainer?: string) {
   if (!Array.isArray(list) || list.length === 0) return null;
   const wanted = wantContainer ? normContainer(wantContainer) : "";
   if (wanted) {
@@ -464,7 +463,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     // lets us diagnose what Maersk's SPA is actually calling.
     const capturedPayloads: Array<{ url: string; data: unknown }> = [];
 
-    page.on("response", async (response: any) => {
+    page.on("response", async (response: HTTPResponse) => {
       try {
         const url: string = response.url();
         if (!/maersk\.com/i.test(url) || /\.(png|jpg|gif|svg|woff|woff2|ttf|ico|css|js)(\?|$)/i.test(url)) return;

@@ -15,7 +15,7 @@ const BWIP_MODULE_NAME: string = "bwip-js";
 
 let bwipjsPromise: Promise<any> | null = null;
 
-function getBwipjs(): Promise<any> {
+function getBwipjs() {
   if (!bwipjsPromise) {
     // Keep this as a runtime-resolved module name. The package ships without a
     // declaration surface compatible with this project's TypeScript settings,

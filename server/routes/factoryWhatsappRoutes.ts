@@ -9,7 +9,7 @@ import { logger } from "../lib/logger";
  * POST /api/factory/accounts/:accountId/send-statement-whatsapp — manual send
  */
 
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { db } from "../db";
 import { factoryAccountWhatsappRules, ledgerAccounts } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
@@ -17,7 +17,7 @@ import { generateAccountStatementPdf } from "../lib/accountStatementPdfGenerator
 import { sendWhatsAppFileByUploadPos } from "../services/whatsappService";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 
-export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
+export function registerFactoryWhatsappRoutes(app: Express, requireAuth: RequestHandler) {
   // ── GET rule ──────────────────────────────────────────────────────────────
   app.get("/api/factory/accounts/:accountId/whatsapp-rule", requireAuth, async (req: Request, res: Response) => {
     try {

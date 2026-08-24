@@ -464,9 +464,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
               });
               return;
             }
-            const uniqueSrcIds = [
-              ...new Set(itemsWithRate.map((i) => Number(i.sourceLocationId)).filter(Boolean)),
-            ];
+            const uniqueSrcIds = [...new Set(itemsWithRate.map((i) => Number(i.sourceLocationId)).filter(Boolean))];
             let sourceName = "Multiple Sources";
             if (uniqueSrcIds.length === 1) {
               const [srcLoc] = await db
@@ -480,7 +478,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
               recipientLocationId,
               sourceLocationName: sourceName,
               destLocationName: destLocation.name,
-              items: transfer.items.map((i: any) => ({
+              items: transfer.items.map((i) => ({
                 stockItemId: i.stockItemId,
                 quantity: parseFloat(i.quantity),
               })),

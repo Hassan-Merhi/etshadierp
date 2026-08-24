@@ -4,7 +4,8 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response } from "express";
+import type { Database } from "../../db";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { eq, and, sql, gte, lte } from "drizzle-orm";
@@ -16,7 +17,7 @@ import {
   factoryWorkers,
 } from "@shared/schema";
 
-export function registerFactoryKpiRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryKpiRoutes(app: Express, requireAuth: RequestHandler, db: Database) {
   app.get("/api/factory/kpis/daily", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -98,7 +99,7 @@ export function registerFactoryKpiRoutes(app: Express, requireAuth: any, db: any
 
       const workers = await db.select().from(factoryWorkers).where(eq(factoryWorkers.companyId, companyId));
 
-      const workerMap = new Map<number, any>(workers.map((w: any) => [w.id, w]));
+      const workerMap = new Map(workers.map((w) => [w.id, w] as const));
 
       const workerStats: Record<number, { workerId: number; workerName: string; balesCount: number; totalKg: number }> =
         {};

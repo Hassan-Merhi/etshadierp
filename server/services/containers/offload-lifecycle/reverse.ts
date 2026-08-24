@@ -1,16 +1,17 @@
+import type { DbTransaction } from "../../../db";
 import { and, eq, sql } from "drizzle-orm";
 import { reverseInventoryByExactValue } from "../../../inventoryHelper";
 import * as schema from "@shared/schema";
 
 import { amount, buildItemMap } from "./types";
 
-async function deleteVoucherWithEntries(tx: any, voucherId: number): Promise<void> {
+async function deleteVoucherWithEntries(tx: DbTransaction, voucherId: number): Promise<void> {
   await tx.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, voucherId));
   await tx.delete(schema.vouchers).where(eq(schema.vouchers.id, voucherId));
 }
 
 export async function reverseExistingOffload(
-  tx: any,
+  tx: DbTransaction,
   container: typeof schema.containers.$inferSelect,
   existingOffload: typeof schema.containerOffloads.$inferSelect,
   lineItems: Array<{ stockItemId: number; quantity: string; rate: string }>

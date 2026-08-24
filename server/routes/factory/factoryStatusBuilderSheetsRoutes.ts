@@ -193,7 +193,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
           (existing.rows as SRow[]) ?? [],
           (existing.columns as any[]) ?? [],
           rows as SRow[],
-          (columns ?? existing.columns) as any[],
+          columns ?? existing.columns,
           req.user?.username || req.user?.name
         ).catch((e) => logger.error("[StatusBuilder] history log failed:", { error: e.message }));
       }

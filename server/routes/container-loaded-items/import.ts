@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../../db";
@@ -14,7 +14,7 @@ import { poLineItems, purchaseOrders, stockItems, supplierContainerLoadedItems }
 
 import { verifyContainerOwnership } from "./_helpers";
 
-export function registerContainerLoadedItemImportRoutes(app: Express, requireAuth: any) {
+export function registerContainerLoadedItemImportRoutes(app: Express, requireAuth: RequestHandler) {
   app.post("/api/containers/:containerId/import-loaded-items", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -94,9 +94,7 @@ export function registerContainerLoadedItemImportRoutes(app: Express, requireAut
           return res.status(400).json({ message: "No line items found in purchase orders" });
         }
 
-        const itemsWithBarcode = lineItems.filter(
-          (item) => item.stockItemCode && item.stockItemCode.trim() !== ""
-        );
+        const itemsWithBarcode = lineItems.filter((item) => item.stockItemCode && item.stockItemCode.trim() !== "");
         const skippedCount = lineItems.length - itemsWithBarcode.length;
 
         if (itemsWithBarcode.length === 0) {

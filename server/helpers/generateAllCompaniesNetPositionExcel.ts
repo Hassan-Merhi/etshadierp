@@ -7,6 +7,7 @@
  * Used by the daily WhatsApp scheduler.
  */
 
+import ExcelJS from "exceljs";
 import { generateMonthEnds, fmtMonthLabel } from "./generateNetPositionExcel";
 import { calculateNetPositionAsOf } from "./calculateNetPositionAsOf";
 import { calculateIncomeStatementForPeriod } from "./calculateIncomeStatementForPeriod";
@@ -32,20 +33,20 @@ const C = {
 
 const currencyFmt = "#,##0.00";
 
-function hdr(cell: any, bgArgb = C.DARK_BLUE) {
+function hdr(cell: ExcelJS.Cell, bgArgb = C.DARK_BLUE) {
   cell.font = { bold: true, color: { argb: C.WHITE }, size: 10 };
   cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bgArgb } };
   cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
   cell.border = { bottom: { style: "thin", color: { argb: "FFAAAAAA" } } };
 }
 
-function subHdr(cell: any) {
+function subHdr(cell: ExcelJS.Cell) {
   cell.font = { bold: true, color: { argb: C.WHITE }, size: 10 };
   cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.MID_BLUE } };
   cell.alignment = { horizontal: "center", vertical: "middle" };
 }
 
-function numCell(cell: any, value: number, _positive = true) {
+function numCell(cell: ExcelJS.Cell, value: number, _positive = true) {
   cell.value = value;
   cell.numFmt = currencyFmt;
   cell.alignment = { horizontal: "right" };
@@ -56,7 +57,7 @@ function numCell(cell: any, value: number, _positive = true) {
   cell.font = { color: { argb: fgArgb }, size: 10 };
 }
 
-function plainNum(cell: any, value: number) {
+function plainNum(cell: ExcelJS.Cell, value: number) {
   cell.value = value;
   cell.numFmt = currencyFmt;
   cell.alignment = { horizontal: "right" };

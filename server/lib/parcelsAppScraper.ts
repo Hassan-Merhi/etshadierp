@@ -18,6 +18,7 @@
  * blocked=true so the caller knows to fall back to the next provider.
  */
 
+import type { HTTPResponse } from "puppeteer";
 import { existsSync } from "fs";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "./logger";
@@ -142,7 +143,7 @@ export const ensureChromiumAvailable = ensureChromiumInstalled;
 let _sharedBrowser: any = null;
 let _stealthRegistered = false;
 
-async function getSharedBrowser(): Promise<any> {
+async function getSharedBrowser() {
   if (_sharedBrowser) {
     try {
       await _sharedBrowser.pages(); // lightweight liveness check
@@ -257,7 +258,7 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
     let isBlocked = false;
 
     // Intercept ParcelsApp API responses (v2 and v3, all known endpoints)
-    page.on("response", async (response: any) => {
+    page.on("response", async (response: HTTPResponse) => {
       const url: string = response.url();
       if (
         url.includes("parcelsapp.com") &&

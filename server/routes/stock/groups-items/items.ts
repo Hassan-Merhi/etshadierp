@@ -11,7 +11,7 @@ import { storage } from "../../../storage";
 import { requireAuth, requireNonPOS } from "../../../auth";
 import { logAudit } from "../../_helpers";
 import { stockItems, insertStockItemSchema } from "@shared/schema";
-import { eq, and, or, asc, sql, isNull, ilike } from "drizzle-orm";
+import { eq, and, or, asc, sql, isNull, ilike, type SQL } from "drizzle-orm";
 
 export function registerStockItemRoutes(app: Express) {
   // Stock Items
@@ -35,7 +35,7 @@ export function registerStockItemRoutes(app: Express) {
       const pageSizeNum = Math.min(500, Math.max(1, parseInt(pageSize as string) || 50));
       const offset = (pageNum - 1) * pageSizeNum;
 
-      const conditions: any[] = [eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)];
+      const conditions: (SQL | undefined)[] = [eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)];
       if (search && typeof search === "string" && search.trim()) {
         const q = `%${search.trim()}%`;
         conditions.push(or(ilike(stockItems.name, q), ilike(stockItems.code, q)));
