@@ -1,0 +1,71 @@
+name: Phase 2.1 Mechanical Type Cleanup
+
+on:
+  push:
+    branches:
+      - phase-2-1-mechanical-type-escapes
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase-2-1-mechanical-type-escapes
+  cancel-in-progress: false
+
+jobs:
+  mechanical-cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Apply mechanical codemod
+        run: node scripts/phase2-1-mechanical-codemod.mjs | tee phase2-1-codemod-report.json
+      - name: Lock lowered type-escape baseline
+        env:
+          UPDATE_TYPE_ESCAPE_BASELINE: "1"
+        run: node scripts/audit-type-escapes.mjs
+      - name: Format changed source
+        run: |
+          files=$(git diff --name-only -- '*.ts' '*.tsx')
+          if [ -n "$files" ]; then
+            node node_modules/prettier/bin/prettier.cjs --write $files
+          fi
+      - name: Persist generated cleanup
+        id: persist
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server shared client/src/lib config/type-escape-boundaries.json
+          git commit -m "refactor(types): apply Phase 2.1 mechanical cleanup"
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+      - name: Stop after generated commit
+        if: steps.persist.outputs.changed == 'true'
+        run: echo "Generated cleanup committed; validation will run on the resulting push."
+      - name: TypeScript
+        if: steps.persist.outputs.changed != 'true'
+        run: npm run check
+      - name: Lint
+        if: steps.persist.outputs.changed != 'true'
+        run: npm run lint
+      - name: Type-escape ratchet
+        if: steps.persist.outputs.changed != 'true'
+        run: npm run audit:type-escapes
+      - name: Backend tests
+        if: steps.persist.outputs.changed != 'true'
+        run: npm run test:backend
+      - name: Build
+        if: steps.persist.outputs.changed != 'true'
+        run: npm run build
