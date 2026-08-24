@@ -75,11 +75,17 @@ export function RepaymentAuditDialog({
         ) : !auditData ? null : (
           (() => {
             const { summary, advances: auditAdvances } = auditData;
-            const missingTotal = auditAdvances.reduce((s: any, a: any) => {
-              if (a.caseType === "missing_voucher") {
-                return s + a.missingVoucherRepayments.reduce((ss: any, r: any) => ss + parseFloat(r.amount || "0"), 0);
+            const missingTotal = auditAdvances.reduce((sum, advance) => {
+              if (advance.caseType === "missing_voucher") {
+                return (
+                  sum +
+                  advance.missingVoucherRepayments.reduce(
+                    (repaymentSum, repayment) => repaymentSum + parseFloat(repayment.amount || "0"),
+                    0
+                  )
+                );
               }
-              return s + parseFloat(a.amount || "0");
+              return sum + parseFloat(advance.amount || "0");
             }, 0);
 
             const grouped: Record<string, AuditAdvance[]> = {};
@@ -91,7 +97,6 @@ export function RepaymentAuditDialog({
 
             return (
               <div className="space-y-4">
-                {/* Summary */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                   <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
                     <p className="text-xs text-muted-foreground mb-1">Total Advances</p>
@@ -119,7 +124,6 @@ export function RepaymentAuditDialog({
                   </div>
                 ) : (
                   <>
-                    {/* Controls */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>
@@ -158,7 +162,6 @@ export function RepaymentAuditDialog({
                       use their original repayment data.
                     </p>
 
-                    {/* Posting impact panel */}
                     {repayAuditForm.cashAccountId && (
                       <div className="rounded-md border overflow-hidden text-sm">
                         <div className="px-4 py-2 bg-muted/20 text-xs font-medium text-muted-foreground border-b">
@@ -190,7 +193,6 @@ export function RepaymentAuditDialog({
                       </div>
                     )}
 
-                    {/* Per-worker breakdown */}
                     <div className="border rounded-md overflow-hidden">
                       <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20">
                         <span>Worker / Advance Date</span>
@@ -208,7 +210,10 @@ export function RepaymentAuditDialog({
                             {wAdvances.map((a) => {
                               const missingAmt =
                                 a.caseType === "missing_voucher"
-                                  ? a.missingVoucherRepayments.reduce((s, r) => s + parseFloat(r.amount || "0"), 0)
+                                  ? a.missingVoucherRepayments.reduce(
+                                      (sum, repayment) => sum + parseFloat(repayment.amount || "0"),
+                                      0
+                                    )
                                   : parseFloat(a.amount || "0");
                               return (
                                 <div
@@ -286,7 +291,19 @@ export function RepaymentAuditDialog({
                 Posting…
               </>
             ) : (
-              `Post Missing Entries — ${fmt(auditData?.advances.reduce((s: any, a: any) => s + (a.caseType === "missing_voucher" ? a.missingVoucherRepayments.reduce((ss: any, r: any) => ss + parseFloat(r.amount || "0"), 0) : parseFloat(a.amount || "0")), 0) ?? 0)}`
+              `Post Missing Entries — ${fmt(
+                auditData?.advances.reduce(
+                  (sum, advance) =>
+                    sum +
+                    (advance.caseType === "missing_voucher"
+                      ? advance.missingVoucherRepayments.reduce(
+                          (repaymentSum, repayment) => repaymentSum + parseFloat(repayment.amount || "0"),
+                          0
+                        )
+                      : parseFloat(advance.amount || "0")),
+                  0
+                ) ?? 0
+              )}`
             )}
           </Button>
         </DialogFooter>
