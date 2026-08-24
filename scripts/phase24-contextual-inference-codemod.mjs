@@ -12,6 +12,12 @@ const parsed = ts.parseJsonConfigFileContent(rawConfig.config, ts.sys, path.dirn
 const program = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options });
 const checker = program.getTypeChecker();
 
+const excludedFiles = new Set([
+  "server/routes/accountStatementRoutes.ts",
+  "server/routes/factory/employee-pos/employeeLedgerWasteRoutes.ts",
+  "server/routes/factory/employee-pos/employeeNetPositionRoutes.ts",
+]);
+
 function useful(type) {
   if (!type) return false;
   const f = type.flags;
@@ -75,7 +81,7 @@ const kinds = new Map();
 
 for (const sf of program.getSourceFiles()) {
   const rel = path.relative(root, sf.fileName).split(path.sep).join("/");
-  if (!rel.startsWith("server/") || rel.endsWith(".d.ts")) continue;
+  if (!rel.startsWith("server/") || rel.endsWith(".d.ts") || excludedFiles.has(rel)) continue;
   const edits = [];
 
   function add(start, end, replacement, kind) {
