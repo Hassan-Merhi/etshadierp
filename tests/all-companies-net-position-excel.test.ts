@@ -60,9 +60,9 @@ describe("all-companies net position workbook", () => {
   it("rejects an empty month range before calculating company data", async () => {
     harness.monthEnds.mockReturnValueOnce([]);
 
-    await expect(generateAllCompaniesNetPositionExcel([{ id: 1, name: "Alpha" }], "2026-02-01", "2026-01-01")).rejects.toThrow(
-      "No months in range"
-    );
+    await expect(
+      generateAllCompaniesNetPositionExcel([{ id: 1, name: "Alpha" }], "2026-02-01", "2026-01-01")
+    ).rejects.toThrow("No months in range");
     expect(harness.netPosition).not.toHaveBeenCalled();
     expect(harness.income).not.toHaveBeenCalled();
   });
