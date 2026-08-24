@@ -155,7 +155,7 @@ export async function applyPurchaseOrderItemsUpdate(
       .where(eq(purchaseOrders.id, id));
 
     // Also update container's totals if applicable
-    const container = await storage.getContainerById(existingPO.containerId);
+    const container = await storage.getContainerByIdForCompany(existingPO.containerId, existingPO.companyId);
     if (container) {
       // Get all POs for this container and recalculate totals
       const allPOs = await storage.getAllPurchaseOrders(existingPO.companyId);
@@ -362,10 +362,10 @@ export async function applyPurchaseOrderItemsUpdate(
   }
 
   // Get updated PO with items
-  const updatedPO = await storage.getPurchaseOrderById(id);
+  const updatedPO = await storage.getPurchaseOrderByIdForCompany(id, existingPO.companyId);
   const lineItems = await storage.getLineItemsByPO(id);
   const supplier = await storage.getSupplierById(existingPO.supplierId);
-  const container = await storage.getContainerById(existingPO.containerId);
+  const container = await storage.getContainerByIdForCompany(existingPO.containerId, existingPO.companyId);
 
   try {
     const _poItemChanges: Record<string, { old?: unknown; new?: unknown }> = {};

@@ -32,6 +32,7 @@ import { locationWhatsAppDeliveryHistory } from "./018-location-whatsapp-deliver
 import { stockMergeAuditUserId } from "./019-stock-merge-audit-user-id";
 import { v3LoadUserId } from "./020-v3-load-user-id";
 import { canonicalStockMovementJournal } from "./021-canonical-stock-movement-journal";
+import { tenantControlIntegrityRepairs } from "./022-tenant-control-integrity-repairs";
 
 export const startupMigrations: string[] = [
   ...coreTablesAndColumns,
@@ -59,6 +60,7 @@ export const startupMigrations: string[] = [
   // References companies, stock_items and locations, so it runs after the core
   // tables that create them.
   ...canonicalStockMovementJournal,
+  ...tenantControlIntegrityRepairs,
 ];
 
 // Re-exported so server/index.ts can bootstrap the journal from the module it

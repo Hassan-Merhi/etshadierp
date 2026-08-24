@@ -24,7 +24,7 @@ import { describe, expect, it } from "vitest";
 import { startupMigrations } from "../server/startup-schema";
 
 /** Statement count of the reviewed composed array. */
-const EXPECTED_STATEMENT_COUNT = 1332;
+const EXPECTED_STATEMENT_COUNT = 1335;
 
 /**
  * sha256 of JSON.stringify(startupMigrations) for the reviewed composed array.
@@ -55,6 +55,11 @@ const EXPECTED_STATEMENT_COUNT = 1332;
  * references by clearing only the missing parent id, and raises the count
  * from 1285 to 1332.
  *
+ * Re-pinned again when the idempotent tenant-control integrity repair stage
+ * was appended, taking the count from 1332 to 1335. It deterministically
+ * collapses duplicate company roles and removes user-location rows without
+ * a matching company role.
+ *
  * Re-pinned again when three VALIDATE statements were removed from
  * 007-schema-catchup-may-2026.ts, taking the count from 1288 to 1285. They
  * validated factory_raw_stock, factory_fx_allocations and
@@ -64,7 +69,7 @@ const EXPECTED_STATEMENT_COUNT = 1332;
  * parent table and raised foreign_key_violation on every boot of a database
  * holding factory rows. Only those three were deleted and no statement moved.
  */
-const EXPECTED_CONTENT_HASH = "eb83cfe04adb580a102cdceae2ff107f1be8f76ac3a6e24d5cf1cf716cb41cba";
+const EXPECTED_CONTENT_HASH = "009308a108ae07a57fa35f5d352369260268ceee3a82991c6e8834a506fb8a18";
 
 function contentHash(statements: string[]): string {
   return crypto.createHash("sha256").update(JSON.stringify(statements)).digest("hex");

@@ -72,7 +72,7 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
         agentChargeLines = [],
       } = validation.data;
 
-      const container = await storage.getContainerById(containerId);
+      const container = await storage.getContainerByIdForCompany(containerId, sessionCompanyId!);
       if (!container) return res.status(404).json({ message: "Container not found" });
 
       const isEdit = container.status === "OFFLOADED";
@@ -101,7 +101,7 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
                 );
               }
             } else {
-              const pos = await storage.getPurchaseOrdersByContainer(containerId);
+              const pos = await storage.getPurchaseOrdersByContainerForCompany(containerId, sessionCompanyId!);
               const allLineItems = [];
               for (const po of pos) {
                 const lineItems = await storage.getLineItemsByPO(po.id);

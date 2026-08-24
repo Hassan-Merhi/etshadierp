@@ -56,6 +56,14 @@ export async function getContainerById(id: number): Promise<Container | undefine
   return container;
 }
 
+export async function getContainerByIdForCompany(id: number, companyId: number): Promise<Container | undefined> {
+  const [container] = await db
+    .select()
+    .from(schema.containers)
+    .where(and(eq(schema.containers.id, id), eq(schema.containers.companyId, companyId)));
+  return container;
+}
+
 export async function getContainerByNumber(containerNumber: string): Promise<Container | undefined> {
   const [container] = await db
     .select()
@@ -91,10 +99,27 @@ export async function getPurchaseOrderById(id: number): Promise<PurchaseOrder | 
   return po;
 }
 
+export async function getPurchaseOrderByIdForCompany(id: number, companyId: number): Promise<PurchaseOrder | undefined> {
+  const [po] = await db
+    .select()
+    .from(schema.purchaseOrders)
+    .where(and(eq(schema.purchaseOrders.id, id), eq(schema.purchaseOrders.companyId, companyId)));
+  return po;
+}
+
 export async function getPurchaseOrdersByContainer(containerId: number): Promise<PurchaseOrder[]> {
   return await db.select().from(schema.purchaseOrders).where(eq(schema.purchaseOrders.containerId, containerId));
 }
 
+export async function getPurchaseOrdersByContainerForCompany(
+  containerId: number,
+  companyId: number
+): Promise<PurchaseOrder[]> {
+  return await db
+    .select()
+    .from(schema.purchaseOrders)
+    .where(and(eq(schema.purchaseOrders.containerId, containerId), eq(schema.purchaseOrders.companyId, companyId)));
+}
 export async function getPurchaseOrdersBySupplier(supplierId: number, companyId: number) {
   return await db
     .select({

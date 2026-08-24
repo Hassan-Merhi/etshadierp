@@ -4,7 +4,6 @@ import { logger } from "../../lib/logger";
 import type { Express } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
-import { getAccessibleCompanyIds } from "../../security/companyAccessBoundary";
 import { requireAuth, requireNonPOS } from "../../auth";
 import {
   stockItems,
@@ -80,7 +79,7 @@ export function registerContainerFreightReadRoutes(app: Express) {
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
 
-      const po = await storage.getPurchaseOrderById(id);
+      const po = await storage.getPurchaseOrderByIdForCompany(id, companyId);
       if (!po) return res.status(404).json({ message: "Purchase order not found" });
       if (po.companyId !== companyId) return res.status(403).json({ message: "Access denied" });
 
@@ -327,20 +326,17 @@ export function registerContainerFreightReadRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid container ID" });
       }
 
-      const container = await storage.getContainerById(containerId);
+      const container = await storage.getContainerByIdForCompany(containerId, req.session.currentCompanyId!);
 
       if (!container) {
         return res.status(404).json({ message: "Container not found" });
       }
 
-      // Verify user has access to this container's company
-      const accessibleCompanyIds = await getAccessibleCompanyIds(userId);
-      if (!accessibleCompanyIds.has(container.companyId)) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
       const supplier = await storage.getSupplierById(container.supplierId);
-      const purchaseOrders = await storage.getPurchaseOrdersByContainer(containerId);
+      const purchaseOrders = await storage.getPurchaseOrdersByContainerForCompany(
+        containerId,
+        req.session.currentCompanyId!
+      );
 
       // Batch-fetch all line items and stock items in 2 queries instead of N*M
       const poIds = purchaseOrders.map((po) => po.id);

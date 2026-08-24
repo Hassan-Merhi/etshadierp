@@ -31,7 +31,7 @@ export function registerContainerOffloadRecalcRoutes(app: Express) {
         }
 
         // Get container
-        const container = await storage.getContainerById(containerId);
+        const container = await storage.getContainerByIdForCompany(containerId, req.session.currentCompanyId!);
         if (!container) {
           return res.status(404).json({ message: "Container not found" });
         }
@@ -87,7 +87,7 @@ export function registerContainerOffloadRecalcRoutes(app: Express) {
             await tx.delete(containerOffloadItems).where(eq(containerOffloadItems.offloadId, offloadRecord.id));
           } else {
             // Fallback for old offloads without stored items (legacy approach)
-            const pos = await storage.getPurchaseOrdersByContainer(containerId);
+            const pos = await storage.getPurchaseOrdersByContainerForCompany(containerId, req.session.currentCompanyId!);
             const allLineItems = [];
             for (const po of pos) {
               const items = await storage.getLineItemsByPO(po.id);

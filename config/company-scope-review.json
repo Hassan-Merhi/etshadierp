@@ -6,6 +6,7 @@
     { "path": "server/chat/reports/implementations/phase5ReportShard.ts", "reason": "Report shard receives the already-authorized company context from the chat report orchestrator." },
     { "path": "server/helpers/generateInvoicePdf.ts", "reason": "PDF generation is called after the owning invoice or voucher has been company-authorized." },
     { "path": "server/index.ts", "reason": "Startup repair queries run in controlled migration context, not from caller-supplied request identity." },
+    { "path": "server/startup/runServerStartupMigrations.ts", "reason": "Legacy ledger-account repair queries run only in controlled startup-maintenance context, never from caller-supplied identity." },
     { "path": "server/inventoryHelper.ts", "reason": "Inventory mutations are invoked inside company-scoped transactional write paths." },
     { "path": "server/lib/transporterAllocation.ts", "reason": "Ledger IDs are resolved from the already company-scoped allocation flow." },
     { "path": "server/routes/accountTransactionPaginationRoutes.ts", "reason": "Account and voucher ownership is validated before the pagination query executes." },

@@ -257,13 +257,13 @@ export function registerContainerCrudRoutes(app: Express) {
     try {
       const containerId = parseId(req.params.id);
       if (containerId === null) return res.status(400).json({ message: "Invalid id" });
-      const container = await storage.getContainerById(containerId);
+      const container = await storage.getContainerByIdForCompany(containerId, req.session.currentCompanyId!);
 
       if (!container) {
         return res.status(404).json({ message: "Container not found" });
       }
 
-      const pos = await storage.getPurchaseOrdersByContainer(containerId);
+       const pos = await storage.getPurchaseOrdersByContainerForCompany(containerId, req.session.currentCompanyId!);
       const charges = await storage.getChargesByContainer(containerId);
 
       // Get line items for all POs

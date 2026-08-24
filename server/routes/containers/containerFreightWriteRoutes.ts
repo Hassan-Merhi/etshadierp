@@ -22,7 +22,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid purchase order ID" });
       }
 
-      const existingPO = await storage.getPurchaseOrderById(id);
+      const existingPO = await storage.getPurchaseOrderByIdForCompany(id, req.session.currentCompanyId!);
       if (!existingPO) {
         return res.status(404).json({ message: "Purchase order not found" });
       }
@@ -46,7 +46,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
       }
 
       // Check if container is offloaded - if so, prevent stock item changes that would cause import cycle imbalance
-      const container = await storage.getContainerById(existingPO.containerId);
+      const container = await storage.getContainerByIdForCompany(existingPO.containerId, req.session.currentCompanyId!);
       if (container?.status === "OFFLOADED" && req.body.items && Array.isArray(req.body.items)) {
         const existingLineItems = await storage.getLineItemsByPO(id);
         const existingStockItemIds = new Set(existingLineItems.map((item) => item.stockItemId));
@@ -503,7 +503,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
           // (interco sync moved to unconditional block below the transaction)
 
           // Update container totals if applicable
-          const container = await storage.getContainerById(existingPO.containerId);
+    const container = await storage.getContainerByIdForCompany(existingPO.containerId, existingPO.companyId);
           if (container) {
             // Get all POs for this container and recalculate totals
             const allPOs = await storage.getAllPurchaseOrders(existingPO.companyId);
@@ -808,7 +808,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid purchase order ID" });
       }
 
-      const existingPO = await storage.getPurchaseOrderById(id);
+      const existingPO = await storage.getPurchaseOrderByIdForCompany(id, req.session.currentCompanyId!);
       if (!existingPO) {
         return res.status(404).json({ message: "Purchase order not found" });
       }

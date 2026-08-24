@@ -41,7 +41,7 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid container ID" });
       }
 
-      const container = await storage.getContainerById(containerId);
+       const container = await storage.getContainerByIdForCompany(containerId, req.session.currentCompanyId!);
       if (!container) {
         return res.status(404).json({ message: "Container not found" });
       }
@@ -94,7 +94,7 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
 
       await db.transaction(async (tx) => {
         if (locationId !== currentOffload.locationId) {
-          const pos = await storage.getPurchaseOrdersByContainer(containerId);
+           const pos = await storage.getPurchaseOrdersByContainerForCompany(containerId, req.session.currentCompanyId!);
           for (const po of pos) {
             const lineItems = await storage.getLineItemsByPO(po.id);
             for (const item of lineItems) {
@@ -180,7 +180,7 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
 
           let stockItemIds: number[] = [...new Set(offloadItems.map((i) => i.stockItemId))];
           if (stockItemIds.length === 0) {
-            const pos = await storage.getPurchaseOrdersByContainer(containerId);
+             const pos = await storage.getPurchaseOrdersByContainerForCompany(containerId, req.session.currentCompanyId!);
             const idSet = new Set<number>();
             for (const po of pos) {
               const lineItems = await storage.getLineItemsByPO(po.id);
