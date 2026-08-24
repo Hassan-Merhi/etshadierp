@@ -37,10 +37,64 @@ interface ChargeLine {
   parentAgentAccountId: string;
 }
 
+interface SpContainerLine {
+  qty?: string | number | null;
+  unitRateUsd?: string | number | null;
+}
+
+interface SpPrepaidCharge {
+  id: string | number;
+  chargeType: string;
+  amountPaidUsd: string | number;
+}
+
+interface SpOffloadContainer {
+  id: number;
+  supplierName?: string | null;
+  containerNumber?: string | null;
+  invoiceNumber?: string | null;
+  discountPct?: string | number | null;
+  invoiceTotalUsd?: string | number | null;
+  lines?: SpContainerLine[];
+  prepaid?: SpPrepaidCharge[];
+}
+
+interface SpSetupAccount {
+  id: string | number;
+  subType: string;
+  name?: string | null;
+}
+
+interface SpBankAccount {
+  id: string | number;
+  bankName: string;
+}
+
+interface SpSetupStatus {
+  spAccounts?: SpSetupAccount[];
+  bankAccounts?: SpBankAccount[];
+}
+
+interface SpLedgerAccount {
+  id: string | number;
+  code?: string | null;
+  name: string;
+}
+
+interface SpLocationOption {
+  id: string | number;
+  name: string;
+}
+
+interface ParentAgentOption {
+  ledger_account_id: string | number;
+  account_name: string;
+}
+
 interface SpOffloadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  container: any;
+  container: SpOffloadContainer | null;
   onSuccess?: () => void;
 }
 
@@ -50,22 +104,22 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
   const [chargeLines, setChargeLines] = useState<ChargeLine[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState("");
 
-  const { data: statusData } = useQuery<any>({
+  const { data: statusData } = useQuery<SpSetupStatus>({
     queryKey: ["/api/sp/setup/status"],
     enabled: open,
   });
 
-  const { data: ledgerAccounts = [] } = useQuery<any[]>({
+  const { data: ledgerAccounts = [] } = useQuery<SpLedgerAccount[]>({
     queryKey: ["/api/ledger-accounts"],
     enabled: open,
   });
 
-  const { data: locationsList = [] } = useQuery<any[]>({
+  const { data: locationsList = [] } = useQuery<SpLocationOption[]>({
     queryKey: ["/api/locations"],
     enabled: open,
   });
 
-  const { data: parentAgents = [] } = useQuery<any[]>({
+  const { data: parentAgents = [] } = useQuery<ParentAgentOption[]>({
     queryKey: ["/api/sp/parent-agents"],
     enabled: open,
   });
@@ -104,22 +158,22 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
   if (!container) return null;
 
   const discountFactor = 1 - parseFloat(container.discountPct || "0") / 100;
-  const totalQty = (container.lines || []).reduce((s: number, l: any) => s + parseFloat(l.qty || "0"), 0);
+  const totalQty = (container.lines || []).reduce((s, l) => s + parseFloat(l.qty || "0"), 0);
   const totalBaseCost = (container.lines || []).reduce(
-    (s: number, l: any) => s + parseFloat(l.qty || "0") * parseFloat(l.unitRateUsd || "0") * discountFactor,
+    (s, l) => s + parseFloat(l.qty || "0") * parseFloat(l.unitRateUsd || "0") * discountFactor,
     0
   );
   const totalLandedCost = chargeLines.reduce((s, c) => s + parseFloat(c.amountUsd || "0"), 0);
   const totalFinalCost = totalBaseCost + totalLandedCost;
   const invoiceTotal = parseFloat(container.invoiceTotalUsd || "0");
 
-  const otwAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_goods_otw");
-  const otwClrAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_otw_clearing");
-  const stockAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_stock");
-  const costClrAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_cost_clearing");
-  const prepaidAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_prepaid");
-  const prepaidExpAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_prepaid_expenses");
-  const hadiIcAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_hadi_intercompany");
+  const otwAcct = (statusData?.spAccounts || []).find((a) => a.subType === "sp_goods_otw");
+  const otwClrAcct = (statusData?.spAccounts || []).find((a) => a.subType === "sp_otw_clearing");
+  const stockAcct = (statusData?.spAccounts || []).find((a) => a.subType === "sp_stock");
+  const costClrAcct = (statusData?.spAccounts || []).find((a) => a.subType === "sp_cost_clearing");
+  const prepaidAcct = (statusData?.spAccounts || []).find((a) => a.subType === "sp_prepaid");
+  const prepaidExpAcct = (statusData?.spAccounts || []).find((a) => a.subType === "sp_prepaid_expenses");
+  const hadiIcAcct = (statusData?.spAccounts || []).find((a) => a.subType === "sp_hadi_intercompany");
 
   const activeCharges = chargeLines.filter((c) => parseFloat(c.amountUsd || "0") > 0);
   const agentCharges = activeCharges.filter((c) => c.chargeType === "parent_agent");
@@ -173,7 +227,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                 <SelectValue placeholder="Select a location…" />
               </SelectTrigger>
               <SelectContent>
-                {(locationsList as any[]).map((l) => (
+                {locationsList.map((l) => (
                   <SelectItem key={l.id} value={String(l.id)}>
                     {l.name}
                   </SelectItem>
@@ -283,7 +337,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                           <SelectValue placeholder="Select prepaid" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(container.prepaid || []).map((p: any) => (
+                          {(container.prepaid || []).map((p) => (
                             <SelectItem key={p.id} value={String(p.id)}>
                               {p.chargeType} — {fmt2(p.amountPaidUsd)}
                             </SelectItem>
@@ -299,7 +353,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                           <SelectValue placeholder="Select bank" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(statusData?.bankAccounts || []).map((b: any) => (
+                          {(statusData?.bankAccounts || []).map((b) => (
                             <SelectItem key={b.id} value={String(b.id)}>
                               {b.bankName}
                             </SelectItem>
@@ -315,7 +369,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                           <SelectValue placeholder="Select account" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(ledgerAccounts as any[]).map((a) => (
+                          {ledgerAccounts.map((a) => (
                             <SelectItem key={a.id} value={String(a.id)}>
                               {a.code} — {a.name}
                             </SelectItem>
@@ -331,7 +385,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                           <SelectValue placeholder="Select agent" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(parentAgents as any[]).map((a) => (
+                          {parentAgents.map((a) => (
                             <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
                               {a.account_name}
                             </SelectItem>
@@ -461,18 +515,18 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                   const amt = parseFloat(c.amountUsd || "0");
                   let creditLabel: string;
                   if (c.chargeType === "prepaid_used") {
-                    const p = (container.prepaid || []).find((x: any) => String(x.id) === c.prepaidChargeId);
+                    const p = (container.prepaid || []).find((x) => String(x.id) === c.prepaidChargeId);
                     creditLabel = prepaidAcct?.name ?? "SP Prepaid Charges";
                     if (p) creditLabel += ` — ${p.chargeType}`;
                   } else if (c.chargeType === "paid_now") {
-                    const b = (statusData?.bankAccounts || []).find((x: any) => String(x.id) === c.creditBankAccountId);
+                    const b = (statusData?.bankAccounts || []).find((x) => String(x.id) === c.creditBankAccountId);
                     creditLabel = b ? b.bankName : "Bank Account";
                   } else if (c.chargeType === "unpaid_payable" || c.chargeType === "other") {
-                    const a = (ledgerAccounts as any[]).find((x) => String(x.id) === c.creditLedgerAccountId);
+                    const a = ledgerAccounts.find((x) => String(x.id) === c.creditLedgerAccountId);
                     creditLabel = a ? `${a.name}` : "Ledger Account";
                   } else if (c.chargeType === "parent_agent") {
                     creditLabel = prepaidExpAcct?.name ?? "Prepaid Expenses";
-                    const agent = (parentAgents as any[]).find(
+                    const agent = parentAgents.find(
                       (x) => String(x.ledger_account_id) === c.parentAgentAccountId
                     );
                     if (agent) creditLabel += ` (via ${agent.account_name})`;
@@ -512,7 +566,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                     <span className="text-right">Dr / Cr</span>
                   </div>
                   {agentCharges.map((c, idx) => {
-                    const agent = (parentAgents as any[]).find(
+                    const agent = parentAgents.find(
                       (x) => String(x.ledger_account_id) === c.parentAgentAccountId
                     );
                     return (

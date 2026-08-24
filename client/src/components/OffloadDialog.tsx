@@ -39,10 +39,38 @@ interface AdditionalCharge {
   ledgerAccountId: string;
 }
 
+interface LedgerAccountOption {
+  id: string | number;
+  name: string;
+}
+
+interface SpSetupAccountOption {
+  id: string | number;
+  subType: string;
+  name?: string | null;
+}
+
+interface SpSetupStatusData {
+  spAccounts?: SpSetupAccountOption[];
+}
+
+interface ParentAgentOption {
+  ledger_account_id: string | number;
+  account_name: string;
+}
+
+interface ContainerCharge {
+  amount?: string | number | null;
+}
+
+interface ContainerOffloadData {
+  charges?: ContainerCharge[];
+}
+
 interface AccountComboboxProps {
   value: string;
   onValueChange: (value: string) => void;
-  accounts: any[];
+  accounts: LedgerAccountOption[];
   placeholder?: string;
   disabled?: boolean;
   testId?: string;
@@ -214,22 +242,22 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
     queryKey: ["/api/locations"],
   });
 
-  const { data: ledgerAccounts = [] } = useQuery<any[]>({
+  const { data: ledgerAccounts = [] } = useQuery<LedgerAccountOption[]>({
     queryKey: ["/api/ledger-accounts"],
     enabled: open && !isSpCompany,
   });
 
-  const { data: spStatusData } = useQuery<any>({
+  const { data: spStatusData } = useQuery<SpSetupStatusData>({
     queryKey: ["/api/sp/setup/status"],
     enabled: open && isSpCompany,
   });
 
-  const { data: parentAgents = [] } = useQuery<any[]>({
+  const { data: parentAgents = [] } = useQuery<ParentAgentOption[]>({
     queryKey: ["/api/sp/parent-agents"],
     enabled: open && isSpCompany,
   });
 
-  const { data: containerData } = useQuery<any>({
+  const { data: containerData } = useQuery<ContainerOffloadData>({
     queryKey: [`/api/containers/${containerId}`],
     enabled: open && !!containerId,
   });
@@ -241,7 +269,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
   // ── Charge calculations ───────────────────────────────────────────────────
   let poChargesTotal = 0;
   if (containerData?.charges && Array.isArray(containerData.charges)) {
-    containerData.charges.forEach((charge: any) => {
+    containerData.charges.forEach((charge) => {
       const amount = parseFloat(charge.amount || "0");
       if (amount > 0) poChargesTotal += amount;
     });
@@ -474,7 +502,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
                             <SelectValue placeholder="Select agent" />
                           </SelectTrigger>
                           <SelectContent>
-                            {(parentAgents as any[]).map((a) => (
+                            {parentAgents.map((a) => (
                               <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
                                 {a.account_name}
                               </SelectItem>
@@ -529,7 +557,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
                             <SelectValue placeholder="Select agent" />
                           </SelectTrigger>
                           <SelectContent>
-                            {(parentAgents as any[]).map((a) => (
+                            {parentAgents.map((a) => (
                               <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
                                 {a.account_name}
                               </SelectItem>
