@@ -77,11 +77,24 @@ export function registerContainerCrudRoutes(app: Express) {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
+      if (req.body.companyId !== undefined && Number(req.body.companyId) !== req.session.currentCompanyId) {
+        return res.status(403).json({
+          message: "Access denied: Container belongs to a different company",
+        });
+      }
 
       const data = insertContainerSchema.parse({
         ...req.body,
         companyId: req.session.currentCompanyId,
       });
+      if (data.supplierId !== undefined && data.supplierId !== null) {
+        const supplier = await storage.getSupplierById(data.supplierId, req.session.currentCompanyId);
+        if (!supplier) {
+          return res.status(403).json({
+            message: "Access denied: Supplier belongs to a different company",
+          });
+        }
+      }
 
       // Extract manual container cost data from request body (not in base schema)
       const itemName = req.body.itemName?.trim();

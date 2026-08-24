@@ -63,6 +63,11 @@ export function registerCustomerMasterRoutes(app: Express) {
   app.post("/api/customers", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = getActiveCustomerCompanyId(req);
+      if (req.body?.companyId !== undefined && Number(req.body.companyId) !== companyId) {
+        return res.status(403).json({
+          message: "Access denied: Customer belongs to a different company",
+        });
+      }
       const customer = await customerService.create(companyId, req.body, getCustomerAuditActor(req));
       return res.status(201).json(customer);
     } catch (error: unknown) {

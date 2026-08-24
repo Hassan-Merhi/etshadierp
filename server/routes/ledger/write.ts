@@ -16,7 +16,16 @@ import { eq } from "drizzle-orm";
 export function registerLedgerAccountWriteRoutes(app: Express) {
   app.post("/api/ledger-accounts", requireAuth, requireNonPOS, async (req, res) => {
     try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
       const parsed = insertLedgerAccountSchema.parse(req.body);
+      if (parsed.companyId !== companyId) {
+        return res.status(403).json({
+          message: "Access denied: Ledger account belongs to a different company",
+        });
+      }
 
       // Check for duplicate name within the same company
       const existingByName = await storage.getLedgerAccountByName(parsed.name, parsed.companyId);

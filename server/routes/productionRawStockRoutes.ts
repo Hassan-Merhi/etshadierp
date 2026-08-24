@@ -195,6 +195,11 @@ export function registerProductionRawStockRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       const userId = req.session.userId;
       if (!companyId || !userId) return res.status(400).json({ message: "No company or user session" });
+      if (req.body?.companyId !== undefined && Number(req.body.companyId) !== companyId) {
+        return res.status(403).json({
+          message: "Access denied: Mix batch belongs to a different company",
+        });
+      }
 
       const { sources, batchSources, name, ...batchData } = req.body;
 

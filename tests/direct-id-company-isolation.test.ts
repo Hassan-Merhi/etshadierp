@@ -235,3 +235,168 @@ describe("purchase order, ledger, customer, and factory direct-ID reads", () => 
     expect((await agent.get(`/api/mix-batches/${foreignMixBatchId}`)).status).toBe(404);
   });
 });
+
+describe("cross-company mutation isolation", () => {
+  it("rejects container PATCH and DELETE without changing the foreign container", async () => {
+    const before = await pool.query(
+      "SELECT container_number, status, grand_total FROM containers WHERE id = $1",
+      [foreignContainerId],
+    );
+
+    const patch = await agent
+      .patch(`/api/containers/${foreignContainerId}/number`)
+      .send({ containerNumber: `${TEST_PREFIX}-B-CHANGED` });
+    expect([403, 404]).toContain(patch.status);
+
+    const del = await agent.delete(`/api/containers/${foreignContainerId}`);
+    expect([403, 404]).toContain(del.status);
+
+    const after = await pool.query(
+      "SELECT container_number, status, grand_total FROM containers WHERE id = $1",
+      [foreignContainerId],
+    );
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it("rejects container creation carrying a foreign company claim", async () => {
+    const response = await agent.post("/api/containers").send({
+      companyId: foreignCompanyId,
+      containerNumber: `${TEST_PREFIX}-SHOULD-NOT-CREATE`,
+      supplierId,
+      status: "OTW",
+      importDate: "2026-08-02",
+    });
+    expect(response.status).toBe(403);
+    const created = await pool.query(
+      "SELECT id FROM containers WHERE container_number = $1",
+      [`${TEST_PREFIX}-SHOULD-NOT-CREATE`],
+    );
+    expect(created.rows).toHaveLength(0);
+  });
+
+  it("rejects container creation carrying a foreign supplier ID", async () => {
+    const response = await agent.post("/api/containers").send({
+      containerNumber: `${TEST_PREFIX}-FOREIGN-SUPPLIER`,
+      supplierId: foreignSupplierId,
+      status: "OTW",
+      importDate: "2026-08-02",
+    });
+    expect(response.status).toBe(403);
+    const created = await pool.query(
+      "SELECT id FROM containers WHERE container_number = $1",
+      [`${TEST_PREFIX}-FOREIGN-SUPPLIER`],
+    );
+    expect(created.rows).toHaveLength(0);
+  });
+
+  it("rejects purchase-order PATCH and DELETE without changing the foreign PO", async () => {
+    const before = await pool.query(
+      "SELECT po_number, items_total, currency, status FROM purchase_orders WHERE id = $1",
+      [foreignPurchaseOrderId],
+    );
+
+    const patch = await agent
+      .patch(`/api/purchase-orders/${foreignPurchaseOrderId}`)
+      .send({ poNumber: `${TEST_PREFIX}-B-CHANGED`, itemsTotal: "999.00" });
+    expect([403, 404]).toContain(patch.status);
+
+    const del = await agent.delete(`/api/purchase-orders/${foreignPurchaseOrderId}`);
+    expect([403, 404]).toContain(del.status);
+
+    const after = await pool.query(
+      "SELECT po_number, items_total, currency, status FROM purchase_orders WHERE id = $1",
+      [foreignPurchaseOrderId],
+    );
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it("rejects ledger-account POST, PUT, and DELETE across companies", async () => {
+    const before = await pool.query(
+      "SELECT code, name, opening_balance FROM ledger_accounts WHERE id = $1",
+      [foreignLedgerAccountId],
+    );
+
+    const post = await agent.post("/api/ledger-accounts").send({
+      companyId: foreignCompanyId,
+      code: `${TEST_PREFIX}-NEW-FOREIGN`,
+      name: `${TEST_PREFIX} New Foreign`,
+      accountType: "Cash",
+      subType: "Cash",
+      openingBalance: "0",
+      openingBalanceSide: "Dr",
+    });
+    expect(post.status).toBe(403);
+
+    const put = await agent
+      .put(`/api/ledger-accounts/${foreignLedgerAccountId}`)
+      .send({ name: `${TEST_PREFIX} Changed Foreign` });
+    expect([403, 404]).toContain(put.status);
+
+    const del = await agent.delete(`/api/ledger-accounts/${foreignLedgerAccountId}`);
+    expect([403, 404]).toContain(del.status);
+
+    const after = await pool.query(
+      "SELECT code, name, opening_balance FROM ledger_accounts WHERE id = $1",
+      [foreignLedgerAccountId],
+    );
+    expect(after.rows).toEqual(before.rows);
+    const created = await pool.query(
+      "SELECT id FROM ledger_accounts WHERE code = $1",
+      [`${TEST_PREFIX}-NEW-FOREIGN`],
+    );
+    expect(created.rows).toHaveLength(0);
+  });
+
+  it("rejects customer POST, PUT, and DELETE across companies", async () => {
+    const before = await pool.query(
+      "SELECT code, legal_name, active FROM customers WHERE id = $1",
+      [foreignCustomerId],
+    );
+
+    const post = await agent.post("/api/customers").send({
+      companyId: foreignCompanyId,
+      legalName: `${TEST_PREFIX} New Foreign`,
+    });
+    expect(post.status).toBe(403);
+
+    const put = await agent
+      .put(`/api/customers/${foreignCustomerId}`)
+      .send({ legalName: `${TEST_PREFIX} Changed Foreign` });
+    expect([403, 404]).toContain(put.status);
+
+    const del = await agent.delete(`/api/customers/${foreignCustomerId}`);
+    expect([403, 404]).toContain(del.status);
+
+    const after = await pool.query(
+      "SELECT code, legal_name, active FROM customers WHERE id = $1",
+      [foreignCustomerId],
+    );
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it("rejects factory mix-batch POSTs that claim or source another company", async () => {
+    const before = await pool.query(
+      "SELECT batch_code, total_weight_kg, used_kg, status FROM mix_batches WHERE id = $1",
+      [foreignMixBatchId],
+    );
+
+    const claimed = await agent.post("/api/mix-batches").send({
+      companyId: foreignCompanyId,
+      sources: [{ containerId: containerId, weightKg: 1, costPerKg: 2 }],
+      name: `${TEST_PREFIX} Claimed Foreign`,
+    });
+    expect(claimed.status).toBe(403);
+
+    const foreignSource = await agent.post("/api/mix-batches").send({
+      batchSources: [{ sourceBatchId: foreignMixBatchId, weightKg: 1 }],
+      name: `${TEST_PREFIX} Cross Company Source`,
+    });
+    expect(foreignSource.status).toBe(400);
+
+    const after = await pool.query(
+      "SELECT batch_code, total_weight_kg, used_kg, status FROM mix_batches WHERE id = $1",
+      [foreignMixBatchId],
+    );
+    expect(after.rows).toEqual(before.rows);
+  });
+});
