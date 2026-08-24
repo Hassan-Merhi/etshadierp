@@ -55,19 +55,23 @@ export function JournalFilters({ model }: { model: TransactionJournalModel }) {
           </div>
 
           {/* Company multi-select */}
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <Label>Companies</Label>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="min-w-[160px] justify-between" data-testid="button-company-filter">
-                  <Building2 className="h-4 w-4 mr-2 shrink-0" />
-                  <span className="flex-1 text-left truncate">
+                <Button
+                  variant="outline"
+                  className="h-9 w-[138px] min-w-0 justify-between gap-1.5 px-2.5"
+                  data-testid="button-company-filter"
+                >
+                  <Building2 className="h-3.5 w-3.5 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate text-left text-xs">
                     {model.selectedCos.length === 0 ? "All Companies" : `${model.selectedCos.length} selected`}
                   </span>
-                  <Filter className="h-3.5 w-3.5 ml-1 text-muted-foreground shrink-0" />
+                  <Filter className="h-3 w-3 shrink-0 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-64">
+              <DropdownMenuContent align="start" className="w-[220px] max-w-[calc(100vw-2rem)]">
                 <DropdownMenuLabel>Select Companies</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuCheckboxItem
@@ -87,7 +91,7 @@ export function JournalFilters({ model }: { model: TransactionJournalModel }) {
                     }}
                     data-testid={`checkbox-company-${c.id}`}
                   >
-                    {c.name}
+                    <span className="truncate">{c.name}</span>
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuContent>
