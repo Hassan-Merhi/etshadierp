@@ -29,6 +29,15 @@ const targets = [
   ["client/src/pages/payroll/WorkerDialogs.tsx", "./usePayrollModel", "usePayrollModel", "PayrollModel"],
   ["client/src/pages/payroll/WorkersTab.tsx", "./usePayrollModel", "usePayrollModel", "PayrollModel"],
   ["client/src/pages/payroll/WorkersTable.tsx", "./usePayrollModel", "usePayrollModel", "PayrollModel"],
+  ["client/src/pages/factory/factoryadvancestab/dialogs/BulkAdvanceDialog.tsx", "../advances/useAdvancesModel", "useAdvancesModel", "AdvancesModel"],
+  ["client/src/pages/factory/factoryadvancestab/dialogs/CashAccountAdjustmentDialog.tsx", "../advances/useAdvancesModel", "useAdvancesModel", "AdvancesModel"],
+  ["client/src/pages/factory/factoryadvancestab/dialogs/ConfirmRepaymentDialog.tsx", "../advances/useAdvancesModel", "useAdvancesModel", "AdvancesModel"],
+  ["client/src/pages/factory/factoryadvancestab/dialogs/PostAccountingPreviewDialog.tsx", "../advances/useAdvancesModel", "useAdvancesModel", "AdvancesModel"],
+  ["client/src/pages/factory/factoryadvancestab/dialogs/ReconcileBalancesDialog.tsx", "../advances/useAdvancesModel", "useAdvancesModel", "AdvancesModel"],
+  ["client/src/pages/factory/factoryadvancestab/dialogs/RecordAdvanceDialog.tsx", "../advances/useAdvancesModel", "useAdvancesModel", "AdvancesModel"],
+  ["client/src/pages/factory/factoryadvancestab/dialogs/RepayByMonthDialog.tsx", "../advances/useAdvancesModel", "useAdvancesModel", "AdvancesModel"],
+  ["client/src/pages/factory/factoryadvancestab/dialogs/RepaymentAuditDialog.tsx", "../advances/useAdvancesModel", "useAdvancesModel", "AdvancesModel"],
+  ["client/src/pages/factory/factoryadvancestab/dialogs/ReverseAdvanceDialog.tsx", "../advances/useAdvancesModel", "useAdvancesModel", "AdvancesModel"],
 ];
 
 function insertModelType(source, modelPath, hookName, alias) {
