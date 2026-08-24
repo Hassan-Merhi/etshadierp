@@ -1,5 +1,5 @@
 import type { Express, RequestHandler } from "express";
-import { and, count, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { companies, voucherEntries, vouchers } from "@shared/schema";
 import { db } from "../../db";
 import { logger } from "../../lib/logger";
@@ -64,7 +64,10 @@ export function registerCentralGlobalTransactionRoutes(app: Express, requireAuth
         if (targetCompanyIds.length === 0) return res.json(emptyResult(page));
       }
 
-      const conditions: any[] = [inArray(vouchers.companyId, targetCompanyIds), isNull(vouchers.deletedAt)];
+      const conditions: (SQL | undefined)[] = [
+        inArray(vouchers.companyId, targetCompanyIds),
+        isNull(vouchers.deletedAt),
+      ];
       if (startDate) conditions.push(gte(vouchers.voucherDate, startDate));
       if (endDate) conditions.push(lte(vouchers.voucherDate, endDate));
       if (voucherType && voucherType !== "all") {

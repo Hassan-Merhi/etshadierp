@@ -3,7 +3,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { inventory, locations, stockGroups, stockItems } from "@shared/schema";
-import { and, asc, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, isNull, or, sql, type SQL } from "drizzle-orm";
 
 function parsePage(value: unknown): number {
   return Math.max(1, Number.parseInt(String(value), 10) || 1);
@@ -31,7 +31,7 @@ export function registerCommonInventoryPerformanceRoutes(app: Express): void {
       const page = parsePage(req.query.page);
       const pageSize = parsePageSize(req.query.pageSize);
       const offset = (page - 1) * pageSize;
-      const conditions: any[] = [eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)];
+      const conditions: (SQL | undefined)[] = [eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)];
 
       const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
       if (search) {
@@ -79,7 +79,7 @@ export function registerCommonInventoryPerformanceRoutes(app: Express): void {
       const page = parsePage(req.query.page);
       const pageSize = parseInventoryPageSize(req.query.pageSize);
       const offset = (page - 1) * pageSize;
-      const conditions: any[] = [
+      const conditions: (SQL | undefined)[] = [
         eq(inventory.companyId, companyId),
         isNull(locations.deletedAt),
         isNull(stockItems.deletedAt),

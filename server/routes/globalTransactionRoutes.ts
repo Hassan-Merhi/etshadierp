@@ -24,7 +24,7 @@ import {
   fixedAssets,
   factorySuppliers,
 } from "../../shared/schema";
-import { eq, and, gte, lte, inArray, or, ilike, desc, sql, count, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, or, ilike, desc, sql, count, isNull, type SQL } from "drizzle-orm";
 import {
   assertCompaniesAccess,
   assertCompanyAccess,
@@ -125,7 +125,10 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: Reque
       }
 
       // 3. Build WHERE conditions
-      const conditions: any[] = [inArray(vouchers.companyId, targetCompanyIds), isNull(vouchers.deletedAt)];
+      const conditions: (SQL | undefined)[] = [
+        inArray(vouchers.companyId, targetCompanyIds),
+        isNull(vouchers.deletedAt),
+      ];
 
       if (startDate) conditions.push(gte(vouchers.voucherDate, startDate));
       if (endDate) conditions.push(lte(vouchers.voucherDate, endDate));

@@ -1,5 +1,5 @@
 import type { Express, NextFunction, Request, Response } from "express";
-import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { requireAuth } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
@@ -80,7 +80,7 @@ export function registerVoucherPaginationRoutes(app: Express): void {
         endDate = end.toISOString().slice(0, 10);
       }
 
-      const conditions: any[] = [
+      const conditions: (SQL | undefined)[] = [
         eq(vouchers.companyId, companyId),
         isNull(vouchers.deletedAt),
         sql`${vouchers.voucherDate} >= ${startDate}`,
