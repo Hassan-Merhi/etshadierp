@@ -4,6 +4,10 @@ import { AdminOverrideDialog } from "@/components/AdminOverrideDialog";
 
 const ADMIN_ROLES = ["Admin", "Owner", "Developer"];
 
+interface CurrentUser {
+  role?: string | null;
+}
+
 /**
  * Module-level cache — when a non-admin successfully verifies admin credentials,
  * we remember it for 5 minutes so they don't have to re-enter on every action.
@@ -39,7 +43,7 @@ interface UseAdminOverrideReturn {
  *   // On a button: onClick={() => wrapAdminAction(() => deleteMutation.mutate(id), "Delete Item")}
  */
 export function useAdminOverride(): UseAdminOverrideReturn {
-  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const { data: currentUser } = useQuery<CurrentUser>({ queryKey: ["/api/auth/me"] });
 
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [actionLabel, setActionLabel] = useState<string | undefined>(undefined);

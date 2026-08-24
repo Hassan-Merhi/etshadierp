@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useAdvancesModel } from "../advances/useAdvancesModel";
+
+type AdvancesModel = ReturnType<typeof useAdvancesModel>;
 import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,18 +38,18 @@ export function RepayByMonthDialog({
   setRepayByMonthOpen,
   setRepayingMonth,
 }: {
-  advances: any;
-  cashAccounts: any;
-  repayByMonthExpanded: any;
-  repayByMonthForm: any;
-  repayByMonthMutation: any;
-  repayByMonthOpen: any;
-  repayingMonth: any;
-  setConfirmRepay: any;
-  setRepayByMonthExpanded: any;
-  setRepayByMonthForm: any;
-  setRepayByMonthOpen: any;
-  setRepayingMonth: any;
+  advances: AdvancesModel["advances"];
+  cashAccounts: AdvancesModel["cashAccounts"];
+  repayByMonthExpanded: AdvancesModel["repayByMonthExpanded"];
+  repayByMonthForm: AdvancesModel["repayByMonthForm"];
+  repayByMonthMutation: AdvancesModel["repayByMonthMutation"];
+  repayByMonthOpen: AdvancesModel["repayByMonthOpen"];
+  repayingMonth: AdvancesModel["repayingMonth"];
+  setConfirmRepay: AdvancesModel["setConfirmRepay"];
+  setRepayByMonthExpanded: AdvancesModel["setRepayByMonthExpanded"];
+  setRepayByMonthForm: AdvancesModel["setRepayByMonthForm"];
+  setRepayByMonthOpen: AdvancesModel["setRepayByMonthOpen"];
+  setRepayingMonth: AdvancesModel["setRepayingMonth"];
 }) {
   return (
     <Dialog
@@ -74,7 +77,7 @@ export function RepayByMonthDialog({
             <Input
               type="date"
               value={repayByMonthForm.repaymentDate}
-              onChange={(e) => setRepayByMonthForm((p: any) => ({ ...p, repaymentDate: e.target.value }))}
+              onChange={(e) => setRepayByMonthForm((p) => ({ ...p, repaymentDate: e.target.value }))}
               data-testid="input-rbm-repayment-date"
             />
           </div>
@@ -84,13 +87,13 @@ export function RepayByMonthDialog({
             </Label>
             <Select
               value={repayByMonthForm.cashAccountId}
-              onValueChange={(v) => setRepayByMonthForm((p: any) => ({ ...p, cashAccountId: v }))}
+              onValueChange={(v) => setRepayByMonthForm((p) => ({ ...p, cashAccountId: v }))}
             >
               <SelectTrigger data-testid="select-rbm-cash-account">
                 <SelectValue placeholder="Select cash account" />
               </SelectTrigger>
               <SelectContent>
-                {(cashAccounts || []).map((a: any) => (
+                {(cashAccounts || []).map((a) => (
                   <SelectItem key={a.id} value={String(a.id)}>
                     {a.name} ({a.code})
                   </SelectItem>
@@ -102,7 +105,7 @@ export function RepayByMonthDialog({
 
         {/* Month groups derived from advances data */}
         {(() => {
-          const allOutstanding = (advances || []).filter((a: any) => !a.fullyPaid);
+          const allOutstanding = (advances || []).filter((a) => !a.fullyPaid);
 
           if (allOutstanding.length === 0) {
             return (
@@ -141,7 +144,7 @@ export function RepayByMonthDialog({
                     <div
                       className="flex items-center justify-between px-4 py-3 bg-muted/40 cursor-pointer hover-elevate"
                       onClick={() =>
-                        setRepayByMonthExpanded((prev: any) => {
+                        setRepayByMonthExpanded((prev) => {
                           const next = new Set(prev);
                           if (next.has(monthKey)) next.delete(monthKey);
                           else next.add(monthKey);

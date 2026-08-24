@@ -116,6 +116,7 @@ export interface SalaryAdvance {
   amount: string;
   remainingBalance: string;
   fullyPaid: boolean;
+  isOpeningBalance?: boolean;
   voucherId?: number;
   notes?: string;
   createdAt: string;

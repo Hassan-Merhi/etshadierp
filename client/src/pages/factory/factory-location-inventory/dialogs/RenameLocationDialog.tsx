@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useFactoryLocationInventory } from "../../FactoryLocationInventoryModel";
+
+type FactoryLocationInventoryModel = ReturnType<typeof useFactoryLocationInventory>;
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -27,12 +30,12 @@ export function RenameLocationDialog({
   setRenameDialogOpen,
   setRenameInput,
 }: {
-  renameDialogOpen: any;
-  renameInput: any;
-  renameLocationMutation: any;
-  renamingLocation: any;
-  setRenameDialogOpen: any;
-  setRenameInput: any;
+  renameDialogOpen: FactoryLocationInventoryModel["renameDialogOpen"];
+  renameInput: FactoryLocationInventoryModel["renameInput"];
+  renameLocationMutation: FactoryLocationInventoryModel["renameLocationMutation"];
+  renamingLocation: FactoryLocationInventoryModel["renamingLocation"];
+  setRenameDialogOpen: FactoryLocationInventoryModel["setRenameDialogOpen"];
+  setRenameInput: FactoryLocationInventoryModel["setRenameInput"];
 }) {
   const { toast } = useToast();
   const [deleteMode, setDeleteMode] = useState(false);
@@ -144,11 +147,7 @@ export function RenameLocationDialog({
             </>
           ) : (
             <>
-              <Button
-                variant="destructive"
-                onClick={() => setDeleteMode(true)}
-                data-testid="button-delete-location"
-              >
+              <Button variant="destructive" onClick={() => setDeleteMode(true)} data-testid="button-delete-location">
                 Delete Location
               </Button>
               <div className="flex gap-2">

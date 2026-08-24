@@ -1,3 +1,6 @@
+import type { usePayrollModel } from "./usePayrollModel";
+
+type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -11,27 +14,27 @@ import { WorkersTable } from "./WorkersTable";
 
 interface WorkersTabProps {
   setNewWorkerDialogOpen: (val: boolean) => void;
-  workerPaymentSummary: any;
+  workerPaymentSummary: PayrollModel["workerPaymentSummary"];
   setBulkPaymentDialogOpen: (val: boolean) => void;
-  selectedPayments: any[];
+  selectedPayments: PayrollModel["selectedPayments"];
   totalAmount: number;
   workerStaff: Employee[];
-  workerGroups: any[];
+  workerGroups: PayrollModel["workerGroupsData"];
   workerGroupsExpanded: Record<number, boolean>;
-  setWorkerGroupsExpanded: (val: any) => void;
-  workerPayments: Record<number, any>;
-  setWorkerOverrides: (val: any) => void;
+  setWorkerGroupsExpanded: PayrollModel["setWorkerGroupsExpanded"];
+  workerPayments: PayrollModel["workerPayments"];
+  setWorkerOverrides: PayrollModel["setWorkerOverrides"];
   setCreateWorkerGroupDialogOpen: (val: boolean) => void;
-  setSelectedWorkerGroupForMembers: (val: any) => void;
+  setSelectedWorkerGroupForMembers: PayrollModel["setSelectedWorkerGroupForMembers"];
   setWorkerGroupMembersDialogOpen: (val: boolean) => void;
-  setWorkerGroupMemberSelections: (val: any) => void;
-  deleteWorkerGroupMutation: any;
+  setWorkerGroupMemberSelections: PayrollModel["setWorkerGroupMemberSelections"];
+  deleteWorkerGroupMutation: PayrollModel["deleteWorkerGroupMutation"];
   handleToggleWorker: (id: number) => void;
   handleUpdateAmount: (id: number, val: string) => void;
   handleDeleteWorker: (worker: Employee) => void;
   setStatementEmployee: (val: Employee | null) => void;
   ungroupedWorkers: Employee[];
-  addWorkerToWorkerGroupMutation: any;
+  addWorkerToWorkerGroupMutation: PayrollModel["addWorkerToWorkerGroupMutation"];
   setWorkerDeductionTarget: (val: Employee | null) => void;
   setSelectedWorkerForEdit: (val: Employee | null) => void;
   setEditWorkerDialogOpen: (val: boolean) => void;
@@ -69,7 +72,7 @@ export function WorkersTab({
 
   const handleSelectAll = () => {
     const shouldSelectAll = !allSelected;
-    setWorkerOverrides((prev: any) => {
+    setWorkerOverrides((prev) => {
       const next = { ...prev };
       workerStaff.forEach((w) => {
         next[w.id] = { ...next[w.id], selected: shouldSelectAll };
@@ -148,23 +151,30 @@ export function WorkersTab({
               <Collapsible
                 key={group.id}
                 open={isExpanded}
-                onOpenChange={(open) =>
-                  setWorkerGroupsExpanded((prev: any) => ({ ...prev, [group.id]: open }))
-                }
+                onOpenChange={(open) => setWorkerGroupsExpanded((prev) => ({ ...prev, [group.id]: open }))}
               >
                 <Card>
                   <CollapsibleTrigger asChild>
                     <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover-elevate rounded-t-md">
                       <div className="flex items-center gap-3">
                         <ChevronDown
-                          className={cn("h-4 w-4 text-muted-foreground transition-transform", isExpanded && "rotate-180")}
+                          className={cn(
+                            "h-4 w-4 text-muted-foreground transition-transform",
+                            isExpanded && "rotate-180"
+                          )}
                         />
                         <div>
                           <h3 className="font-semibold">{group.name}</h3>
                           <p className="text-xs text-muted-foreground">
                             {groupMembers.length} workers
                             {groupSelected > 0 && (
-                              <> · <span className="text-primary font-medium">{groupSelected} selected · {formatAmount(groupPayTotal)}</span></>
+                              <>
+                                {" "}
+                                ·{" "}
+                                <span className="text-primary font-medium">
+                                  {groupSelected} selected · {formatAmount(groupPayTotal)}
+                                </span>
+                              </>
                             )}
                           </p>
                         </div>
@@ -177,7 +187,9 @@ export function WorkersTab({
                             setSelectedWorkerGroupForMembers(group);
                             setWorkerGroupMembersDialogOpen(true);
                             const selections: Record<number, boolean> = {};
-                            groupMembers.forEach((m) => { selections[m.id] = true; });
+                            groupMembers.forEach((m) => {
+                              selections[m.id] = true;
+                            });
                             setWorkerGroupMemberSelections(selections);
                           }}
                           data-testid={`button-manage-group-${group.id}`}

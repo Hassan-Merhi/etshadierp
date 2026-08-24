@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useFactoryLocationInventory } from "../../FactoryLocationInventoryModel";
+
+type FactoryLocationInventoryModel = ReturnType<typeof useFactoryLocationInventory>;
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -40,34 +43,34 @@ export function FinalizeProformaDialog({
   updateFinalizePrice,
   updateFinalizeQty,
 }: {
-  bulkCreateMutation: any;
-  createCustomerMutation: any;
-  customerSearch: any;
-  editingProformaId: any;
-  filteredCustomers: any;
-  finalizeOpen: any;
-  formatAmount: any;
-  grandTotal: any;
-  handleCloseFinalizeDialog: any;
-  handleExportExcel: any;
-  handleExportPdf: any;
-  handleSaveProforma: any;
-  newCustomerName: any;
-  proformaName: any;
-  removeFromFinalize: any;
-  replaceLinesMutation: any;
-  savedProformaId: any;
-  selectedCustomerId: any;
-  selectedItems: any;
-  setCustomerSearch: any;
-  setNewCustomerName: any;
-  setProformaName: any;
-  setSelectedCustomerId: any;
-  setShowCreateCustomer: any;
-  showCreateCustomer: any;
-  totalSelectedBales: any;
-  updateFinalizePrice: any;
-  updateFinalizeQty: any;
+  bulkCreateMutation: FactoryLocationInventoryModel["bulkCreateMutation"];
+  createCustomerMutation: FactoryLocationInventoryModel["createCustomerMutation"];
+  customerSearch: FactoryLocationInventoryModel["customerSearch"];
+  editingProformaId: FactoryLocationInventoryModel["editingProformaId"];
+  filteredCustomers: FactoryLocationInventoryModel["filteredCustomers"];
+  finalizeOpen: FactoryLocationInventoryModel["finalizeOpen"];
+  formatAmount: FactoryLocationInventoryModel["formatAmount"];
+  grandTotal: FactoryLocationInventoryModel["grandTotal"];
+  handleCloseFinalizeDialog: FactoryLocationInventoryModel["handleCloseFinalizeDialog"];
+  handleExportExcel: FactoryLocationInventoryModel["handleExportExcel"];
+  handleExportPdf: FactoryLocationInventoryModel["handleExportPdf"];
+  handleSaveProforma: FactoryLocationInventoryModel["handleSaveProforma"];
+  newCustomerName: FactoryLocationInventoryModel["newCustomerName"];
+  proformaName: FactoryLocationInventoryModel["proformaName"];
+  removeFromFinalize: FactoryLocationInventoryModel["removeFromFinalize"];
+  replaceLinesMutation: FactoryLocationInventoryModel["replaceLinesMutation"];
+  savedProformaId: FactoryLocationInventoryModel["savedProformaId"];
+  selectedCustomerId: FactoryLocationInventoryModel["selectedCustomerId"];
+  selectedItems: FactoryLocationInventoryModel["selectedItems"];
+  setCustomerSearch: FactoryLocationInventoryModel["setCustomerSearch"];
+  setNewCustomerName: FactoryLocationInventoryModel["setNewCustomerName"];
+  setProformaName: FactoryLocationInventoryModel["setProformaName"];
+  setSelectedCustomerId: FactoryLocationInventoryModel["setSelectedCustomerId"];
+  setShowCreateCustomer: FactoryLocationInventoryModel["setShowCreateCustomer"];
+  showCreateCustomer: FactoryLocationInventoryModel["showCreateCustomer"];
+  totalSelectedBales: FactoryLocationInventoryModel["totalSelectedBales"];
+  updateFinalizePrice: FactoryLocationInventoryModel["updateFinalizePrice"];
+  updateFinalizeQty: FactoryLocationInventoryModel["updateFinalizeQty"];
 }) {
   return (
     <Dialog
@@ -154,7 +157,7 @@ export function FinalizeProformaDialog({
                     {filteredCustomers.length === 0 ? (
                       <div className="text-center text-muted-foreground text-sm py-3">No customers found</div>
                     ) : (
-                      filteredCustomers.map((c: any) => (
+                      filteredCustomers.map((c) => (
                         <div
                           key={c.id}
                           className={`px-3 py-2 cursor-pointer text-sm hover-elevate ${selectedCustomerId === String(c.id) ? "bg-primary/10 font-medium" : ""}`}
@@ -187,7 +190,7 @@ export function FinalizeProformaDialog({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {selectedItems.map((item: any) => {
+                    {selectedItems.map((item) => {
                       const lineTotal = item.selectedQty * parseFloat(item.pricePerBale || "0");
                       return (
                         <TableRow key={item.productId} data-testid={`row-finalize-item-${item.productId}`}>

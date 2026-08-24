@@ -1,3 +1,6 @@
+import type { useFactorySuppliersModel } from "./useFactorySuppliersModel";
+
+type FactorySuppliersModel = ReturnType<typeof useFactorySuppliersModel>;
 import { SupplierFormDialog } from "./SupplierFormDialog";
 import { SupplierOtherDialogs } from "./SupplierOtherDialogs";
 import { SupplierPaymentFxDialogs } from "./SupplierPaymentFxDialogs";
@@ -47,8 +50,8 @@ interface SupplierDialogsProps {
   allSuppliers: SupplierWithBalance[];
   createSubAccountParentId: number | null;
   setCreateSubAccountParentId: (val: number | null) => void;
-  createMutation: UseMutationResult<any, any, any>;
-  updateMutation: UseMutationResult<any, any, any>;
+  createMutation: FactorySuppliersModel["createMutation"];
+  updateMutation: FactorySuppliersModel["updateMutation"];
   resetForm: () => void;
 
   paymentDialogSupplier: SupplierWithBalance | null;
@@ -76,7 +79,7 @@ interface SupplierDialogsProps {
     }>
   >;
   ledgerAccounts: NoInfer<{ id: number; name: string; code: string }[]> | undefined;
-  paymentMutation: UseMutationResult<any, any, any>;
+  paymentMutation: FactorySuppliersModel["paymentMutation"];
   paymentAmtUsd: number;
   paymentBalanceUsd: number;
   isOverpayment: boolean;
@@ -114,7 +117,7 @@ interface SupplierDialogsProps {
   >;
   fxSourceType: "supplier" | "commission" | "both";
   setFxSourceType: (val: "supplier" | "commission" | "both") => void;
-  fxConversionMutation: UseMutationResult<any, any, any>;
+  fxConversionMutation: FactorySuppliersModel["fxConversionMutation"];
   wrapAdminAction: (fn: () => void, title: string) => void;
 
   bulkFxOpen: boolean;
@@ -142,16 +145,14 @@ interface SupplierDialogsProps {
   bulkFxPreview: BulkFxPreview | null;
   setBulkFxPreview: (val: BulkFxPreview | null) => void;
   bulkFxPreviewMutation: UseMutationResult<BulkFxPreview, Error, void, unknown>;
-  bulkFxMutation: UseMutationResult<any, any, any>;
-
+  bulkFxMutation: FactorySuppliersModel["bulkFxMutation"];
   obEditSupplier: { id: number; name: string; currentBalance: string } | null;
   setObEditSupplier: React.Dispatch<React.SetStateAction<{ id: number; name: string; currentBalance: string } | null>>;
   obEditValue: string;
   setObEditValue: (val: string) => void;
-  obEditMutation: UseMutationResult<any, any, any>;
-
-  dueDialogSupplier: { name: string; containers: unknown[] } | null;
-  setDueDialogSupplier: React.Dispatch<React.SetStateAction<{ name: string; containers: unknown[] } | null>>;
+  obEditMutation: FactorySuppliersModel["obEditMutation"];
+  dueDialogSupplier: FactorySuppliersModel["dueDialogSupplier"];
+  setDueDialogSupplier: FactorySuppliersModel["setDueDialogSupplier"];
   formatDate: (val: string) => string;
   formatNum: (val: string) => string;
 
@@ -165,7 +166,7 @@ interface SupplierDialogsProps {
       notes: string;
     } | null>
   >;
-  updateObCommissionMutation: UseMutationResult<any, any, any>;
+  updateObCommissionMutation: FactorySuppliersModel["updateObCommissionMutation"];
 }
 
 export function SupplierDialogs({

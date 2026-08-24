@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useAdvancesModel } from "../advances/useAdvancesModel";
+
+type AdvancesModel = ReturnType<typeof useAdvancesModel>;
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,12 +27,12 @@ export function ReconcileBalancesDialog({
   reconcilePreviewLoading,
   setReconcileOpen,
 }: {
-  formatDate: any;
-  reconcileMutation: any;
-  reconcileOpen: any;
-  reconcilePreview: any;
-  reconcilePreviewLoading: any;
-  setReconcileOpen: any;
+  formatDate: AdvancesModel["formatDate"];
+  reconcileMutation: AdvancesModel["reconcileMutation"];
+  reconcileOpen: AdvancesModel["reconcileOpen"];
+  reconcilePreview: AdvancesModel["reconcilePreview"];
+  reconcilePreviewLoading: AdvancesModel["reconcilePreviewLoading"];
+  setReconcileOpen: AdvancesModel["setReconcileOpen"];
 }) {
   return (
     <Dialog open={reconcileOpen} onOpenChange={setReconcileOpen}>
@@ -49,8 +52,8 @@ export function ReconcileBalancesDialog({
           </div>
         ) : !reconcilePreview ? null : (
           (() => {
-            const dirty = reconcilePreview.changes.filter((c: any) => c.changed);
-            const clean = reconcilePreview.changes.filter((c: any) => !c.changed);
+            const dirty = reconcilePreview.changes.filter((c) => c.changed);
+            const clean = reconcilePreview.changes.filter((c) => !c.changed);
             return (
               <div className="space-y-4">
                 {/* Summary */}
@@ -83,7 +86,7 @@ export function ReconcileBalancesDialog({
                       <span className="text-right">New Balance</span>
                     </div>
                     <div className="divide-y">
-                      {dirty.map((c: any) => (
+                      {dirty.map((c) => (
                         <div
                           key={c.advanceId}
                           className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-4 py-2 text-sm items-center"
@@ -124,7 +127,7 @@ export function ReconcileBalancesDialog({
             disabled={
               reconcileMutation.isPending ||
               reconcilePreviewLoading ||
-              reconcilePreview?.changes.filter((c: any) => c.changed).length === 0
+              reconcilePreview?.changes.filter((c) => c.changed).length === 0
             }
             data-testid="button-confirm-reconcile"
           >
@@ -133,10 +136,10 @@ export function ReconcileBalancesDialog({
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Reconciling…
               </>
-            ) : reconcilePreview?.changes.filter((c: any) => c.changed).length === 0 ? (
+            ) : reconcilePreview?.changes.filter((c) => c.changed).length === 0 ? (
               "Nothing to Change"
             ) : (
-              `Confirm — Update ${reconcilePreview?.changes.filter((c: any) => c.changed).length ?? "…"} Record(s)`
+              `Confirm — Update ${reconcilePreview?.changes.filter((c) => c.changed).length ?? "…"} Record(s)`
             )}
           </Button>
         </DialogFooter>

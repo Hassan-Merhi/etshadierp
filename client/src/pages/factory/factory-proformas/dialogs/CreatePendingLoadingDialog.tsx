@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useFactoryProformasModel } from "../../factoryproformas/useFactoryProformasModel";
+
+type FactoryProformasModel = ReturnType<typeof useFactoryProformasModel>;
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -18,12 +21,12 @@ export function CreatePendingLoadingDialog({
   setCreateLoadingLocationId,
   setCreateLoadingProforma,
 }: {
-  createLoadingLocationId: any;
-  createLoadingMutation: any;
-  createLoadingProforma: any;
-  locations: any;
-  setCreateLoadingLocationId: any;
-  setCreateLoadingProforma: any;
+  createLoadingLocationId: FactoryProformasModel["createLoadingLocationId"];
+  createLoadingMutation: FactoryProformasModel["createLoadingMutation"];
+  createLoadingProforma: FactoryProformasModel["createLoadingProforma"];
+  locations: FactoryProformasModel["locations"];
+  setCreateLoadingLocationId: FactoryProformasModel["setCreateLoadingLocationId"];
+  setCreateLoadingProforma: FactoryProformasModel["setCreateLoadingProforma"];
 }) {
   return (
     <Dialog
@@ -51,7 +54,7 @@ export function CreatePendingLoadingDialog({
                 <SelectValue placeholder="Select a location..." />
               </SelectTrigger>
               <SelectContent>
-                {locations.map((loc: any) => (
+                {locations.map((loc) => (
                   <SelectItem key={loc.id} value={loc.id.toString()} data-testid={`select-location-option-${loc.id}`}>
                     {loc.name} {loc.code ? `(${loc.code})` : ""}
                   </SelectItem>
