@@ -1,7 +1,7 @@
 import { parseId } from "../lib/parseId";
 import { logger } from "../lib/logger";
 import { requireNonPOS } from "../auth";
-import type { Express, Request } from "express";
+import type { Express, Request, RequestHandler } from "express";
 import { db } from "../db";
 import {
   vouchers,
@@ -43,7 +43,7 @@ async function resolveGlobalCompanyScope(req: Request): Promise<{ userId: string
   };
 }
 
-export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) {
+export function registerGlobalTransactionRoutes(app: Express, requireAuth: RequestHandler) {
   // GET /api/global/transactions
   // Returns vouchers across all ERP companies the user has access to.
   app.get("/api/global/transactions", requireAuth, requireNonPOS, async (req, res) => {

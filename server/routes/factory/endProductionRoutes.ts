@@ -5,7 +5,7 @@
  * names from frozen bale snapshots before the current catalog.
  */
 
-import type { Express } from "express";
+import type { Express, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db, pool } from "../../db";
@@ -52,7 +52,7 @@ async function fetchBaleGroupsForDate(companyId: number, date: string, language:
     GROUP BY fb.finalized_by, fw.full_name, fb.product_id, fbp.article_code
     ORDER BY fw.full_name NULLS LAST, fbp.article_code NULLS LAST
   `);
-  return (rows.rows);
+  return rows.rows;
 }
 
 async function getCompanyName(companyId: number): Promise<string> {
@@ -70,7 +70,10 @@ async function getProductionWaGroupId(companyId: number): Promise<string | null>
 }
 
 function safeFileName(companyName: string, date: string, language: FactoryCatalogLanguage): string {
-  const safe = companyName.replace(/[^a-zA-Z0-9 \-_.]/g, "").trim().slice(0, 60);
+  const safe = companyName
+    .replace(/[^a-zA-Z0-9 \-_.]/g, "")
+    .trim()
+    .slice(0, 60);
   return `Worker Matrix ${safe} ${date} ${language.toUpperCase()}.pdf`;
 }
 
@@ -80,117 +83,138 @@ function caption(companyName: string, date: string, language: FactoryCatalogLang
     : `Worker Matrix — ${companyName} — ${date}`;
 }
 
-export function registerEndProductionRoutes(app: Express, requireAuth: any) {
-  app.get("/api/factory/stock-entry/production-session", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
-    try {
-      const companyId = req.session?.factoryCompanyId || req.session?.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const date = (req.query.date as string) || getClientDate(req);
-      const [session] = await db
-        .select()
-        .from(factoryProductionSessions)
-        .where(and(eq(factoryProductionSessions.companyId, companyId), eq(factoryProductionSessions.sessionDate, date)));
-      res.json(session ?? null);
-    } catch (err: unknown) {
-      logger.error("[endProduction] GET session error:", { error: err });
-      res.status(500).json({ message: getErrorMessage(err) });
+export function registerEndProductionRoutes(app: Express, requireAuth: RequestHandler) {
+  app.get(
+    "/api/factory/stock-entry/production-session",
+    requireAuth,
+    async (req: import("express").Request, res: import("express").Response) => {
+      try {
+        const companyId = req.session?.factoryCompanyId || req.session?.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const date = (req.query.date as string) || getClientDate(req);
+        const [session] = await db
+          .select()
+          .from(factoryProductionSessions)
+          .where(
+            and(eq(factoryProductionSessions.companyId, companyId), eq(factoryProductionSessions.sessionDate, date))
+          );
+        res.json(session ?? null);
+      } catch (err: unknown) {
+        logger.error("[endProduction] GET session error:", { error: err });
+        res.status(500).json({ message: getErrorMessage(err) });
+      }
     }
-  });
+  );
 
-  app.post("/api/factory/stock-entry/end-production", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
-    try {
-      const companyId = req.session?.factoryCompanyId || req.session?.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const language = requestedLanguage(req);
-      const date = (req.body?.date as string) || getClientDate(req);
-      const endedBy = req.session?.username ?? req.session?.userId ?? null;
-      const [existing] = await db
-        .select()
-        .from(factoryProductionSessions)
-        .where(and(eq(factoryProductionSessions.companyId, companyId), eq(factoryProductionSessions.sessionDate, date)));
-      if (existing?.productionEndedAt) {
-        return res.status(409).json({ message: "Production already ended for this date.", session: existing });
-      }
+  app.post(
+    "/api/factory/stock-entry/end-production",
+    requireAuth,
+    async (req: import("express").Request, res: import("express").Response) => {
+      try {
+        const companyId = req.session?.factoryCompanyId || req.session?.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const language = requestedLanguage(req);
+        const date = (req.body?.date as string) || getClientDate(req);
+        const endedBy = req.session?.username ?? req.session?.userId ?? null;
+        const [existing] = await db
+          .select()
+          .from(factoryProductionSessions)
+          .where(
+            and(eq(factoryProductionSessions.companyId, companyId), eq(factoryProductionSessions.sessionDate, date))
+          );
+        if (existing?.productionEndedAt) {
+          return res.status(409).json({ message: "Production already ended for this date.", session: existing });
+        }
 
-      const groups = await fetchBaleGroupsForDate(companyId, date, language);
-      if (!groups.length) return res.status(404).json({ message: "No stock entry session found for today." });
-      const chatId = await getProductionWaGroupId(companyId);
-      if (!chatId) return res.status(400).json({ message: "No production WhatsApp group configured." });
+        const groups = await fetchBaleGroupsForDate(companyId, date, language);
+        if (!groups.length) return res.status(404).json({ message: "No stock entry session found for today." });
+        const chatId = await getProductionWaGroupId(companyId);
+        if (!chatId) return res.status(400).json({ message: "No production WhatsApp group configured." });
 
-      const companyName = await getCompanyName(companyId);
-      const pdfBuffer = await generateBilingualWorkerBalesPdf(groups, date, companyName, language);
-      const fileName = safeFileName(companyName, date, language);
-      const waResult = await sendWhatsAppFileByUploadPos(
-        chatId,
-        pdfBuffer,
-        fileName,
-        caption(companyName, date, language),
-        "application/pdf"
-      );
-      if (!waResult?.success) {
-        return res.status(502).json({
-          message: `Worker Matrix WhatsApp send failed. Production was not ended. ${waResult?.error ?? ""}`.trim(),
-        });
-      }
+        const companyName = await getCompanyName(companyId);
+        const pdfBuffer = await generateBilingualWorkerBalesPdf(groups, date, companyName, language);
+        const fileName = safeFileName(companyName, date, language);
+        const waResult = await sendWhatsAppFileByUploadPos(
+          chatId,
+          pdfBuffer,
+          fileName,
+          caption(companyName, date, language),
+          "application/pdf"
+        );
+        if (!waResult?.success) {
+          return res.status(502).json({
+            message: `Worker Matrix WhatsApp send failed. Production was not ended. ${waResult?.error ?? ""}`.trim(),
+          });
+        }
 
-      const now = new Date();
-      const [session] = await db
-        .insert(factoryProductionSessions)
-        .values({
-          companyId,
-          sessionDate: date,
-          productionEndedAt: now,
-          productionEndedBy: endedBy ? String(endedBy) : null,
-          workerMatrixWhatsappSentAt: now,
-          workerMatrixWhatsappMessageId: null,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: [factoryProductionSessions.companyId, factoryProductionSessions.sessionDate],
-          set: {
+        const now = new Date();
+        const [session] = await db
+          .insert(factoryProductionSessions)
+          .values({
+            companyId,
+            sessionDate: date,
             productionEndedAt: now,
             productionEndedBy: endedBy ? String(endedBy) : null,
             workerMatrixWhatsappSentAt: now,
             workerMatrixWhatsappMessageId: null,
             updatedAt: now,
-          },
-        })
-        .returning();
-      res.json({ message: "Production ended. Worker Matrix PDF sent to WhatsApp.", language, session, whatsapp: waResult });
-    } catch (err: unknown) {
-      logger.error("[endProduction] POST end-production error:", { error: err });
-      res.status(500).json({ message: getErrorMessage(err) });
-    }
-  });
-
-  app.post("/api/factory/bales/send-worker-pdf-whatsapp", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
-    try {
-      const companyId = req.session?.factoryCompanyId || req.session?.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const language = requestedLanguage(req);
-      const date = (req.body?.date as string) || getClientDate(req);
-      const groups = await fetchBaleGroupsForDate(companyId, date, language);
-      if (!groups.length) return res.status(404).json({ message: "No stock entry data found for the given date." });
-      const chatId = await getProductionWaGroupId(companyId);
-      if (!chatId) return res.status(400).json({ message: "No production WhatsApp group configured." });
-
-      const companyName = await getCompanyName(companyId);
-      const pdfBuffer = await generateBilingualWorkerBalesPdf(groups, date, companyName, language);
-      const fileName = safeFileName(companyName, date, language);
-      const waResult = await sendWhatsAppFileByUploadPos(
-        chatId,
-        pdfBuffer,
-        fileName,
-        caption(companyName, date, language),
-        "application/pdf"
-      );
-      if (!waResult?.success) {
-        return res.status(502).json({ message: `WhatsApp send failed. ${waResult?.error ?? ""}`.trim() });
+          })
+          .onConflictDoUpdate({
+            target: [factoryProductionSessions.companyId, factoryProductionSessions.sessionDate],
+            set: {
+              productionEndedAt: now,
+              productionEndedBy: endedBy ? String(endedBy) : null,
+              workerMatrixWhatsappSentAt: now,
+              workerMatrixWhatsappMessageId: null,
+              updatedAt: now,
+            },
+          })
+          .returning();
+        res.json({
+          message: "Production ended. Worker Matrix PDF sent to WhatsApp.",
+          language,
+          session,
+          whatsapp: waResult,
+        });
+      } catch (err: unknown) {
+        logger.error("[endProduction] POST end-production error:", { error: err });
+        res.status(500).json({ message: getErrorMessage(err) });
       }
-      res.json({ message: "Worker Matrix PDF sent to WhatsApp.", language, whatsapp: waResult });
-    } catch (err: unknown) {
-      logger.error("[endProduction] POST manual send error:", { error: err });
-      res.status(500).json({ message: getErrorMessage(err) });
     }
-  });
+  );
+
+  app.post(
+    "/api/factory/bales/send-worker-pdf-whatsapp",
+    requireAuth,
+    async (req: import("express").Request, res: import("express").Response) => {
+      try {
+        const companyId = req.session?.factoryCompanyId || req.session?.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const language = requestedLanguage(req);
+        const date = (req.body?.date as string) || getClientDate(req);
+        const groups = await fetchBaleGroupsForDate(companyId, date, language);
+        if (!groups.length) return res.status(404).json({ message: "No stock entry data found for the given date." });
+        const chatId = await getProductionWaGroupId(companyId);
+        if (!chatId) return res.status(400).json({ message: "No production WhatsApp group configured." });
+
+        const companyName = await getCompanyName(companyId);
+        const pdfBuffer = await generateBilingualWorkerBalesPdf(groups, date, companyName, language);
+        const fileName = safeFileName(companyName, date, language);
+        const waResult = await sendWhatsAppFileByUploadPos(
+          chatId,
+          pdfBuffer,
+          fileName,
+          caption(companyName, date, language),
+          "application/pdf"
+        );
+        if (!waResult?.success) {
+          return res.status(502).json({ message: `WhatsApp send failed. ${waResult?.error ?? ""}`.trim() });
+        }
+        res.json({ message: "Worker Matrix PDF sent to WhatsApp.", language, whatsapp: waResult });
+      } catch (err: unknown) {
+        logger.error("[endProduction] POST manual send error:", { error: err });
+        res.status(500).json({ message: getErrorMessage(err) });
+      }
+    }
+  );
 }

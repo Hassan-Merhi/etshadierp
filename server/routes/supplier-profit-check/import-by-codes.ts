@@ -4,12 +4,12 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 
-export function registerSupplierProfitImportRoutes(app: Express, requireAuth: any) {
+export function registerSupplierProfitImportRoutes(app: Express, requireAuth: RequestHandler) {
   // ── Add a new stock item directly from Supplier Profit Check ────────────────
   // ── Import by codes (Excel upload) ─────────────────────────────────────────
   // Accepts a list of item codes (from Excel). Looks up stock_items by code for

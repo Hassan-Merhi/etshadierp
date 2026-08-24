@@ -1,5 +1,5 @@
 import { toArrayBuffer } from "../../lib/bufferCompatibility";
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { logAudit } from "../helpers/auditHelpers";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -16,7 +16,13 @@ function money(value: string | number | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-async function auditExport(req: import("express").Request, companyId: number, type: "PDF" | "Excel", startDate: string, endDate: string) {
+async function auditExport(
+  req: import("express").Request,
+  companyId: number,
+  type: "PDF" | "Excel",
+  startDate: string,
+  endDate: string
+) {
   try {
     await logAudit({
       userId: req.session.userId!,
@@ -33,7 +39,7 @@ async function auditExport(req: import("express").Request, companyId: number, ty
   }
 }
 
-export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: RequestHandler, db: any) {
   app.post("/api/factory/payroll/export-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = Number(req.body?.companyId);

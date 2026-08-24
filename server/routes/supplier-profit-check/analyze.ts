@@ -4,12 +4,12 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 
-export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: any) {
+export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: RequestHandler) {
   app.post("/api/supplier-profit-check/analyze", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;

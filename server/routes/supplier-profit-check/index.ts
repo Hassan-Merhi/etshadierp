@@ -5,7 +5,7 @@
  * Express resolves first-match, so reordering these calls can change which
  * handler serves a request - config/route-manifest.json pins the result.
  */
-import type { Express } from "express";
+import type { Express, RequestHandler } from "express";
 import { registerSupplierProfitLookupRoutes } from "./lookups";
 import { registerSupplierProfitAnalyzeRoutes } from "./analyze";
 import { registerSupplierProfitProformaRoutes } from "./proforma";
@@ -14,7 +14,7 @@ import { registerSupplierProfitPoOverrideRoutes } from "./po-overrides";
 import { registerSupplierProfitImportRoutes } from "./import-by-codes";
 import { registerSupplierProfitAddStockItemRoutes } from "./add-stock-item";
 
-export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: unknown) {
+export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: RequestHandler) {
   registerSupplierProfitLookupRoutes(app, requireAuth);
   registerSupplierProfitAnalyzeRoutes(app, requireAuth);
   registerSupplierProfitProformaRoutes(app, requireAuth);

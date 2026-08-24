@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { logAudit } from "../helpers/auditHelpers";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -29,7 +29,7 @@ import {
   writeDaybookEntry,
 } from "./_helpers";
 
-export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: RequestHandler, db: any) {
   app.post("/api/factory/payroll/generate", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;

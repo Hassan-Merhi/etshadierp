@@ -1,7 +1,7 @@
 /**
  * factoryPayrollRoutes: FactoryPayrollUpdate endpoints.
  */
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { logAudit } from "../helpers/auditHelpers";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -24,7 +24,7 @@ import {
 } from "@shared/schema";
 import { writeDaybookEntry } from "./_helpers";
 
-export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: RequestHandler, db: any) {
   app.patch("/api/factory/payroll/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseId(req.params.id);

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -21,7 +21,7 @@ import {
 
 import { getFactoryCompanyId, writeDaybookEntry } from "./_helpers";
 
-export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: RequestHandler, db: any) {
   // GET /api/factory/workers/:id - Get single worker with computed stats
   app.get("/api/factory/workers/:id", requireAuth, async (req: Request, res: Response) => {
     try {

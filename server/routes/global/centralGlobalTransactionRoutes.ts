@@ -1,17 +1,5 @@
-import type { Express } from "express";
-import {
-  and,
-  count,
-  desc,
-  eq,
-  gte,
-  ilike,
-  inArray,
-  isNull,
-  lte,
-  or,
-  sql,
-} from "drizzle-orm";
+import type { Express, RequestHandler } from "express";
+import { and, count, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { companies, voucherEntries, vouchers } from "@shared/schema";
 import { db } from "../../db";
 import { logger } from "../../lib/logger";
@@ -22,7 +10,7 @@ function emptyResult(page: number) {
   return { vouchers: [], total: 0, page, totalPages: 0, summary: [], companies: [] };
 }
 
-export function registerCentralGlobalTransactionRoutes(app: Express, requireAuth: any) {
+export function registerCentralGlobalTransactionRoutes(app: Express, requireAuth: RequestHandler) {
   app.get("/api/global/transactions", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const userId = req.session.userId!;
@@ -76,20 +64,12 @@ export function registerCentralGlobalTransactionRoutes(app: Express, requireAuth
         if (targetCompanyIds.length === 0) return res.json(emptyResult(page));
       }
 
-      const conditions: any[] = [
-        inArray(vouchers.companyId, targetCompanyIds),
-        isNull(vouchers.deletedAt),
-      ];
+      const conditions: any[] = [inArray(vouchers.companyId, targetCompanyIds), isNull(vouchers.deletedAt)];
       if (startDate) conditions.push(gte(vouchers.voucherDate, startDate));
       if (endDate) conditions.push(lte(vouchers.voucherDate, endDate));
       if (voucherType && voucherType !== "all") {
         if (voucherType === "Stock Transfer" || voucherType === "StockTransfer") {
-          conditions.push(
-            or(
-              eq(vouchers.voucherType, "Stock Transfer"),
-              eq(vouchers.voucherType, "StockTransfer")
-            )
-          );
+          conditions.push(or(eq(vouchers.voucherType, "Stock Transfer"), eq(vouchers.voucherType, "StockTransfer")));
         } else {
           conditions.push(eq(vouchers.voucherType, voucherType));
         }
@@ -112,10 +92,7 @@ export function registerCentralGlobalTransactionRoutes(app: Express, requireAuth
       }
 
       const whereClause = and(...conditions);
-      const [{ total }] = await db
-        .select({ total: count() })
-        .from(vouchers)
-        .where(whereClause);
+      const [{ total }] = await db.select({ total: count() }).from(vouchers).where(whereClause);
       const totalCount = Number(total);
       const totalPages = Math.ceil(totalCount / limit);
 
@@ -182,34 +159,24 @@ export function registerCentralGlobalTransactionRoutes(app: Express, requireAuth
     }
   });
 
-  app.get(
-    "/api/global/transactions/voucher-types",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        const userId = req.session.userId!;
-        const role = req.session.currentRole!;
-        const allowedCompanyIds = await resolveAllowedGlobalCompanyIds(userId, role);
-        if (allowedCompanyIds.length === 0) return res.json([]);
+  app.get("/api/global/transactions/voucher-types", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const role = req.session.currentRole!;
+      const allowedCompanyIds = await resolveAllowedGlobalCompanyIds(userId, role);
+      if (allowedCompanyIds.length === 0) return res.json([]);
 
-        const privileged = ["Admin", "Owner", "Manager", "Developer"].includes(role);
-        const types = await db
-          .selectDistinct({ voucherType: vouchers.voucherType })
-          .from(vouchers)
-          .where(
-            and(
-              inArray(vouchers.companyId, allowedCompanyIds),
-              ...(privileged ? [] : [isNull(vouchers.deletedAt)])
-            )
-          )
-          .orderBy(vouchers.voucherType);
+      const privileged = ["Admin", "Owner", "Manager", "Developer"].includes(role);
+      const types = await db
+        .selectDistinct({ voucherType: vouchers.voucherType })
+        .from(vouchers)
+        .where(and(inArray(vouchers.companyId, allowedCompanyIds), ...(privileged ? [] : [isNull(vouchers.deletedAt)])))
+        .orderBy(vouchers.voucherType);
 
-        return res.json(types.map((row) => row.voucherType));
-      } catch (error) {
-        logger.error("[CentralGlobalTransactions/types]", { error });
-        return res.status(500).json({ message: "Failed to fetch voucher types" });
-      }
+      return res.json(types.map((row) => row.voucherType));
+    } catch (error) {
+      logger.error("[CentralGlobalTransactions/types]", { error });
+      return res.status(500).json({ message: "Failed to fetch voucher types" });
     }
-  );
+  });
 }

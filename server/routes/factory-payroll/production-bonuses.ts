@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { sql } from "drizzle-orm";
 import { checkFactoryAdmin } from "../factory/_helpers";
 import { logAudit } from "../helpers/auditHelpers";
@@ -44,7 +44,7 @@ const emptyTotals = () => ({
   rejectedCount: 0,
 });
 
-export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: RequestHandler, db: any) {
   app.get("/api/factory/payroll/:id/production-bonuses", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseId(req.params.id);
