@@ -23,7 +23,9 @@ import {
 
 import { balePhotoUpload } from "./_helpers";
 
-export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: any, db: any) {
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
+
+export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   app.get("/api/factory/bales/:id/trace", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -51,7 +53,7 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: a
             .from(factoryMixBatchSources)
             .where(eq(factoryMixBatchSources.mixBatchId, mixBatch.id));
 
-          const containerIds = mixSources.map((s: any) => s.containerId).filter(Boolean);
+          const containerIds = mixSources.map((s) => s.containerId).filter(Boolean);
           const containers =
             containerIds.length > 0
               ? await db
@@ -65,9 +67,9 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: a
                   )
               : [];
 
-          const containerMap = new Map<number, any>(containers.map((c: any) => [c.id, c]));
+          const containerMap = new Map<number, any>(containers.map((c) => [c.id, c]));
 
-          const supplierIds = Array.from(new Set(containers.map((c: any) => c.supplierId).filter(Boolean))) as number[];
+          const supplierIds = Array.from(new Set(containers.map((c) => c.supplierId).filter(Boolean))) as number[];
           const suppliers =
             supplierIds.length > 0
               ? await db
@@ -80,9 +82,9 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: a
                     )})`
                   )
               : [];
-          const supplierMap = new Map<number, any>(suppliers.map((s: any) => [s.id, s]));
+          const supplierMap = new Map<number, any>(suppliers.map((s) => [s.id, s]));
 
-          sourcesData = mixSources.map((s: any) => {
+          sourcesData = mixSources.map((s) => {
             const container = s.containerId ? containerMap.get(s.containerId) : null;
             const supplier = container?.supplierId ? supplierMap.get(container.supplierId) : null;
             return {

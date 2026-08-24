@@ -11,7 +11,9 @@ import { cache } from "../../lib/simpleCache";
 import { eq } from "drizzle-orm";
 import { factorySettings } from "@shared/schema";
 
-export function registerFactorySettingsRoutes(app: Express, requireAuth: any, db: any) {
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
+
+export function registerFactorySettingsRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   // ───────────────────────────────────────────────
   // 1. Settings CRUD
   // ───────────────────────────────────────────────

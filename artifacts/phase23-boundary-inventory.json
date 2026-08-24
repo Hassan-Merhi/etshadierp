@@ -1,26 +1,26 @@
 {
-  "generatedAt": "2026-08-24T13:04:18.612Z",
+  "generatedAt": "2026-08-24T13:14:34.762Z",
   "repositorySummary": {
-    "scannedFiles": 2979,
-    "filesWithEscapes": 750,
-    "explicitAny": 2524,
+    "scannedFiles": 2980,
+    "filesWithEscapes": 746,
+    "explicitAny": 2450,
     "asAny": 89,
     "suppressions": 0,
     "drizzleRowCasts": 1,
-    "typeEscapeTotal": 2613,
-    "ceiling": 2613,
+    "typeEscapeTotal": 2539,
+    "ceiling": 2539,
     "improvedFiles": 0,
     "failedFiles": 0
   },
   "candidateSummary": {
-    "files": 399,
-    "escapes": 1480,
+    "files": 395,
+    "escapes": 1406,
     "drizzleRowCasts": 1
   },
   "bucketTotals": {
     "server-route": {
-      "files": 298,
-      "escapes": 1084,
+      "files": 294,
+      "escapes": 1010,
       "drizzleRowCasts": 1
     },
     "client-lib": {
@@ -86,22 +86,6 @@
         "errors": 34
       },
       "signalTotal": 139
-    },
-    {
-      "path": "server/routes/factory-intelligence/profitability.ts",
-      "bucket": "server-route",
-      "explicitAny": 19,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 19,
-      "signals": {
-        "http": 14,
-        "db": 25,
-        "dto": 0,
-        "errors": 12
-      },
-      "signalTotal": 51
     },
     {
       "path": "server/routes/sp-migration/_helpers.ts",
@@ -182,22 +166,6 @@
         "errors": 6
       },
       "signalTotal": 25
-    },
-    {
-      "path": "server/routes/factory-intelligence/mix-optimize.ts",
-      "bucket": "server-route",
-      "explicitAny": 16,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 16,
-      "signals": {
-        "http": 5,
-        "db": 8,
-        "dto": 0,
-        "errors": 6
-      },
-      "signalTotal": 19
     },
     {
       "path": "client/src/lib/excelImport.ts",
@@ -424,22 +392,6 @@
       "signalTotal": 53
     },
     {
-      "path": "server/routes/factory-intelligence/kpis.ts",
-      "bucket": "server-route",
-      "explicitAny": 10,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 10,
-      "signals": {
-        "http": 19,
-        "db": 14,
-        "dto": 0,
-        "errors": 18
-      },
-      "signalTotal": 51
-    },
-    {
       "path": "server/routes/factory/factoryStatusBuilderSheetsRoutes.ts",
       "bucket": "server-route",
       "explicitAny": 10,
@@ -536,22 +488,6 @@
       "signalTotal": 109
     },
     {
-      "path": "server/routes/factory-intelligence/bale-trace-photos.ts",
-      "bucket": "server-route",
-      "explicitAny": 9,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 9,
-      "signals": {
-        "http": 25,
-        "db": 11,
-        "dto": 0,
-        "errors": 30
-      },
-      "signalTotal": 66
-    },
-    {
       "path": "server/routes/sp/spMigrationPhase2Common.ts",
       "bucket": "server-route",
       "explicitAny": 9,
@@ -614,22 +550,6 @@
         "errors": 21
       },
       "signalTotal": 23
-    },
-    {
-      "path": "server/routes/factory-intelligence/supplier-score.ts",
-      "bucket": "server-route",
-      "explicitAny": 9,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 9,
-      "signals": {
-        "http": 6,
-        "db": 7,
-        "dto": 0,
-        "errors": 6
-      },
-      "signalTotal": 19
     },
     {
       "path": "server/services/security/namedPermissionService.ts",
@@ -774,22 +694,6 @@
         "errors": 37
       },
       "signalTotal": 45
-    },
-    {
-      "path": "server/routes/factory-intelligence/alerts.ts",
-      "bucket": "server-route",
-      "explicitAny": 8,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 8,
-      "signals": {
-        "http": 13,
-        "db": 7,
-        "dto": 0,
-        "errors": 19
-      },
-      "signalTotal": 39
     },
     {
       "path": "server/routes/factory/docs-users/companyImportRoutes.ts",
@@ -1382,22 +1286,6 @@
         "errors": 0
       },
       "signalTotal": 13
-    },
-    {
-      "path": "server/routes/factory-intelligence/cashflow.ts",
-      "bucket": "server-route",
-      "explicitAny": 6,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 6,
-      "signals": {
-        "http": 4,
-        "db": 1,
-        "dto": 0,
-        "errors": 6
-      },
-      "signalTotal": 11
     },
     {
       "path": "server/routes/performance/supplierVoucherEntryBatcher.ts",
@@ -2568,22 +2456,6 @@
       "signalTotal": 26
     },
     {
-      "path": "server/routes/factory-intelligence/settings.ts",
-      "bucket": "server-route",
-      "explicitAny": 3,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 3,
-      "signals": {
-        "http": 11,
-        "db": 2,
-        "dto": 0,
-        "errors": 12
-      },
-      "signalTotal": 25
-    },
-    {
       "path": "server/routes/factory/bales/balesExportRoutes.ts",
       "bucket": "server-route",
       "explicitAny": 3,
@@ -2614,6 +2486,134 @@
         "errors": 12
       },
       "signalTotal": 22
+    },
+    {
+      "path": "server/routes/factory/raw-stock/recalc/partial-offload-scan.ts",
+      "bucket": "server-route",
+      "explicitAny": 3,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 13,
+        "db": 0,
+        "dto": 0,
+        "errors": 9
+      },
+      "signalTotal": 22
+    },
+    {
+      "path": "server/routes/factory-payroll/delete.ts",
+      "bucket": "server-route",
+      "explicitAny": 3,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 9,
+        "db": 2,
+        "dto": 0,
+        "errors": 9
+      },
+      "signalTotal": 20
+    },
+    {
+      "path": "server/lib/trackTraceScraper.ts",
+      "bucket": "server-lib",
+      "explicitAny": 3,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 0,
+        "db": 0,
+        "dto": 1,
+        "errors": 16
+      },
+      "signalTotal": 17
+    },
+    {
+      "path": "server/storage/stock-ops/cost-prices.ts",
+      "bucket": "server-storage",
+      "explicitAny": 2,
+      "asAny": 1,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 0,
+        "db": 6,
+        "dto": 0,
+        "errors": 7
+      },
+      "signalTotal": 13
+    },
+    {
+      "path": "server/routes/payroll/_payrollAccountingHelper.ts",
+      "bucket": "server-route",
+      "explicitAny": 3,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 0,
+        "db": 11,
+        "dto": 0,
+        "errors": 1
+      },
+      "signalTotal": 12
+    },
+    {
+      "path": "server/routes/reportsContainerTrackingRoutes.ts",
+      "bucket": "server-route",
+      "explicitAny": 3,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 4,
+        "db": 2,
+        "dto": 0,
+        "errors": 6
+      },
+      "signalTotal": 12
+    },
+    {
+      "path": "server/storage/factory/production.ts",
+      "bucket": "server-storage",
+      "explicitAny": 3,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 0,
+        "db": 12,
+        "dto": 0,
+        "errors": 0
+      },
+      "signalTotal": 12
+    },
+    {
+      "path": "server/storage/stock-ops/transfers-create.ts",
+      "bucket": "server-storage",
+      "explicitAny": 0,
+      "asAny": 3,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 0,
+        "db": 12,
+        "dto": 0,
+        "errors": 0
+      },
+      "signalTotal": 12
     }
   ]
 }

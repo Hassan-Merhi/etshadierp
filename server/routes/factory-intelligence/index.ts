@@ -16,7 +16,9 @@ import { registerFactoryMixOptimizeRoutes } from "./mix-optimize";
 import { registerFactoryBaleTracePhotoRoutes } from "./bale-trace-photos";
 import { registerFactoryCashflowRoutes } from "./cashflow";
 
-export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: unknown, db: unknown) {
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
+
+export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   registerFactorySettingsRoutes(app, requireAuth, db);
   registerFactoryDashboardWasteRoutes(app, requireAuth, db);
   registerFactoryKpiRoutes(app, requireAuth, db);

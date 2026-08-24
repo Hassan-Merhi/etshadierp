@@ -8,6 +8,8 @@ import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { eq, and, sql, gte, lte } from "drizzle-orm";
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
+
 import {
   factoryWasteEntries,
   factoryBales,
@@ -16,7 +18,7 @@ import {
   factoryWorkers,
 } from "@shared/schema";
 
-export function registerFactoryKpiRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryKpiRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   app.get("/api/factory/kpis/daily", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -98,7 +100,7 @@ export function registerFactoryKpiRoutes(app: Express, requireAuth: any, db: any
 
       const workers = await db.select().from(factoryWorkers).where(eq(factoryWorkers.companyId, companyId));
 
-      const workerMap = new Map<number, any>(workers.map((w: any) => [w.id, w]));
+      const workerMap = new Map<number, any>(workers.map((w) => [w.id, w]));
 
       const workerStats: Record<number, { workerId: number; workerName: string; balesCount: number; totalKg: number }> =
         {};
@@ -147,7 +149,7 @@ export function registerFactoryKpiRoutes(app: Express, requireAuth: any, db: any
           )
         );
 
-      const mixIds = mixes.map((m: any) => m.id);
+      const mixIds = mixes.map((m) => m.id);
       if (mixIds.length === 0) return res.json([]);
 
       const sources = await db
@@ -173,13 +175,13 @@ export function registerFactoryKpiRoutes(app: Express, requireAuth: any, db: any
           )
         );
 
-      const result = mixes.map((mix: any) => {
-        const mixSources = sources.filter((s: any) => s.mixBatchId === mix.id);
-        const totalInputKg = mixSources.reduce((s: number, src: any) => s + parseFloat(src.weightKg || "0"), 0);
+      const result = mixes.map((mix) => {
+        const mixSources = sources.filter((s) => s.mixBatchId === mix.id);
+        const totalInputKg = mixSources.reduce((s: number, src) => s + parseFloat(src.weightKg || "0"), 0);
 
-        const mixBales = bales.filter((b: any) => b.mixBatchId === mix.id);
+        const mixBales = bales.filter((b) => b.mixBatchId === mix.id);
         const outputBalesCount = mixBales.length;
-        const totalOutputKg = mixBales.reduce((s: number, b: any) => s + parseFloat(b.weightKg || "0"), 0);
+        const totalOutputKg = mixBales.reduce((s: number, b) => s + parseFloat(b.weightKg || "0"), 0);
 
         const wasteKg = totalInputKg - totalOutputKg;
         const wastePct = totalInputKg > 0 ? (wasteKg / totalInputKg) * 100 : 0;

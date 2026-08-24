@@ -10,7 +10,9 @@ import { logger } from "../../lib/logger";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { factoryWorkers, containerFreight, containerFreightPayments, customerOrders } from "@shared/schema";
 
-export function registerFactoryCashflowRoutes(app: Express, requireAuth: any, db: any) {
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
+
+export function registerFactoryCashflowRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   app.get("/api/factory/cashflow", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -45,8 +47,8 @@ export function registerFactoryCashflowRoutes(app: Express, requireAuth: any, db
       for (const f of freightEntries) {
         const amount = parseFloat(f.freightAmount || "0");
         const paid = freightPayments
-          .filter((p: any) => p.containerFreightId === f.id)
-          .reduce((s: number, p: any) => s + parseFloat(p.amount || "0"), 0);
+          .filter((p) => p.containerFreightId === f.id)
+          .reduce((s: number, p) => s + parseFloat(p.amount || "0"), 0);
         const remaining = amount - paid;
         if (remaining > 0.01) {
           upcomingFreight.push({
@@ -64,7 +66,7 @@ export function registerFactoryCashflowRoutes(app: Express, requireAuth: any, db
         .from(factoryWorkers)
         .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)));
 
-      const totalMonthlyPayroll = activeWorkers.reduce((s: number, w: any) => {
+      const totalMonthlyPayroll = activeWorkers.reduce((s: number, w) => {
         return s + parseFloat(w.baseSalary || "0");
       }, 0);
 
@@ -78,7 +80,7 @@ export function registerFactoryCashflowRoutes(app: Express, requireAuth: any, db
         .from(customerOrders)
         .where(and(eq(customerOrders.companyId, companyId), eq(customerOrders.status, "FINALIZED")));
 
-      const expectedIncome = pendingOrders.reduce((s: number, o: any) => s + parseFloat(o.grandTotal || "0"), 0);
+      const expectedIncome = pendingOrders.reduce((s: number, o) => s + parseFloat(o.grandTotal || "0"), 0);
 
       res.json({
         upcomingFreight,
