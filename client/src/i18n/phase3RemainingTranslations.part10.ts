@@ -348,7 +348,7 @@ export const phase3RemainingTranslationsPart10: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Invoice sent to WhatsApp group.",
-    ar: "فواتير أرسلت إلى مجموعة ماساب",
+    ar: "فواتير أرسلت إلى مجموعةواتساب",
     fr: "Facture envoyée au groupe WhatsApp.",
   },
   { en: "Invoice Status", ar: "الفاتورة", fr: "État de la facture" },
@@ -700,12 +700,12 @@ export const phase3RemainingTranslationsPart10: readonly Phase3SharedUiEntry[] =
   { en: "Link", ar: "Link", fr: "Lien" },
   {
     en: "Link a WhatsApp group before enabling stock reports",
-    ar: "ربط مجموعة ماساب قبل تقديم تقارير المخزون",
+    ar: "ربط مجموعةواتسابقبل تقديم تقارير المخزون",
     fr: "Liener un groupe WhatsApp avant d'activer les rapports d'inventaire",
   },
   {
     en: "Link and enable the location WhatsApp group before enabling automatic stock reports",
-    ar: "ربط وتمكين مجموعة ماساب من موقعها قبل تمكين تقارير الجرد التلقائية",
+    ar: "ربط وتمكين مجموعةواتسابمن موقعها قبل تمكين تقارير الجرد التلقائية",
     fr: "Lien et activer le groupe WhatsApp emplacement avant d'activer les rapports de stock automatiques",
   },
   { en: "Link Cell", ar: "Link Cell", fr: "Cellule de liaison" },

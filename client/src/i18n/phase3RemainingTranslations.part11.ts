@@ -260,7 +260,7 @@ export const phase3RemainingTranslationsPart11: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Make sure it is a valid .xlsx file.",
-    ar: "تأكّدْ بأنّه a ملف ساكس صالح.",
+    ar: "تأكّد من أنه ملف .xlsx صالح.",
     fr: "Assurez-vous que c'est un fichier .xlsx valide.",
   },
   { en: "Make sure QZ Tray is running", ar: "تأكّدْ QZ (تراي) يركض", fr: "Assurez-vous que QZ Tray est en marche" },
@@ -283,7 +283,7 @@ export const phase3RemainingTranslationsPart11: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Manage automatic backups, scheduled reports, and WhatsApp delivery.",
-    ar: "إدارة الدعم التلقائي، التقارير المُقرّرة، تسليم (ماساب).",
+    ar: "إدارة الدعم التلقائي، التقارير المُقرّرة، تسليم واتساب.",
     fr: "Gérer les sauvegardes automatiques, les rapports programmés et la livraison de WhatsApp.",
   },
   { en: "Manage Categories", ar: "Manage Categories", fr: "Gérer les catégories" },
@@ -367,7 +367,7 @@ export const phase3RemainingTranslationsPart11: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Map each clearing agent (NCA, Nahli, etc.) to a WhatsApp group for the balance allocation image send.",
-    ar: "تخيّل كلّ من وكلاء المقاصة (NCA، Nahli، وما إلى ذلك) إلى مجموعة ماساب لإرسال صورة توزيع التوازن.",
+    ar: "تخيّل كلّ من وكلاء المقاصة (NCA، Nahli، وما إلى ذلك) إلى مجموعةواتسابلإرسال صورة توزيع التوازن.",
     fr: "Cartez chaque agent de compensation (NCA, Nahli, etc.) à un groupe WhatsApp pour l'image de répartition du solde envoyé.",
   },
   { en: "mappings array required", ar: "مجموعة الخرائط المطلوبة", fr: "tableau de mappages requis" },
@@ -537,7 +537,7 @@ export const phase3RemainingTranslationsPart11: readonly Phase3SharedUiEntry[] =
   { en: "Mix Batch Details", ar: "التفاصيل", fr: "Mélanger les détails du lot" },
   {
     en: "Mix batch details sent to WhatsApp group.",
-    ar: "(ميكس باك) أرسلت تفاصيل إلى مجموعة (ماساب)",
+    ar: "(ميكس باك) أرسلت تفاصيل إلى مجموعة واتساب",
     fr: "Mélanger les détails des lots envoyés au groupe WhatsApp.",
   },
   {
@@ -549,7 +549,7 @@ export const phase3RemainingTranslationsPart11: readonly Phase3SharedUiEntry[] =
   { en: "Mix Batch ID (optional)", ar: "ميكس باتش هويات (اختيارية)", fr: "Numéro de lot (facultatif)" },
   {
     en: "Mix batch image sent to WhatsApp group.",
-    ar: "صورة (إكس باك) أرسلت إلى مجموعة (ماساب)",
+    ar: "صورة (إكس باك) أرسلت إلى مجموعة واتساب",
     fr: "Mélanger l'image par lots envoyée au groupe WhatsApp.",
   },
   {

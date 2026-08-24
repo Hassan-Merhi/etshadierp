@@ -15,7 +15,7 @@ export const phase3RemainingTranslationsPart14: readonly Phase3SharedUiEntry[] =
   { en: "Open POS options", ar: "خيارات البرمجيات المفتوحة", fr: "Ouvrir les options de POS" },
   { en: "Open Qty", ar: "افتحي فمك", fr: "Quantité ouverte" },
   { en: "Open voucher", ar: "قسائم مفتوحة", fr: "Ouvrir le bon" },
-  { en: "Open WhatsApp", ar: "إفتح ماك آب", fr: "Ouvrir WhatsApp" },
+  { en: "Open WhatsApp", ar: "فتح واتساب", fr: "Ouvrir WhatsApp" },
   { en: "Opening", ar: "الافتتاحي", fr: "Ouverture" },
   { en: "Opening (BL)", ar: "الافتتاح (BL)", fr: "Ouverture (BL)" },
   {
@@ -849,7 +849,7 @@ export const phase3RemainingTranslationsPart14: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Please ensure the file is a valid Excel file (.xlsx)",
-    ar: "يرجى ضمان أن يكون الملف ملفاً صالحاً (xx)",
+    ar: "يرجى التأكد من أن الملف هو ملف إكسل صالح (.xlsx)",
     fr: "Veuillez vous assurer que le fichier est un fichier Excel valide (.xlsx)",
   },
   {

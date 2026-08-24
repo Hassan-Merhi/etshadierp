@@ -97,4 +97,41 @@ describe("Phase 3 translation completion", () => {
       expect(slots(entry.ar)).toEqual(slots(entry.fr));
     }
   });
+
+  // File extensions, brand names, template paths and date format tokens are
+  // values the operator reads back or types verbatim, so they have to survive
+  // translation byte-exact. The engine did not treat them that way: `.xlsx`
+  // came back as "(xxx)" and "ساكس", `17track` as "المسار 17", `YYYY-MM-DD` as
+  // "YYY-MMM-DD", and "WhatsApp exports" as "الصادرات من آب/أغسطس" — exports
+  // from the month of August.
+  it("reproduces protected format tokens and brand names verbatim", () => {
+    // Arabic transliterates the one brand it has a settled spelling for; every
+    // other token is Latin in all three languages.
+    const PROTECTED = ["YYYY-MM-DD", "17track", ".xlsx", ".csv", "@c.us", "@g.us"] as const;
+    const BRANDS = { WhatsApp: "واتساب" } as const;
+
+    const count = (haystack: string, needle: string) => haystack.split(needle).length - 1;
+
+    for (const entry of entries) {
+      if (entry.fr === entry.en && entry.ar === entry.en) continue;
+
+      // A token inside a `${...}` expression is part of the interpolated value,
+      // not literal copy, so it is carried by the slot rather than the text.
+      const literalEn = entry.en.replace(/\$\{[^}]*\}/g, "");
+
+      for (const token of PROTECTED) {
+        const required = count(literalEn, token);
+        if (required === 0) continue;
+        expect(count(entry.fr, token)).toBeGreaterThanOrEqual(required);
+        expect(count(entry.ar, token)).toBeGreaterThanOrEqual(required);
+      }
+
+      for (const [brand, arabic] of Object.entries(BRANDS)) {
+        const required = count(literalEn, brand);
+        if (required === 0) continue;
+        expect(count(entry.fr, brand)).toBeGreaterThanOrEqual(required);
+        expect(count(entry.ar, brand) + count(entry.ar, arabic)).toBeGreaterThanOrEqual(required);
+      }
+    }
+  });
 });

@@ -201,7 +201,7 @@ export const phase3RemainingTranslationsPart15: readonly Phase3SharedUiEntry[] =
   { en: "Please upload a file", ar: "يرجى تحميل ملف", fr: "Veuillez télécharger un fichier" },
   {
     en: "Please upload a valid .xlsx file",
-    ar: "من فضلك قم بتحميل ملف اكسلسكس",
+    ar: "يرجى رفع ملف .xlsx صالح",
     fr: "Veuillez télécharger un fichier .xlsx valide",
   },
   {
@@ -299,7 +299,7 @@ export const phase3RemainingTranslationsPart15: readonly Phase3SharedUiEntry[] =
     fr: "Les utilisateurs de POS ne peuvent réviser que les éléments assignés à leur propre emplacement source",
   },
   { en: "POS WhatsApp API saved", ar: "POS WhatsApp API انقذ", fr: "API POS WhatsApp enregistrée" },
-  { en: "POS WhatsApp Groups", ar: "مجموعة ماساب", fr: "Groupes POS WhatsApp" },
+  { en: "POS WhatsApp Groups", ar: "مجموعةواتساب", fr: "Groupes POS WhatsApp" },
   { en: "Position / Working", ar: "المنصب/العمل", fr: "Fonction/travail" },
   { en: "Positive balance", ar: "التوازن الإيجابي", fr: "Solde positif" },
   { en: "Positive Only", ar: "إيجابي فقط", fr: "Positif seulement" },
@@ -597,7 +597,7 @@ export const phase3RemainingTranslationsPart15: readonly Phase3SharedUiEntry[] =
   { en: "Production ended", ar: "الإنتاج المنتهية", fr: "Fin de la production" },
   {
     en: "Production ended. Worker Matrix PDF sent to WhatsApp.",
-    ar: "انتهى الإنتاج (العامل (ماتريكس PDF أرسل إلى (ماساب",
+    ar: "انتهى الإنتاج (العامل (ماتريكس PDF أرسل إلى واتساب",
     fr: "Fin de la production. Worker Matrix PDF envoyé à WhatsApp.",
   },
   { en: "Production Intel", ar: "Production Intel", fr: "Intel de production" },
@@ -619,7 +619,7 @@ export const phase3RemainingTranslationsPart15: readonly Phase3SharedUiEntry[] =
   { en: "Production weight by category", ar: "وزن الإنتاج حسب الفئة", fr: "Poids de production par catégorie" },
   {
     en: "Production WhatsApp group updated.",
-    ar: "تم تحديث مجموعة ماساب",
+    ar: "تم تحديث مجموعةواتساب",
     fr: "Groupe de production WhatsApp mis à jour.",
   },
   { en: "PRODUCTION اجراء اعمال", ar: "الإنتاج", fr: "PRODUCTION" },

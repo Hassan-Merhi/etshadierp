@@ -670,7 +670,7 @@ export const phase3RemainingTranslationsPart04: readonly Phase3SharedUiEntry[] =
     fr: "Choisissez un fournisseur du panneau ci-dessus pour charger ses articles",
   },
   { en: "Choose A4 Label Design", ar: "Choose A4 Label Design", fr: "Choisir A4 Design d'étiquette" },
-  { en: "Choose an .xlsx workbook first", ar: "اختر دفتر عمل", fr: "Choisissez d'abord un cahier .xlsx" },
+  { en: "Choose an .xlsx workbook first", ar: "اختر مصنّف .xlsx أولاً", fr: "Choisissez d'abord un cahier .xlsx" },
   {
     en: "Choose any report metric to compare every matching stock item across the two sides.",
     ar: "اختر أي تقرير قياسي لمقارنة كل مخزون مطابق على الجانبين",
@@ -702,7 +702,7 @@ export const phase3RemainingTranslationsPart04: readonly Phase3SharedUiEntry[] =
   { en: "Choose Label Design", ar: "Choose Label Design", fr: "Choisir Design d'étiquette" },
   {
     en: "Choose the .xlsx template exported from Bale Explorer.",
-    ar: "اختر نموذج (اكس) المصدّر من مستكشف (بيل)",
+    ar: "اختر قالب .xlsx المُصدَّر من Bale Explorer.",
     fr: "Choisissez le modèle .xlsx exporté de Bale Explorer.",
   },
   {

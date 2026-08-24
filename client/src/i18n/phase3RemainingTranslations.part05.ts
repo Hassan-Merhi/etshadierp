@@ -38,7 +38,7 @@ export const phase3RemainingTranslationsPart05: readonly Phase3SharedUiEntry[] =
     ar: "نؤمن بفترة كشوف المرتبات والإطارات، ثم استعراض مسبق قبل التوليد.",
     fr: "Configurer la période de paie et les paramètres, puis prévisualiser avant de générer.",
   },
-  { en: "Configure WhatsApp rule", ar: "قاعدة الثقّة", fr: "Configurer la règle WhatsApp" },
+  { en: "Configure WhatsApp rule", ar: "تكوين قاعدة واتساب", fr: "Configurer la règle WhatsApp" },
   {
     en: "Configure which users receive notifications for each system event.",
     ar: "(ب) الثقة التي يتلقّى المستعملون إخطارات بشأن كل حدث من أحداث النظام.",
@@ -370,7 +370,7 @@ export const phase3RemainingTranslationsPart05: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Container report sent to WhatsApp group.",
-    ar: "تقرير الحاويات أرسل إلى مجموعة ماساب",
+    ar: "تقرير الحاويات أرسل إلى مجموعةواتساب",
     fr: "Rapport de conteneur envoyé au groupe WhatsApp.",
   },
   {
@@ -435,11 +435,11 @@ export const phase3RemainingTranslationsPart05: readonly Phase3SharedUiEntry[] =
   },
   { en: "Containers (OTW)", ar: "الحاويات", fr: "Conteneurs (OTW)" },
   { en: "Containers OTW", ar: "الحاويات", fr: "Conteneurs OTW" },
-  { en: "Containers OTW — WhatsApp", ar: "الحاويات", fr: "Conteneurs OTW — WhatsApp" },
+  { en: "Containers OTW — WhatsApp", ar: "الحاويات في الطريق — واتساب", fr: "Conteneurs OTW — WhatsApp" },
   { en: "Containers scanned", ar: "حاويات تم مسحها", fr: "Conteneurs scannés" },
   {
     en: "Containers WhatsApp settings saved.",
-    ar: "حاويات ماساب انقذت",
+    ar: "حاوياتواتسابانقذت",
     fr: "Conteneurs Paramètres WhatsApp enregistrés.",
   },
   { en: "CONTINENTAL (+11d)", ar: "CONTINENTAL (+11d)", fr: "CONTINENTAL (+11d)" },
@@ -572,7 +572,7 @@ export const phase3RemainingTranslationsPart05: readonly Phase3SharedUiEntry[] =
   { en: "Could not allocate any amount", ar: "لا يمكن تخصيص أي مبلغ", fr: "Impossible d'attribuer un montant" },
   {
     en: "Could not claim WhatsApp delivery",
-    ar: "لم أستطع المطالبة بتوصيل ماساب",
+    ar: "لم أستطع المطالبة بتوصيلواتساب",
     fr: "Impossible de réclamer la livraison de WhatsApp",
   },
   { en: "Could not delete contact", ar: "لا يمكن حذف الاتصال", fr: "Impossible de supprimer le contact" },
@@ -689,12 +689,12 @@ export const phase3RemainingTranslationsPart05: readonly Phase3SharedUiEntry[] =
   { en: "Creation Failed", ar: "الاختلال", fr: "La création a échoué" },
   {
     en: "Credentials set but WhatsApp sending is disabled.",
-    ar: "تم تحديد وثائق التفويض لكن ماساب سيرسل معاق",
+    ar: "تم تحديد وثائق التفويض لكنواتسابسيرسل معاق",
     fr: "Les lettres de créances sont définies mais l'envoi de WhatsApp est désactivé.",
   },
   {
     en: "Credentials set but WhatsApp sending is disabled. Enable it in WhatsApp settings.",
-    ar: "تم تحديد وثائق التفويض لكن ماساب سيرسل معاق قابلها في (ماساب)",
+    ar: "تم تحديد وثائق التفويض لكنواتسابسيرسل معاق قابلها في واتساب",
     fr: "Les lettres de créances sont définies mais l'envoi de WhatsApp est désactivé. Activez-le dans les paramètres de WhatsApp.",
   },
   { en: "credit", ar: "الائتمان", fr: "crédit" },

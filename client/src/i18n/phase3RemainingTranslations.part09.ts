@@ -594,8 +594,8 @@ export const phase3RemainingTranslationsPart09: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Import CSV to bulk-update ETA. Columns: Container #, Supplier, ETA (YYYY-MM-DD)",
-    ar: "Import CSV to bulk-update ETA. Columns: Container #, Supplier, ETA (YYYY-MMM-DD)",
-    fr: "Importer le CSV à l'ETA en vrac. Colonnes : No de conteneur, fournisseur, ETA (AAAA-MM-JJ)",
+    ar: "Import CSV to bulk-update ETA. Columns: Container #, Supplier, ETA (YYYY-MM-DD)",
+    fr: "Importer le CSV à l'ETA en vrac. Colonnes : No de conteneur, fournisseur, ETA (YYYY-MM-DD)",
   },
   { en: "Import Cycle Breakdown", ar: "مجموعة استيراد", fr: "Ventilation du cycle d'importation" },
   { en: "Import Data (Excel/CSV)", ar: "بيانات الاستيراد (Excel/CSV)", fr: "Données d'importation (Excel/CSV)" },
@@ -791,8 +791,8 @@ export const phase3RemainingTranslationsPart09: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Invalid asOfDate format. Use YYYY-MM-DD",
-    ar: "شكل غير سليم استخدام YYYY-MMM-DD",
-    fr: "Format non valide asOfDate. Utiliser AAAA-MM-JJ",
+    ar: "شكل غير سليم استخدام YYYY-MM-DD",
+    fr: "Format non valide asOfDate. Utiliser YYYY-MM-DD",
   },
   { en: "Invalid bale id", ar: "Invalid bale", fr: "Numéro d'identification de la balle" },
   { en: "Invalid bale ID", ar: "Invalid bale ID", fr: "Identification de la balle non valide" },
@@ -860,13 +860,13 @@ export const phase3RemainingTranslationsPart09: readonly Phase3SharedUiEntry[] =
   { en: "Invalid date format", ar: "الشكل غير الرسمي للموعد", fr: "Format de date non valide" },
   {
     en: "Invalid date format, use YYYY-MM-DD",
-    ar: "Invalid date format, use YYYY-MMDD",
-    fr: "Format de date non valide, utiliser AAAA-MM-JJ",
+    ar: "صيغة التاريخ غير صالحة، استخدم YYYY-MM-DD",
+    fr: "Format de date non valide, utiliser YYYY-MM-DD",
   },
   {
     en: "Invalid date format. Use YYYY-MM-DD",
-    ar: "شكل تاريخ غير سليم استخدام YYYY-MMM-DD",
-    fr: "Format de date non valide. Utiliser AAAA-MM-JJ",
+    ar: "شكل تاريخ غير سليم استخدام YYYY-MM-DD",
+    fr: "Format de date non valide. Utiliser YYYY-MM-DD",
   },
   { en: "Invalid date range", ar: "النطاق غير المستقر للموعد", fr: "Plage de dates non valide" },
   {

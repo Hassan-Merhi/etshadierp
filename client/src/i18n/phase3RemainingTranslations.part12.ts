@@ -101,7 +101,7 @@ export const phase3RemainingTranslationsPart12: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "No active group recipients — add one in the WhatsApp Export section first.",
-    ar: "ولا يوجد مستفيدون من المجموعات النشطة - أي إضافة واحدة في قسم تصدير ماساب أولا.",
+    ar: "ولا يوجد مستفيدون من المجموعات النشطة - أي إضافة واحدة في قسم تصديرواتسابأولا.",
     fr: "Pas de destinataires actifs du groupe — ajoutez-en un dans la section Exportation de WhatsApp.",
   },
   {
@@ -147,7 +147,7 @@ export const phase3RemainingTranslationsPart12: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "No active WhatsApp groups found. Add a group recipient in the WhatsApp Export section above.",
-    ar: "لم تجد أي مجموعات (ماساب) نشطة تضاف مجموعة متلقية في قسم تصدير ماساب أعلاه.",
+    ar: "لم تجد أي مجموعات واتساب نشطة تضاف مجموعة متلقية في قسم تصديرواتسابأعلاه.",
     fr: "Aucun groupe WhatsApp actif trouvé. Ajouter un destinataire de groupe dans la section Exportation de WhatsApp ci-dessus.",
   },
   {
@@ -659,7 +659,7 @@ export const phase3RemainingTranslationsPart12: readonly Phase3SharedUiEntry[] =
   { en: "No groups found.", ar: "لا توجد مجموعات", fr: "Aucun groupe trouvé." },
   {
     en: "No groups found. Make sure your WhatsApp instance is connected.",
-    ar: "لا توجد مجموعات احرص على أن تكون متصلاً",
+    ar: "لم يتم العثور على مجموعات. تأكّد من أن نسخة واتساب لديك متصلة.",
     fr: "Aucun groupe trouvé. Assurez-vous que votre instance WhatsApp est connectée.",
   },
   { en: "No historical data available", ar: "لا توجد بيانات تاريخية", fr: "Aucune donnée historique disponible" },

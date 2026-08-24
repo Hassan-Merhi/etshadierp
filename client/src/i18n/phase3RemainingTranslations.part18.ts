@@ -276,7 +276,7 @@ export const phase3RemainingTranslationsPart18: readonly Phase3SharedUiEntry[] =
     ar: "تم حفظ البيان كصورة PNG.",
     fr: "Déclaration enregistrée comme image PNG.",
   },
-  { en: "Statement sent to WhatsApp", ar: "بيان أرسل إلى ماسابب", fr: "Déclaration envoyée à WhatsApp" },
+  { en: "Statement sent to WhatsApp", ar: "بيان أرسل إلىواتسابب", fr: "Déclaration envoyée à WhatsApp" },
   { en: "statementNote must be a string", ar: "يجب أن يكون البيان", fr: "la note doit être une chaîne" },
   { en: "status is required", ar: "الحالة مطلوبة", fr: "statut est nécessaire" },
   { en: "Status tab", ar: "نموذج الحالة(ب)", fr: "Onglet État" },
@@ -290,7 +290,7 @@ export const phase3RemainingTranslationsPart18: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Step 1: Select & Parse Excel File (.xlsx)",
-    ar: "الخطوة 1: اختيار &quot; ملف &quot; (xx)",
+    ar: "الخطوة 1: اختيار وتحليل ملف إكسل (.xlsx)",
     fr: "Étape 1: Sélectionner et analyser le fichier Excel (.xlsx)",
   },
   {
@@ -538,7 +538,7 @@ export const phase3RemainingTranslationsPart18: readonly Phase3SharedUiEntry[] =
   { en: "Stock PDF", ar: "Stock PDF", fr: "Stock PDF" },
   {
     en: 'Stock PDF sent to ${result.destinationGroupName || "the linked WhatsApp group"}',
-    ar: "Stock PDF sent to{{0}}",
+    ar: "تم إرسال ملف PDF للمخزون إلى {{0}}",
     fr: "Stock PDF envoyé à{{0}}",
   },
   { en: "Stock Query", ar: "Stock Query", fr: "Demande de stock" },
@@ -556,7 +556,7 @@ export const phase3RemainingTranslationsPart18: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Stock report sent to WhatsApp group.",
-    ar: "تقرير المخزون أرسل إلى مجموعة ماساب",
+    ar: "تقرير المخزون أرسل إلى مجموعةواتساب",
     fr: "Rapport de stock envoyé au groupe WhatsApp.",
   },
   { en: "Stock report settings saved", ar: "عمليات حفظ السلام", fr: "Paramètres de rapport de stock enregistrés" },
@@ -601,12 +601,12 @@ export const phase3RemainingTranslationsPart18: readonly Phase3SharedUiEntry[] =
     ar: "قسائم تحويل المخزونات التي استكملت بنجاح",
     fr: "Bon de transfert d'actions mis à jour avec succès",
   },
-  { en: "Stock Transfers — WhatsApp", ar: "تحويلات المخزونات - ماساب", fr: "Transferts de stocks — WhatsApp" },
+  { en: "Stock Transfers — WhatsApp", ar: "تحويلات المخزونات -واتساب", fr: "Transferts de stocks — WhatsApp" },
   { en: "Stock Value", ar: "قيمة المخزونات", fr: "Valeur en stock" },
   {
     en: "stockEntryDate must be YYYY-MM-DD",
-    ar: "مخزون يجب أن يكون YYYYY-MMM-DD",
-    fr: "stockEntryDate doit être AAAA-MM-JJ",
+    ar: "مخزون يجب أن يكون YYYY-MM-DD",
+    fr: "stockEntryDate doit être YYYY-MM-DD",
   },
   {
     en: "stockItemId is required so opening stock and ERP inventory remain synchronized",
@@ -860,7 +860,7 @@ export const phase3RemainingTranslationsPart18: readonly Phase3SharedUiEntry[] =
     fr: "fournisseurPartagerLe montant doit être un nombre non négatif",
   },
   { en: "Supply Chain", ar: "سلسلة الإمدادات", fr: "Chaîne d'approvisionnement" },
-  { en: "Supports .xlsx format", ar: "شكل الدعم", fr: "Prend en charge le format .xlsx" },
+  { en: "Supports .xlsx format", ar: "يدعم صيغة .xlsx", fr: "Prend en charge le format .xlsx" },
   { en: "Surcharge", ar: "التغذية", fr: "Supplément" },
   { en: "Suspend Offload", ar: "الشحنة المعلقة", fr: "Suspendre le déchargement" },
   { en: "Swap Failed", ar: "Swap Failed", fr: "Échec de l'échange" },
@@ -890,7 +890,7 @@ export const phase3RemainingTranslationsPart18: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "System will attempt to re-send via WhatsApp shortly.",
-    ar: "النظام سيحاول العودة عن طريق ماساب قريباً",
+    ar: "النظام سيحاول العودة عن طريقواتسابقريباً",
     fr: "Le système tentera de re-envoyer par WhatsApp sous peu.",
   },
   { en: "Tab", ar: "Tab", fr: "onglet" },
@@ -960,8 +960,8 @@ export const phase3RemainingTranslationsPart18: readonly Phase3SharedUiEntry[] =
   { en: "Template not found", ar: "لا يوجد", fr: "Modèle non trouvé" },
   {
     en: "Template not found: server/templates/supplier_partner_sales_form_template.xlsx",
-    ar: "لم يعثر على النموذج: الخادم/المؤقتات/المورد - الشريك",
-    fr: "Modèle introuvable : serveur/templates/fournisseur partner sales form template.xlsx",
+    ar: "لم يتم العثور على القالب: server/templates/supplier_partner_sales_form_template.xlsx",
+    fr: "Modèle introuvable : server/templates/supplier_partner_sales_form_template.xlsx",
   },
   { en: "templateId and date required", ar: "النموذج والتاريخ المطلوب", fr: "modèleId et date requise" },
   { en: "tenant guarantee deposit flags", ar: "أعلام ضمان المستأجرين", fr: "Drapeaux de garantie du locataire" },

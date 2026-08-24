@@ -58,7 +58,7 @@ export const phase3RemainingTranslationsPart19: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "The linked WhatsApp destination is not a valid group",
-    ar: "وجهة ماساب ذات الصلة ليست مجموعة صالحة",
+    ar: "وجهةواتسابذات الصلة ليست مجموعة صالحة",
     fr: "La destination WhatsApp liée n'est pas un groupe valide",
   },
   {
@@ -204,7 +204,7 @@ export const phase3RemainingTranslationsPart19: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "The tracking report is too large to fit in one WhatsApp image even after compression.",
-    ar: "تقرير التتبّع كبير جداً لتلائم صورة (ماساب) حتى بعد الضغط",
+    ar: "تقرير التتبّع كبير جداً لتلائم صورة واتساب حتى بعد الضغط",
     fr: "Le rapport de suivi est trop grand pour être intégré à une image de WhatsApp même après compression.",
   },
   {
@@ -220,7 +220,7 @@ export const phase3RemainingTranslationsPart19: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "The ZIP has been queued for WhatsApp delivery.",
-    ar: "لقد تم إستبعاد (زي بي) من أجل (ماساب)",
+    ar: "لقد تم إستبعاد (زي بي) من أجل واتساب",
     fr: "Le ZIP est en attente pour la livraison de WhatsApp.",
   },
   {
@@ -1085,7 +1085,7 @@ export const phase3RemainingTranslationsPart19: readonly Phase3SharedUiEntry[] =
   { en: "Truck / Location", ar: "شاحنة/مكان", fr: "Camion / Emplacement" },
   {
     en: "Truck / Location report sent to WhatsApp group.",
-    ar: "/ تقرير موقع أرسل إلى مجموعة ماساب.",
+    ar: "/ تقرير موقع أرسل إلى مجموعةواتساب.",
     fr: "Camion / rapport de localisation envoyé au groupe WhatsApp.",
   },
   {

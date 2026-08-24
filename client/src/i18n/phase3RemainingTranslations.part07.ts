@@ -518,14 +518,14 @@ export const phase3RemainingTranslationsPart07: readonly Phase3SharedUiEntry[] =
   { en: "Exact match", ar: "تطابق", fr: "Correspondance exacte" },
   { en: "Exactly meets requirements", ar: "بالضبط يفي بالمتطلبات", fr: "Satisfait exactement aux exigences" },
   { en: "Exceeds Available Stock", ar: "المخزونات المتاحة", fr: "Dépasse le stock disponible" },
-  { en: "Excel (.xlsx)", ar: "إكسيل (xxx)", fr: "Excel (.xlsx)" },
+  { en: "Excel (.xlsx)", ar: "إكسل (.xlsx)", fr: "Excel (.xlsx)" },
   {
     en: "Excel data imported successfully",
     ar: "بيانات الإكسيل المستوردة بنجاح",
     fr: "Données Excel importées avec succès",
   },
   { en: "Excel exported", ar: "Excel exported", fr: "Excel exporté" },
-  { en: "Excel File (.xlsx)", ar: "Excel File (.xx)", fr: "Fichier Excel (.xlsx)" },
+  { en: "Excel File (.xlsx)", ar: "ملف إكسل (.xlsx)", fr: "Fichier Excel (.xlsx)" },
   { en: "Excel file is required", ar: "مطلوب ملف إكسيل", fr: "Fichier Excel requis" },
   {
     en: "Excel formula errors detected in export: ${detail}",

@@ -41,7 +41,7 @@ export const phase3RemainingTranslationsPart13: readonly Phase3SharedUiEntry[] =
   { en: "No production today", ar: "لا إنتاج اليوم", fr: "Aucune production aujourd'hui" },
   {
     en: "No production WhatsApp group configured.",
-    ar: "لم يتم تشكيل مجموعة ماساب",
+    ar: "لم يتم تشكيل مجموعةواتساب",
     fr: "Aucun groupe de production WhatsApp configuré.",
   },
   { en: "No products found", ar: "لا توجد منتجات", fr: "Aucun produit trouvé" },
@@ -503,12 +503,12 @@ export const phase3RemainingTranslationsPart13: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "No WhatsApp group configured. Go to Settings → Export Settings to configure one.",
-    ar: "لا مجموعة ماساب تم تشكيلها إذهب إلى (ستينغز) لـ (مؤسسات التصدير) لتحدي واحد",
+    ar: "لا مجموعةواتسابتم تشكيلها إذهب إلى (ستينغز) لـ (مؤسسات التصدير) لتحدي واحد",
     fr: "Pas de groupe WhatsApp configuré. Aller à Paramètres → Exporter les paramètres pour en configurer un.",
   },
   {
     en: "No WhatsApp group is linked to this location",
-    ar: "لا مجموعة ماساب مرتبطة بهذا الموقع",
+    ar: "لا مجموعةواتسابمرتبطة بهذا الموقع",
     fr: "Aucun groupe WhatsApp n'est lié à cet emplacement",
   },
   {
@@ -816,7 +816,7 @@ export const phase3RemainingTranslationsPart13: readonly Phase3SharedUiEntry[] =
   { en: "only", ar: "فقط", fr: "seulement" },
   {
     en: "Only .xlsx files are supported",
-    ar: "فقط ملفات (اكس) مدعومة",
+    ar: "ملفات .xlsx فقط مدعومة",
     fr: "Seuls les fichiers .xlsx sont pris en charge",
   },
   { en: "Only ${item.quantity} available", ar: "فقط{{0}}متاح", fr: "Seulement{{0}}disponibles" },

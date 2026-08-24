@@ -412,8 +412,8 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "${fieldName} must be a valid date in YYYY-MM-DD format",
-    ar: "{{0}}يجب أن يكون تاريخاً صالحاً في شكل YYY-MMM-DD",
-    fr: "{{0}}doit être une date valide au format AAAA-MM-JJ",
+    ar: "{{0}}يجب أن يكون تاريخاً صالحاً في شكل YYYY-MM-DD",
+    fr: "{{0}}doit être une date valide au format YYYY-MM-DD",
   },
   { en: "${form.username} has been added", ar: "{{0}}أضيف", fr: "{{0}}a été ajouté" },
   {
@@ -480,8 +480,8 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "${label} must use YYYY-MM-DD format",
-    ar: "{{0}}يجب أن تستخدم استمارة YYYY-MMMM-DD",
-    fr: "{{0}}doit utiliser le format AAAA-MM-JJ",
+    ar: "{{0}}يجب أن تستخدم استمارة YYYY-MM-DD",
+    fr: "{{0}}doit utiliser le format YYYY-MM-DD",
   },
   {
     en: "${labels.length} label(s) sent to Zebra printer",
@@ -577,8 +577,8 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   },
   {
     en: '${result.itemCount ?? 0} items sent to ${result.destinationGroupName || "the linked WhatsApp group"}.',
-    ar: "{{0}}البنود المرسلة إلى{{1}}.",
-    fr: "{{0}}les articles envoyés à{{1}}.",
+    ar: "تم إرسال {{0}} عنصرًا إلى {{1}}.",
+    fr: "{{0}} article(s) envoyé(s) à {{1}}.",
   },
   {
     en: '${result.itemCount ?? 0} items${result.duplicate ? " were already processed" : " sent"}${result.pageCount ?',
@@ -759,15 +759,19 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   { en: "123 Business St, City, State", ar: "123 Business St, City, State", fr: "123 rue des affaires, ville, État" },
   {
     en: "17track API error code ${data.code}",
-    ar: "رمز خطأ المسار 17{{0}}",
+    ar: "رمز خطأ واجهة 17track: {{0}}",
     fr: "Code d'erreur de l'API 17track{{0}}",
   },
   {
     en: "17track gettrackinfo HTTP ${infoRes.status}",
-    ar: "17thrack gettrackinfo HTTP{{0}}",
+    ar: "17track gettrackinfo HTTP{{0}}",
     fr: "17track gettrackinfo HTTP{{0}}",
   },
-  { en: "17track register HTTP ${regRes.status}", ar: "سجل المسار 17{{0}}", fr: "Registre HTTP 17 pistes{{0}}" },
+  {
+    en: "17track register HTTP ${regRes.status}",
+    ar: "تسجيل 17track عبر HTTP {{0}}",
+    fr: "Enregistrement 17track HTTP {{0}}",
+  },
   { en: "243XXXXXXXXX@c.us or group@g.us", ar: "243XXXXXX@c.us or group@g.us", fr: "243XXXXXX@c.us ou groupe@g.us" },
   { en: "404 Page Not Found", ar: "٤٠٤ الصفحة", fr: "404 Page introuvable" },
   {
@@ -943,7 +947,7 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "A WhatsApp reminder will be sent when this customer has an outstanding balance past their due date.",
-    ar: "سيتم إرسال رسالة تذكيرية عندما يكون لدى هذا العميل رصيد غير مسدد بعد موعده المحدد.",
+    ar: "سيتم إرسال تذكير عبر واتساب عندما يكون لدى هذا العميل رصيد غير مسدد بعد تاريخ الاستحقاق.",
     fr: "Un rappel WhatsApp sera envoyé lorsque ce client aura un solde impayé après la date d'échéance.",
   },
   {
@@ -1328,7 +1332,7 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   { en: "Add Deduction", ar: "الاقتطاع", fr: "Ajouter la déduction" },
   {
     en: "Add each agent name exactly as it appears in the Agent / Duty tab, then pick its WhatsApp group.",
-    ar: "أضف اسم كل عميل كما يبدو بالضبط في وكيل / حساب الواجب، ثم اختيار مجموعة ماساب.",
+    ar: "أضف اسم كل عميل كما يبدو بالضبط في وكيل / حساب الواجب، ثم اختيار مجموعةواتساب.",
     fr: "Ajoutez chaque nom d'agent exactement comme il apparaît dans l'onglet Agent / Duty, puis choisissez son groupe WhatsApp.",
   },
   { en: "Add email address...", ar: "أضف عنوان البريد الإلكتروني", fr: "Ajouter une adresse email..." },

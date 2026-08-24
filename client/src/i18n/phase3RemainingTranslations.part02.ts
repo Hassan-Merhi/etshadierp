@@ -280,7 +280,7 @@ export const phase3RemainingTranslationsPart02: readonly Phase3SharedUiEntry[] =
   { en: "After", ar: "بعد", fr: "Après" },
   { en: "Agent", ar: "الوكيل", fr: "Agent" },
   { en: "Agent / Duty", ar: "وكيل/واجب", fr: "Agent / service" },
-  { en: "Agent / Duty — WhatsApp", ar: "الوكيل/الواجب -", fr: "Agent / Devoir — WhatsApp" },
+  { en: "Agent / Duty — WhatsApp", ar: "الوكيل / المهمة — واتساب", fr: "Agent / Devoir — WhatsApp" },
   { en: "Agent Accounts", ar: "حسابات العملاء", fr: "Comptes des mandataires" },
   { en: "Agent already exists", ar: "العميل موجود بالفعل", fr: "Agent existe déjà" },
   {
@@ -310,7 +310,7 @@ export const phase3RemainingTranslationsPart02: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Agent Duty WhatsApp settings saved.",
-    ar: "العميل (ماساب) الذي أنقذ",
+    ar: "العميل واتساب الذي أنقذ",
     fr: "Paramètres de l'agent Duty WhatsApp sauvegardés.",
   },
   { en: "Agent name", ar: "اسم العميل", fr: "Nom de l'agent" },
@@ -914,7 +914,7 @@ export const phase3RemainingTranslationsPart02: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Arabic translation workbook (.xlsx)",
-    ar: "كتاب عمل للترجمة العربية",
+    ar: "مصنّف الترجمة العربية (.xlsx)",
     fr: "Manuel de traduction arabe (.xlsx)",
   },
   { en: "Arabic translations updated", ar: "تحديث الترجمة العربية", fr: "Traductions en arabe mises à jour" },

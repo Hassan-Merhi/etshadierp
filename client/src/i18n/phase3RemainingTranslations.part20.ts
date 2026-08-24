@@ -398,7 +398,7 @@ export const phase3RemainingTranslationsPart20: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Upload a .csv or .xlsx file with your data",
-    ar: "تحميل ملف (سيف) أو (ريكس) مع بياناتك",
+    ar: "ارفع ملف .csv أو .xlsx يحتوي على بياناتك",
     fr: "Télécharger un fichier .csv ou .xlsx avec vos données",
   },
   {
@@ -418,8 +418,8 @@ export const phase3RemainingTranslationsPart20: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Upload an Excel file (.xlsx) to bulk-import containers. New suppliers will be created automatically.",
-    ar: "تحميل ملف &quot; إكسيل &quot; (xx) على حاويات النقل بالجملة. وسينشأ الموردون الجدد تلقائيا.",
-    fr: "Télécharger un fichier Excel (.xlsx) dans des conteneurs d'importation en vrac. De nouveaux fournisseurs seront créés automatiquement.",
+    ar: "ارفع ملف إكسل (.xlsx) لاستيراد الحاويات بالجملة. سيتم إنشاء الموردين الجدد تلقائيًا.",
+    fr: "Téléchargez un fichier Excel (.xlsx) pour importer des conteneurs en masse. De nouveaux fournisseurs seront créés automatiquement.",
   },
   {
     en: "Upload an Excel file to bulk-assign categories (stock groups) to existing stock items by their item code.",
@@ -931,7 +931,7 @@ export const phase3RemainingTranslationsPart20: readonly Phase3SharedUiEntry[] =
   { en: "Weekly Attendance Sheet", ar: "صحيفة الحضور الأسبوعية", fr: "Feuille de participation hebdomadaire" },
   {
     en: "Weekly report WhatsApp group updated.",
-    ar: "استكمل فريق ماساب",
+    ar: "استكمل فريقواتساب",
     fr: "Rapport hebdomadaire Mise à jour du groupe WhatsApp.",
   },
   { en: "Weekly Salary", ar: "المرتبات الأسبوعية", fr: "Salaire hebdomadaire" },

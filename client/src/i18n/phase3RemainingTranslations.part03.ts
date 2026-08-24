@@ -23,7 +23,7 @@ export const phase3RemainingTranslationsPart03: readonly Phase3SharedUiEntry[] =
   { en: "Assets (Debit)", ar: "الأصول (الديون)", fr: "Actifs (débit)" },
   {
     en: "Assign a WhatsApp group to each POS location. Reports are sent when a shift ends with low stock.",
-    ar: "نسمي مجموعة (ماساب) لكل موقع من مواقع مكتب خدمات المشاريع تُرسل التقارير عندما تنتهي النوبة بمخزون منخفض",
+    ar: "نسمي مجموعة واتساب لكل موقع من مواقع مكتب خدمات المشاريع تُرسل التقارير عندما تنتهي النوبة بمخزون منخفض",
     fr: "Affecter un groupe WhatsApp à chaque emplacement du POS. Les rapports sont envoyés lorsqu'un quart se termine avec un stock faible.",
   },
   {
@@ -106,7 +106,7 @@ export const phase3RemainingTranslationsPart03: readonly Phase3SharedUiEntry[] =
   { en: "Attach file", ar: "ملف Attach", fr: "Joindre le fichier" },
   {
     en: "Attach the downloaded files manually in WhatsApp.",
-    ar: "رافق الملفات المحملة يدوياً في (ماساب)",
+    ar: "رافق الملفات المحملة يدوياً في واتساب",
     fr: "Joindre les fichiers téléchargés manuellement dans WhatsApp.",
   },
   {
@@ -200,7 +200,7 @@ export const phase3RemainingTranslationsPart03: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Automatically send statements to WhatsApp when vouchers are posted.",
-    ar: "إرسال بيانات تلقائيا إلى ماساب عند نشر القسائم.",
+    ar: "إرسال بيانات تلقائيا إلىواتسابعند نشر القسائم.",
     fr: "Envoyez automatiquement les relevés à WhatsApp lorsque les bons sont affichés.",
   },
   {
@@ -267,7 +267,7 @@ export const phase3RemainingTranslationsPart03: readonly Phase3SharedUiEntry[] =
   { en: "Balance after sale", ar: "الرصيد بعد البيع", fr: "Solde après vente" },
   {
     en: "Balance allocation sent to ${agent.agentName} WhatsApp group.",
-    ar: "الرصيد المرسل{{0}}مجموعة ماساب",
+    ar: "الرصيد المرسل{{0}}مجموعةواتساب",
     fr: "Répartition du solde{{0}}Groupe WhatsApp.",
   },
   { en: "Balance Components", ar: "الأرصدة", fr: "Composantes du solde" },
