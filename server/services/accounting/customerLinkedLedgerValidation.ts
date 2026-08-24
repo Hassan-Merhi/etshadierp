@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../db";
 import { and, eq, inArray } from "drizzle-orm";
 import { customers } from "@shared/schema";
 import type { VoucherEntryInsertFields } from "./accountingTypes";
@@ -13,9 +14,7 @@ export interface CustomerLedgerOwnershipRow {
   ledgerAccountId: number | null;
 }
 
-export function collectCustomerLedgerPairs(
-  entries: VoucherEntryInsertFields[]
-): CustomerLedgerPair[] {
+export function collectCustomerLedgerPairs(entries: VoucherEntryInsertFields[]): CustomerLedgerPair[] {
   const pairs = entries
     .filter((entry) => entry.customerId != null && entry.ledgerAccountId != null)
     .map((entry) => ({
@@ -68,7 +67,7 @@ export function validateCustomerLedgerPairs(
 }
 
 export async function assertCustomerLinkedLedgerPairs(input: {
-  tx: any;
+  tx: DbTransaction;
   companyId: number;
   entries: VoucherEntryInsertFields[];
 }): Promise<void> {
@@ -79,12 +78,7 @@ export async function assertCustomerLinkedLedgerPairs(input: {
   const rows = await input.tx
     .select({ id: customers.id, ledgerAccountId: customers.ledgerAccountId })
     .from(customers)
-    .where(
-      and(
-        eq(customers.companyId, input.companyId),
-        inArray(customers.id, customerIds)
-      )
-    );
+    .where(and(eq(customers.companyId, input.companyId), inArray(customers.id, customerIds)));
 
   validateCustomerLedgerPairs(pairs, rows, input.companyId);
 }

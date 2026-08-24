@@ -1,11 +1,11 @@
-import { and, asc, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, isNull, or, sql, type SQL } from "drizzle-orm";
 import { inventory, locations, stockGroups, stockItems } from "@shared/schema";
 
 import { db } from "../../db";
 import type { InventoryListFilters } from "./inventoryRequestContext";
 
 function buildInventoryConditions(companyId: number, filters: InventoryListFilters) {
-  const conditions: any[] = [
+  const conditions: (SQL | undefined)[] = [
     eq(inventory.companyId, companyId),
     isNull(locations.deletedAt),
     isNull(stockItems.deletedAt),
@@ -42,13 +42,7 @@ export async function getInventoryPage(companyId: number, filters: InventoryList
       .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
       .innerJoin(locations, eq(inventory.locationId, locations.id))
       .where(where)
-      .groupBy(
-        inventory.stockItemId,
-        stockItems.name,
-        stockItems.code,
-        stockItems.stockGroupId,
-        stockGroups.name,
-      )
+      .groupBy(inventory.stockItemId, stockItems.name, stockItems.code, stockItems.stockGroupId, stockGroups.name)
       .orderBy(asc(stockItems.code));
 
     return {

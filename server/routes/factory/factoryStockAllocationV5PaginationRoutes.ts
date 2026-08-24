@@ -343,18 +343,20 @@ export function registerFactoryStockAllocationV5PaginationRoutes(app: Express): 
 
       const aggregateResult = await pool.query(aggregateQuery, values);
       const aggregate = aggregateResult.rows[0] ?? {};
-      const pageRows: PageRow[] = (Array.isArray(aggregate.rows) ? aggregate.rows : []).map((row: Record<string, unknown>) => ({
-        articleCode: String(row.articleCode),
-        productName: String(row.productName || row.articleCode),
-        categoryName: String(row.categoryName || ""),
-        stockAvailable: Number(row.stockAvailable || 0),
-        totalLoaded: Number(row.totalLoaded || 0),
-        expectedToLoad: Number(row.expectedToLoad || 0),
-        freeToPromise: Number(row.freeToPromise || 0),
-        totalKg: Number(row.totalKg || 0),
-        isGarbageOrWipers: Boolean(row.isGarbageOrWipers),
-        proformaDetails: [],
-      }));
+      const pageRows: PageRow[] = (Array.isArray(aggregate.rows) ? aggregate.rows : []).map(
+        (row: Record<string, unknown>) => ({
+          articleCode: String(row.articleCode),
+          productName: String(row.productName || row.articleCode),
+          categoryName: String(row.categoryName || ""),
+          stockAvailable: Number(row.stockAvailable || 0),
+          totalLoaded: Number(row.totalLoaded || 0),
+          expectedToLoad: Number(row.expectedToLoad || 0),
+          freeToPromise: Number(row.freeToPromise || 0),
+          totalKg: Number(row.totalKg || 0),
+          isGarbageOrWipers: Boolean(row.isGarbageOrWipers),
+          proformaDetails: [],
+        })
+      );
 
       const pageCodes = pageRows.map((row) => row.articleCode);
       if (pageCodes.length > 0) {
@@ -425,7 +427,7 @@ export function registerFactoryStockAllocationV5PaginationRoutes(app: Express): 
         const pageMap = new Map(pageRows.map((row) => [row.articleCode, row]));
         const proformaMaps = new Map<string, Map<number, ProformaDetail>>();
 
-        for (const detail of detailsResult.rows as any[]) {
+        for (const detail of detailsResult.rows) {
           const articleCode = String(detail.articleCode);
           const target = pageMap.get(articleCode);
           if (!target) continue;

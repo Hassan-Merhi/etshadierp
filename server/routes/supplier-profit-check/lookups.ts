@@ -4,12 +4,12 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 
-export function registerSupplierProfitLookupRoutes(app: Express, requireAuth: any) {
+export function registerSupplierProfitLookupRoutes(app: Express, requireAuth: RequestHandler) {
   // ── GET location groups (master locations with configured price groups) ──
   app.get("/api/supplier-profit-check/location-groups", requireAuth, async (req: Request, res: Response) => {
     try {

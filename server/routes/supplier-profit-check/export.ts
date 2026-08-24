@@ -4,13 +4,13 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 import ExcelJS from "exceljs";
 
-export function registerSupplierProfitExportRoutes(app: Express, requireAuth: any) {
+export function registerSupplierProfitExportRoutes(app: Express, requireAuth: RequestHandler) {
   app.get(
     "/api/supplier-profit-check/proforma/:proformaId/export-supplier",
     requireAuth,

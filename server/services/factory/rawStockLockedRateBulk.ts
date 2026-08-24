@@ -13,6 +13,8 @@ import { getStableSupplierCost } from "./rawStockStableCost";
  * the normal backfill/offload paths establish the persisted rate.
  */
 export async function getLockedSupplierRatesReadOnlyBulk(
+  // Callers pass either the pooled db or a transaction; unified in the
+  // database-abstraction phase, not here.
   tx: any,
   companyId: number,
   supplierIds: readonly number[]

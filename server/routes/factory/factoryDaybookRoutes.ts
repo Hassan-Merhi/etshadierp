@@ -282,7 +282,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
           for (const row of baleStockRows) {
             try {
               const meta = JSON.parse(row.metaJson || "{}");
-              const bales: any[] = Array.isArray(meta.bales) ? meta.bales : [];
+              const bales = Array.isArray(meta.bales) ? meta.bales : [];
               for (const b of bales) {
                 const numId = parseInt(b.id, 10);
                 if (!b.id || isNaN(numId) || String(numId) !== String(b.id)) continue; // skip UUIDs / non-integers

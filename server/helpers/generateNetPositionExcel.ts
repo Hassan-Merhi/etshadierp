@@ -3,6 +3,7 @@
  * Used by both the HTTP route (streams to browser) and the WhatsApp scheduler.
  */
 
+import ExcelJS from "exceljs";
 import { calculateNetPositionAsOf, NetPositionLineItem } from "./calculateNetPositionAsOf";
 import { calculateIncomeStatementForPeriod, IncomeStatement } from "./calculateIncomeStatementForPeriod";
 import { round2 } from "../netPositionHelper";
@@ -80,21 +81,21 @@ const C = {
 const currencyFmt = "#,##0.00";
 const signedFmt = '+#,##0.00;-#,##0.00;"-"';
 
-function styleHeader(cell: any, bgArgb = C.DARK_BLUE) {
+function styleHeader(cell: ExcelJS.Cell, bgArgb = C.DARK_BLUE) {
   cell.font = { bold: true, color: { argb: C.WHITE }, size: 11 };
   cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bgArgb } };
   cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
   cell.border = { bottom: { style: "thin", color: { argb: "FFAAAAAA" } } };
 }
 
-function styleTitle(cell: any, text: string, fontSize = 16) {
+function styleTitle(cell: ExcelJS.Cell, text: string, fontSize = 16) {
   cell.value = text;
   cell.font = { bold: true, size: fontSize, color: { argb: C.WHITE } };
   cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.DARK_BLUE } };
   cell.alignment = { horizontal: "center", vertical: "middle" };
 }
 
-function setThin(cell: any) {
+function setThin(cell: ExcelJS.Cell) {
   cell.border = { bottom: { style: "hair", color: { argb: "FFDDDDDD" } } };
 }
 

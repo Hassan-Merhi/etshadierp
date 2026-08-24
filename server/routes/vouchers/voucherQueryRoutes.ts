@@ -82,7 +82,7 @@ export function registerVoucherQueryRoutes(app: Express) {
         }
       }
 
-      const filteredVouchers = filterAndSortVouchers(sanitizedVouchers as any[], listQuery);
+      const filteredVouchers = filterAndSortVouchers(sanitizedVouchers, listQuery);
       res.setHeader("Cache-Control", "private, max-age=30, stale-while-revalidate=30");
       if (!listQuery.paginated) return res.json(filteredVouchers);
       return res.json(buildVoucherPage(filteredVouchers, listQuery.page, listQuery.pageSize));
@@ -282,11 +282,7 @@ export function registerVoucherQueryRoutes(app: Express) {
 
       const { type, locationId, startDate, endDate, search } = req.query;
 
-      const conditions = [
-        eq(vouchers.companyId, companyId),
-        eq(vouchers.optional, true),
-        isNull(vouchers.deletedAt),
-      ];
+      const conditions = [eq(vouchers.companyId, companyId), eq(vouchers.optional, true), isNull(vouchers.deletedAt)];
 
       if (type) {
         conditions.push(eq(vouchers.voucherType, type as string));

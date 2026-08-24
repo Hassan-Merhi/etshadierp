@@ -4,6 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
+import ExcelJS from "exceljs";
 import type { Express, Request, Response } from "express";
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
@@ -430,9 +431,9 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
         const NUM_FMT = "#,##0.00";
         const INT_FMT = "#,##0";
 
-        const styleHeaderRow = (row: any, argbColor: string) => {
+        const styleHeaderRow = (row: ExcelJS.Row, argbColor: string) => {
           row.height = 20;
-          row.eachCell((cell: any) => {
+          row.eachCell((cell: ExcelJS.Cell) => {
             cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: argbColor } };
             cell.alignment = { vertical: "middle", horizontal: "center", wrapText: false };
@@ -442,25 +443,25 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
           });
         };
 
-        const applyDataRow = (row: any, isAlt: boolean, altArgb: string) => {
+        const applyDataRow = (row: ExcelJS.Row, isAlt: boolean, altArgb: string) => {
           if (isAlt) {
-            row.eachCell({ includeEmpty: false }, (cell: any) => {
+            row.eachCell({ includeEmpty: false }, (cell: ExcelJS.Cell) => {
               cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: altArgb } };
             });
           }
-          row.eachCell({ includeEmpty: false }, (cell: any) => {
+          row.eachCell({ includeEmpty: false }, (cell: ExcelJS.Cell) => {
             cell.alignment = { vertical: "middle" };
           });
         };
 
         const buildSummarySheet = (
-          ws: any,
+          ws: ExcelJS.Worksheet,
           rows: GroupedRow[],
           label: string,
           headerColor: string,
           altColor: string
         ) => {
-          const cols: Array<{ header: string; key: string; width: number; }> = [
+          const cols: Array<{ header: string; key: string; width: number }> = [
             { header: "Article Code", key: "articleCode", width: 18 },
             { header: "Product Name", key: "productName", width: 38 },
             { header: "Category", key: "category", width: 22 },
@@ -543,7 +544,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
           }
           const tr = ws.addRow(td);
           tr.font = { bold: true };
-          tr.eachCell({ includeEmpty: false }, (cell: any) => {
+          tr.eachCell({ includeEmpty: false }, (cell: ExcelJS.Cell) => {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TOTAL_BG } };
           });
           tr.getCell("baleCount").numFmt = INT_FMT;
@@ -571,7 +572,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
         });
 
         const baleSheet = workbook.addWorksheet("Bale Details");
-        const baleCols: Array<{ header: string; key: string; width: number; }> = [
+        const baleCols: Array<{ header: string; key: string; width: number }> = [
           { header: "Bale Ref #", key: "referenceNumber", width: 24 },
           { header: "Article Code", key: "articleCode", width: 18 },
           { header: "Product Name", key: "productName", width: 38 },
@@ -623,7 +624,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
         });
 
         const garbageDetailSheet = workbook.addWorksheet("Garbage & Wiper Details");
-        const garbageBaleCols: Array<{ header: string; key: string; width: number; }> = [
+        const garbageBaleCols: Array<{ header: string; key: string; width: number }> = [
           { header: "Bale Ref #", key: "referenceNumber", width: 24 },
           { header: "Bale Code", key: "baleCode", width: 18 },
           { header: "Article Code", key: "articleCode", width: 18 },
