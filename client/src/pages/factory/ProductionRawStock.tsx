@@ -3,7 +3,7 @@ import { useState, useMemo, useRef } from "react";
 import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { FlaskConical, ArrowDown, Plus, Tag, Layers } from "lucide-react";
+import { FlaskConical, ArrowDown, Tag, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -16,7 +16,6 @@ import { RawStockTable } from "./production-raw-stock/RawStockTable";
 import { MixBatchList } from "./production-raw-stock/MixBatchList";
 import { KpiCards } from "./production-raw-stock/KpiCards";
 import { OffloadDialog } from "./production-raw-stock/OffloadDialog";
-import { OpeningBalanceDialog } from "./production-raw-stock/OpeningBalanceDialog";
 import { StockAdjustmentDialog } from "./production-raw-stock/StockAdjustmentDialog";
 import { DeductStockDialog } from "./production-raw-stock/DeductStockDialog";
 import { AddToBatchDialog } from "./production-raw-stock/AddToBatchDialog";
@@ -32,7 +31,6 @@ export default function ProductionRawStock() {
 
   // Dialog States
   const [offloadDialogOpen, setOffloadDialogOpen] = useState(false);
-  const [obDialogOpen, setObDialogOpen] = useState(false);
   const [categoriesDialogOpen, setCategoriesDialogOpen] = useState(false);
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [deductDialogOpen, setDeductDialogOpen] = useState(false);
@@ -99,19 +97,6 @@ export default function ProductionRawStock() {
         description: error?.message || "Could not offload container. Please check your inputs and try again.",
         variant: "destructive",
       });
-    },
-  });
-
-  const openingBalanceMutation = useMutation({
-    mutationFn: async (data) => {
-      const res = await modeApiRequest("POST", "/api/factory/raw-stock/opening-balance", data);
-      if (!res.ok) throw new Error((await res.json()).message || "Failed to add OB");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
-      setObDialogOpen(false);
-      toast({ title: "Success", description: "Opening balance added." });
     },
   });
 
@@ -247,20 +232,28 @@ export default function ProductionRawStock() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button onClick={() => setCreateMixBatchOpen(true)} className="gap-2" data-testid="button-create-mix-batch">
-            <Layers className="h-4 w-4" /> New Mix Batch
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
+            onClick={() => setCreateMixBatchOpen(true)}
+            className="h-9 gap-2 rounded-lg bg-blue-600 px-3 text-xs font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md dark:bg-blue-500 dark:hover:bg-blue-400"
+            data-testid="button-create-mix-batch"
+          >
+            <Layers className="h-4 w-4" /> <span className="hidden sm:inline">New Mix Batch</span>
+            <span className="sm:hidden">New Batch</span>
           </Button>
           <Button
             onClick={() => setOffloadDialogOpen(true)}
-            className="bg-emerald-600 hover:bg-emerald-600 text-white gap-2"
+            className="h-9 gap-2 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-md dark:bg-emerald-500 dark:text-emerald-950 dark:hover:bg-emerald-400"
+            data-testid="button-offload-container"
           >
             <ArrowDown className="h-4 w-4" /> Offload Container
           </Button>
-          <Button variant="outline" onClick={() => setObDialogOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" /> Add OB Stock
-          </Button>
-          <Button variant="outline" onClick={() => setCategoriesDialogOpen(true)} className="gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setCategoriesDialogOpen(true)}
+            className="h-9 gap-2 rounded-lg border-amber-500/40 bg-amber-500/5 px-3 text-xs font-semibold text-amber-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-500/60 hover:bg-amber-500/10 hover:shadow-md dark:text-amber-300"
+            data-testid="button-manage-categories"
+          >
             <Tag className="h-4 w-4" /> Categories
           </Button>
         </div>
@@ -344,14 +337,6 @@ export default function ProductionRawStock() {
         offloadMutation={offloadMutation}
         wrapAdminAction={wrapAdminAction}
         mixBatches={mixBatches || []}
-      />
-
-      <OpeningBalanceDialog
-        open={obDialogOpen}
-        onOpenChange={setObDialogOpen}
-        factorySuppliers={factorySuppliers}
-        openingBalanceMutation={openingBalanceMutation}
-        wrapAdminAction={wrapAdminAction}
       />
 
       <StockAdjustmentDialog

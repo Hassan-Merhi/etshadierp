@@ -9,6 +9,7 @@ import {
   Loader2,
   Plus,
   Save,
+  Tag,
   Trash2,
   XCircle,
 } from "lucide-react";
@@ -23,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
+import { WorkerCategoriesManager } from "./bale-stock-entry/WorkerCategoriesTab";
 
 interface Worker {
   id: number;
@@ -187,6 +189,7 @@ function WorkerSelector({
 
 export default function ProductionPlannerDialog() {
   const [open, setOpen] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [date, setDate] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [categoryIds, setCategoryIds] = useState<number[]>([]);
   const [entries, setEntries] = useState<EditableEntry[]>([]);
@@ -337,6 +340,16 @@ export default function ProductionPlannerDialog() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setShowCategoryManager((visible) => !visible)}
+              aria-expanded={showCategoryManager}
+              data-testid="button-manage-worker-groups"
+            >
+              <Tag className="mr-1 h-4 w-4" />
+              {showCategoryManager ? "Hide Groups" : "Manage Groups"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => copyPreviousMutation.mutate()}
               disabled={copyPreviousMutation.isPending || planLoading}
               data-testid="button-copy-yesterday"
@@ -364,6 +377,8 @@ export default function ProductionPlannerDialog() {
               </Button>
             </div>
           </div>
+
+          {showCategoryManager && <WorkerCategoriesManager compact />}
 
           {entries.length > 0 && (
             <div className="flex flex-wrap items-center gap-4 rounded-md bg-muted/50 p-3 text-sm">

@@ -18,7 +18,7 @@ import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 
-export function WorkerCategoriesTab() {
+export function WorkerCategoriesManager({ compact = false }: { compact?: boolean }) {
   const { toast } = useToast();
   const appMode = useAppMode();
   const catApiRequest = getApiRequest(appMode);
@@ -94,11 +94,15 @@ export function WorkerCategoriesTab() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className={compact ? "space-y-3 rounded-lg border bg-card/50 p-3" : "space-y-4"}>
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Worker Groups</h2>
-          <p className="text-xs text-muted-foreground">Group workers for easier assignment during stock entry</p>
+          <p className="text-xs text-muted-foreground">
+            {compact
+              ? "Create and assign teams used by this planner."
+              : "Group workers for easier assignment during stock entry"}
+          </p>
         </div>
         <Button onClick={openNewCat} size="sm" className="gap-2" data-testid="button-new-category">
           <Plus className="h-4 w-4" />
@@ -106,7 +110,7 @@ export function WorkerCategoriesTab() {
         </Button>
       </div>
 
-      <div className="rounded-xl border bg-card overflow-hidden">
+      <div className="overflow-hidden rounded-xl border bg-card">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30">
@@ -232,4 +236,8 @@ export function WorkerCategoriesTab() {
       </Dialog>
     </div>
   );
+}
+
+export function WorkerCategoriesTab() {
+  return <WorkerCategoriesManager />;
 }
