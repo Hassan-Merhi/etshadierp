@@ -16,6 +16,7 @@ const capacitorEnv = read("client/.env.capacitor");
 const gitignore = read(".gitignore");
 const pkg = JSON.parse(read("package.json"));
 const serviceWorker = read("client/public/sw.js");
+const serviceWorkerRegistration = read("client/src/registerServiceWorker.ts");
 const main = read("client/src/main.tsx");
 const app = read("client/src/App.tsx");
 const indexHtml = read("client/index.html");
@@ -89,11 +90,17 @@ for (const token of ['"assetRecovery:"', '"swReload:"', '"chunkReload:"', '"chun
   if (!app.includes(token)) failures.push(`Manual update refresh guard missing: ${token}`);
 }
 
+if (!indexHtml.includes('<script type="module" src="/src/registerServiceWorker.ts"></script>')) {
+  failures.push("Service-worker registration module must be loaded by the app shell");
+}
+
 for (const token of [
   'register("/sw.js", { updateViaCache: "none" })',
   'return navigator.serviceWorker.register("/sw.js")',
 ]) {
-  if (!indexHtml.includes(token)) failures.push(`Service-worker registration contract missing: ${token}`);
+  if (!serviceWorkerRegistration.includes(token)) {
+    failures.push(`Service-worker registration contract missing: ${token}`);
+  }
 }
 
 for (const token of [
