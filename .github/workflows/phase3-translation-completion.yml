@@ -40,10 +40,10 @@ jobs:
       NODE_OPTIONS: --max-old-space-size=4096
       PORT: "5000"
     steps:
-      - name: Checkout Phase 3 branch
+      - name: Checkout current PR merge ref
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: phase3-translation-ui-polish
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
           fetch-depth: 0
 
       - name: Set up Node
