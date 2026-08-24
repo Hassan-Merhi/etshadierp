@@ -47,6 +47,6 @@ export function buildSecurityHeaderOptions(nodeEnv = process.env.NODE_ENV): Helm
   };
 }
 
-export function securityHeadersMiddleware(): RequestHandler {
-  return helmet(buildSecurityHeaderOptions());
+export function securityHeadersMiddleware(nodeEnv = process.env.NODE_ENV): RequestHandler {
+  return helmet(buildSecurityHeaderOptions(nodeEnv));
 }
