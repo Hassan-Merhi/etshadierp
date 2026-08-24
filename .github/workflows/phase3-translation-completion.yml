@@ -103,19 +103,29 @@ jobs:
       - name: Prepare test database schema
         run: node node_modules/drizzle-kit/bin.cjs push --force
 
-      - name: Certify translation contracts
+      - name: Certify i18n audit classifier
+        run: node scripts/verify-i18n-audit-classifier.mjs
+
+      - name: Certify full i18n audit
+        run: node scripts/audit-i18n-phase14.mjs
+
+      - name: Certify Phase 3 translation tests
         run: |
-          node scripts/verify-i18n-audit-classifier.mjs
-          node scripts/audit-i18n-phase14.mjs
           npx vitest run \
             tests/phase3-translation-completion.test.ts \
             tests/phase3-shared-interface-translations.test.ts \
             tests/sidebar-stock-label-i18n.test.ts \
             --maxWorkers=1 \
             --no-file-parallelism
-          npm run check
-          npm run lint
-          node scripts/verify-program7d-accessibility-responsive.mjs
+
+      - name: Certify TypeScript
+        run: npm run check
+
+      - name: Certify lint
+        run: npm run lint
+
+      - name: Certify accessibility and responsive contracts
+        run: node scripts/verify-program7d-accessibility-responsive.mjs
 
       - name: Stop offline translation engine
         if: always()
