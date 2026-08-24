@@ -1,3 +1,6 @@
+import type { usePayrollModel } from "./usePayrollModel";
+
+type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +17,7 @@ interface WorkerDeductionDialogProps {
   setReason: (val: string) => void;
   date: string;
   setDate: (val: string) => void;
-  mutation: any;
+  mutation: PayrollModel["workerDeductionMutation"];
 }
 
 export function WorkerDeductionDialog({

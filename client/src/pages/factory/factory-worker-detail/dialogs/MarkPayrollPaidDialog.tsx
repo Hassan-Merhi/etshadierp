@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useFactoryWorkerDetailModel } from "../../factoryworkerdetail/useFactoryWorkerDetailModel";
+
+type FactoryWorkerDetailModel = ReturnType<typeof useFactoryWorkerDetailModel>;
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -27,15 +30,15 @@ export function MarkPayrollPaidDialog({
   setPayTargetId,
   wrapAdminAction,
 }: {
-  cashAccounts: any;
-  markPaidMutation: any;
-  payCashAccountId: any;
-  payOpen: any;
-  payTargetId: any;
-  setPayCashAccountId: any;
-  setPayOpen: any;
-  setPayTargetId: any;
-  wrapAdminAction: any;
+  cashAccounts: FactoryWorkerDetailModel["cashAccounts"];
+  markPaidMutation: FactoryWorkerDetailModel["markPaidMutation"];
+  payCashAccountId: FactoryWorkerDetailModel["payCashAccountId"];
+  payOpen: FactoryWorkerDetailModel["payOpen"];
+  payTargetId: FactoryWorkerDetailModel["payTargetId"];
+  setPayCashAccountId: FactoryWorkerDetailModel["setPayCashAccountId"];
+  setPayOpen: FactoryWorkerDetailModel["setPayOpen"];
+  setPayTargetId: FactoryWorkerDetailModel["setPayTargetId"];
+  wrapAdminAction: FactoryWorkerDetailModel["wrapAdminAction"];
 }) {
   return (
     <Dialog
@@ -60,7 +63,7 @@ export function MarkPayrollPaidDialog({
                 <SelectValue placeholder="Select account" />
               </SelectTrigger>
               <SelectContent>
-                {cashAccounts?.map((a: any) => (
+                {cashAccounts?.map((a) => (
                   <SelectItem key={a.id} value={String(a.id)}>
                     {a.name} ({a.code})
                   </SelectItem>

@@ -1,3 +1,6 @@
+import type { useFactorySuppliersModel } from "./useFactorySuppliersModel";
+
+type FactorySuppliersModel = ReturnType<typeof useFactorySuppliersModel>;
 import {
   Dialog,
   DialogContent,
@@ -9,23 +12,21 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UseMutationResult } from "@tanstack/react-query";
 import { Package } from "lucide-react";
 
 interface SupplierOtherDialogsProps {
   obEditSupplier: { id: number; name: string; currentBalance: string } | null;
-  setObEditSupplier: (val: any) => void;
+  setObEditSupplier: FactorySuppliersModel["setObEditSupplier"];
   obEditValue: string;
   setObEditValue: (val: string) => void;
-  obEditMutation: UseMutationResult<any, any, any>;
-
-  dueDialogSupplier: { name: string; containers: any[] } | null;
-  setDueDialogSupplier: (val: any) => void;
+  obEditMutation: FactorySuppliersModel["obEditMutation"];
+  dueDialogSupplier: FactorySuppliersModel["dueDialogSupplier"];
+  setDueDialogSupplier: FactorySuppliersModel["setDueDialogSupplier"];
   formatDate: (val: string) => string;
 
   editObComm: null | { rawStockId: number; amount: string; currencyCode: string; personName: string; notes: string };
-  setEditObComm: (val: any) => void;
-  updateObCommissionMutation: UseMutationResult<any, any, any>;
+  setEditObComm: FactorySuppliersModel["setEditObComm"];
+  updateObCommissionMutation: FactorySuppliersModel["updateObCommissionMutation"];
   wrapAdminAction: (fn: () => void, title: string) => void;
 }
 
@@ -67,7 +68,7 @@ export function SupplierOtherDialogs({
                     type="number"
                     step="0.01"
                     value={editObComm.amount}
-                    onChange={(e) => setEditObComm((p: any) => (p ? { ...p, amount: e.target.value } : null))}
+                    onChange={(e) => setEditObComm((p) => (p ? { ...p, amount: e.target.value } : null))}
                   />
                 </div>
                 <div className="space-y-1">
@@ -75,7 +76,7 @@ export function SupplierOtherDialogs({
                   <Input
                     value={editObComm.currencyCode}
                     onChange={(e) =>
-                      setEditObComm((p: any) => (p ? { ...p, currencyCode: e.target.value.toUpperCase() } : null))
+                      setEditObComm((p) => (p ? { ...p, currencyCode: e.target.value.toUpperCase() } : null))
                     }
                     maxLength={10}
                   />
@@ -85,7 +86,7 @@ export function SupplierOtherDialogs({
                 <Label>Person / Broker</Label>
                 <Input
                   value={editObComm.personName}
-                  onChange={(e) => setEditObComm((p: any) => (p ? { ...p, personName: e.target.value } : null))}
+                  onChange={(e) => setEditObComm((p) => (p ? { ...p, personName: e.target.value } : null))}
                   placeholder="Name (optional)"
                 />
               </div>
@@ -93,7 +94,7 @@ export function SupplierOtherDialogs({
                 <Label>Notes</Label>
                 <Input
                   value={editObComm.notes}
-                  onChange={(e) => setEditObComm((p: any) => (p ? { ...p, notes: e.target.value } : null))}
+                  onChange={(e) => setEditObComm((p) => (p ? { ...p, notes: e.target.value } : null))}
                   placeholder="Notes (optional)"
                 />
               </div>

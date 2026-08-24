@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useAdvancesModel } from "../advances/useAdvancesModel";
+
+type AdvancesModel = ReturnType<typeof useAdvancesModel>;
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,17 +36,17 @@ export function BulkAdvanceDialog({
   setBulkSelected,
   workers,
 }: {
-  bulkAmounts: any;
-  bulkForm: any;
-  bulkMutation: any;
-  bulkOpen: any;
-  bulkSelected: any;
-  cashAccounts: any;
-  setBulkAmounts: any;
-  setBulkForm: any;
-  setBulkOpen: any;
-  setBulkSelected: any;
-  workers: any;
+  bulkAmounts: AdvancesModel["bulkAmounts"];
+  bulkForm: AdvancesModel["bulkForm"];
+  bulkMutation: AdvancesModel["bulkMutation"];
+  bulkOpen: AdvancesModel["bulkOpen"];
+  bulkSelected: AdvancesModel["bulkSelected"];
+  cashAccounts: AdvancesModel["cashAccounts"];
+  setBulkAmounts: AdvancesModel["setBulkAmounts"];
+  setBulkForm: AdvancesModel["setBulkForm"];
+  setBulkOpen: AdvancesModel["setBulkOpen"];
+  setBulkSelected: AdvancesModel["setBulkSelected"];
+  workers: AdvancesModel["workers"];
 }) {
   return (
     <Dialog
@@ -69,7 +72,7 @@ export function BulkAdvanceDialog({
               <Input
                 type="date"
                 value={bulkForm.advanceDate}
-                onChange={(e) => setBulkForm((p: any) => ({ ...p, advanceDate: e.target.value }))}
+                onChange={(e) => setBulkForm((p) => ({ ...p, advanceDate: e.target.value }))}
                 data-testid="input-bulk-advance-date"
               />
             </div>
@@ -77,13 +80,13 @@ export function BulkAdvanceDialog({
               <Label>Cash Account</Label>
               <Select
                 value={bulkForm.cashAccountId}
-                onValueChange={(v) => setBulkForm((p: any) => ({ ...p, cashAccountId: v }))}
+                onValueChange={(v) => setBulkForm((p) => ({ ...p, cashAccountId: v }))}
               >
                 <SelectTrigger data-testid="select-bulk-cash-account">
                   <SelectValue placeholder="Optional" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(cashAccounts || []).map((a: any) => (
+                  {(cashAccounts || []).map((a) => (
                     <SelectItem key={a.id} value={String(a.id)}>
                       {a.name}
                     </SelectItem>
@@ -97,7 +100,7 @@ export function BulkAdvanceDialog({
               <Label>Repayment Type</Label>
               <Select
                 value={bulkForm.repaymentType}
-                onValueChange={(v) => setBulkForm((p: any) => ({ ...p, repaymentType: v }))}
+                onValueChange={(v) => setBulkForm((p) => ({ ...p, repaymentType: v }))}
               >
                 <SelectTrigger data-testid="select-bulk-repayment-type">
                   <SelectValue />
@@ -113,7 +116,7 @@ export function BulkAdvanceDialog({
               <Input
                 placeholder="Optional notes for all"
                 value={bulkForm.notes}
-                onChange={(e) => setBulkForm((p: any) => ({ ...p, notes: e.target.value }))}
+                onChange={(e) => setBulkForm((p) => ({ ...p, notes: e.target.value }))}
                 data-testid="input-bulk-notes"
               />
             </div>
@@ -127,7 +130,7 @@ export function BulkAdvanceDialog({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setBulkSelected(new Set((workers || []).map((w: any) => w.id)))}
+                  onClick={() => setBulkSelected(new Set((workers || []).map((w) => w.id)))}
                   data-testid="button-bulk-select-all"
                 >
                   Select All
@@ -159,14 +162,14 @@ export function BulkAdvanceDialog({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    (workers || []).map((w: any) => {
+                    (workers || []).map((w) => {
                       const selected = bulkSelected.has(w.id);
                       return (
                         <TableRow
                           key={w.id}
                           className={`cursor-pointer hover-elevate ${selected ? "bg-primary/5" : ""}`}
                           onClick={() =>
-                            setBulkSelected((prev: any) => {
+                            setBulkSelected((prev) => {
                               const next = new Set(prev);
                               if (next.has(w.id)) next.delete(w.id);
                               else next.add(w.id);
@@ -179,7 +182,7 @@ export function BulkAdvanceDialog({
                             <Checkbox
                               checked={selected}
                               onCheckedChange={() =>
-                                setBulkSelected((prev: any) => {
+                                setBulkSelected((prev) => {
                                   const next = new Set(prev);
                                   if (next.has(w.id)) next.delete(w.id);
                                   else next.add(w.id);
@@ -200,9 +203,9 @@ export function BulkAdvanceDialog({
                               value={bulkAmounts[w.id] || ""}
                               onChange={(e) => {
                                 const val = e.target.value;
-                                setBulkAmounts((prev: any) => ({ ...prev, [w.id]: val }));
+                                setBulkAmounts((prev) => ({ ...prev, [w.id]: val }));
                                 if (val && parseFloat(val) > 0) {
-                                  setBulkSelected((prev: any) => {
+                                  setBulkSelected((prev) => {
                                     const n = new Set(prev);
                                     n.add(w.id);
                                     return n;
@@ -221,18 +224,10 @@ export function BulkAdvanceDialog({
             </div>
             {bulkSelected.size > 0 && (
               <p className="text-xs text-muted-foreground text-right">
-                {
-                  Array.from(bulkSelected as Set<string>).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0)
-                    .length
-                }{" "}
-                worker(s) with valid amounts
+                {Array.from(bulkSelected).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0).length} worker(s)
+                with valid amounts
                 {" — "}Total:{" "}
-                {fmt(
-                  Array.from(bulkSelected as Set<string>).reduce(
-                    (s: number, wid) => s + parseFloat(bulkAmounts[wid] || "0"),
-                    0
-                  )
-                )}
+                {fmt(Array.from(bulkSelected).reduce((s: number, wid) => s + parseFloat(bulkAmounts[wid] || "0"), 0))}
               </p>
             )}
           </div>
@@ -245,14 +240,13 @@ export function BulkAdvanceDialog({
             onClick={() => bulkMutation.mutate()}
             disabled={
               bulkMutation.isPending ||
-              Array.from(bulkSelected as Set<string>).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0)
-                .length === 0
+              Array.from(bulkSelected).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0).length === 0
             }
             data-testid="button-submit-bulk-advance"
           >
             {bulkMutation.isPending
               ? "Saving..."
-              : `Record ${Array.from(bulkSelected as Set<string>).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0).length || ""} Advance(s)`}
+              : `Record ${Array.from(bulkSelected).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0).length || ""} Advance(s)`}
           </Button>
         </DialogFooter>
       </DialogContent>

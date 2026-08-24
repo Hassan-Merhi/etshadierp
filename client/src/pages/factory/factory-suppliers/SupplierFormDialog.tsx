@@ -1,3 +1,6 @@
+import type { useFactorySuppliersModel } from "./useFactorySuppliersModel";
+
+type FactorySuppliersModel = ReturnType<typeof useFactorySuppliersModel>;
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,22 +8,21 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SupplierWithBalance } from "./factorySupplierTypes";
 import { FactorySupplier } from "@shared/schema";
-import { UseMutationResult } from "@tanstack/react-query";
 
 interface SupplierFormDialogProps {
   createOpen: boolean;
   setCreateOpen: (val: boolean) => void;
   editingSupplier: FactorySupplier | null;
   setEditingSupplier: (val: FactorySupplier | null) => void;
-  formData: any;
-  setFormData: (val: any) => void;
+  formData: FactorySuppliersModel["formData"];
+  setFormData: FactorySuppliersModel["setFormData"];
   formRole: "broker" | "standalone" | "linked";
   setFormRole: (val: "broker" | "standalone" | "linked") => void;
   allSuppliers: SupplierWithBalance[];
   createSubAccountParentId: number | null;
   setCreateSubAccountParentId: (val: number | null) => void;
-  createMutation: UseMutationResult<any, any, any>;
-  updateMutation: UseMutationResult<any, any, any>;
+  createMutation: FactorySuppliersModel["createMutation"];
+  updateMutation: FactorySuppliersModel["updateMutation"];
   resetForm: () => void;
   wrapAdminAction: (fn: () => void, title: string) => void;
 }
@@ -49,10 +51,10 @@ export function SupplierFormDialog({
     // is always persisted, regardless of whether we're creating or editing.
     const rolePayload =
       formRole === "broker"
-        ? { isBroker: true,  parentId: null }
+        ? { isBroker: true, parentId: null }
         : formRole === "linked"
-        ? { isBroker: false, parentId: formData.parentId ?? null }
-        : { isBroker: false, parentId: null };
+          ? { isBroker: false, parentId: formData.parentId ?? null }
+          : { isBroker: false, parentId: null };
 
     if (editingSupplier) {
       updateMutation.mutate({ id: editingSupplier.id, ...formData, ...rolePayload });

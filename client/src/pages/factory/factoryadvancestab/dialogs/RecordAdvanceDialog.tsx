@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useAdvancesModel } from "../advances/useAdvancesModel";
+
+type AdvancesModel = ReturnType<typeof useAdvancesModel>;
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,13 +30,13 @@ export function RecordAdvanceDialog({
   setForm,
   workers,
 }: {
-  addOpen: any;
-  cashAccounts: any;
-  createMutation: any;
-  form: any;
-  setAddOpen: any;
-  setForm: any;
-  workers: any;
+  addOpen: AdvancesModel["addOpen"];
+  cashAccounts: AdvancesModel["cashAccounts"];
+  createMutation: AdvancesModel["createMutation"];
+  form: AdvancesModel["form"];
+  setAddOpen: AdvancesModel["setAddOpen"];
+  setForm: AdvancesModel["setForm"];
+  workers: AdvancesModel["workers"];
 }) {
   return (
     <Dialog open={addOpen} onOpenChange={setAddOpen}>
@@ -50,7 +53,7 @@ export function RecordAdvanceDialog({
                 <SelectValue placeholder="Select worker" />
               </SelectTrigger>
               <SelectContent>
-                {(workers || []).map((w: any) => (
+                {(workers || []).map((w) => (
                   <SelectItem key={w.id} value={String(w.id)}>
                     {w.fullName}
                   </SelectItem>
@@ -88,7 +91,7 @@ export function RecordAdvanceDialog({
                 <SelectValue placeholder="Select cash account (optional)" />
               </SelectTrigger>
               <SelectContent>
-                {(cashAccounts || []).map((a: any) => (
+                {(cashAccounts || []).map((a) => (
                   <SelectItem key={a.id} value={String(a.id)}>
                     {a.name}
                   </SelectItem>

@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useFactoryProformasModel } from "../../factoryproformas/useFactoryProformasModel";
+
+type FactoryProformasModel = ReturnType<typeof useFactoryProformasModel>;
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -30,7 +33,7 @@ export function ImportProformaExcelDialog({
   setExcelImportName,
   setIsExcelImportOpen,
 }: {
-  bulkImportMutation: any;
+  bulkImportMutation: FactoryProformasModel["bulkImportMutation"];
   customerId: number | null;
   customers: Customer[];
   downloadProformaTemplate: () => Promise<void>;

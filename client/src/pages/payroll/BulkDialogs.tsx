@@ -1,3 +1,6 @@
+import type { usePayrollModel } from "./usePayrollModel";
+
+type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,28 +19,28 @@ interface BulkDialogsProps {
   setBulkDepositDate: (v: string) => void;
   bulkDepositNotes: string;
   setBulkDepositNotes: (v: string) => void;
-  employeeStaff: any[];
+  employeeStaff: PayrollModel["employeeStaff"];
   bulkDepositSelections: Record<number, boolean>;
-  handleSelectAllEmployees: (checked: any) => void;
+  handleSelectAllEmployees: PayrollModel["handleSelectAllEmployees"];
   handleToggleEmployeeDeposit: (id: number) => void;
   bulkDepositTotal: number;
-  validSelectedEmployees: any[];
-  bulkDepositMutation: any;
+  validSelectedEmployees: PayrollModel["validSelectedEmployees"];
+  bulkDepositMutation: PayrollModel["bulkDepositMutation"];
   bulkWithdrawalDialogOpen: boolean;
   setBulkWithdrawalDialogOpen: (open: boolean) => void;
   bulkWithdrawalDate: string;
   setBulkWithdrawalDate: (v: string) => void;
   bulkWithdrawalAccountType: string;
-  setBulkWithdrawalAccountType: (v: any) => void;
+  setBulkWithdrawalAccountType: PayrollModel["setBulkWithdrawalAccountType"];
   bulkWithdrawalAccountId: string;
   setBulkWithdrawalAccountId: (v: string) => void;
   bulkWithdrawalNotes: string;
   setBulkWithdrawalNotes: (v: string) => void;
   bulkWithdrawalAmounts: Record<number, string>;
   setBulkWithdrawalAmounts: (fn: (prev: Record<number, string>) => Record<number, string>) => void;
-  bulkWithdrawalMutation: any;
-  cashAccounts: any[];
-  bankAccounts: any[] | undefined;
+  bulkWithdrawalMutation: PayrollModel["bulkWithdrawalMutation"];
+  cashAccounts: PayrollModel["cashAccounts"];
+  bankAccounts: PayrollModel["bankAccounts"];
   bulkBonusDialogOpen: boolean;
   setBulkBonusDialogOpen: (open: boolean) => void;
   bulkBonusStep: "edit" | "preview";
@@ -58,11 +61,11 @@ interface BulkDialogsProps {
   setBulkBonusAutoPctLocationId: (v: string) => void;
   bulkBonusAmounts: Record<number, string>;
   setBulkBonusAmounts: (fn: (prev: Record<number, string>) => Record<number, string>) => void;
-  pendingBonuses: Record<number, any>;
+  pendingBonuses: PayrollModel["pendingBonuses"];
   bulkBonusBreakdowns: Record<number, string[]>;
-  bulkBonusMutation: any;
+  bulkBonusMutation: PayrollModel["bulkBonusMutation"];
   handlePrintBulkBonus: () => void;
-  locations: any[];
+  locations: PayrollModel["locations"];
 }
 
 export function BulkDialogs({
@@ -277,8 +280,10 @@ export function BulkDialogs({
                 <Select
                   value={bulkWithdrawalAccountType}
                   onValueChange={(val) => {
-                    setBulkWithdrawalAccountType(val);
-                    setBulkWithdrawalAccountId("");
+                    if (val === "cash" || val === "bank") {
+                      setBulkWithdrawalAccountType(val);
+                      setBulkWithdrawalAccountId("");
+                    }
                   }}
                 >
                   <SelectTrigger data-testid="select-withdrawal-account-type">

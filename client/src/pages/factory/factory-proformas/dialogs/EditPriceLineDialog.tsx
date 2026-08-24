@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useFactoryProformasModel } from "../../factoryproformas/useFactoryProformasModel";
+
+type FactoryProformasModel = ReturnType<typeof useFactoryProformasModel>;
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,12 +19,12 @@ export function EditPriceLineDialog({
   setEditLineValues,
   setEditingLine,
 }: {
-  editLineMutation: any;
-  editLineValues: any;
-  editingLine: any;
-  handleEditLine: any;
-  setEditLineValues: any;
-  setEditingLine: any;
+  editLineMutation: FactoryProformasModel["editLineMutation"];
+  editLineValues: FactoryProformasModel["editLineValues"];
+  editingLine: FactoryProformasModel["editingLine"];
+  handleEditLine: FactoryProformasModel["handleEditLine"];
+  setEditLineValues: FactoryProformasModel["setEditLineValues"];
+  setEditingLine: FactoryProformasModel["setEditingLine"];
 }) {
   return (
     <Dialog open={!!editingLine} onOpenChange={(open) => !open && setEditingLine(null)}>

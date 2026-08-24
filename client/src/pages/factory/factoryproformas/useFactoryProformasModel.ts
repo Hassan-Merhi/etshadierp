@@ -9,7 +9,7 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { read as readExcel, utils as excelUtils, writeFile as writeExcel } from "@/lib/excelHelper";
-import type { Customer, Proforma, ProformaLine } from "./types";
+import type { CatalogStockItem, Customer, Proforma, ProformaLine } from "./types";
 
 export function useFactoryProformasModel() {
   const { selectedCompany } = useCompany();
@@ -46,7 +46,7 @@ export function useFactoryProformasModel() {
   const [renameValue, setRenameValue] = useState("");
   const [addLineMode, setAddLineMode] = useState<"manual" | "catalog">("catalog");
   const [catalogSearch, setCatalogSearch] = useState("");
-  const [catalogSelectedItem, setCatalogSelectedItem] = useState<unknown | null>(null);
+  const [catalogSelectedItem, setCatalogSelectedItem] = useState<CatalogStockItem | null>(null);
   const [createLoadingProforma, setCreateLoadingProforma] = useState<Proforma | null>(null);
   const [createLoadingLocationId, setCreateLoadingLocationId] = useState<string>("");
   const [transferProforma, setTransferProforma] = useState<Proforma | null>(null);
@@ -133,7 +133,7 @@ export function useFactoryProformasModel() {
   // Phase 4: opening/expanding a proforma no longer downloads the ERP stock
   // catalog. The add-item dialog is the only consumer, and it only needs the
   // identity profile (id/code/name/uom).
-  const { data: allStockItems = [] } = useQuery({
+  const { data: allStockItems = [] } = useQuery<CatalogStockItem[]>({
     queryKey: ["/api/stock-items/light?profile=identity", selectedCompany?.id],
     enabled: isAddLineOpen && !!selectedCompany?.id,
     staleTime: 30 * 60 * 1000,

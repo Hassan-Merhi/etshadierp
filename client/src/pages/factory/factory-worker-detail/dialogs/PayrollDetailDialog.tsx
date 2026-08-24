@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useFactoryWorkerDetailModel } from "../../factoryworkerdetail/useFactoryWorkerDetailModel";
+
+type FactoryWorkerDetailModel = ReturnType<typeof useFactoryWorkerDetailModel>;
 import { DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,10 +21,10 @@ export function PayrollDetailDialog({
   payrollDetailLoading,
   setDetailPayrollId,
 }: {
-  detailPayrollId: any;
-  payrollDetail: any;
-  payrollDetailLoading: any;
-  setDetailPayrollId: any;
+  detailPayrollId: FactoryWorkerDetailModel["detailPayrollId"];
+  payrollDetail: FactoryWorkerDetailModel["payrollDetail"];
+  payrollDetailLoading: FactoryWorkerDetailModel["payrollDetailLoading"];
+  setDetailPayrollId: FactoryWorkerDetailModel["setDetailPayrollId"];
 }) {
   return (
     <Dialog
@@ -145,7 +148,7 @@ export function PayrollDetailDialog({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {payrollDetail.attendance.map((att: any) => {
+                      {payrollDetail.attendance.map((att) => {
                         const d = new Date(att.attendanceDate + "T00:00:00");
                         const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
                         const statusColors: Record<string, string> = {
@@ -175,13 +178,13 @@ export function PayrollDetailDialog({
             </div>
 
             {/* Extra stats (bales / kg / overtime) */}
-            {(parseFloat(payrollDetail.payroll.balesCount || "0") > 0 ||
-              parseFloat(payrollDetail.payroll.kgProcessed || "0") > 0 ||
-              parseFloat(payrollDetail.payroll.overtimeHours || "0") > 0) && (
+            {(Number(payrollDetail.payroll.balesCount ?? 0) > 0 ||
+              Number(payrollDetail.payroll.kgProcessed ?? 0) > 0 ||
+              Number(payrollDetail.payroll.overtimeHours ?? 0) > 0) && (
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Production</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {parseFloat(payrollDetail.payroll.balesCount || "0") > 0 && (
+                  {Number(payrollDetail.payroll.balesCount ?? 0) > 0 && (
                     <Card>
                       <CardContent className="p-3 text-center">
                         <p className="text-xl font-bold">{payrollDetail.payroll.balesCount}</p>
@@ -189,21 +192,19 @@ export function PayrollDetailDialog({
                       </CardContent>
                     </Card>
                   )}
-                  {parseFloat(payrollDetail.payroll.kgProcessed || "0") > 0 && (
+                  {Number(payrollDetail.payroll.kgProcessed ?? 0) > 0 && (
                     <Card>
                       <CardContent className="p-3 text-center">
-                        <p className="text-xl font-bold">
-                          {parseFloat(payrollDetail.payroll.kgProcessed || "0").toFixed(1)}
-                        </p>
+                        <p className="text-xl font-bold">{Number(payrollDetail.payroll.kgProcessed ?? 0).toFixed(1)}</p>
                         <p className="text-xs text-muted-foreground">KG</p>
                       </CardContent>
                     </Card>
                   )}
-                  {parseFloat(payrollDetail.payroll.overtimeHours || "0") > 0 && (
+                  {Number(payrollDetail.payroll.overtimeHours ?? 0) > 0 && (
                     <Card>
                       <CardContent className="p-3 text-center">
                         <p className="text-xl font-bold">
-                          {parseFloat(payrollDetail.payroll.overtimeHours || "0").toFixed(1)}
+                          {Number(payrollDetail.payroll.overtimeHours ?? 0).toFixed(1)}
                         </p>
                         <p className="text-xs text-muted-foreground">OT Hours</p>
                       </CardContent>

@@ -1,3 +1,6 @@
+import type { usePayrollModel } from "./usePayrollModel";
+
+type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -7,9 +10,9 @@ import { Button } from "@/components/ui/button";
 interface DepositDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  selectedEmployee: { firstName?: string; lastName?: string } | null;
-  form: any;
-  mutation: any;
+  selectedEmployee: PayrollModel["selectedEmployee"];
+  form: PayrollModel["depositForm"];
+  mutation: PayrollModel["depositMutation"];
 }
 
 export function DepositDialog({ open, onOpenChange, selectedEmployee, form, mutation }: DepositDialogProps) {
@@ -24,7 +27,7 @@ export function DepositDialog({ open, onOpenChange, selectedEmployee, form, muta
         </DialogHeader>
 
         <Form {...form}>
-          <form noValidate onSubmit={form.handleSubmit((data: unknown) => mutation.mutate(data))} className="space-y-4">
+          <form noValidate onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
             <FormField
               control={form.control}
               name="amount"

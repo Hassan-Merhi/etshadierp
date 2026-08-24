@@ -11,13 +11,7 @@ import type { DirectContainer } from "./AssignContainersDialog";
 import type { BulkFxPreview, StatementResponse, SupplierWithBalance } from "./factorySupplierTypes";
 
 export type SupplierFilter =
-  | "all"
-  | "brokers"
-  | "standalone"
-  | "with-balance"
-  | "zero-balance"
-  | "has-foreign"
-  | "has-recent";
+  "all" | "brokers" | "standalone" | "with-balance" | "zero-balance" | "has-foreign" | "has-recent";
 export type FxSourceType = "supplier" | "commission" | "both";
 
 export interface SupplierFormData {
@@ -77,6 +71,23 @@ interface OpeningCommissionEdit {
   currencyCode: string;
   personName: string;
   notes: string;
+}
+
+interface OpeningCommissionUpdatePayload {
+  rawStockId: number;
+  commissionAmount: string;
+  commissionCurrencyCode: string;
+  commissionPersonName: string;
+  commissionNotes: string;
+}
+
+interface DueContainer {
+  id: number;
+  containerNumber: string;
+  offloadDate: string;
+  currencyCode: string;
+  value: string;
+  daysPastDue: number;
 }
 
 interface MoveContainerState {
@@ -185,7 +196,7 @@ export function useFactorySuppliersModel() {
   });
   const [bulkFxPreview, setBulkFxPreview] = useState<BulkFxPreview | null>(null);
   const [editObComm, setEditObComm] = useState<OpeningCommissionEdit | null>(null);
-  const [dueDialogSupplier, setDueDialogSupplier] = useState<{ name: string; containers: unknown[] } | null>(null);
+  const [dueDialogSupplier, setDueDialogSupplier] = useState<{ name: string; containers: DueContainer[] } | null>(null);
 
   useEscapeBack(
     statementSupplierId
@@ -477,7 +488,7 @@ export function useFactorySuppliersModel() {
   });
 
   const updateObCommissionMutation = useMutation({
-    mutationFn: async (data: OpeningCommissionEdit) =>
+    mutationFn: async (data: OpeningCommissionUpdatePayload) =>
       factoryApiRequest("PATCH", `/api/factory/raw-stock/opening-balance/${data.rawStockId}`, data),
     onSuccess: () => {
       setEditObComm(null);

@@ -1,3 +1,6 @@
+import type { usePayrollModel } from "./usePayrollModel";
+
+type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,13 +12,13 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 interface BulkPaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  selectedPayments: any[];
+  selectedPayments: PayrollModel["selectedPaymentsSummary"];
   totalAmount: number;
-  workerStaff: any[];
-  form: any;
-  mutation: any;
-  cashAccounts: any[];
-  bankAccounts: any[] | undefined;
+  workerStaff: PayrollModel["workerStaff"];
+  form: PayrollModel["bulkPaymentForm"];
+  mutation: PayrollModel["bulkPaymentMutation"];
+  cashAccounts: PayrollModel["cashAccounts"];
+  bankAccounts: PayrollModel["bankAccounts"];
   bankAccountsLoading: boolean;
 }
 
@@ -65,7 +68,7 @@ export function BulkPaymentDialog({
         </div>
 
         <Form {...form}>
-          <form noValidate onSubmit={form.handleSubmit((data: unknown) => mutation.mutate(data))} className="space-y-4">
+          <form noValidate onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
             <FormField
               control={form.control}
               name="paymentAccountType"

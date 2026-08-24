@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useAdvancesModel } from "../advances/useAdvancesModel";
+
+type AdvancesModel = ReturnType<typeof useAdvancesModel>;
 import { RotateCcw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,9 +24,9 @@ export function ReverseAdvanceDialog({
   reverseTarget,
   setReverseTarget,
 }: {
-  reverseMutation: any;
-  reverseTarget: any;
-  setReverseTarget: any;
+  reverseMutation: AdvancesModel["reverseMutation"];
+  reverseTarget: AdvancesModel["reverseTarget"];
+  setReverseTarget: AdvancesModel["setReverseTarget"];
 }) {
   return (
     <Dialog open={!!reverseTarget} onOpenChange={(open) => !open && setReverseTarget(null)}>
