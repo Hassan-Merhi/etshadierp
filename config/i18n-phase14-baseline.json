@@ -2,52 +2,52 @@
   "schemaVersion": 2,
   "detectorVersion": 9,
   "policyDigest": "f1c6e5e3ab5cfcb6faeb5c854ae37033676b5782e2858007404e90a861a607c9",
-  "reviewedAt": "2026-08-21",
-  "reviewedHead": "main@884fe9bb1962a9aa7bba71e5faea550de5e6b758",
-  "description": "Reconciled against exact current main after the Wave H static-format repair and current-main dependency updates. The classified audit measures 11,995 actionable literals; accounting is 1,373 and administration is 1,129, with all other module ceilings pinned to their exact measured counts so future growth stays blocked.",
-  "maxActionable": 11995,
+  "reviewedAt": "2026-08-24",
+  "reviewedHead": "phase3-translation-ui-polish",
+  "description": "Phase 3 app-wide translation completion: every classified actionable literal is covered by EN/FR/AR runtime translations; the untranslated-text ratchet is locked at zero.",
+  "maxActionable": 0,
   "modules": {
     "accounting": {
-      "maxActionable": 1373
+      "maxActionable": 0
     },
     "administration": {
-      "maxActionable": 1129
+      "maxActionable": 0
     },
     "backend-messages": {
       "maxActionable": 0
     },
     "container-purchasing": {
-      "maxActionable": 819
+      "maxActionable": 0
     },
     "factory": {
-      "maxActionable": 5316
+      "maxActionable": 0
     },
     "inventory-logistics": {
-      "maxActionable": 1324
+      "maxActionable": 0
     },
     "other-client": {
-      "maxActionable": 760
+      "maxActionable": 0
     },
     "payroll": {
-      "maxActionable": 535
+      "maxActionable": 0
     },
     "properties-rentals": {
       "maxActionable": 0
     },
     "reports-exports": {
-      "maxActionable": 2
+      "maxActionable": 0
     },
     "sales-pos": {
-      "maxActionable": 731
+      "maxActionable": 0
     },
     "shared-contracts": {
-      "maxActionable": 4
+      "maxActionable": 0
     },
     "shared-ui": {
       "maxActionable": 0
     },
     "supplier-partner": {
-      "maxActionable": 2
+      "maxActionable": 0
     }
   },
   "maxUnclassified": 0
