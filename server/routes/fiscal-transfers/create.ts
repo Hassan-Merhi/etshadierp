@@ -480,7 +480,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
               recipientLocationId,
               sourceLocationName: sourceName,
               destLocationName: destLocation.name,
-              items: transfer.items.map((i: any) => ({
+              items: transfer.items.map((i) => ({
                 stockItemId: i.stockItemId,
                 quantity: parseFloat(i.quantity),
               })),

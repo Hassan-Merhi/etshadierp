@@ -38,7 +38,7 @@ export function registerPayrollRunMigrationRoutes(app: Express) {
       }
 
       // Helper: get or create a ledger account by code
-      async function getOrCreateAccount(code: string, name: string): Promise<any> {
+      async function getOrCreateAccount(code: string, name: string) {
         const accs = await storage.getAllLedgerAccounts(companyId);
         let acc = accs.find((a) => a.code === code);
         if (!acc) {

@@ -478,7 +478,7 @@ export function registerBalesReportRoutes(app: Express) {
             .filter((n) => !isNaN(n))
         : [];
 
-      let results: any[] = [];
+      let results = [];
 
       const baseConditions: any[] = [
         eq(factoryBales.companyId, companyId),

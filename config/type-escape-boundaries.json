@@ -2070,7 +2070,7 @@
         0
       ],
       "server/routes/accountCurrencyRoutes.ts": [
-        6,
+        5,
         0,
         0
       ],
@@ -2255,7 +2255,7 @@
         0
       ],
       "server/routes/erp-payroll/runs-migration.ts": [
-        2,
+        1,
         0,
         0
       ],
@@ -2455,7 +2455,7 @@
         0
       ],
       "server/routes/factory/bales/balesReportRoutes.ts": [
-        6,
+        5,
         0,
         0
       ],
@@ -2980,7 +2980,7 @@
         0
       ],
       "server/routes/fiscal-transfers/create.ts": [
-        3,
+        2,
         0,
         0
       ],
@@ -3335,7 +3335,7 @@
         0
       ],
       "server/routes/sp/spMigrationPhase4Users.ts": [
-        16,
+        13,
         0,
         0
       ],
@@ -3987,6 +3987,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 3113
+    "typeEscapeCeiling": 3106
   }
 }

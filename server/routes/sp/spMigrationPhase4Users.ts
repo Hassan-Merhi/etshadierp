@@ -57,7 +57,7 @@ async function switchUserSessions(
   return resultRows(result).length;
 }
 
-async function loadUserLocations(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], userId: string, companyId: number): Promise<any[]> {
+async function loadUserLocations(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], userId: string, companyId: number) {
   const result = await tx.execute(sql`
     SELECT location_id
     FROM user_locations
@@ -67,7 +67,7 @@ async function loadUserLocations(tx: Parameters<Parameters<typeof db.transaction
   return resultRows(result).map((row) => ({ locationId: pn(row.location_id) }));
 }
 
-async function loadCashMappings(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], userId: string, companyId: number): Promise<any[]> {
+async function loadCashMappings(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], userId: string, companyId: number) {
   const result = await tx.execute(sql`
     SELECT location_id, cash_account_id, pos_station
     FROM user_location_cash_accounts
@@ -104,7 +104,7 @@ async function mapRole(sourceId: number, targetId: number, sourceRole: any): Pro
   };
 }
 
-async function mapAllLocations(sourceId: number, targetId: number, rows: any[]): Promise<any[]> {
+async function mapAllLocations(sourceId: number, targetId: number, rows: any[]) {
   const mapped = [];
   for (const row of rows) {
     const location = await resolveTargetLocation(sourceId, targetId, pn(row.locationId));
