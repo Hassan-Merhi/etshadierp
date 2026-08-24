@@ -12,6 +12,14 @@ import { db } from "../../../../db";
 import { requireAuth } from "../../../../auth";
 import { getOrCreateLedgerAccount } from "../../_helpers";
 import {
+  financialOperationFingerprint,
+  withDurableFinancialOperation,
+} from "../../../../services/accounting/durableFinancialOperation";
+import {
+  financialOperationRequestPayload,
+  resolveFinancialOperationKey,
+} from "../../../../services/accounting/financialOperationRequest";
+import {
   factoryBales,
   customerBalances,
   voucherEntries,
@@ -85,7 +93,20 @@ export function registerPosSaleWriteRoutes(app: Express) {
       const nextNum = (Number(seqRow?.count || 0) + 1).toString().padStart(4, "0");
       const saleNumber = `FPOS-${nextNum}`;
 
-      const result = await db.transaction(async (tx: any) => {
+      const operationKey = resolveFinancialOperationKey(req);
+      const operation = await withDurableFinancialOperation(
+        {
+          companyId: Number(companyId),
+          operationName: "factory.pos-sale.create",
+          idempotencyKey: operationKey,
+          requestFingerprint: financialOperationFingerprint({
+            method: req.method,
+            path: req.path,
+            companyId: Number(companyId),
+            body: financialOperationRequestPayload(req.body),
+          }),
+        },
+        async (tx: any) => {
         // 1. Create sale record
         const [sale] = await tx
           .insert(factoryPosSales)
@@ -293,10 +314,10 @@ export function registerPosSaleWriteRoutes(app: Express) {
           });
         }
 
-        return sale;
+        return { value: sale, resultReference: sale.id };
       });
 
-      res.json(result);
+      res.json(operation.value);
     } catch (error: unknown) {
       logger.error("Error creating factory POS sale:", { error: error });
       res.status(400).json({ message: getErrorMessage(error) });

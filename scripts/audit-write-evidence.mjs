@@ -43,7 +43,7 @@ function mutatesStock(file, source) {
 const JOURNAL_WRITER = /\b(?:postStockMovementTx|journalStockTransferLeg)\b/;
 
 const REQUEST_IDENTITY =
-  /\b(?:clientRequestId|resolveStockDocumentRequestId|stockDocumentIdempotencyKey|postBalancedVoucherTx|insertInfrastructureVoucherTx|insertInfrastructureVoucher)\b/;
+  /\b(?:clientRequestId|resolveStockDocumentRequestId|stockDocumentIdempotencyKey|postBalancedVoucherTx|insertInfrastructureVoucherTx|insertInfrastructureVoucher|withDurableFinancialOperation|resolveFinancialOperationKey|financialOperationFingerprint)\b/;
 
 const IDENTITY_OWNING_VOUCHER_WRITERS = new Set([
   "server/services/accounting/voucherPostingService.ts",

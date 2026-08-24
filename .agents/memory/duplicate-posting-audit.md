@@ -9,4 +9,8 @@ The duplicate-posting standard distinguishes four states: replay-safe, intention
 
 The shared Phase 2 boundary is transaction-owned: reserve, financial effects, result reference, and completion payload use the caller's same database transaction. A thrown operation rolls back the reservation, while a committed result is replayable; a pre-existing processing marker fails closed rather than rerunning.
 
+Equivalent retries may send the identity as either `X-Idempotency-Key` or `clientRequestId`; canonical fingerprints must exclude the identity field itself so switching transport does not create a false payload conflict.
+
+**Why:** The first Phase 3 route migrations support both identity transports and need the same request to replay regardless of whether a client retries through a header or compatibility body field.
+
 **How to apply:** When implementing the shared boundary, preserve legitimate repeated events with new identities, keep edits/reversals separate from creates, and require the identity marker and financial effects to share an atomic recovery boundary. Do not treat an HTTP response-capture table as the financial commit authority.

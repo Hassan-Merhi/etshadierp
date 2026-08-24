@@ -24,6 +24,15 @@ import {
   getProductionBonusTotalsForPayrollIds,
   prepareProductionBonusesForPayroll,
 } from "../../../services/payroll/productionBonusPayrollService";
+import {
+  financialOperationErrorStatus,
+  financialOperationRequestPayload,
+  resolveFinancialOperationKey,
+} from "../../../services/accounting/financialOperationRequest";
+import {
+  financialOperationFingerprint,
+  withDurableFinancialOperation,
+} from "../../../services/accounting/durableFinancialOperation";
 
 async function ensureNoPendingProductionBonuses(companyId: number, payrollIds: number[]) {
   if (payrollIds.length === 0) return { ok: true as const };
@@ -105,7 +114,21 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
         ? await findOrCreateLedger(companyId, "Payroll Payable", "Liability")
         : null;
 
-      const updated = await db.transaction(async (tx) => {
+       const operationKey = resolveFinancialOperationKey(req);
+       const operation = await withDurableFinancialOperation(
+         {
+           companyId: Number(companyId),
+           operationName: "factory.payroll.mark-paid",
+           idempotencyKey: operationKey,
+           requestFingerprint: financialOperationFingerprint({
+             method: req.method,
+             path: req.path,
+             companyId: Number(companyId),
+             body: financialOperationRequestPayload(req.body),
+             payrollId: id,
+           }),
+         },
+         async (tx) => {
         const [payroll] = await tx
           .update(factoryPayrolls)
           .set({ status: "PAID", paidAt: new Date(paymentDate), cashAccountId })
@@ -155,14 +178,15 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
           amountCurrency: parseFloat(payroll.netSalary || "0"),
           amountUsd: parseFloat(payroll.netSalary || "0"),
         });
-        return payroll;
-      });
+         return { value: payroll, resultReference: payroll.id };
+       });
 
-      res.json(updated);
+       res.json(operation.value);
     } catch (error: unknown) {
       if (getErrorMessage(error) === "Payroll record not found")
         return res.status(404).json({ message: getErrorMessage(error) });
-      res.status(500).json({ message: getErrorMessage(error) });
+       const status = financialOperationErrorStatus(error);
+       res.status(status).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -244,7 +268,21 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
       if (!pendingGuard.ok) return res.status(pendingGuard.status).json(pendingGuard);
 
       const payableAccBulk = cashId ? await findOrCreateLedger(companyId, "Payroll Payable", "Liability") : null;
-      await db.transaction(async (tx) => {
+       const operationKey = resolveFinancialOperationKey(req);
+       const operation = await withDurableFinancialOperation(
+         {
+           companyId: Number(companyId),
+           operationName: "factory.payroll.mark-paid-bulk",
+           idempotencyKey: operationKey,
+           requestFingerprint: financialOperationFingerprint({
+             method: req.method,
+             path: req.path,
+             companyId: Number(companyId),
+             body: financialOperationRequestPayload(req.body),
+             payrollIds: normalizedIds,
+           }),
+         },
+         async (tx) => {
         const payrollsToMark = await tx
           .select()
           .from(factoryPayrolls)
@@ -300,11 +338,12 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
           txType: "PAYROLL_PAYMENT",
           description: `Payroll bulk paid: ${normalizedIds.length} worker${normalizedIds.length !== 1 ? "s" : ""}`,
         });
-      });
+         return { value: { updated: normalizedIds.length }, resultReference: operationKey };
+       });
 
-      res.json({ updated: normalizedIds.length });
+       res.json(operation.value);
     } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
+       res.status(financialOperationErrorStatus(error)).json({ message: getErrorMessage(error) });
     }
   });
 }

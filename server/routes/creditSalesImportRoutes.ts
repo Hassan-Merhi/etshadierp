@@ -30,6 +30,14 @@ import {
   stockItemLocationPrices,
   ledgerAccounts,
 } from "@shared/schema";
+import {
+  financialOperationFingerprint,
+  withDurableFinancialOperation,
+} from "../services/accounting/durableFinancialOperation";
+import {
+  financialOperationRequestPayload,
+  resolveFinancialOperationKey,
+} from "../services/accounting/financialOperationRequest";
 
 export function registerCreditSalesImportRoutes(app: Express) {
   // ============= Credit Sales Import Endpoints =============
@@ -256,7 +264,20 @@ export function registerCreditSalesImportRoutes(app: Express) {
       let totalSales = 0;
       let createdVoucher: any = null;
 
-      await db.transaction(async (tx) => {
+      const operationKey = resolveFinancialOperationKey(req);
+      const operation = await withDurableFinancialOperation(
+        {
+          companyId: req.session.currentCompanyId!,
+          operationName: "credit-sales-import.create",
+          idempotencyKey: operationKey,
+          requestFingerprint: financialOperationFingerprint({
+            method: req.method,
+            path: req.path,
+            companyId: req.session.currentCompanyId!,
+            body: financialOperationRequestPayload(req.body),
+          }),
+        },
+        async (tx) => {
         const voucherNumber = `CREDIT-SALES-${Date.now()}`;
 
         const [voucher] = await tx
@@ -389,7 +410,13 @@ export function registerCreditSalesImportRoutes(app: Express) {
           currency: "USD",
           description: `Credit Sale Import - ${items.length} items`,
         });
+        return {
+          value: { voucher, totalSales },
+          resultReference: voucher.id,
+        };
       });
+      createdVoucher = operation.value.voucher;
+      totalSales = operation.value.totalSales;
 
       res.json({
         success: true,

@@ -284,6 +284,9 @@ export async function cleanupTestData(prefix: string): Promise<void> {
       await pool.query("DELETE FROM login_history WHERE company_id = $1", [company.id]);
     }
 
+    // Durable financial request reservations are company-scoped and must be
+    // removed before deleting the fixture company.
+    await pool.query("DELETE FROM financial_operation_requests WHERE company_id = $1", [company.id]);
     await clearAsyncReferences();
 
     try {

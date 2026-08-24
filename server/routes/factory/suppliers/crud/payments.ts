@@ -21,6 +21,15 @@ import {
   insertFactorySupplierPaymentSchema,
 } from "@shared/schema";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import {
+  financialOperationErrorStatus,
+  financialOperationRequestPayload,
+  resolveFinancialOperationKey,
+} from "../../../../services/accounting/financialOperationRequest";
+import {
+  financialOperationFingerprint,
+  withDurableFinancialOperation,
+} from "../../../../services/accounting/durableFinancialOperation";
 
 export function registerFactorySupplierPaymentRoutes(app: Express) {
   app.get("/api/factory/supplier-payments", requireAuth, async (req: Request, res: Response) => {
@@ -76,7 +85,20 @@ export function registerFactorySupplierPaymentRoutes(app: Express) {
         }
       }
 
-      const created = await db.transaction(async (tx) => {
+      const operationKey = resolveFinancialOperationKey(req);
+      const operation = await withDurableFinancialOperation(
+        {
+          companyId: Number(companyId),
+          operationName: "factory.supplier-payment.create",
+          idempotencyKey: operationKey,
+          requestFingerprint: financialOperationFingerprint({
+            method: req.method,
+            path: req.path,
+            companyId: Number(companyId),
+            body: financialOperationRequestPayload(req.body),
+          }),
+        },
+        async (tx) => {
         const [payment] = await tx.insert(factorySupplierPayments).values(parsed).returning();
 
         // Double-entry Payment voucher: DR Supplier Payable / CR Bank or Cash
@@ -122,29 +144,31 @@ export function registerFactorySupplierPaymentRoutes(app: Express) {
           narration: `Bank/cash outflow – factory payment #${payment.id}`,
         });
 
-        return payment;
-      });
-
-      const [spSupplier] = await db
-        .select({ name: factorySuppliers.name })
-        .from(factorySuppliers)
-        .where(eq(factorySuppliers.id, created.supplierId));
-      await writeDaybookEntry(db, {
-        companyId,
-        txDate: created.date,
-        txType: "SUPPLIER_PAYMENT",
-        referenceId: created.id,
-        referenceTable: "factory_supplier_payments",
-        description: `Supplier payment: ${spSupplier?.name || "Unknown"} – ${parseFloat(created.amount).toFixed(2)} ${created.currencyCode}`,
-        amountCurrency: parseFloat(created.amount),
-        amountUsd: parseFloat(created.amountUsd),
-        currencyCode: created.currencyCode,
-        effectiveDate: (req.body.effectiveDate as string) || null,
-      });
-      res.json(created);
+        const [spSupplier] = await tx
+          .select({ name: factorySuppliers.name })
+          .from(factorySuppliers)
+          .where(and(eq(factorySuppliers.id, payment.supplierId), eq(factorySuppliers.companyId, companyId)));
+        await writeDaybookEntry(tx, {
+          companyId,
+          txDate: payment.date,
+          txType: "SUPPLIER_PAYMENT",
+          referenceId: payment.id,
+          referenceTable: "factory_supplier_payments",
+          description: `Supplier payment: ${spSupplier?.name || "Unknown"} – ${parseFloat(payment.amount).toFixed(2)} ${payment.currencyCode}`,
+          amountCurrency: parseFloat(payment.amount),
+          amountUsd: parseFloat(payment.amountUsd),
+          currencyCode: payment.currencyCode,
+          effectiveDate: (req.body.effectiveDate as string) || null,
+        });
+        return { value: payment, resultReference: payment.id };
+        }
+      );
+      res.json(operation.value);
     } catch (error: unknown) {
       logger.error("Error creating supplier payment:", { error: error });
-      res.status(400).json({ message: getErrorMessage(error) });
+      res.status(financialOperationErrorStatus(error) === 500 ? 400 : financialOperationErrorStatus(error)).json({
+        message: getErrorMessage(error),
+      });
     }
   });
 
