@@ -6,7 +6,7 @@ import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole } from "../../auth";
 import { logAudit } from "../_helpers";
-import { containers, containerCharges, vouchers, voucherEntries } from "@shared/schema";
+import { containers, containerCharges, vouchers, voucherEntries, ledgerAccounts } from "@shared/schema";
 import type { InsertPurchaseOrder } from "@shared/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { calcPoAmounts, syncIntercoParentVoucher } from "./containerHelpers";
@@ -97,6 +97,30 @@ export function registerContainerFreightWriteRoutes(app: Express) {
             : req.body.freightParentAccountId
               ? Number(req.body.freightParentAccountId)
               : null;
+
+      // Account references are company-owned. Validate them before changing the
+      // PO so a foreign ID cannot be persisted or reach voucher accounting.
+      const requestedLedgerAccountIds = [
+        allowedUpdates.freightOwnAccountId,
+        allowedUpdates.freightParentAccountId,
+      ].filter((accountId): accountId is number => typeof accountId === "number");
+      if (requestedLedgerAccountIds.length > 0) {
+        const scopedAccounts = await db
+          .select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, existingPO.companyId),
+              inArray(ledgerAccounts.id, requestedLedgerAccountIds),
+            ),
+          );
+        const scopedAccountIds = new Set(scopedAccounts.map((account) => account.id));
+        if (requestedLedgerAccountIds.some((accountId) => !scopedAccountIds.has(accountId))) {
+          return res.status(400).json({
+            message: "Freight ledger account must belong to the purchase order company",
+          });
+        }
+      }
 
       // Set chargesEdited flag if any charge field was modified
       const chargesWereEdited =

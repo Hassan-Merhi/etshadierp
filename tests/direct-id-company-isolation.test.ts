@@ -310,6 +310,45 @@ describe("cross-company mutation isolation", () => {
     expect(after.rows).toEqual(before.rows);
   });
 
+  it("rejects foreign freight ledger IDs before changing the local PO or voucher", async () => {
+    const before = await pool.query(
+      `SELECT po_number, freight, freight_paid_by, freight_own_account_id, freight_parent_account_id
+       FROM purchase_orders WHERE id = $1`,
+      [purchaseOrderId],
+    );
+    const voucherBefore = await pool.query(
+      `SELECT v.total_amount, ve.ledger_account_id, ve.debit_amount, ve.credit_amount
+       FROM vouchers v
+       LEFT JOIN voucher_entries ve ON ve.voucher_id = v.id
+       WHERE v.id = (SELECT voucher_id FROM purchase_orders WHERE id = $1)
+       ORDER BY ve.id`,
+      [purchaseOrderId],
+    );
+
+    const response = await agent.patch(`/api/purchase-orders/${purchaseOrderId}`).send({
+      freight: "10.00",
+      freightPaidBy: "own",
+      freightOwnAccountId: foreignLedgerAccountId,
+    });
+    expect(response.status).toBe(400);
+
+    const after = await pool.query(
+      `SELECT po_number, freight, freight_paid_by, freight_own_account_id, freight_parent_account_id
+       FROM purchase_orders WHERE id = $1`,
+      [purchaseOrderId],
+    );
+    const voucherAfter = await pool.query(
+      `SELECT v.total_amount, ve.ledger_account_id, ve.debit_amount, ve.credit_amount
+       FROM vouchers v
+       LEFT JOIN voucher_entries ve ON ve.voucher_id = v.id
+       WHERE v.id = (SELECT voucher_id FROM purchase_orders WHERE id = $1)
+       ORDER BY ve.id`,
+      [purchaseOrderId],
+    );
+    expect(after.rows).toEqual(before.rows);
+    expect(voucherAfter.rows).toEqual(voucherBefore.rows);
+  });
+
   it("rejects ledger-account POST, PUT, and DELETE across companies", async () => {
     const before = await pool.query(
       "SELECT code, name, opening_balance FROM ledger_accounts WHERE id = $1",
@@ -372,6 +411,30 @@ describe("cross-company mutation isolation", () => {
       [foreignCustomerId],
     );
     expect(after.rows).toEqual(before.rows);
+  });
+
+  it("rejects customer creation with a foreign linked ledger before creating a customer", async () => {
+    const legalName = `${TEST_PREFIX} Foreign Ledger Customer`;
+    const localBefore = await pool.query(
+      "SELECT code, legal_name, ledger_account_id FROM customers WHERE id = $1",
+      [customerId],
+    );
+    const response = await agent.post("/api/customers").send({
+      legalName,
+      ledgerAccountId: foreignLedgerAccountId,
+    });
+    expect(response.status).toBe(400);
+
+    const created = await pool.query(
+      "SELECT id, company_id, ledger_account_id FROM customers WHERE legal_name = $1",
+      [legalName],
+    );
+    expect(created.rows).toHaveLength(0);
+    const localAfter = await pool.query(
+      "SELECT code, legal_name, ledger_account_id FROM customers WHERE id = $1",
+      [customerId],
+    );
+    expect(localAfter.rows).toEqual(localBefore.rows);
   });
 
   it("rejects factory mix-batch POSTs that claim or source another company", async () => {

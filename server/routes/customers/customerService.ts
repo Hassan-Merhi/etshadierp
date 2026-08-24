@@ -1,5 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
-import { customers, insertCustomerSchema } from "@shared/schema";
+import { customers, insertCustomerSchema, ledgerAccounts } from "@shared/schema";
 
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -92,6 +92,16 @@ export const customerService = {
       ...(input && typeof input === "object" ? input : {}),
       companyId,
     });
+    if (parsed.ledgerAccountId !== undefined) {
+      const [linkedLedger] = await db
+        .select({ id: ledgerAccounts.id })
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.id, parsed.ledgerAccountId), eq(ledgerAccounts.companyId, companyId)))
+        .limit(1);
+      if (!linkedLedger) {
+        throw new CustomerRouteError(400, "Linked ledger account must belong to the customer company");
+      }
+    }
     const code = await nextCustomerCode(companyId);
     const customer = await storage.createCustomer({ ...parsed, code } as {
       companyId: number;
