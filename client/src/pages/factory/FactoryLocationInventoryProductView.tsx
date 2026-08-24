@@ -181,7 +181,7 @@ export function FactoryLocationInventoryProductView({ inventory }: { inventory: 
 
       {/* KPI cards */}
       {!inventoryLoading && (
-        <div className="flex flex-wrap gap-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
           <StatCard
             icon={<Package className="h-4 w-4 text-blue-400" />}
             label="Total Bales"

@@ -19,7 +19,6 @@ import type { useBaleProductsModel } from "../useBaleProductsModel";
 type Model = ReturnType<typeof useBaleProductsModel>;
 export function BaleProductsView1({ model }: { model: Model }) {
   const {
-    designColors,
     setCreateDialogOpen,
     condensedView,
     expandedGroups,
@@ -53,7 +52,6 @@ export function BaleProductsView1({ model }: { model: Model }) {
     toggleSelectAll,
     selectedActiveIds,
     selectedHiddenIds,
-    colorUpdateMutation,
     bulkToggleActiveMutation,
     toggleGroup,
     groupedProducts,
@@ -346,40 +344,7 @@ export function BaleProductsView1({ model }: { model: Model }) {
                           <TableCell className="font-mono text-muted-foreground text-sm pl-8">
                             {product.articleCode || "-"}
                           </TableCell>
-                          <TableCell className="text-sm">
-                            <div className="flex items-center gap-2">
-                              <span>{product.name}</span>
-                              {isAdmin && (
-                                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                  <button
-                                    title="No color"
-                                    onClick={() =>
-                                      colorUpdateMutation.mutate({ id: product.id, labelDesignColor: null })
-                                    }
-                                    className={`w-5 h-5 rounded-full border border-border flex items-center justify-center transition-all ${!product.labelDesignColor ? "ring-1 ring-offset-1 ring-primary" : "opacity-50 hover:opacity-100"}`}
-                                    data-testid={`button-color-none-${product.id}`}
-                                  >
-                                    <X className="w-3 h-3 text-muted-foreground" />
-                                  </button>
-                                  {designColors.map((opt) => (
-                                    <button
-                                      key={opt.value}
-                                      title={opt.label}
-                                      onClick={() =>
-                                        colorUpdateMutation.mutate({ id: product.id, labelDesignColor: opt.value })
-                                      }
-                                      className={`w-5 h-5 rounded-full border transition-all ${product.labelDesignColor === opt.value ? "ring-1 ring-offset-1 ring-primary opacity-100" : "opacity-50 hover:opacity-100"}`}
-                                      style={{
-                                        backgroundColor: opt.color,
-                                        borderColor: opt.color === "#F5F5F5" ? "#ccc" : opt.color,
-                                      }}
-                                      data-testid={`button-color-${opt.value}-${product.id}`}
-                                    />
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
+                          <TableCell className="text-sm">{product.name}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {product.categoryId ? categoryMap.get(product.categoryId) || "-" : "-"}
                           </TableCell>
@@ -461,9 +426,6 @@ export function BaleProductsView1({ model }: { model: Model }) {
                     Sell Price
                   </TableHead>
                 )}
-                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Status
-                </TableHead>
                 <TableHead className="w-[60px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -482,38 +444,7 @@ export function BaleProductsView1({ model }: { model: Model }) {
                     />
                   </TableCell>
                   <TableCell className="font-mono font-medium">{product.articleCode || "-"}</TableCell>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <span>{product.name}</span>
-                      {isAdmin && (
-                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            title="No color"
-                            onClick={() => colorUpdateMutation.mutate({ id: product.id, labelDesignColor: null })}
-                            className={`w-5 h-5 rounded-full border border-border flex items-center justify-center transition-all ${!product.labelDesignColor ? "ring-1 ring-offset-1 ring-primary" : "opacity-50 hover:opacity-100"}`}
-                            data-testid={`button-color-none-${product.id}`}
-                          >
-                            <X className="w-3 h-3 text-muted-foreground" />
-                          </button>
-                          {designColors.map((opt) => (
-                            <button
-                              key={opt.value}
-                              title={opt.label}
-                              onClick={() =>
-                                colorUpdateMutation.mutate({ id: product.id, labelDesignColor: opt.value })
-                              }
-                              className={`w-5 h-5 rounded-full border transition-all ${product.labelDesignColor === opt.value ? "ring-1 ring-offset-1 ring-primary opacity-100" : "opacity-50 hover:opacity-100"}`}
-                              style={{
-                                backgroundColor: opt.color,
-                                borderColor: opt.color === "#F5F5F5" ? "#ccc" : opt.color,
-                              }}
-                              data-testid={`button-color-${opt.value}-${product.id}`}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
+                  <TableCell className="font-medium">{product.name}</TableCell>
                   <TableCell className="font-medium text-right" dir="rtl" lang="ar">
                     {product.nameAr || "—"}
                   </TableCell>
@@ -535,11 +466,6 @@ export function BaleProductsView1({ model }: { model: Model }) {
                         : "—"}
                     </TableCell>
                   )}
-                  <TableCell>
-                    <Badge variant={product.active ? "secondary" : "outline"}>
-                      {product.active ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
                   <TableCell>
                     {isAdmin && (
                       <Button

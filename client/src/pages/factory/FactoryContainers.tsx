@@ -1,6 +1,5 @@
 import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import FactoryOtwTrackingTab from "./FactoryOtwTrackingTab";
 import {
   Plus,
   Download,
@@ -11,7 +10,6 @@ import {
   CheckCircle2,
   Trash2,
   Ship,
-  Radio,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,7 +60,7 @@ import {
 
 export default function FactoryContainers() {
   const { selectedCompany } = useCompany();
-  const [viewMode, setViewMode] = useState<"list" | "summary" | "tracking">("tracking");
+  const [viewMode, setViewMode] = useState<"list" | "summary">("summary");
   const [_trackingNowId, _setTrackingNowId] = useState<number | null>(null);
   const [openOtwGroups, setOpenOtwGroups] = useState<Set<string>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
@@ -291,14 +289,6 @@ export default function FactoryContainers() {
           )}
           <div className="flex rounded-md border overflow-hidden">
             <Button
-              variant={viewMode === "tracking" ? "default" : "ghost"}
-              className="rounded-none"
-              onClick={() => setViewMode("tracking")}
-              data-testid="button-view-tracking"
-            >
-              <Radio className="h-4 w-4 mr-2" /> OTW Tracking
-            </Button>
-            <Button
               variant={viewMode === "summary" ? "default" : "ghost"}
               className="rounded-none"
               onClick={() => setViewMode("summary")}
@@ -332,8 +322,6 @@ export default function FactoryContainers() {
           onViewContainer={setViewContainer}
         />
       )}
-
-      {viewMode === "tracking" && <FactoryOtwTrackingTab onEdit={openEdit} />}
 
       {viewMode === "list" && (
         <ContainerListView

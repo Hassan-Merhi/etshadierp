@@ -9,8 +9,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   ArrowLeft,
   Check,
+  ChevronDown,
   ChevronsUpDown,
   RotateCcw,
   Ship,
@@ -21,7 +28,6 @@ import {
   Trash2,
   Plus,
   Wrench,
-  DollarSign,
   RefreshCw,
   FileText,
 } from "lucide-react";
@@ -110,10 +116,6 @@ export default function FactoryPendingInvoiceVerify() {
     forceSyncMutation,
     recoverBalesMutation: _recoverBalesMutation,
     autoRecoverMutation: _autoRecoverMutation,
-    applyProformaMutation,
-    applyProductionPricesMutation,
-    applySellingPricesMutation,
-    repairPerKgMutation,
     fetchFinalizePreview,
     handleAddCharge,
     getStatusBadge: _getStatusBadge,
@@ -158,7 +160,29 @@ export default function FactoryPendingInvoiceVerify() {
             <p className="text-muted-foreground text-sm">Review loaded bales against proforma</p>
           </div>
         </div>
-        <div>
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-verification-actions">
+                Actions
+                <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => setShowReturnDialog(true)}
+                disabled={returnToLoadingMutation.isPending}
+                data-testid="menu-return-to-loading"
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Return to Loading
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowViewProformaDialog(true)} data-testid="menu-view-proforma">
+                <FileText className="mr-2 h-4 w-4" />
+                View Proforma
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {isLoadingStatus && (
             <Badge
               variant="outline"
@@ -505,61 +529,7 @@ export default function FactoryPendingInvoiceVerify() {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setShowReturnDialog(true)}
-            disabled={returnToLoadingMutation.isPending}
-            data-testid="button-return-to-loading"
-          >
-            <RotateCcw className="mr-2 h-4 w-4" />
-            Return to Loading
-          </Button>
-          <Button variant="outline" onClick={() => setShowViewProformaDialog(true)} data-testid="button-view-proforma">
-            <FileText className="mr-2 h-4 w-4" />
-            View Proforma
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setSelectedProformaId("");
-              setShowProformaDialog(true);
-            }}
-            disabled={applyProformaMutation.isPending}
-            data-testid="button-apply-proforma-prices"
-          >
-            <DollarSign className="mr-2 h-4 w-4" />
-            Apply Proforma Prices
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => repairPerKgMutation.mutate()}
-            disabled={repairPerKgMutation.isPending}
-            data-testid="button-repair-perkg-prices"
-            title="Find orders with 0 price on per-kg items and recompute from actual bale weight"
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            {repairPerKgMutation.isPending ? "Repairing..." : "Repair Per-KG Prices"}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => applyProductionPricesMutation.mutate()}
-            disabled={applyProductionPricesMutation.isPending}
-            data-testid="button-apply-production-prices"
-            title="Set all bale prices to the production (cost) price from the catalogue"
-          >
-            Apply Production Price
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => applySellingPricesMutation.mutate()}
-            disabled={applySellingPricesMutation.isPending}
-            data-testid="button-apply-selling-prices"
-            title="Set all bale prices to the selling price from the catalogue"
-          >
-            Apply Selling Price
-          </Button>
-        </div>
+        <div className="flex items-center gap-2"></div>
 
         <div className="flex items-center gap-2">
           {isPending && (

@@ -12,7 +12,7 @@ import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Search, User, Trash2, FileText, RotateCcw, History, Clock } from "lucide-react";
+import { Plus, Pencil, Search, User, Trash2, FileText, RotateCcw, History, Clock, Eye, EyeOff } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PageHeader } from "@/components/PageHeader";
@@ -39,6 +39,7 @@ export default function FactoryCustomers() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
+  const [showZeroBalance, setShowZeroBalance] = useState(false);
   const [formData, setFormData] = useState({
     legalName: "",
     phone: "",
@@ -80,7 +81,13 @@ export default function FactoryCustomers() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: { legalName: string; phone: string | null; paymentTermsDays: number | null; } }) => {
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: number;
+      data: { legalName: string; phone: string | null; paymentTermsDays: number | null };
+    }) => {
       return await factoryApiRequest("PUT", `/api/factory/customers/${id}`, data);
     },
     onSuccess: () => {
@@ -185,6 +192,10 @@ export default function FactoryCustomers() {
       c.legalName.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || (c.phone && c.phone.includes(q))
     );
   });
+  const zeroBalanceCount = filtered.filter((customer) => Math.abs(customer.balance ?? 0) <= 0.001).length;
+  const visibleCustomers = showZeroBalance
+    ? filtered
+    : filtered.filter((customer) => Math.abs(customer.balance ?? 0) > 0.001);
 
   if (isLoading) {
     return (
@@ -217,10 +228,18 @@ export default function FactoryCustomers() {
           <p className="text-sm text-muted-foreground">{customers.length} total customers</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => setShowDeleted(!showDeleted)} data-testid="button-toggle-deleted">
-            <History className="h-4 w-4 mr-2" />
-            {showDeleted ? "Hide Deleted" : "Deleted Customers"}
-          </Button>
+          {zeroBalanceCount > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => setShowZeroBalance((visible) => !visible)}
+              aria-pressed={showZeroBalance}
+              data-testid="button-toggle-zero-balance"
+              className="gap-2"
+            >
+              {showZeroBalance ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showZeroBalance ? "Hide 0 Balance" : `Show 0 Balance (${zeroBalanceCount})`}
+            </Button>
+          )}
           <Button onClick={openCreate} data-testid="button-add-customer">
             <Plus className="h-4 w-4 mr-2" />
             Add Customer
@@ -257,14 +276,18 @@ export default function FactoryCustomers() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.length === 0 ? (
+              {visibleCustomers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                    {search ? "No customers match your search" : "No customers yet"}
+                    {search
+                      ? "No customers match your search"
+                      : zeroBalanceCount > 0
+                        ? "All customers currently have a zero balance"
+                        : "No customers yet"}
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((customer) => (
+                visibleCustomers.map((customer) => (
                   <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
                     <TableCell className="font-medium" data-testid={`text-customer-name-${customer.id}`}>
                       <button
