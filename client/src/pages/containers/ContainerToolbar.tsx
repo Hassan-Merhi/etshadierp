@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Download, Plus, Wrench, ChevronDown, Loader2, RefreshCw } from "lucide-react";
+import { Download, Plus, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,65 +10,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface ContainerToolbarProps {
-  isDeveloper: boolean;
-  syncAllIsPending: boolean;
-  onSyncAllClick: () => void;
   onExportExcel: () => void;
   onExportAllFull: () => void;
-  isSupplierPartner: boolean;
-  onAddDialogOpen: () => void;
-  onRefreshEtasClick?: () => void;
-  refreshEtasIsPending?: boolean;
 }
 
-export function ContainerToolbar({
-  isDeveloper,
-  syncAllIsPending,
-  onSyncAllClick,
-  onExportExcel,
-  onExportAllFull,
-  isSupplierPartner,
-  onAddDialogOpen,
-  onRefreshEtasClick,
-  refreshEtasIsPending,
-}: ContainerToolbarProps) {
+export function ContainerToolbar({ onExportExcel, onExportAllFull }: ContainerToolbarProps) {
   return (
     <div className="flex gap-2 flex-wrap">
-      {isDeveloper && (
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={onSyncAllClick}
-          disabled={syncAllIsPending}
-          data-testid="button-sync-all-vouchers"
-        >
-          {syncAllIsPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Wrench className="h-4 w-4" />
-          )}
-          Fix All PO &amp; Parent JV Sync
-        </Button>
-      )}
-
-      {isDeveloper && onRefreshEtasClick && (
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={onRefreshEtasClick}
-          disabled={refreshEtasIsPending}
-          title="Refresh ETAs via JSONCargo (Maersk / Hapag-Lloyd / MSC / CMA CGM)"
-          data-testid="button-refresh-etas"
-        >
-          {refreshEtasIsPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
-          Update ETAs
-        </Button>
-      )}
-
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" className="gap-2" data-testid="button-export-dropdown">
@@ -90,37 +38,12 @@ export function ContainerToolbar({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {isSupplierPartner ? (
-        <Link href="/po-import">
-          <Button className="gap-2" data-testid="button-add-container">
-            <Plus className="h-4 w-4" />
-            Import Container
-          </Button>
-        </Link>
-      ) : (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button className="gap-2" data-testid="button-add-dropdown">
-              <Plus className="h-4 w-4" />
-              Add
-              <ChevronDown className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onAddDialogOpen} data-testid="button-add-container">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Container
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild data-testid="button-import-po">
-              <Link href="/po-import" className="flex items-center">
-                <Plus className="h-4 w-4 mr-2" />
-                Import PO
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
+      <Link href="/po-import">
+        <Button className="gap-2" data-testid="button-add-container">
+          <Plus className="h-4 w-4" />
+          Add
+        </Button>
+      </Link>
     </div>
   );
 }

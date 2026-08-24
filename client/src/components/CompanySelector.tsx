@@ -153,19 +153,16 @@ export function CompanySelector() {
           variant="outline"
           size="sm"
           data-testid="button-company-selector"
-          aria-label={[
-            [t("company.current"), selectedCompany.name].join(": "),
-            t("company.openSwitcher"),
-          ].join(". ")}
+          aria-label={[[t("company.current"), selectedCompany.name].join(": "), t("company.openSwitcher")].join(". ")}
           title={selectedCompany.name}
-          className="h-10 max-w-[4.5rem] gap-1.5 px-2 sm:h-8 sm:max-w-[11rem] sm:pr-2"
+          className="h-10 max-w-[4.5rem] gap-1 px-1.5 sm:h-8 sm:max-w-[8rem] sm:pr-1.5"
         >
           {isOnline ? (
             <CompanyAvatar name={selectedCompany.name} type={activeType} />
           ) : (
             <WifiOff className="h-4 w-4 shrink-0 text-muted-foreground" />
           )}
-          <span className="hidden max-w-[120px] truncate sm:inline">{selectedCompany.name}</span>
+          <span className="hidden max-w-[72px] truncate text-xs sm:inline">{selectedCompany.name}</span>
           <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>

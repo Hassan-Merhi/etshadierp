@@ -5,19 +5,15 @@ import { Package, Truck, Check, MapPin } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { AddContainerDialog } from "../components/AddContainerDialog";
 // Split-out hooks
 import { useContainerQueries } from "./containers/useContainerQueries";
-import { useContainerSyncAll } from "./containers/useContainerSyncAll";
 import { useContainerNumberEdit } from "./containers/useContainerNumberEdit";
 import { useContainerImportExport } from "./containers/useContainerImportExport";
-import { useJsonCargoEta } from "./containers/useJsonCargoEta";
 // Split-out components
 import { useContainerFilters } from "./containers/useContainerFilters";
 import { ContainerFilters } from "./containers/ContainerFilters";
 import { ActiveContainersTable } from "./containers/ActiveContainersTable";
 import { ContainerToolbar } from "./containers/ContainerToolbar";
-import { ContainerConfirmDialogs } from "./containers/ContainerConfirmDialogs";
 import { ContainerLoadingState } from "./containers/ContainerLoadingState";
 import { ContainerSpView } from "./containers/ContainerSpView";
 
@@ -39,7 +35,6 @@ export default function Containers() {
     isLoading,
     spContainersLoading,
     hideContainerCosts,
-    isDeveloper,
   } = useContainerQueries(selectedCompany, isSupplierPartner, isFactory);
 
   const {
@@ -58,8 +53,6 @@ export default function Containers() {
     return supplier ? supplier.legalName : "Unknown";
   };
 
-  const syncAll = useContainerSyncAll();
-  const jsonCargoEta = useJsonCargoEta();
   const numberEdit = useContainerNumberEdit();
   const importExport = useContainerImportExport({
     containers,
@@ -93,15 +86,8 @@ export default function Containers() {
     <div className="space-y-4 sm:space-y-6">
       <PageHeader title="Container Tracking" subtitle="Track containers and manage offloading">
         <ContainerToolbar
-          isDeveloper={isDeveloper}
-          syncAllIsPending={syncAll.syncAllMutation.isPending}
-          onSyncAllClick={() => syncAll.setSyncAllConfirmOpen(true)}
           onExportExcel={importExport.exportToExcel}
           onExportAllFull={importExport.exportAllContainersFull}
-          isSupplierPartner={isSupplierPartner}
-          onAddDialogOpen={() => setAddDialogOpen(true)}
-          onRefreshEtasClick={jsonCargoEta.refreshBulk}
-          refreshEtasIsPending={jsonCargoEta.bulkIsPending}
         />
       </PageHeader>
 
@@ -196,14 +182,6 @@ export default function Containers() {
         }}
         isEditNumberPending={numberEdit.editContainerNumberMutation.isPending}
         getSupplierName={getSupplierName}
-      />
-
-      <AddContainerDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
-
-      <ContainerConfirmDialogs
-        syncAllConfirmOpen={syncAll.syncAllConfirmOpen}
-        onSyncAllConfirmOpenChange={syncAll.setSyncAllConfirmOpen}
-        onSyncAllConfirm={() => syncAll.syncAllMutation.mutate()}
       />
 
       {/* Hidden file input for tracking import */}
