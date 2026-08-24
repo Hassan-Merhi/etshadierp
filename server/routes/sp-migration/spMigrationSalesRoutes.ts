@@ -333,7 +333,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
         SELECT sub_type, id FROM ledger_accounts
         WHERE company_id = ${targetId} AND deleted_at IS NULL AND sub_type IN ('sp_goods_otw', 'sp_otw_clearing')
       `)
-        ).rows as any[];
+        ).rows;
         const otwBySubType = new Map(otwAcctRows.map((r) => [r.sub_type, pn(r.id)]));
         const otwAssetAcctId = otwBySubType.get("sp_goods_otw");
         const otwClearingAcctId = otwBySubType.get("sp_otw_clearing");
@@ -344,7 +344,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
         FROM containers WHERE company_id = ${sourceId}
         ORDER BY import_date ASC, id ASC
       `)
-        ).rows as any[];
+        ).rows;
 
         let containersCreated = 0,
           containersSkipped = 0,
@@ -388,7 +388,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
              ${"Migrated from GC-LSHI ERP container #" + c.container_number})
           RETURNING id
         `)
-          ).rows as any[];
+          ).rows;
           const newContainerId = pn(contRow.id);
           await trackRow(runId, "sp_containers", newContainerId);
           await db.execute(sql`
@@ -431,7 +431,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
                         ${otwAmount.toFixed(2)}, 'USD', 'SP_MIGRATION')
                 RETURNING id
               `)
-                ).rows as any[];
+                ).rows;
                 const otwVoucherId = pn(otwVRow.id);
                 await trackRow(runId, "vouchers", otwVoucherId);
 
@@ -441,7 +441,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
                 VALUES (${otwVoucherId}, ${otwAssetAcctId}, ${otwAmount.toFixed(2)}, '0.00', ${"Goods OTW — container " + c.container_number})
                 RETURNING id
               `)
-                ).rows as any[];
+                ).rows;
                 await trackRow(runId, "voucher_entries", pn(otwDrEntry.id));
 
                 const [otwCrEntry] = (
@@ -450,7 +450,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
                 VALUES (${otwVoucherId}, ${otwClearingAcctId}, '0.00', ${otwAmount.toFixed(2)}, ${"Goods OTW clearing — container " + c.container_number})
                 RETURNING id
               `)
-                ).rows as any[];
+                ).rows;
                 await trackRow(runId, "voucher_entries", pn(otwCrEntry.id));
 
                 rowsCreated += 3;
@@ -464,7 +464,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
               await db.execute(sql`
             SELECT stock_item_id, item_name, quantity, rate FROM po_line_items WHERE po_id = ${pn(poRow.id)}
           `)
-            ).rows as any[];
+            ).rows;
             for (const li of lineItems) {
               const srcStockItemId = li.stock_item_id ? pn(li.stock_item_id) : null;
               const targetStockItemId = srcStockItemId ? (stockItemMap.get(srcStockItemId) ?? null) : null;
@@ -479,7 +479,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
               VALUES (${newContainerId}, ${targetId}, ${li.item_name}, ${li.item_name}, ${li.quantity}, ${li.rate}, ${targetStockItemId})
               RETURNING id
             `)
-              ).rows as any[];
+              ).rows;
               await trackRow(runId, "sp_container_lines", pn(lineRow.id));
               linesCreated++;
               rowsCreated++;
@@ -604,7 +604,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
           WHERE company_id = ${targetId} AND deleted_at IS NULL
             AND sub_type IN ('gc_our_profit_share', 'gc_supplier_profit_share', 'gc_accumulated_profit_clearing')
         `)
-        ).rows as any[];
+        ).rows;
         const bySubType = new Map(acctRows.map((r) => [r.sub_type, pn(r.id)]));
         const ourAcctId = bySubType.get("gc_our_profit_share");
         const supAcctId = bySubType.get("gc_supplier_profit_share");
@@ -662,7 +662,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
                   ${profit.toFixed(2)}, 'USD', 'SP_MIGRATION')
           RETURNING id
         `)
-        ).rows as any[];
+        ).rows;
         const voucherId = pn(vRow.id);
         await trackRow(runId, "vouchers", voucherId);
 

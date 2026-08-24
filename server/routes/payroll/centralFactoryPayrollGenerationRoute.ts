@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { getClientDate } from "../../lib/dateUtils";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -21,7 +21,7 @@ function statusForGenerationError(error: unknown): number {
  * while owning generation in one transaction. The older route remains as a
  * compatibility fallback in source but is shadowed by registration order.
  */
-export function registerCentralFactoryPayrollGenerationRoute(app: Express, requireAuth: any): void {
+export function registerCentralFactoryPayrollGenerationRoute(app: Express, requireAuth: RequestHandler): void {
   app.post("/api/factory/payroll/generate", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;

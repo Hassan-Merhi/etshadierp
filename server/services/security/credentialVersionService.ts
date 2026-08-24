@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../db";
 import { eq, sql } from "drizzle-orm";
 import { userCredentialVersions } from "@shared/schema";
 
@@ -90,7 +91,7 @@ export async function hydrateActiveCredentialVersion(
   return active;
 }
 
-export async function bumpCredentialVersion(tx: any, userId: string): Promise<number> {
+export async function bumpCredentialVersion(tx: DbTransaction, userId: string): Promise<number> {
   await ensureCredentialVersionSchema(tx);
 
   const [row] = await tx
@@ -122,7 +123,7 @@ export async function rotateCredentialsAndRevokeSessions(
   userId: string,
   options: { exceptSid?: string | null } = {}
 ): Promise<number> {
-  const version = await db.transaction((tx: any) => bumpCredentialVersion(tx, userId));
+  const version = await db.transaction((tx: DbTransaction) => bumpCredentialVersion(tx, userId));
   await revokeUserSessions(pool, userId, options.exceptSid);
   return version;
 }

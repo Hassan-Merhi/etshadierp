@@ -1,5 +1,5 @@
 import { and, eq, inArray, or } from "drizzle-orm";
-import { db } from "../db";
+import { db, type DbTransaction } from "../db";
 import { adjustInventory } from "../inventoryHelper";
 import {
   interCompanyTransfers,
@@ -61,7 +61,7 @@ export function sortStockTransferDeletionItems<
 }
 
 async function assertPersistedTransferScope(input: {
-  tx: any;
+  tx: DbTransaction;
   companyId: number;
   destinationLocationId: number;
   items: Array<{ sourceLocationId: number; stockItemId: number }>;

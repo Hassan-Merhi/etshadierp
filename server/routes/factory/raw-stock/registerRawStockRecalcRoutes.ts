@@ -21,7 +21,7 @@ export function registerRawStockRecalcRoutes(app: Express): void {
   };
   const originalQuery = mutablePool.query;
 
-  mutablePool.query = function guardedRegistrationQuery(...args: any[]): Promise<any> {
+  mutablePool.query = function guardedRegistrationQuery(...args: any[]) {
     const sqlText = typeof args[0] === "string" ? args[0] : args[0]?.text;
     if (typeof sqlText === "string" && UNDO_LOG_CREATE_TABLE_PATTERN.test(sqlText)) {
       return Promise.resolve({ rows: [], rowCount: 0, command: "SKIPPED_RUNTIME_DDL", fields: [] });

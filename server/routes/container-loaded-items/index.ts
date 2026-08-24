@@ -5,13 +5,13 @@
  * Express resolves first-match, so reordering these calls can change which
  * handler serves a request - config/route-manifest.json pins the result.
  */
-import type { Express } from "express";
+import type { Express, RequestHandler } from "express";
 import { registerContainerLoadedItemCrudRoutes } from "./crud";
 import { registerContainerLoadedItemImportRoutes } from "./import";
 import { registerContainerLoadedItemReportRoutes } from "./reports";
 import { registerContainerLoadedItemSummaryRoutes } from "./summary";
 
-export function registerContainerLoadedItemsRoutes(app: Express, requireAuth: unknown) {
+export function registerContainerLoadedItemsRoutes(app: Express, requireAuth: RequestHandler) {
   registerContainerLoadedItemCrudRoutes(app, requireAuth);
   registerContainerLoadedItemImportRoutes(app, requireAuth);
   registerContainerLoadedItemReportRoutes(app, requireAuth);

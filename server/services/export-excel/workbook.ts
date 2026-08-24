@@ -222,7 +222,7 @@ export async function buildCompanyWorkbook(
 // Peak RAM = ExcelJS workbook + one dataset, instead of all datasets at once.
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function qStream(sql: string): Promise<any[]> {
+async function qStream(sql: string) {
   try {
     const r = await pool.query(sql);
     return r.rows;

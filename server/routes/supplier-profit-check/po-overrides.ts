@@ -4,11 +4,11 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { pool } from "../../db";
 
-export function registerSupplierProfitPoOverrideRoutes(app: Express, requireAuth: any) {
+export function registerSupplierProfitPoOverrideRoutes(app: Express, requireAuth: RequestHandler) {
   app.get("/api/supplier-profit-check/po-overrides", requireAuth, async (req: Request, res: Response) => {
     try {
       const supplierId = parseInt(req.query.supplierId as string);

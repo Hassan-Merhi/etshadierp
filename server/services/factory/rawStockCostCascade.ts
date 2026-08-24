@@ -6,6 +6,7 @@
  * balances, payments, or source ownership. Callers must invoke it inside the
  * transaction that owns the business event.
  */
+import type { DbTransaction } from "../../db";
 import { eq, and, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
 import {
@@ -73,7 +74,7 @@ const COMPLETED_BATCH_STATUSES = ["COMPLETED", "CLOSED"];
  * to every non-deleted bale still associated with the batch.
  */
 export async function recomputeBatchAndCascadeBales(
-  tx: any,
+  tx: DbTransaction,
   companyId: number,
   batchId: number
 ): Promise<{
@@ -155,7 +156,7 @@ export async function recomputeBatchAndCascadeBales(
  * value that remains relevant to current inventory and eligible production.
  */
 export async function cascadeContainerCostChange(
-  tx: any,
+  tx: DbTransaction,
   params: {
     companyId: number;
     containerId: number;

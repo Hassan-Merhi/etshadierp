@@ -41,7 +41,7 @@ async function getBaseCurrency(companyId: number): Promise<string> {
   return company?.baseCurrency || "USD";
 }
 
-function unresolvedOpeningPayload(body: Record<string, any>, rawAmount: Decimal): Record<string, any> {
+function unresolvedOpeningPayload(body: Record<string, any>, rawAmount: Decimal) {
   return {
     ...body,
     openingBalance: rawAmount.toFixed(),

@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../../db";
 import {
   infrastructurePostingIdentity,
   insertInfrastructureVoucherTx,
@@ -9,7 +10,7 @@ import { findOrCreateImportChargeAccounts } from "./charge-accounts";
 import { ContainerOffloadLifecycleError, ContainerOffloadLifecycleInput, amount } from "./types";
 
 export async function postChargeVouchers(
-  tx: any,
+  tx: DbTransaction,
   container: typeof schema.containers.$inferSelect,
   companyId: number,
   input: ContainerOffloadLifecycleInput

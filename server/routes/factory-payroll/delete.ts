@@ -4,7 +4,9 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response } from "express";
+import type { Database } from "../../db";
+import type { DbTransaction } from "../../db";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { logAudit } from "../helpers/auditHelpers";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -17,7 +19,7 @@ import { factoryPayrolls, factoryWorkerAdvances, factoryAdvanceRepayments } from
 
 import { writeDaybookEntry } from "./_helpers";
 
-export function registerFactoryPayrollDeleteRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryPayrollDeleteRoutes(app: Express, requireAuth: RequestHandler, db: Database) {
   app.delete("/api/factory/payroll/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId
@@ -37,7 +39,7 @@ export function registerFactoryPayrollDeleteRoutes(app: Express, requireAuth: an
       if (existing.status !== "DRAFT")
         return res.status(400).json({ message: "Only draft payroll records can be deleted" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: DbTransaction) => {
         // Restore advance balances that were settled at generate time
         const advDeducted = parseFloat(existing.advances || "0");
         if (advDeducted > 0) {

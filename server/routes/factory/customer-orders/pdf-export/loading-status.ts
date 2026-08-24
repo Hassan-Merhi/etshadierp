@@ -1,3 +1,4 @@
+import ExcelJS from "exceljs";
 import { toArrayBuffer } from "../../../../lib/bufferCompatibility";
 /**
  * orderPdfExportRoutes: OrderLoadingStatusExport endpoints.
@@ -201,7 +202,7 @@ export function registerOrderLoadingStatusExportRoutes(app: Express) {
           "NOT LOADED": { bg: "FFEEEEEE", fg: "FF555555" },
         };
 
-        const setFill = (cell: any, argb: string) => {
+        const setFill = (cell: ExcelJS.Cell, argb: string) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
         };
         const merge = (r: number, c1: number, c2: number) => sheet.mergeCells(r, c1, r, c2);

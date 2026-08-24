@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../../db";
 import {
   infrastructurePostingIdentity,
   insertInfrastructureVoucherTx,
@@ -26,7 +27,7 @@ import { computeRemainingFraction, loadActiveCharges, loadCostInputs } from "./l
 import { PostOffloadMutationParams, PostOffloadMutationResult } from "./types";
 
 export async function applyPostOffloadChargeMutation(
-  tx: any,
+  tx: DbTransaction,
   params: PostOffloadMutationParams
 ): Promise<PostOffloadMutationResult> {
   const { action, companyId, containerId, txDate, userId } = params;
