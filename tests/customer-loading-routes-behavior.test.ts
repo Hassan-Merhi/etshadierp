@@ -3,12 +3,28 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const harness = vi.hoisted(() => {
   const executeResults: unknown[] = [];
   const selectResults: unknown[][] = [];
+  const mutationResults: unknown[][] = [];
   const makeBuilder = (result: unknown[]) => {
     const builder: any = {
       from: vi.fn(() => builder),
       where: vi.fn(() => builder),
+      for: vi.fn(() => builder),
       limit: vi.fn(() => Promise.resolve(result)),
       then: (resolve: (value: unknown[]) => unknown, reject: (reason: unknown) => unknown) => Promise.resolve(result).then(resolve, reject),
+    };
+    return builder;
+  };
+  const makeMutationBuilder = () => {
+    const builder: any = {
+      values: vi.fn((values: unknown) => {
+        builder.valuesPayload = values;
+        return builder;
+      }),
+      set: vi.fn(() => builder),
+      where: vi.fn(() => builder),
+      returning: vi.fn(() => Promise.resolve(mutationResults.shift() ?? [])),
+      then: (resolve: (value: unknown[]) => unknown, reject: (reason: unknown) => unknown) =>
+        Promise.resolve([]).then(resolve, reject),
     };
     return builder;
   };
@@ -16,9 +32,14 @@ const harness = vi.hoisted(() => {
     db: {
       execute: vi.fn(async () => executeResults.shift() ?? { rows: [] }),
       select: vi.fn(() => makeBuilder(selectResults.shift() ?? [])),
+      insert: vi.fn(() => makeMutationBuilder()),
+      update: vi.fn(() => makeMutationBuilder()),
+      delete: vi.fn(() => makeMutationBuilder()),
+      transaction: vi.fn(async (callback: (tx: any) => unknown) => callback(harness.db)),
     },
     executeResults,
     selectResults,
+    mutationResults,
   };
 });
 
@@ -30,9 +51,25 @@ vi.mock("../server/lib/queryResult", () => ({ resultRows: (value: any) => value?
 vi.mock("drizzle-orm", () => ({
   eq: (column: unknown, value: unknown) => ({ type: "eq", column, value }),
   and: (...conditions: unknown[]) => ({ type: "and", conditions }),
+  ne: (column: unknown, value: unknown) => ({ type: "ne", column, value }),
+  isNull: (column: unknown) => ({ type: "isNull", column }),
+  inArray: (column: unknown, values: unknown[]) => ({ type: "inArray", column, values }),
   sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }),
 }));
 vi.mock("@shared/schema", () => ({
+  factoryBales: { id: "factoryBales.id", companyId: "factoryBales.companyId", status: "factoryBales.status", updatedAt: "factoryBales.updatedAt" },
+  customerOrders: {
+    id: "customerOrders.id", companyId: "customerOrders.companyId", customerId: "customerOrders.customerId",
+    proformaIdUsed: "customerOrders.proformaIdUsed", status: "customerOrders.status", deletedAt: "customerOrders.deletedAt",
+    locationId: "customerOrders.locationId", orderDate: "customerOrders.orderDate", containerNotes: "customerOrders.containerNotes",
+    totalQtyBales: "customerOrders.totalQtyBales", loadingStartedAt: "customerOrders.loadingStartedAt",
+    loadingFinalizedAt: "customerOrders.loadingFinalizedAt", verifiedAt: "customerOrders.verifiedAt", updatedAt: "customerOrders.updatedAt",
+    grandTotal: "customerOrders.grandTotal",
+  },
+  customerOrderBales: { orderId: "customerOrderBales.orderId", articleCode: "customerOrderBales.articleCode", baleId: "customerOrderBales.baleId", priceUsed: "customerOrderBales.priceUsed" },
+  customerProformas: { id: "customerProformas.id", companyId: "customerProformas.companyId" },
+  customerProformaLines: { proformaId: "customerProformaLines.proformaId", articleCode: "customerProformaLines.articleCode" },
+  factoryDaybookEntries: { companyId: "factoryDaybookEntries.companyId", txType: "factoryDaybookEntries.txType", referenceId: "factoryDaybookEntries.referenceId" },
   customers: {
     id: "customers.id",
     legalName: "customers.legalName",
@@ -40,14 +77,22 @@ vi.mock("@shared/schema", () => ({
     deletedAt: "customers.deletedAt",
   },
 }));
+vi.mock("../server/lib/notificationService", () => ({ dispatchNotification: vi.fn(() => Promise.resolve()) }));
+vi.mock("../server/lib/dateUtils", () => ({ getClientDate: () => "2026-08-24" }));
+vi.mock("../server/routes/factory/_helpers", () => ({ writeDaybookEntry: vi.fn(async () => ({ id: 1 })) }));
 
 import { registerCustomerLoadingRoutes } from "../server/routes/factory/products/customerLoadingRoutes";
+import { registerOrderLoadingRoutes } from "../server/routes/factory/customer-orders/finalize-loading/loading";
 
 type Handler = (req: any, res: any) => unknown;
 function buildRoutes() {
   const routes = new Map<string, Handler>();
-  const app: any = { get: (path: string, ...handlers: any[]) => routes.set(`GET ${path}`, handlers.at(-1)) };
+  const app: any = {
+    get: (path: string, ...handlers: any[]) => routes.set(`GET ${path}`, handlers.at(-1)),
+    post: (path: string, ...handlers: any[]) => routes.set(`POST ${path}`, handlers.at(-1)),
+  };
   registerCustomerLoadingRoutes(app);
+  registerOrderLoadingRoutes(app);
   return routes;
 }
 function req(overrides: Record<string, unknown> = {}) {
@@ -64,7 +109,12 @@ function resHarness() {
 
 describe("customer loading intelligence route", () => {
   const routes = buildRoutes();
-  beforeEach(() => { vi.clearAllMocks(); harness.executeResults.splice(0); harness.selectResults.splice(0); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    harness.executeResults.splice(0);
+    harness.selectResults.splice(0);
+    harness.mutationResults.splice(0);
+  });
 
   it("requires a selected company and a positive customer id", async () => {
     const noCompany = resHarness();
@@ -141,5 +191,92 @@ describe("customer loading intelligence route", () => {
     expect(historyText).toContain("co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED', 'FINALIZED')");
     expect(historyText).toContain("co.deleted_at IS NULL");
     expect(historyText).toContain("LIMIT 100");
+  });
+
+  describe("loading finalization continuation", () => {
+    const finalize = (body: Record<string, unknown> = {}) =>
+      routes.get("POST /api/factory/customer-orders/:id/finalize-loading")!(
+        req({ body, params: { id: "10" } }),
+        resHarness()
+      ) as Promise<void>;
+    const order = {
+      id: 10, companyId: 4, customerId: 12, proformaIdUsed: 7, locationId: 2, orderDate: "2026-08-24",
+      status: "LOADING", containerNotes: null, grandTotal: "0",
+    };
+    const bale = { orderId: 10, baleId: 20, articleCode: "A", priceUsed: "5" };
+    const proforma = { id: 7 };
+    const line = { proformaId: 7, articleCode: "A", quantity: 3 };
+    const setup = (overrides: { order?: any; bales?: any[]; lines?: any[]; relatedOrders?: any[]; relatedBales?: any[] } = {}) => {
+      harness.selectResults.push(
+        [overrides.order ?? order],
+        overrides.bales ?? [bale],
+        overrides.lines ?? [proforma],
+        overrides.lines === undefined ? [line] : overrides.lines,
+        overrides.relatedOrders ?? [{ id: 10 }],
+        overrides.relatedBales ?? [bale],
+        [{ legalName: "Customer A" }],
+        []
+      );
+      harness.mutationResults.push([{ id: 2 }], [{ ...order, status: "VERIFIED" }]);
+    };
+
+    it("creates one company-scoped LOADING continuation for a partial proforma", async () => {
+      setup();
+      const response = resHarness();
+      await routes.get("POST /api/factory/customer-orders/:id/finalize-loading")!(
+        req({ body: { createContinuation: true }, params: { id: "10" } }), response
+      );
+      expect(response.statusCode).toBe(200);
+      const insert = harness.db.insert.mock.results[0]?.value;
+      expect(insert.valuesPayload.companyId).toBe(4);
+      expect(insert.valuesPayload.status).toBe("LOADING");
+      expect(insert.valuesPayload.totalQtyBales).toBe(2);
+      expect(response.body.continuationOrder).toEqual(expect.objectContaining({ id: 2 }));
+    });
+
+    it("finalizes with NVM without creating a continuation", async () => {
+      setup();
+      const response = resHarness();
+      await routes.get("POST /api/factory/customer-orders/:id/finalize-loading")!(
+        req({ body: { createContinuation: false }, params: { id: "10" } }), response
+      );
+      expect(response.statusCode).toBe(200);
+      expect(harness.db.insert).not.toHaveBeenCalled();
+      expect(response.body).not.toHaveProperty("continuationOrder");
+    });
+
+    it("keeps the old behavior for full and no-proforma orders", async () => {
+      setup({ lines: [proforma], relatedBales: [{ articleCode: "A" }, { articleCode: "A" }, { articleCode: "A" }] });
+      const fullResponse = resHarness();
+      await routes.get("POST /api/factory/customer-orders/:id/finalize-loading")!(
+        req({ body: { createContinuation: true }, params: { id: "10" } }), fullResponse
+      );
+      expect(harness.db.insert).not.toHaveBeenCalled();
+      expect(fullResponse.body).not.toHaveProperty("continuationOrder");
+
+      vi.clearAllMocks();
+      harness.selectResults.splice(0);
+      harness.mutationResults.splice(0);
+      setup({ order: { ...order, proformaIdUsed: null } });
+      const noProformaResponse = resHarness();
+      await routes.get("POST /api/factory/customer-orders/:id/finalize-loading")!(
+        req({ body: { createContinuation: true }, params: { id: "10" } }), noProformaResponse
+      );
+      expect(harness.db.insert).not.toHaveBeenCalled();
+      expect(noProformaResponse.body).not.toHaveProperty("continuationOrder");
+    });
+
+    it("does not leave a finalized order or continuation after a transaction error", async () => {
+      setup();
+      harness.db.transaction.mockRejectedValueOnce(new Error("daybook write failed"));
+      const response = resHarness();
+      await routes.get("POST /api/factory/customer-orders/:id/finalize-loading")!(
+        req({ body: { createContinuation: true }, params: { id: "10" } }), response
+      );
+      expect(response.statusCode).toBe(400);
+      expect(harness.db.update).not.toHaveBeenCalled();
+      expect(harness.db.insert).not.toHaveBeenCalled();
+      expect(response.body).toEqual({ message: "daybook write failed" });
+    });
   });
 });

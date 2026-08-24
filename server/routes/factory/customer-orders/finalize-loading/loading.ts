@@ -17,6 +17,7 @@ import {
   factoryBales,
   customerOrders,
   customerOrderBales,
+  customerProformas,
   customerProformaLines,
   customers,
   factoryDaybookEntries,
@@ -91,7 +92,8 @@ export function registerOrderLoadingRoutes(app: Express) {
         const [order] = await tx
           .select()
           .from(customerOrders)
-          .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+          .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)))
+          .for("update");
         if (!order) throw new Error("Order not found");
         if (order.status !== "LOADING") throw new Error("Only LOADING orders can be finalized for loading");
 
@@ -100,10 +102,16 @@ export function registerOrderLoadingRoutes(app: Express) {
 
         let continuationOrder: typeof order | null = null;
         if (createContinuation && order.proformaIdUsed) {
-          const proformaLines = await tx
-            .select()
-            .from(customerProformaLines)
-            .where(eq(customerProformaLines.proformaId, order.proformaIdUsed));
+          const [proforma] = await tx
+            .select({ id: customerProformas.id })
+            .from(customerProformas)
+            .where(and(eq(customerProformas.id, order.proformaIdUsed), eq(customerProformas.companyId, companyId)));
+          const proformaLines = proforma
+            ? await tx
+                .select()
+                .from(customerProformaLines)
+                .where(eq(customerProformaLines.proformaId, order.proformaIdUsed))
+            : [];
           const relatedOrders = await tx
             .select({ id: customerOrders.id })
             .from(customerOrders)
@@ -247,7 +255,10 @@ export function registerOrderLoadingRoutes(app: Express) {
         companyId,
       }).catch(() => {});
 
-      res.json({ ...finalized.updated, continuationOrder: finalized.continuationOrder });
+      res.json({
+        ...finalized.updated,
+        ...(finalized.continuationOrder ? { continuationOrder: finalized.continuationOrder } : {}),
+      });
     } catch (error: unknown) {
       logger.error("Error finalizing loading:", { error: error });
       res.status(400).json({ message: getErrorMessage(error) });

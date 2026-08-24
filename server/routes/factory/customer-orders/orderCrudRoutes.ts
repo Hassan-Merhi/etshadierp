@@ -178,10 +178,16 @@ export function registerOrderCrudRoutes(app: Express) {
           }>
         | undefined;
       if (req.query.continuationFromOrderId && orderProformaId) {
-        const proformaLines = await db
-          .select()
-          .from(customerProformaLines)
-          .where(eq(customerProformaLines.proformaId, orderProformaId));
+        const [continuationProforma] = await db
+          .select({ id: customerProformas.id })
+          .from(customerProformas)
+          .where(and(eq(customerProformas.id, orderProformaId), eq(customerProformas.companyId, companyId)));
+        const proformaLines = continuationProforma
+          ? await db
+              .select()
+              .from(customerProformaLines)
+              .where(eq(customerProformaLines.proformaId, orderProformaId))
+          : [];
         const relatedOrders = await db
           .select({ id: customerOrders.id })
           .from(customerOrders)
