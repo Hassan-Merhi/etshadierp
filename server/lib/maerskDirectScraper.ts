@@ -21,6 +21,7 @@
  * Never throws — always returns a typed result.
  */
 
+import type { HTTPResponse } from "puppeteer";
 import { existsSync } from "fs";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "./logger";
@@ -462,7 +463,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     // lets us diagnose what Maersk's SPA is actually calling.
     const capturedPayloads: Array<{ url: string; data: unknown }> = [];
 
-    page.on("response", async (response: any) => {
+    page.on("response", async (response: HTTPResponse) => {
       try {
         const url: string = response.url();
         if (!/maersk\.com/i.test(url) || /\.(png|jpg|gif|svg|woff|woff2|ttf|ico|css|js)(\?|$)/i.test(url)) return;
