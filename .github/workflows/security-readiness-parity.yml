@@ -21,11 +21,11 @@ jobs:
     timeout-minutes: 25
     services:
       postgres:
-        image: postgres:15.19
+        image: postgres:16.15
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
+          POSTGRES_DB: heliumdb
         ports:
           - 5432:5432
         options: >-
@@ -33,20 +33,11 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd="redis-cli ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
     env:
       NODE_ENV: test
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
-      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
-      REDIS_URL: redis://localhost:6379
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
 
     steps:
       - name: Harden Runner (audit mode)
