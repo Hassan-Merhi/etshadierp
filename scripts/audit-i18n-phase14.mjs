@@ -87,13 +87,28 @@ function writeOutput(file, content) {
   fs.writeFileSync(file, content);
 }
 
+function decodeCompatibilityValue(quote, rawValue) {
+  // Generated translation inventories serialize their English source with
+  // JSON.stringify. Decode that one serialization layer before comparing it
+  // with scanner findings so escaped newlines, Unicode escapes, and escaped
+  // template markers match the actual source value rather than file encoding.
+  if (quote === '"') {
+    try {
+      return JSON.parse(`"${rawValue}"`);
+    } catch {
+      // Fall through to the legacy quote decoder for hand-authored entries.
+    }
+  }
+  return rawValue.replace(/\\(["'`\\])/g, "$1");
+}
+
 function loadCompatibilityCoveredValues() {
   const values = new Set();
   for (const file of compatibilityTranslationFiles) {
     if (!fs.existsSync(file)) continue;
     const source = fs.readFileSync(file, "utf8");
     for (const match of source.matchAll(/\ben\s*:\s*(["'`])((?:\\.|(?!\1).)*)\1/g)) {
-      values.add(match[2].replace(/\\(["'`])/g, "$1").trim());
+      values.add(decodeCompatibilityValue(match[1], match[2]).trim());
     }
   }
   return values;
