@@ -48,10 +48,16 @@ export function ApplicationLanguageProvider({ children }: { children: ReactNode 
   const [announcement, setAnnouncement] = useState("");
   const announcedLanguageRef = useRef(language);
   const browserPreferenceChangedRef = useRef(false);
+  const isLoginRoute =
+    typeof window !== "undefined" &&
+    (window.location.pathname === "/login" || window.location.pathname.startsWith("/login/"));
 
   const preferenceQuery = useQuery<LanguagePreferenceResponse>({
     queryKey: ["/api/language-preference"],
     retry: false,
+    // Language preferences are account data; the public login screen should
+    // use its local/default language without probing a protected endpoint.
+    enabled: !isLoginRoute,
     staleTime: 5 * 60_000,
   });
 

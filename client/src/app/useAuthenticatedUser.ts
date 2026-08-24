@@ -10,7 +10,16 @@ import { authenticatedUserQueryOptions } from "@/contracts/sessionQueryContracts
  *   - handleLogout — clears cache, clears biometric credentials, redirects
  */
 export function useAuthenticatedUser() {
-  const { data: user, isLoading, error } = useQuery(authenticatedUserQueryOptions());
+  const isLoginRoute =
+    typeof window !== "undefined" &&
+    (window.location.pathname === "/login" || window.location.pathname.startsWith("/login/"));
+  const { data: user, isLoading, error } = useQuery({
+    ...authenticatedUserQueryOptions(),
+    // The login page is public. Avoid starting an authenticated session probe
+    // while it is already being displayed; a stale render can otherwise turn
+    // the expected 401 into browser error noise.
+    enabled: !isLoginRoute,
+  });
 
   const handleLogout = async (): Promise<void> => {
     try {

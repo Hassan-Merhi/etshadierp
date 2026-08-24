@@ -6,6 +6,7 @@ import {
   authenticatedUserQueryOptions,
   fetchAuthenticatedUser,
 } from "../../client/src/contracts/sessionQueryContracts";
+import { isExpectedUnauthenticatedProbe } from "../../client/src/lib/clientObservability";
 
 function source(path: string): string {
   return readFileSync(resolve(process.cwd(), path), "utf8");
@@ -48,6 +49,40 @@ describe("authenticated request gating", () => {
     const options = authenticatedUserQueryOptions();
     expect(options.retry).toBe(3);
     expect(options.refetchOnReconnect).toBe(true);
+  });
+
+  it("keeps the unauthenticated login entry path quiet without hiding real API failures", () => {
+    const authHook = source("client/src/app/useAuthenticatedUser.ts");
+    const languageProvider = source("client/src/contexts/ApplicationLanguageContext.tsx");
+    const app = source("client/src/App.tsx");
+
+    expect(authHook).toContain('window.location.pathname === "/login"');
+    expect(authHook).toContain("enabled: !isLoginRoute");
+    expect(languageProvider).toContain("enabled: !isLoginRoute");
+    expect(app).toContain('<Route path="/login">');
+    expect(app).toContain("<Login />");
+
+    expect(
+      isExpectedUnauthenticatedProbe({
+        status: 401,
+        url: "/api/auth/me",
+        message: "Unauthorized",
+      })
+    ).toBe(true);
+    expect(
+      isExpectedUnauthenticatedProbe({
+        status: 401,
+        url: "/api/customers",
+        message: "Unauthorized",
+      })
+    ).toBe(false);
+    expect(
+      isExpectedUnauthenticatedProbe({
+        status: 503,
+        url: "/api/auth/me",
+        message: "Service unavailable",
+      })
+    ).toBe(false);
   });
 
   it("passes the already-verified user into the authenticated workspace", () => {

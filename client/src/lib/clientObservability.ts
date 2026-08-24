@@ -16,6 +16,28 @@ export interface ClientErrorReport {
   componentStack?: string;
 }
 
+/**
+ * The session probe is intentionally allowed to receive 401 when a visitor
+ * opens the public login page. It is not an application failure and should
+ * not become either browser console noise or an observability event.
+ *
+ * Keep this narrowly scoped: permission and business API 401s remain useful
+ * diagnostic signals.
+ */
+export function isExpectedUnauthenticatedProbe(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { status?: unknown; message?: unknown; url?: unknown };
+  if (candidate.status !== 401) return false;
+
+  const message = typeof candidate.message === "string" ? candidate.message : "";
+  const url = typeof candidate.url === "string" ? candidate.url : "";
+  return (
+    url.includes("/api/auth/me") ||
+    message.includes("/api/auth/me") ||
+    message.includes("Failed to load authenticated user (401)")
+  );
+}
+
 function trim(value: unknown, max: number): string | undefined {
   if (typeof value !== "string") return undefined;
   const clean = value.trim();
@@ -60,6 +82,7 @@ function isChunkFailure(value: unknown): boolean {
 
 export function reportClientError(report: ClientErrorReport): void {
   if (typeof window === "undefined") return;
+  if (report.source === "unhandled_rejection" && isExpectedUnauthenticatedProbe(report)) return;
   const message = trim(report.message, 2_000);
   if (!message) return;
   const stack = trim(report.stack, 8_000);
@@ -127,6 +150,10 @@ export function installClientObservability(): void {
   });
 
   window.addEventListener("unhandledrejection", (event) => {
+    if (isExpectedUnauthenticatedProbe(event.reason)) {
+      event.preventDefault();
+      return;
+    }
     if (isChunkFailure(event.reason)) return;
     const error = event.reason instanceof Error ? event.reason : undefined;
     reportClientError({
