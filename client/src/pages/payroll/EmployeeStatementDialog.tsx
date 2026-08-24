@@ -59,14 +59,18 @@ export function EmployeeStatementDialog({
             <div className="rounded-md border bg-muted/30 p-3">
               <p className="text-xs text-muted-foreground">Total Deposited</p>
               <p className="font-mono font-semibold text-sm mt-1">
-                {formatAmount(employeeTransactions.filter((t) => !t.isDebit).reduce((s, t) => s + Number(t.amount || 0), 0))}
+                {formatAmount(
+                  employeeTransactions.filter((t) => !t.isDebit).reduce((s, t) => s + Number(t.amount || 0), 0)
+                )}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">Credits</p>
             </div>
             <div className="rounded-md border bg-muted/30 p-3">
               <p className="text-xs text-muted-foreground">Total Withdrawn</p>
               <p className="font-mono font-semibold text-sm mt-1">
-                {formatAmount(employeeTransactions.filter((t) => t.isDebit).reduce((s, t) => s + Number(t.amount || 0), 0))}
+                {formatAmount(
+                  employeeTransactions.filter((t) => t.isDebit).reduce((s, t) => s + Number(t.amount || 0), 0)
+                )}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">Debits</p>
             </div>
@@ -180,7 +184,9 @@ export function EmployeeStatementDialog({
                                 Total
                               </TableCell>
                               <TableCell className="text-right font-mono text-sm">{formatAmount(totalDebit)}</TableCell>
-                              <TableCell className="text-right font-mono text-sm">{formatAmount(totalCredit)}</TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {formatAmount(totalCredit)}
+                              </TableCell>
                             </TableRow>
                             <TableRow className="font-semibold bg-muted/20">
                               <TableCell colSpan={3} className="text-sm text-muted-foreground">
@@ -215,7 +221,9 @@ export function EmployeeStatementDialog({
                               </div>
                               <div className="text-right shrink-0">
                                 {txn.isDebit ? (
-                                  <p className="font-mono text-sm font-medium">{formatAmount(Number(txn.amount || 0))}</p>
+                                  <p className="font-mono text-sm font-medium">
+                                    {formatAmount(Number(txn.amount || 0))}
+                                  </p>
                                 ) : (
                                   <p className="font-mono text-sm font-medium text-green-600 dark:text-green-400">
                                     {formatAmount(Number(txn.amount || 0))}
