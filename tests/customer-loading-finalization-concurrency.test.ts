@@ -116,4 +116,62 @@ describe("customer loading finalization concurrency", () => {
     );
     expect(continuations.rows).toEqual([{ id: expect.any(Number), status: "LOADING" }]);
   });
+
+  it("rejects a retry after finalization without creating more records", async () => {
+    const beforeDaybook = await pool.query<{ tx_type: string; reference_id: number }>(
+      `SELECT tx_type, reference_id
+       FROM factory_daybook_entries
+       WHERE company_id = $1
+         AND reference_table = 'customer_orders'
+         AND reference_id = $2
+         AND tx_type IN ('LOADING_SUBMITTED', 'ORDER_VERIFIED')`,
+      [ctx.companyId, orderId]
+    );
+    const beforeContinuations = await pool.query<{ id: number }>(
+      `SELECT id
+       FROM customer_orders
+       WHERE company_id = $1
+         AND proforma_id_used = $2
+         AND id <> $3
+         AND deleted_at IS NULL`,
+      [ctx.companyId, proformaId, orderId]
+    );
+
+    const retry = await agent
+      .post(`/api/factory/customer-orders/${orderId}/finalize-loading`)
+      .send({ createContinuation: true });
+
+    expect(retry.status).toBe(400);
+    expect(retry.body).toEqual({ message: "Only LOADING orders can be finalized for loading" });
+
+    const order = await pool.query<{ status: string; loading_finalized_at: Date | null }>(
+      `SELECT status, loading_finalized_at
+       FROM customer_orders
+       WHERE id = $1 AND company_id = $2`,
+      [orderId, ctx.companyId]
+    );
+    expect(order.rows).toEqual([{ status: "VERIFIED", loading_finalized_at: expect.anything() }]);
+
+    const afterContinuations = await pool.query<{ id: number }>(
+      `SELECT id
+       FROM customer_orders
+       WHERE company_id = $1
+         AND proforma_id_used = $2
+         AND id <> $3
+         AND deleted_at IS NULL`,
+      [ctx.companyId, proformaId, orderId]
+    );
+    const afterDaybook = await pool.query<{ tx_type: string; reference_id: number }>(
+      `SELECT tx_type, reference_id
+       FROM factory_daybook_entries
+       WHERE company_id = $1
+         AND reference_table = 'customer_orders'
+         AND reference_id = $2
+         AND tx_type IN ('LOADING_SUBMITTED', 'ORDER_VERIFIED')`,
+      [ctx.companyId, orderId]
+    );
+
+    expect(afterContinuations.rows).toEqual(beforeContinuations.rows);
+    expect(afterDaybook.rows).toEqual(beforeDaybook.rows);
+  });
 });
