@@ -62,7 +62,6 @@ export function PostAccountingPreviewDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Cash account selector */}
           <div className="space-y-2">
             <Label>
               Cash Account to Credit <span className="text-destructive">*</span>
@@ -81,7 +80,6 @@ export function PostAccountingPreviewDialog({
             </Select>
           </div>
 
-          {/* Preview section */}
           {unvoucheredLoading ? (
             <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -96,7 +94,7 @@ export function PostAccountingPreviewDialog({
           ) : (
             (() => {
               const selectedAcct = (cashAccounts || []).find((a) => String(a.id) === postCashAccountId);
-              const grandTotal = unvouchered.reduce((s: any, a: any) => s + parseFloat(a.amount || "0"), 0);
+              const grandTotal = unvouchered.reduce((sum, advance) => sum + parseFloat(advance.amount || "0"), 0);
               const grouped: Record<string, typeof unvouchered> = {};
               for (const adv of unvouchered) {
                 const key = adv.workerName || `Worker #${adv.workerId}`;
@@ -106,7 +104,6 @@ export function PostAccountingPreviewDialog({
 
               return (
                 <div className="space-y-4">
-                  {/* Summary boxes */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                     <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
                       <p className="text-xs text-muted-foreground mb-1">Advances to Post</p>
@@ -124,7 +121,6 @@ export function PostAccountingPreviewDialog({
                     </div>
                   </div>
 
-                  {/* Per-advance breakdown */}
                   <div className="border rounded-md overflow-hidden">
                     <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20">
                       <span>Worker / Date</span>
@@ -140,7 +136,7 @@ export function PostAccountingPreviewDialog({
                           <div className="px-4 py-1.5 bg-muted/30 text-xs font-semibold text-muted-foreground flex justify-between">
                             <span>{workerName}</span>
                             <span className="font-mono">
-                              {fmt(advs.reduce((s: any, a: any) => s + parseFloat(a.amount || "0"), 0))}
+                              {fmt(advs.reduce((sum, advance) => sum + parseFloat(advance.amount || "0"), 0))}
                             </span>
                           </div>
                           {advs.map((adv) => (
@@ -164,7 +160,6 @@ export function PostAccountingPreviewDialog({
                         </Fragment>
                       ))}
                     </div>
-                    {/* Grand total row */}
                     <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-4 py-2 text-sm font-bold bg-muted/20 border-t">
                       <span>Total</span>
                       <span></span>
@@ -209,7 +204,7 @@ export function PostAccountingPreviewDialog({
                 Posting…
               </>
             ) : (
-              `Confirm — Post ${fmt(unvouchered?.reduce((s: any, a: any) => s + parseFloat(a.amount || "0"), 0) ?? 0)} (${unvouchered?.length ?? 0} entries)`
+              `Confirm — Post ${fmt(unvouchered?.reduce((sum, advance) => sum + parseFloat(advance.amount || "0"), 0) ?? 0)} (${unvouchered?.length ?? 0} entries)`
             )}
           </Button>
         </DialogFooter>
