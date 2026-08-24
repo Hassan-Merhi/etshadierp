@@ -4,6 +4,7 @@ const skipTypeScript = process.env.PROGRAM6_SKIP_TYPESCRIPT === "1";
 
 const commands = [
   ...(skipTypeScript ? [] : [["npm", ["run", "check"]]]),
+  ["node", ["scripts/audit-company-scope.mjs", "--fail-on-findings"]],
   [
     "node",
     [
