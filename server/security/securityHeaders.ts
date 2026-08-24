@@ -12,7 +12,8 @@ import helmet, { type HelmetOptions } from "helmet";
  *
  * Inline styles remain allowed because the existing React UI uses style
  * attributes extensively. This does not weaken script execution because
- * script-src and script-src-attr remain independently locked down.
+ * script-src and script-src-attr remain independently locked down. Blob-backed
+ * frames remain allowed for authenticated stored-file/PDF previews.
  */
 export function buildSecurityHeaderOptions(nodeEnv = process.env.NODE_ENV): HelmetOptions {
   const isProduction = nodeEnv === "production";
@@ -25,6 +26,7 @@ export function buildSecurityHeaderOptions(nodeEnv = process.env.NODE_ENV): Helm
         baseUri: ["'self'"],
         objectSrc: ["'none'"],
         frameAncestors: ["'self'"],
+        frameSrc: ["'self'", "blob:"],
         formAction: ["'self'"],
         scriptSrc: isProduction
           ? ["'self'"]
