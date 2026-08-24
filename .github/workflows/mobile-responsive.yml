@@ -79,7 +79,7 @@ jobs:
       - name: Authenticated responsive and multilingual browser smoke
         run: |
           mkdir -p artifacts/ux-regression-startup
-          node dist/index.js > artifacts/ux-regression-startup/server.log 2>&1 &
+          npm start > artifacts/ux-regression-startup/server.log 2>&1 &
           app_pid=$!
           cleanup() {
             kill "$app_pid" 2>/dev/null || true
