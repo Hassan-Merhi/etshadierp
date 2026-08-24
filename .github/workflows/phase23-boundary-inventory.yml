@@ -1,4 +1,4 @@
-name: Phase 2.3 Boundary Inventory
+name: Phase 2.3 Boundary Refactor
 
 on:
   push:
@@ -9,10 +9,10 @@ permissions:
   contents: write
 
 jobs:
-  inventory:
-    if: ${{ !contains(github.event.head_commit.message, '[phase23-report]') }}
+  refactor:
+    if: ${{ !contains(github.event.head_commit.message, '[phase23-autofix]') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,14 +22,31 @@ jobs:
           node-version-file: .node-version
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: node scripts/phase23-boundary-inventory.mjs --write
-      - name: Commit inventory report
+      - name: Apply boundary typing batch
+        run: node scripts/phase23-boundary-autofix.mjs
+      - name: Format touched code
+        run: >-
+          node node_modules/prettier/bin/prettier.cjs --write
+          "server/routes/factory-intelligence/**/*.ts"
+          "server/routes/routeBoundaryTypes.ts"
+          "scripts/phase23-boundary-autofix.mjs"
+      - name: TypeScript certification
+        run: npm run check
+      - name: ESLint certification
+        run: npm run lint
+      - name: Ratchet improved type-escape baselines
+        run: UPDATE_TYPE_ESCAPE_BASELINE=1 npm run audit:type-escapes
+      - name: Refresh boundary inventory
+        run: node scripts/phase23-boundary-inventory.mjs --write
+      - name: Verify exact type-escape audit
+        run: npm run audit:type-escapes
+      - name: Commit certified batch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add artifacts/phase23-boundary-inventory.json
+          git add server/routes/factory-intelligence server/routes/routeBoundaryTypes.ts scripts/phase23-boundary-autofix.mjs config/type-escape-boundaries.json artifacts/phase23-boundary-inventory.json
           if git diff --cached --quiet; then
             exit 0
           fi
-          git commit -m "chore(types): refresh Phase 2.3 boundary inventory [phase23-report]"
+          git commit -m "refactor(types): type factory intelligence boundaries [phase23-autofix]"
           git push
