@@ -342,7 +342,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
             // Patch the filteredDaybookRows in-place.
             // BALE_STOCK_ENTRY is always overwritten so old rows stored with
             // selling price are corrected to production price on the fly.
-            for (const row of filteredDaybookRows as any[]) {
+            for (const row of filteredDaybookRows) {
               if (row.txType === "BALE_STOCK_ENTRY") {
                 const derived = rowValueMap.get(row.id);
                 if (derived && derived > 0) {
@@ -397,7 +397,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
       // desc by id so the first occurrence of each key is the most recent.
       const SINGLETON_TX_TYPES = new Set(["INVOICE", "INVOICE_REVERTED", "ORDER_VERIFIED", "ORDER_CANCELLED"]);
       const _seenSingletonKeys = new Set<string>();
-      const deduplicatedRows = (filteredDaybookRows as any[]).filter((r) => {
+      const deduplicatedRows = filteredDaybookRows.filter((r) => {
         if (!SINGLETON_TX_TYPES.has(r.txType) || r.referenceId == null) return true;
         const key = `${r.txType}:${r.referenceId}`;
         if (_seenSingletonKeys.has(key)) return false;

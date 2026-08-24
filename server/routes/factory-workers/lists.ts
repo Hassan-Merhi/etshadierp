@@ -198,7 +198,7 @@ export function registerFactoryWorkerListRoutes(app: Express, requireAuth: Reque
           )
         )
         .orderBy(factoryWorkers.nationality);
-      const list = rows.map((r: any) => r.nationality as string).filter(Boolean);
+      const list = rows.map((r) => r.nationality as string).filter(Boolean);
       res.json(list);
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });

@@ -229,7 +229,7 @@ export function registerGitAgentRoutes(app: Express) {
         sql`SELECT container_id FROM git_prepaid_designations
             WHERE company_id = ${companyId} AND agent_name = ${agentName} AND container_id = ${Number(oldContainerId)}`
       );
-      if ((existing.rows as any[]).length === 0) {
+      if (existing.rows.length === 0) {
         return res.status(409).json({
           message: `Container ${oldC.container_number} is not currently designated as prepaid for this agent.`,
         });

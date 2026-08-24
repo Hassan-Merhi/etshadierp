@@ -65,7 +65,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: RequestHandler,
         )
         .orderBy(companies.id);
 
-      let currentCompany = assignedFactories.find((company: any) => company.id === session.currentCompanyId) ?? null;
+      let currentCompany = assignedFactories.find((company) => company.id === session.currentCompanyId) ?? null;
       if (!currentCompany && session.currentRole === "Developer" && session.currentCompanyId) {
         const [developerCurrent] = await db
           .select({ id: companies.id, companyType: companies.companyType, active: companies.active })
@@ -84,7 +84,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: RequestHandler,
       const factoryCompanyId = chooseAuthorizedFactoryCompany({
         pinnedFactoryId: session.factoryCompanyId,
         currentCompany,
-        assignedFactoryIds: assignedFactories.map((company: any) => company.id),
+        assignedFactoryIds: assignedFactories.map((company) => company.id),
       });
 
       if (!factoryCompanyId) {
