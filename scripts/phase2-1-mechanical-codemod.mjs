@@ -41,6 +41,41 @@ function unsafeType(type, depth = 0, seen = new Set()) {
   const printed = checker.typeToString(type, undefined, ts.TypeFormatFlags.NoTruncation);
   return /(^|[^A-Za-z0-9_$])(any|unknown)([^A-Za-z0-9_$]|$)/.test(printed);
 }
+function isFunctionNode(node) {
+  return ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node) || ts.isMethodDeclaration(node);
+}
+function nearestFunction(node) {
+  for (let current = node.parent; current && !ts.isSourceFile(current); current = current.parent) {
+    if (isFunctionNode(current)) return current;
+  }
+  return undefined;
+}
+function hasModifier(node, kind) {
+  return Boolean(node?.modifiers?.some((modifier) => modifier.kind === kind));
+}
+function variableStatementForFunction(fn) {
+  if (!ts.isArrowFunction(fn) && !ts.isFunctionExpression(fn)) return undefined;
+  const parent = fn.parent;
+  if (!ts.isVariableDeclaration(parent)) return undefined;
+  return ts.isVariableDeclarationList(parent.parent) && ts.isVariableStatement(parent.parent.parent)
+    ? parent.parent.parent
+    : undefined;
+}
+function hasPublicInferredSurface(fn) {
+  if (fn.type) return false;
+  if (ts.isFunctionDeclaration(fn)) return hasModifier(fn, ts.SyntaxKind.ExportKeyword) || hasModifier(fn, ts.SyntaxKind.DefaultKeyword);
+  if (ts.isMethodDeclaration(fn)) {
+    if (hasModifier(fn, ts.SyntaxKind.PrivateKeyword)) return false;
+    const cls = fn.parent;
+    return ts.isClassDeclaration(cls) && (hasModifier(cls, ts.SyntaxKind.ExportKeyword) || hasModifier(cls, ts.SyntaxKind.DefaultKeyword));
+  }
+  const statement = variableStatementForFunction(fn);
+  return statement ? hasModifier(statement, ts.SyntaxKind.ExportKeyword) : false;
+}
+function localContextIsStable(node) {
+  const fn = nearestFunction(node);
+  return Boolean(fn && !hasPublicInferredSurface(fn));
+}
 function contextualParameterType(param) {
   const fn = param.parent;
   if (!ts.isArrowFunction(fn) && !ts.isFunctionExpression(fn)) return undefined;
@@ -52,19 +87,6 @@ function contextualParameterType(param) {
   if (index < 0) return undefined;
   const symbol = signatures[0].parameters[index];
   return symbol ? checker.getTypeOfSymbolAtLocation(symbol, param) : undefined;
-}
-function isFunctionNode(node) {
-  return ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node) || ts.isMethodDeclaration(node);
-}
-function hasFunctionAncestor(node) {
-  for (let current = node.parent; current && !ts.isSourceFile(current); current = current.parent) {
-    if (isFunctionNode(current)) return true;
-  }
-  return false;
-}
-function isExported(node) {
-  const statement = ts.isVariableDeclaration(node) ? node.parent?.parent : node;
-  return Boolean(statement?.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword || modifier.kind === ts.SyntaxKind.DefaultKeyword));
 }
 function collectOwnReturnExpressions(fn) {
   if (ts.isArrowFunction(fn) && !ts.isBlock(fn.body)) return [fn.body];
@@ -80,6 +102,12 @@ function collectOwnReturnExpressions(fn) {
   };
   visit(fn.body);
   return expressions;
+}
+function isExportedFunction(fn) {
+  if (ts.isFunctionDeclaration(fn)) return hasModifier(fn, ts.SyntaxKind.ExportKeyword) || hasModifier(fn, ts.SyntaxKind.DefaultKeyword);
+  if (ts.isMethodDeclaration(fn)) return !hasModifier(fn, ts.SyntaxKind.PrivateKeyword);
+  const statement = variableStatementForFunction(fn);
+  return statement ? hasModifier(statement, ts.SyntaxKind.ExportKeyword) : false;
 }
 function annotationStart(sourceFile, nameNode, typeNode) {
   const typeStart = typeNode.getStart(sourceFile);
@@ -97,10 +125,12 @@ function anyKeywordCount(sourceFile) {
 }
 
 const candidatesByFile = new Map();
+const candidateReasons = new Map();
 function addCandidate(sourceFile, start, end, text, reason) {
   const candidates = candidatesByFile.get(sourceFile.fileName) ?? [];
   candidates.push({ start, end, text, reason });
   candidatesByFile.set(sourceFile.fileName, candidates);
+  candidateReasons.set(reason, (candidateReasons.get(reason) ?? 0) + 1);
 }
 
 for (const sourceFile of program.getSourceFiles()) {
@@ -108,23 +138,23 @@ for (const sourceFile of program.getSourceFiles()) {
   if (!isTarget(relativePath)) continue;
 
   const visit = (node) => {
-    // Callback annotations are safe to remove only when a concrete contextual
-    // parameter type already exists. The compiler gate below verifies body use.
+    // Concrete context already supplies the callback parameter type. This is
+    // limited to callback expressions and never touches Express route req/res
+    // declarations or exported API signatures.
     if (ts.isParameter(node) && node.type && typeNodeHasAny(node.type) && !node.questionToken) {
       if (ts.isArrowFunction(node.parent) || ts.isFunctionExpression(node.parent)) {
         const contextual = contextualParameterType(node);
-        if (contextual && !unsafeType(contextual)) {
+        if (contextual && !unsafeType(contextual) && !hasPublicInferredSurface(node.parent)) {
           addCandidate(sourceFile, node.name.end, node.type.end, "", "contextual-callback");
         }
       }
     }
 
-    // Local initialized variables may drop an explicit escape when their
-    // initializer already has a concrete type. Empty arrays/objects are not
-    // special-cased: the per-file compiler gate rejects bad never[]/narrowing.
+    // Local initialized variables can use concrete initializer inference. The
+    // workflow's full tsc pass reverts an entire file if inference is too narrow.
     if (
       ts.isVariableDeclaration(node) &&
-      hasFunctionAncestor(node) &&
+      localContextIsStable(node) &&
       node.type &&
       typeNodeHasAny(node.type) &&
       node.initializer
@@ -135,44 +165,43 @@ for (const sourceFile of program.getSourceFiles()) {
       }
     }
 
-    // Catch variables become unknown under the repo's strict compiler config;
-    // only catches whose bodies already narrow/use that safely survive the gate.
+    // A catch variable without ': any' is unknown under the strict compiler.
+    // Files that do not already narrow it correctly are automatically reverted.
     if (
       ts.isVariableDeclaration(node) &&
       ts.isCatchClause(node.parent) &&
-      node.type?.kind === ts.SyntaxKind.AnyKeyword
+      node.type?.kind === ts.SyntaxKind.AnyKeyword &&
+      localContextIsStable(node)
     ) {
       addCandidate(sourceFile, annotationStart(sourceFile, node.name, node.type), node.type.end, "", "catch-unknown-narrowing");
     }
 
-    // Non-exported/local return annotations can rely on concrete inference.
-    if (isFunctionNode(node) && node.type && typeNodeHasAny(node.type) && node.body && (hasFunctionAncestor(node) || !isExported(node))) {
+    // Return inference is only attempted for non-exported/private function
+    // surfaces, with every direct return expression already concretely typed.
+    if (isFunctionNode(node) && node.type && typeNodeHasAny(node.type) && node.body && !isExportedFunction(node)) {
       const returns = collectOwnReturnExpressions(node);
       if (returns.length > 0 && returns.every((expr) => !unsafeType(checker.getTypeAtLocation(expr)))) {
-        const fallback = node.parameters?.end ?? node.getStart(sourceFile);
         const typeStart = node.type.getStart(sourceFile);
         const colon = sourceFile.text.lastIndexOf(":", typeStart);
-        if (colon >= fallback) addCandidate(sourceFile, colon, node.type.end, "", "local-return-inference");
+        if (colon >= (node.parameters?.end ?? node.getStart(sourceFile))) {
+          addCandidate(sourceFile, colon, node.type.end, "", "local-return-inference");
+        }
       }
     }
 
-    // Remove only casts where the underlying expression itself is already
-    // concrete. The compiler gate confirms the surrounding use still accepts it.
-    if (ts.isAsExpression(node) && node.type.kind === ts.SyntaxKind.AnyKeyword) {
-      const originalType = checker.getTypeAtLocation(node.expression);
-      if (!unsafeType(originalType)) addCandidate(sourceFile, node.expression.end, node.end, "", "redundant-as-any");
-    }
-
-    // Private initialized properties cannot alter a public API surface.
+    // A private initialized field may rely on its concrete initializer without
+    // changing a class's public surface.
     if (
       ts.isPropertyDeclaration(node) &&
-      node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.PrivateKeyword) &&
+      hasModifier(node, ts.SyntaxKind.PrivateKeyword) &&
       node.type &&
       typeNodeHasAny(node.type) &&
       node.initializer
     ) {
       const inferred = checker.getTypeAtLocation(node.initializer);
-      if (!unsafeType(inferred)) addCandidate(sourceFile, annotationStart(sourceFile, node.name, node.type), node.type.end, "", "private-property-inference");
+      if (!unsafeType(inferred)) {
+        addCandidate(sourceFile, annotationStart(sourceFile, node.name, node.type), node.type.end, "", "private-property-inference");
+      }
     }
 
     ts.forEachChild(node, visit);
@@ -180,98 +209,24 @@ for (const sourceFile of program.getSourceFiles()) {
   visit(sourceFile);
 }
 
-// Keep a single incremental language service alive while evaluating candidates.
-// This makes the codemod self-filtering: a mechanical edit is accepted only if
-// the changed file remains syntactically and semantically clean.
-const overrides = new Map();
-const versions = new Map();
-const snapshots = new Map();
-const host = {
-  getScriptFileNames: () => parsed.fileNames,
-  getScriptVersion: (fileName) => String(versions.get(fileName) ?? 0),
-  getScriptSnapshot: (fileName) => {
-    if (overrides.has(fileName)) return ts.ScriptSnapshot.fromString(overrides.get(fileName));
-    if (snapshots.has(fileName)) return snapshots.get(fileName);
-    if (!ts.sys.fileExists(fileName)) return undefined;
-    const snapshot = ts.ScriptSnapshot.fromString(ts.sys.readFile(fileName) ?? "");
-    snapshots.set(fileName, snapshot);
-    return snapshot;
-  },
-  getCurrentDirectory: () => root,
-  getCompilationSettings: () => parsed.options,
-  getDefaultLibFileName: (options) => ts.getDefaultLibFilePath(options),
-  fileExists: ts.sys.fileExists,
-  readFile: ts.sys.readFile,
-  readDirectory: ts.sys.readDirectory,
-  directoryExists: ts.sys.directoryExists,
-  getDirectories: ts.sys.getDirectories,
-  realpath: ts.sys.realpath,
-};
-const languageService = ts.createLanguageService(host, ts.createDocumentRegistry());
-
-function applyEdits(original, edits) {
-  let updated = original;
-  let lastStart = Infinity;
-  for (const edit of [...edits].sort((a, b) => b.start - a.start || b.end - a.end)) {
-    if (edit.end > lastStart) continue;
-    updated = updated.slice(0, edit.start) + edit.text + updated.slice(edit.end);
-    lastStart = edit.start;
-  }
-  return updated;
-}
-function diagnosticsFor(fileName, text) {
-  overrides.set(fileName, text);
-  versions.set(fileName, (versions.get(fileName) ?? 0) + 1);
-  return [
-    ...languageService.getSyntacticDiagnostics(fileName),
-    ...languageService.getSemanticDiagnostics(fileName),
-  ];
-}
-
 let modifiedFiles = 0;
 let removedAnyKeywords = 0;
-let rejectedCandidates = 0;
-const acceptedReasons = new Map();
-const rejectedReasons = new Map();
 const details = [];
-
 for (const [fileName, rawCandidates] of candidatesByFile) {
   const sourceFile = program.getSourceFile(fileName);
   if (!sourceFile) continue;
-  const original = sourceFile.text;
-  const baselineDiagnostics = diagnosticsFor(fileName, original);
-  if (baselineDiagnostics.length > 0) {
-    rejectedCandidates += rawCandidates.length;
-    rejectedReasons.set("preexisting-diagnostics", (rejectedReasons.get("preexisting-diagnostics") ?? 0) + rawCandidates.length);
-    continue;
+  const candidates = [...new Map(rawCandidates.map((candidate) => [`${candidate.start}:${candidate.end}`, candidate])).values()]
+    .sort((a, b) => b.start - a.start || b.end - a.end);
+  let updated = sourceFile.text;
+  let lastStart = Infinity;
+  let accepted = 0;
+  for (const candidate of candidates) {
+    if (candidate.end > lastStart) continue;
+    updated = updated.slice(0, candidate.start) + candidate.text + updated.slice(candidate.end);
+    lastStart = candidate.start;
+    accepted += 1;
   }
-
-  const unique = [...new Map(rawCandidates.map((candidate) => [`${candidate.start}:${candidate.end}`, candidate])).values()]
-    .sort((a, b) => a.start - b.start || a.end - b.end);
-  const accepted = [];
-  for (const candidate of unique) {
-    const overlaps = accepted.some((edit) => candidate.start < edit.end && candidate.end > edit.start);
-    if (overlaps) {
-      rejectedCandidates += 1;
-      rejectedReasons.set("overlap", (rejectedReasons.get("overlap") ?? 0) + 1);
-      continue;
-    }
-    const trial = applyEdits(original, [...accepted, candidate]);
-    const diagnostics = diagnosticsFor(fileName, trial);
-    if (diagnostics.length === 0) {
-      accepted.push(candidate);
-      acceptedReasons.set(candidate.reason, (acceptedReasons.get(candidate.reason) ?? 0) + 1);
-    } else {
-      rejectedCandidates += 1;
-      rejectedReasons.set(candidate.reason, (rejectedReasons.get(candidate.reason) ?? 0) + 1);
-    }
-  }
-
-  const updated = applyEdits(original, accepted);
-  overrides.set(fileName, updated);
-  versions.set(fileName, (versions.get(fileName) ?? 0) + 1);
-  if (updated === original) continue;
-
+  if (updated === sourceFile.text) continue;
   const before = anyKeywordCount(sourceFile);
   const reparsed = ts.createSourceFile(fileName, updated, ts.ScriptTarget.Latest, true, sourceFile.scriptKind);
   const after = anyKeywordCount(reparsed);
@@ -279,15 +234,13 @@ for (const [fileName, rawCandidates] of candidatesByFile) {
   fs.writeFileSync(fileName, updated);
   modifiedFiles += 1;
   removedAnyKeywords += before - after;
-  details.push({ path: rel(fileName), before, after, removed: before - after, accepted: accepted.length });
+  details.push({ path: rel(fileName), before, after, removed: before - after, candidates: accepted });
 }
 
 details.sort((a, b) => b.removed - a.removed || a.path.localeCompare(b.path));
 console.log(JSON.stringify({
   modifiedFiles,
   removedAnyKeywords,
-  rejectedCandidates,
-  acceptedReasons: Object.fromEntries(acceptedReasons),
-  rejectedReasons: Object.fromEntries(rejectedReasons),
+  candidateReasons: Object.fromEntries(candidateReasons),
   details,
 }, null, 2));
