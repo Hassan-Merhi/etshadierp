@@ -4,7 +4,7 @@ import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { eq, and, desc } from "drizzle-orm";
-import { factoryWorkers, factoryWorkerDeductions } from "@shared/schema";
+import { employees, factoryWorkers, factoryWorkerDeductions } from "@shared/schema";
 import { getFactoryCompanyId, getErpCompanyId } from "./helpers";
 
 export function registerWorkerDeductionsRoutes(app: Express) {
@@ -17,7 +17,8 @@ export function registerWorkerDeductionsRoutes(app: Express) {
           id: factoryWorkerDeductions.id,
           companyId: factoryWorkerDeductions.companyId,
           workerId: factoryWorkerDeductions.workerId,
-          workerName: factoryWorkers.fullName,
+          employeeFirstName: employees.firstName,
+          employeeLastName: employees.lastName,
           amount: factoryWorkerDeductions.amount,
           reason: factoryWorkerDeductions.reason,
           deductionDate: factoryWorkerDeductions.deductionDate,
@@ -26,10 +27,18 @@ export function registerWorkerDeductionsRoutes(app: Express) {
           createdAt: factoryWorkerDeductions.createdAt,
         })
         .from(factoryWorkerDeductions)
-        .leftJoin(factoryWorkers, eq(factoryWorkerDeductions.workerId, factoryWorkers.id))
+        .leftJoin(
+          employees,
+          and(eq(factoryWorkerDeductions.workerId, employees.id), eq(employees.companyId, companyId))
+        )
         .where(eq(factoryWorkerDeductions.companyId, companyId))
         .orderBy(desc(factoryWorkerDeductions.createdAt));
-      res.json(rows);
+      res.json(
+        rows.map(({ employeeFirstName, employeeLastName, ...row }) => ({
+          ...row,
+          workerName: `${employeeFirstName ?? ""} ${employeeLastName ?? ""}`.trim() || `Worker #${row.workerId}`,
+        }))
+      );
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
