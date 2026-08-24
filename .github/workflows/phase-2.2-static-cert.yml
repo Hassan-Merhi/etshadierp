@@ -1,3 +1,4 @@
+# Temporary Phase 2.2 CI retrigger; remove before merge.
 name: Phase 2.2 Static Certification
 
 on:
