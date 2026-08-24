@@ -1,9 +1,9 @@
 name: Phase 2.4 DB Boundary Workbench
 
 on:
-  push:
-    branches: [phase-2.4-backend-db-type-safety]
-    paths: [.phase24-db-trigger]
+  pull_request:
+    branches: [main]
+    types: [reopened]
 
 permissions:
   contents: write
