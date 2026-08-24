@@ -42,7 +42,7 @@ describe("worker bales PDF generator", () => {
         },
       ],
       "2026-08-24",
-      "HMD International",
+      "HMD International"
     );
 
     expect(Buffer.isBuffer(pdf)).toBe(true);
@@ -54,12 +54,10 @@ describe("worker bales PDF generator", () => {
     const pdf = await generateWorkerBalesPdf(
       [
         {
-          bales: [
-            { referenceNumber: null, workerName: null, productName: null, articleCode: null, weightKg: null },
-          ],
+          bales: [{ referenceNumber: null, workerName: null, productName: null, articleCode: null, weightKg: null }],
         },
       ],
-      "2026-08-24",
+      "2026-08-24"
     );
 
     expect(pdf.subarray(0, 4).toString()).toBe("%PDF");

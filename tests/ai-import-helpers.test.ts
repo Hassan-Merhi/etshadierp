@@ -105,7 +105,7 @@ describe("AI import ownership and correction memory", () => {
         resolvedId: 31,
         confidence: 100,
         createdBy: "u2",
-      }),
+      })
     );
   });
 });
@@ -115,7 +115,7 @@ describe("AI import validators", () => {
     harness.selectResults.push(
       [{ code: "EXIST" }],
       [{ id: 9, name: "Hardware", code: "HW" }],
-      [{ rawValue: "remembered", resolvedId: 10 }],
+      [{ rawValue: "remembered", resolvedId: 10 }]
     );
 
     const result = await validateStockItemRows(7, [
@@ -142,7 +142,10 @@ describe("AI import validators", () => {
       { id: 2, rowNumber: 2, rawData: { name: "Bob", code: "C-2" } },
       { id: 3, rowNumber: 3, rawData: { name: "", code: "C-1" } },
     ]);
-    expect(customers[0]).toMatchObject({ status: "valid", mappedData: expect.objectContaining({ legalName: "Alice" }) });
+    expect(customers[0]).toMatchObject({
+      status: "valid",
+      mappedData: expect.objectContaining({ legalName: "Alice" }),
+    });
     expect(customers[1].errors.join(" ")).toContain("duplicated within this import");
     expect(customers[2].errors).toEqual(expect.arrayContaining(["name is required", 'code "C-1" already exists']));
 
@@ -164,7 +167,7 @@ describe("AI import validators", () => {
         { id: 101, name: "Cash", code: "1000" },
         { id: 202, name: "Sales", code: "4000" },
       ],
-      [{ rawValue: "cashbox", resolvedId: 101, resolvedValue: "Cash" }],
+      [{ rawValue: "cashbox", resolvedId: 101, resolvedValue: "Cash" }]
     );
 
     const result = await validateVoucherRows(7, [
@@ -223,8 +226,13 @@ describe("AI import posters", () => {
       "u1",
       "Operator",
       "stock_items",
-      [{ id: 1, mappedData: { name: "Hammer", code: "H1", sellingPrice: "10.00", reorderLevel: "2.00", stockGroupId: 9 } }],
-      stockTx as never,
+      [
+        {
+          id: 1,
+          mappedData: { name: "Hammer", code: "H1", sellingPrice: "10.00", reorderLevel: "2.00", stockGroupId: 9 },
+        },
+      ],
+      stockTx as never
     );
     expect(stock).toEqual([{ rowId: 1, recordType: "stock_item", recordId: 501 }]);
 
@@ -234,8 +242,13 @@ describe("AI import posters", () => {
       "u1",
       "Operator",
       "customers",
-      [{ id: 2, mappedData: { name: "Alice", legalName: "Alice Ltd", code: "C1", phone: "1", email: "a@example.com" } }],
-      customerTx as never,
+      [
+        {
+          id: 2,
+          mappedData: { name: "Alice", legalName: "Alice Ltd", code: "C1", phone: "1", email: "a@example.com" },
+        },
+      ],
+      customerTx as never
     );
     expect(customer).toEqual([{ rowId: 2, recordType: "customer", recordId: 601 }]);
 
@@ -246,7 +259,7 @@ describe("AI import posters", () => {
       "Operator",
       "suppliers",
       [{ id: 3, mappedData: { legalName: "Supply Co", code: "S1", openingBalance: "50" } }],
-      supplierTx as never,
+      supplierTx as never
     );
     expect(supplier).toEqual([{ rowId: 3, recordType: "supplier", recordId: 701 }]);
 

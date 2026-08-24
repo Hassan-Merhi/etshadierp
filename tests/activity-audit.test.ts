@@ -24,7 +24,7 @@ function request(
     userId: "user-1",
     username: "Operator",
     currentCompanyId: 7,
-  },
+  }
 ): Request {
   return {
     method,
@@ -85,7 +85,7 @@ describe("successful activity audit", () => {
         action,
         tableName,
         recordId,
-      }),
+      })
     );
   });
 
@@ -105,9 +105,9 @@ describe("successful activity audit", () => {
           username: "Factory Admin",
           factoryCompanyId: 12,
           currentCompanyId: 7,
-        },
+        }
       ),
-      201,
+      201
     );
 
     await vi.waitFor(() => expect(harness.logAudit).toHaveBeenCalledTimes(1));
@@ -119,7 +119,7 @@ describe("successful activity audit", () => {
           currency: { old: null, new: "USD" },
           scope: { old: null, new: "container" },
         },
-      }),
+      })
     );
   });
 
@@ -130,7 +130,7 @@ describe("successful activity audit", () => {
     await vi.waitFor(() => expect(harness.warn).toHaveBeenCalledTimes(1));
     expect(harness.warn).toHaveBeenCalledWith(
       "Activity audit write failed after successful request",
-      expect.objectContaining({ action: "void", path: "/api/pos/sale/88/void" }),
+      expect.objectContaining({ action: "void", path: "/api/pos/sale/88/void" })
     );
   });
 });

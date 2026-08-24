@@ -138,7 +138,7 @@ describe("historical replay scope", () => {
       computeReplayFingerprint(7, [2], preview as never, {
         includeCompletedBatches: true,
         includeFinalizedBales: true,
-      }),
+      })
     ).toBe(baseline);
   });
 
@@ -187,7 +187,7 @@ describe("historical replay scope", () => {
       [],
       preview as never,
       { includeCompletedBatches: false, includeFinalizedBales: false },
-      { query } as never,
+      { query } as never
     );
 
     expect([...scope.safeSupplierIds]).toEqual([]);
