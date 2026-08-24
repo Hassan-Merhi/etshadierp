@@ -1,3 +1,4 @@
+import ExcelJS from "exceljs";
 import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -317,7 +318,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
         { key: "note", width: 40 },
       ];
 
-      const addTitle = (ws: any, text: string, argb: string) => {
+      const addTitle = (ws: ExcelJS.Worksheet, text: string, argb: string) => {
         const row = ws.addRow([text]);
         row.height = 28;
         const cell = row.getCell(1);
@@ -327,7 +328,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
         ws.mergeCells(`A${row.number}:C${row.number}`);
       };
 
-      const addSubheader = (ws: any, text: string, argb: string) => {
+      const addSubheader = (ws: ExcelJS.Worksheet, text: string, argb: string) => {
         const row = ws.addRow([text]);
         row.height = 18;
         const cell = row.getCell(1);
