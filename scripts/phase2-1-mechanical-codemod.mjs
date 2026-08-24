@@ -14,6 +14,13 @@ const program = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.
 const checker = program.getTypeChecker();
 
 const TARGET_PREFIXES = ["server/", "shared/", "client/src/lib/"];
+const requestedCategories = new Set(
+  (process.env.PHASE21_CATEGORY ?? "all")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean),
+);
+const categoryEnabled = (reason) => requestedCategories.has("all") || requestedCategories.has(reason);
 
 function rel(fileName) {
   return path.relative(root, fileName).split(path.sep).join("/");
@@ -61,6 +68,11 @@ function variableStatementForFunction(fn) {
     ? parent.parent.parent
     : undefined;
 }
+function isVariableStatementExported(declaration) {
+  const list = declaration.parent;
+  const statement = list && ts.isVariableDeclarationList(list) ? list.parent : undefined;
+  return Boolean(statement && ts.isVariableStatement(statement) && (hasModifier(statement, ts.SyntaxKind.ExportKeyword) || hasModifier(statement, ts.SyntaxKind.DefaultKeyword)));
+}
 function hasPublicInferredSurface(fn) {
   if (fn.type) return false;
   if (ts.isFunctionDeclaration(fn)) return hasModifier(fn, ts.SyntaxKind.ExportKeyword) || hasModifier(fn, ts.SyntaxKind.DefaultKeyword);
@@ -75,6 +87,16 @@ function hasPublicInferredSurface(fn) {
 function localContextIsStable(node) {
   const fn = nearestFunction(node);
   return Boolean(fn && !hasPublicInferredSurface(fn));
+}
+function isModuleLocalVariable(node) {
+  if (!ts.isVariableDeclaration(node) || isVariableStatementExported(node)) return false;
+  const list = node.parent;
+  const statement = list && ts.isVariableDeclarationList(list) ? list.parent : undefined;
+  return Boolean(statement && ts.isVariableStatement(statement) && ts.isSourceFile(statement.parent));
+}
+function isNonExportedClass(node) {
+  if (!ts.isClassDeclaration(node)) return false;
+  return !hasModifier(node, ts.SyntaxKind.ExportKeyword) && !hasModifier(node, ts.SyntaxKind.DefaultKeyword);
 }
 function contextualParameterType(param) {
   const fn = param.parent;
@@ -114,6 +136,15 @@ function annotationStart(sourceFile, nameNode, typeNode) {
   const colon = sourceFile.text.lastIndexOf(":", typeStart);
   return colon >= nameNode.end ? colon : typeStart;
 }
+function expressionHasStableLocalSurface(node) {
+  const fn = nearestFunction(node);
+  if (fn) return !hasPublicInferredSurface(fn);
+  for (let current = node.parent; current && !ts.isSourceFile(current); current = current.parent) {
+    if (ts.isVariableDeclaration(current)) return isModuleLocalVariable(current);
+    if (ts.isPropertyDeclaration(current) && ts.isClassDeclaration(current.parent)) return isNonExportedClass(current.parent);
+  }
+  return false;
+}
 function anyKeywordCount(sourceFile) {
   let count = 0;
   const visit = (node) => {
@@ -127,6 +158,7 @@ function anyKeywordCount(sourceFile) {
 const candidatesByFile = new Map();
 const candidateReasons = new Map();
 function addCandidate(sourceFile, start, end, text, reason) {
+  if (!categoryEnabled(reason)) return;
   const candidates = candidatesByFile.get(sourceFile.fileName) ?? [];
   candidates.push({ start, end, text, reason });
   candidatesByFile.set(sourceFile.fileName, candidates);
@@ -138,9 +170,6 @@ for (const sourceFile of program.getSourceFiles()) {
   if (!isTarget(relativePath)) continue;
 
   const visit = (node) => {
-    // Concrete context already supplies the callback parameter type. This is
-    // limited to callback expressions and never touches Express route req/res
-    // declarations or exported API signatures.
     if (ts.isParameter(node) && node.type && typeNodeHasAny(node.type) && !node.questionToken) {
       if (ts.isArrowFunction(node.parent) || ts.isFunctionExpression(node.parent)) {
         const contextual = contextualParameterType(node);
@@ -148,25 +177,26 @@ for (const sourceFile of program.getSourceFiles()) {
           addCandidate(sourceFile, node.name.end, node.type.end, "", "contextual-callback");
         }
       }
-    }
 
-    // Local initialized variables can use concrete initializer inference. The
-    // workflow's full tsc pass reverts an entire file if inference is too narrow.
-    if (
-      ts.isVariableDeclaration(node) &&
-      localContextIsStable(node) &&
-      node.type &&
-      typeNodeHasAny(node.type) &&
-      node.initializer
-    ) {
-      const inferred = checker.getTypeAtLocation(node.initializer);
-      if (!unsafeType(inferred)) {
-        addCandidate(sourceFile, annotationStart(sourceFile, node.name, node.type), node.type.end, "", "local-variable-inference");
+      if (node.initializer && localContextIsStable(node)) {
+        const inferred = checker.getTypeAtLocation(node.initializer);
+        if (!unsafeType(inferred)) {
+          addCandidate(sourceFile, annotationStart(sourceFile, node.name, node.type), node.type.end, "", "default-parameter-inference");
+        }
       }
     }
 
-    // A catch variable without ': any' is unknown under the strict compiler.
-    // Files that do not already narrow it correctly are automatically reverted.
+    if (ts.isVariableDeclaration(node) && node.type && typeNodeHasAny(node.type) && node.initializer) {
+      const inferred = checker.getTypeAtLocation(node.initializer);
+      if (!unsafeType(inferred)) {
+        if (localContextIsStable(node)) {
+          addCandidate(sourceFile, annotationStart(sourceFile, node.name, node.type), node.type.end, "", "local-variable-inference");
+        } else if (isModuleLocalVariable(node)) {
+          addCandidate(sourceFile, annotationStart(sourceFile, node.name, node.type), node.type.end, "", "module-variable-inference");
+        }
+      }
+    }
+
     if (
       ts.isVariableDeclaration(node) &&
       ts.isCatchClause(node.parent) &&
@@ -176,8 +206,6 @@ for (const sourceFile of program.getSourceFiles()) {
       addCandidate(sourceFile, annotationStart(sourceFile, node.name, node.type), node.type.end, "", "catch-unknown-narrowing");
     }
 
-    // Return inference is only attempted for non-exported/private function
-    // surfaces, with every direct return expression already concretely typed.
     if (isFunctionNode(node) && node.type && typeNodeHasAny(node.type) && node.body && !isExportedFunction(node)) {
       const returns = collectOwnReturnExpressions(node);
       if (returns.length > 0 && returns.every((expr) => !unsafeType(checker.getTypeAtLocation(expr)))) {
@@ -189,18 +217,25 @@ for (const sourceFile of program.getSourceFiles()) {
       }
     }
 
-    // A private initialized field may rely on its concrete initializer without
-    // changing a class's public surface.
-    if (
-      ts.isPropertyDeclaration(node) &&
-      hasModifier(node, ts.SyntaxKind.PrivateKeyword) &&
-      node.type &&
-      typeNodeHasAny(node.type) &&
-      node.initializer
-    ) {
+    if (ts.isPropertyDeclaration(node) && node.type && typeNodeHasAny(node.type) && node.initializer) {
       const inferred = checker.getTypeAtLocation(node.initializer);
       if (!unsafeType(inferred)) {
-        addCandidate(sourceFile, annotationStart(sourceFile, node.name, node.type), node.type.end, "", "private-property-inference");
+        if (hasModifier(node, ts.SyntaxKind.PrivateKeyword)) {
+          addCandidate(sourceFile, annotationStart(sourceFile, node.name, node.type), node.type.end, "", "private-property-inference");
+        } else if (ts.isClassDeclaration(node.parent) && isNonExportedClass(node.parent)) {
+          addCandidate(sourceFile, annotationStart(sourceFile, node.name, node.type), node.type.end, "", "module-class-property-inference");
+        }
+      }
+    }
+
+    if (
+      ts.isAsExpression(node) &&
+      node.type.kind === ts.SyntaxKind.AnyKeyword &&
+      expressionHasStableLocalSurface(node)
+    ) {
+      const expressionType = checker.getTypeAtLocation(node.expression);
+      if (!unsafeType(expressionType)) {
+        addCandidate(sourceFile, node.expression.end, node.end, "", "redundant-local-as-any");
       }
     }
 
@@ -239,6 +274,7 @@ for (const [fileName, rawCandidates] of candidatesByFile) {
 
 details.sort((a, b) => b.removed - a.removed || a.path.localeCompare(b.path));
 console.log(JSON.stringify({
+  requestedCategories: [...requestedCategories],
   modifiedFiles,
   removedAnyKeywords,
   candidateReasons: Object.fromEntries(candidateReasons),
