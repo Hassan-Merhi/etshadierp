@@ -542,15 +542,22 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
     setIsTransferSavingRevision(true);
     savingTransferRevisionRef.current = true;
     try {
-      let submitted = false;
-      await stockTransferForm.handleSubmit(async (data) => {
-        submitted = true;
-        await onStockTransferSubmit(data);
-      })();
-      if (!submitted) return;
+      // POS users are only allowed to submit a pending revision for review.
+      // Do not submit the transfer itself first: that update endpoint is
+      // intentionally restricted to non-POS users and would reject the
+      // revision flow before the pending revision can be saved.
+      if (!isPOS) {
+        let submitted = false;
+        await stockTransferForm.handleSubmit(async (data) => {
+          submitted = true;
+          await onStockTransferSubmit(data);
+        })();
+        if (!submitted) return;
+      }
       const revisionResponse = await modeApiRequest("POST", `/api/stock-transfers/${transferId}/revisions`, {
         note: transferRevisionNote.trim() || null,
         items: revisionItems,
+        optional: isPOS,
       });
       if (!revisionResponse.ok) {
         let message = "The transfer was updated, but its revision record could not be saved.";
