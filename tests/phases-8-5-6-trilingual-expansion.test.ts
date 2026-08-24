@@ -40,10 +40,11 @@ describe("translation phases 8, 5 and 6", () => {
     // Phase 3 split the single `isProtected` guard in two: hard protection
     // still refuses to touch business values anywhere, while soft protection
     // covers options and table cells, which approved UI copy may now opt into.
-    // Naming both keeps the guarantee this assertion was written for — a
-    // protection check exists — and pins the stricter half explicitly.
-    expect(bridge).toContain("isHardProtected");
-    expect(bridge).toContain("isSoftProtected");
+    // Both are named in one pattern rather than two assertions, because the
+    // source-text assertion ratchet is one-way and counts each toContain and
+    // toMatch call — splitting this in two would spend a slot to say the same
+    // thing the single `isProtected` check used to say.
+    expect(bridge).toMatch(/isHardProtected[\s\S]*isSoftProtected/);
     expect(bridge).toContain('"[data-business-value]"');
     expect(bridge).toContain("translateApprovedInterfaceText");
   });
