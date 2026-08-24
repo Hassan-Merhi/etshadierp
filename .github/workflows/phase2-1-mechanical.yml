@@ -32,6 +32,20 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Measure starting scanner state
         run: npm run audit:type-escapes
+      - name: Verify backend test baseline
+        shell: bash
+        run: |
+          set +e
+          npm run test:backend 2>&1 | tee phase2-1-backend-baseline.log
+          status=${PIPESTATUS[0]}
+          set -e
+          exit "$status"
+      - name: Upload backend baseline failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase2-1-backend-baseline-failure
+          path: phase2-1-backend-baseline.log
       - name: Apply surgical mechanical codemod
         run: node scripts/phase2-1-mechanical-codemod.mjs | tee phase2-1-codemod-report.json
       - name: Filter compiler-unsafe files
@@ -62,6 +76,12 @@ jobs:
 
           echo "Rechecking after conservative file-level reverts..."
           npm run check
+      - name: Snapshot compiler-safe mechanical batch
+        shell: bash
+        run: |
+          git diff --name-only -- server shared client/src/lib | sort -u > phase2-1-compiler-safe-files.txt
+          git diff -- server shared client/src/lib > phase2-1-compiler-safe.patch
+          cat phase2-1-compiler-safe-files.txt
       - name: Lock exact lowered baseline
         env:
           UPDATE_TYPE_ESCAPE_BASELINE: "1"
@@ -77,7 +97,25 @@ jobs:
       - name: Changed-file formatting
         run: npm run format:check:changed
       - name: Backend tests
-        run: npm run test:backend
+        shell: bash
+        run: |
+          set +e
+          npm run test:backend 2>&1 | tee phase2-1-backend-candidate.log
+          status=${PIPESTATUS[0]}
+          set -e
+          exit "$status"
+      - name: Upload candidate diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase2-1-candidate-diagnostics
+          path: |
+            phase2-1-backend-candidate.log
+            phase2-1-codemod-report.json
+            phase2-1-compiler-safe-files.txt
+            phase2-1-compiler-safe.patch
+            phase2-1-failing-files.txt
+          if-no-files-found: ignore
       - name: Build
         run: npm run build
       - name: Persist green mechanical batch
