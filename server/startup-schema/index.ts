@@ -33,6 +33,7 @@ import { stockMergeAuditUserId } from "./019-stock-merge-audit-user-id";
 import { v3LoadUserId } from "./020-v3-load-user-id";
 import { canonicalStockMovementJournal } from "./021-canonical-stock-movement-journal";
 import { tenantControlIntegrityRepairs } from "./022-tenant-control-integrity-repairs";
+import { financialOperationRequests } from "./023-financial-operation-requests";
 
 export const startupMigrations: string[] = [
   ...coreTablesAndColumns,
@@ -61,9 +62,11 @@ export const startupMigrations: string[] = [
   // tables that create them.
   ...canonicalStockMovementJournal,
   ...tenantControlIntegrityRepairs,
+  ...financialOperationRequests,
 ];
 
 // Re-exported so server/index.ts can bootstrap the journal from the module it
 // already imports for the ordered pass: the journal has to exist in every
 // migration mode, including the production one that skips that pass.
 export { ensureCanonicalStockMovementJournal } from "../services/inventory/ensureCanonicalStockMovementJournal";
+export { ensureFinancialOperationRequests } from "../services/accounting/ensureFinancialOperationRequests";

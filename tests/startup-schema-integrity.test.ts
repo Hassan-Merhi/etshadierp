@@ -24,7 +24,7 @@ import { describe, expect, it } from "vitest";
 import { startupMigrations } from "../server/startup-schema";
 
 /** Statement count of the reviewed composed array. */
-const EXPECTED_STATEMENT_COUNT = 1335;
+const EXPECTED_STATEMENT_COUNT = 1338;
 
 /**
  * sha256 of JSON.stringify(startupMigrations) for the reviewed composed array.
@@ -60,6 +60,10 @@ const EXPECTED_STATEMENT_COUNT = 1335;
  * collapses duplicate company roles and removes user-location rows without
  * a matching company role.
  *
+ * Re-pinned again when the generic transaction-owned financial operation
+ * request table and its two indexes were appended as startup stage 023,
+ * taking the count from 1335 to 1338.
+ *
  * Re-pinned again when three VALIDATE statements were removed from
  * 007-schema-catchup-may-2026.ts, taking the count from 1288 to 1285. They
  * validated factory_raw_stock, factory_fx_allocations and
@@ -69,7 +73,7 @@ const EXPECTED_STATEMENT_COUNT = 1335;
  * parent table and raised foreign_key_violation on every boot of a database
  * holding factory rows. Only those three were deleted and no statement moved.
  */
-const EXPECTED_CONTENT_HASH = "009308a108ae07a57fa35f5d352369260268ceee3a82991c6e8834a506fb8a18";
+const EXPECTED_CONTENT_HASH = "cc00c4e9e221a9dae06e9a9c321066dd1deb68a6957a6eedaab54090396e4094";
 
 function contentHash(statements: string[]): string {
   return crypto.createHash("sha256").update(JSON.stringify(statements)).digest("hex");

@@ -7,4 +7,6 @@ The duplicate-posting standard distinguishes four states: replay-safe, intention
 
 **Why:** The audit found that central posting, selected POS/inventory flows, infrastructure voucher phases, and exact reversals already have durable protection, while legacy payroll, rental, import, raw-stock, container, supplier, repair, and replacement flows vary materially.
 
-**How to apply:** When implementing the shared boundary, preserve legitimate repeated events with new identities, keep edits/reversals separate from creates, and require the identity marker and financial effects to share an atomic recovery boundary.
+The shared Phase 2 boundary is transaction-owned: reserve, financial effects, result reference, and completion payload use the caller's same database transaction. A thrown operation rolls back the reservation, while a committed result is replayable; a pre-existing processing marker fails closed rather than rerunning.
+
+**How to apply:** When implementing the shared boundary, preserve legitimate repeated events with new identities, keep edits/reversals separate from creates, and require the identity marker and financial effects to share an atomic recovery boundary. Do not treat an HTTP response-capture table as the financial commit authority.
