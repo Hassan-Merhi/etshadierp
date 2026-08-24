@@ -13,7 +13,8 @@
     "POST /api/stock-transfers/:transferId/revisions [requireAuth > requireNonPOS > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
-    "USE /api/factory/v5/stock-allocation [<anonymous>]"
+    "USE /api/factory/v5/stock-allocation [<anonymous>]",
+    "USE / [helmetMiddleware]"
   ],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [

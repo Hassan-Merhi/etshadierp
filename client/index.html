@@ -22,19 +22,6 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", function () {
-          navigator.serviceWorker
-            .register("/sw.js", { updateViaCache: "none" })
-            .catch(function () {
-              // Older browsers may not understand updateViaCache. Keep the
-              // original registration path as a compatibility fallback.
-              return navigator.serviceWorker.register("/sw.js");
-            })
-            .catch(function () {});
-        });
-      }
-    </script>
+    <script type="module" src="/src/registerServiceWorker.ts"></script>
   </body>
 </html>

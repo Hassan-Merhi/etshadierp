@@ -1,5 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 
+import { getCompanyRequestRuntimeContext } from "./companyRequestRuntimeContext";
+
 /**
  * Minimal structural view of a database transaction handle.
  *
@@ -50,10 +52,19 @@ function positiveCompanyId(value: unknown): number {
 /**
  * Assert the authoritative company on the current PostgreSQL transaction.
  *
- * The Phase 3 RLS-readiness policies consult app.current_company_id when it is
- * present. Central accounting/inventory services call this at the start of their
- * transaction-owned write boundary so all compatible reads and writes receive a
+ * The RLS-readiness policies consult app.current_company_id when it is present.
+ * Central accounting/inventory services call this at the start of their
+ * transaction-owned write boundary so compatible reads and writes receive a
  * database-level tenant guard in addition to application ownership checks.
+ *
+ * For HTTP work, the request boundary already resolved a canonical server-owned
+ * company and stored it in AsyncLocalStorage. Refuse to set PostgreSQL scope to
+ * a different company even if a downstream service is accidentally handed the
+ * wrong companyId. Developer requests are intentionally not exempt: privileged
+ * users must switch their active company before operating on another tenant.
+ *
+ * Background/scheduled work has no request runtime context, so it can continue
+ * to assert an explicit validated company before entering its transaction.
  *
  * `set_config(..., true)` is transaction-local: PostgreSQL automatically clears
  * the value at commit/rollback, preventing pooled connections from leaking one
@@ -61,6 +72,12 @@ function positiveCompanyId(value: unknown): number {
  */
 export async function assertTransactionCompanyScope(tx: CompanyScopedTransaction, value: unknown): Promise<number> {
   const companyId = positiveCompanyId(value);
+  const requestContext = getCompanyRequestRuntimeContext();
+
+  if (requestContext && requestContext.companyId !== companyId) {
+    throw new TransactionCompanyScopeError("transaction company scope does not match the active request company");
+  }
+
   await tx.execute(sql`SELECT set_config('app.current_company_id', ${String(companyId)}, true)`);
   return companyId;
 }
