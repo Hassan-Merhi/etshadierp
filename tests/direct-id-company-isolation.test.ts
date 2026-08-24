@@ -26,6 +26,7 @@ let foreignPurchaseOrderId: number;
 let customerId: number;
 let foreignCustomerId: number;
 let foreignLedgerAccountId: number;
+let importCustomerId: number;
 let mixBatchId: number;
 let foreignMixBatchId: number;
 
@@ -177,6 +178,12 @@ beforeAll(async () => {
   expect(login.status).toBe(200);
   const selected = await agent.post("/api/auth/set-company").send({ companyId: ctx.companyId });
   expect(selected.status).toBe(200);
+  await pool.query(
+    "UPDATE user_company_roles SET can_access_customers = TRUE WHERE user_id = $1 AND company_id = $2",
+    [ctx.userId, ctx.companyId],
+  );
+  const refreshed = await agent.post("/api/auth/set-company").send({ companyId: ctx.companyId });
+  expect(refreshed.status).toBe(200);
   await insertIds();
 }, 60000);
 
@@ -435,6 +442,60 @@ describe("cross-company mutation isolation", () => {
       [customerId],
     );
     expect(localAfter.rows).toEqual(localBefore.rows);
+  });
+
+  it("rejects POS customer creation with a foreign linked ledger before creating a customer", async () => {
+    const legalName = `${TEST_PREFIX} POS Foreign Ledger Customer`;
+    const response = await agent.post("/api/pos/customers").send({
+      legalName,
+      ledgerAccountId: foreignLedgerAccountId,
+    });
+    expect(response.status).toBe(400);
+
+    const created = await pool.query(
+      "SELECT id, company_id, ledger_account_id FROM customers WHERE legal_name = $1",
+      [legalName],
+    );
+    expect(created.rows).toHaveLength(0);
+  });
+
+  it("rejects credit-sales import when the local customer has a foreign ledger before creating accounting data", async () => {
+    const customer = await pool.query<{ id: number; ledger_account_id: number | null }>(
+      "INSERT INTO customers (company_id, code, legal_name, ledger_account_id) VALUES ($1, $2, $3, $4) RETURNING id, ledger_account_id",
+      [ctx.companyId, `${TEST_PREFIX}-IMPORT-CUST`, `${TEST_PREFIX} Import Customer`, foreignLedgerAccountId],
+    );
+    importCustomerId = customer.rows[0].id;
+
+    try {
+      const before = await pool.query(
+        "SELECT company_id, code, legal_name, ledger_account_id FROM customers WHERE id = $1",
+        [importCustomerId],
+      );
+      const vouchersBefore = await pool.query(
+        "SELECT id FROM vouchers WHERE company_id = $1 AND description LIKE $2",
+        [ctx.companyId, "Credit Sale Import -%"],
+      );
+      const response = await agent.post("/api/credit-sales-import/import").send({
+        locationId: ctx.locationId,
+        saleDate: "2026-08-24",
+        items: [],
+        customerId: importCustomerId,
+      });
+      expect(response.status).toBe(400);
+
+      const after = await pool.query(
+        "SELECT company_id, code, legal_name, ledger_account_id FROM customers WHERE id = $1",
+        [importCustomerId],
+      );
+      expect(after.rows).toEqual(before.rows);
+      const vouchersAfter = await pool.query(
+        "SELECT id FROM vouchers WHERE company_id = $1 AND description LIKE $2",
+        [ctx.companyId, "Credit Sale Import -%"],
+      );
+      expect(vouchersAfter.rows).toEqual(vouchersBefore.rows);
+    } finally {
+      await pool.query("DELETE FROM customers WHERE id = $1", [importCustomerId]);
+    }
   });
 
   it("rejects customer updates with a foreign linked ledger before changing customer accounting data", async () => {

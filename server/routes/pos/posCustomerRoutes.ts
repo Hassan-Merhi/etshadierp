@@ -3,7 +3,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth } from "../../auth";
-import { userCompanyRoles, insertCustomerSchema } from "@shared/schema";
+import { userCompanyRoles, insertCustomerSchema, ledgerAccounts } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
 export function registerPosCustomerRoutes(app: Express): void {
@@ -110,6 +110,21 @@ export function registerPosCustomerRoutes(app: Express): void {
       };
 
       const parsed = insertCustomerSchema.parse(dataWithCompany);
+      if (parsed.ledgerAccountId !== undefined) {
+        const [linkedLedger] = await db
+          .select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.id, parsed.ledgerAccountId),
+              eq(ledgerAccounts.companyId, req.session.currentCompanyId)
+            )
+          )
+          .limit(1);
+        if (!linkedLedger) {
+          return res.status(400).json({ message: "Linked ledger account must belong to the customer company" });
+        }
+      }
 
       let code = "CUST001";
       let suffix = 1;

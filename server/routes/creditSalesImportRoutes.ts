@@ -28,6 +28,7 @@ import {
   customerBalances,
   inventory,
   stockItemLocationPrices,
+  ledgerAccounts,
 } from "@shared/schema";
 
 export function registerCreditSalesImportRoutes(app: Express) {
@@ -201,6 +202,21 @@ export function registerCreditSalesImportRoutes(app: Express) {
       let customer = await storage.getCustomerById(customerId);
       if (!customer || customer.companyId !== req.session.currentCompanyId) {
         return res.status(400).json({ message: "Invalid customer" });
+      }
+      if (customer.ledgerAccountId) {
+        const [linkedLedger] = await db
+          .select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.id, customer.ledgerAccountId),
+              eq(ledgerAccounts.companyId, req.session.currentCompanyId)
+            )
+          )
+          .limit(1);
+        if (!linkedLedger) {
+          return res.status(400).json({ message: "Customer ledger account must belong to the customer company" });
+        }
       }
 
       // Get or create "Sales Revenue" ledger account (safe: handles soft-deleted rows)

@@ -14,6 +14,7 @@ import {
   customerBalances,
   customers,
   insertCustomerSchema,
+  ledgerAccounts,
   voucherEntries,
   vouchers,
 } from "@shared/schema";
@@ -172,6 +173,16 @@ export function registerFactoryCustomerCrudRoutes(app: Express) {
 
       const dataWithCompany = { ...req.body, companyId };
       const parsed = insertCustomerSchema.parse(dataWithCompany);
+      if (parsed.ledgerAccountId !== undefined) {
+        const [linkedLedger] = await db
+          .select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.id, parsed.ledgerAccountId), eq(ledgerAccounts.companyId, companyId)))
+          .limit(1);
+        if (!linkedLedger) {
+          return res.status(400).json({ message: "Linked ledger account must belong to the customer company" });
+        }
+      }
 
       let suffix = 1;
       const allExisting = await db.select().from(customers).where(eq(customers.companyId, companyId));
@@ -234,6 +245,16 @@ export function registerFactoryCustomerCrudRoutes(app: Express) {
       }
 
       const parsed = insertCustomerSchema.partial().parse(req.body);
+      if (parsed.ledgerAccountId !== undefined) {
+        const [linkedLedger] = await db
+          .select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.id, parsed.ledgerAccountId), eq(ledgerAccounts.companyId, companyId)))
+          .limit(1);
+        if (!linkedLedger) {
+          return res.status(400).json({ message: "Linked ledger account must belong to the customer company" });
+        }
+      }
       const [updated] = await db.update(customers).set(parsed).where(eq(customers.id, customerId)).returning();
 
       res.json(updated);
