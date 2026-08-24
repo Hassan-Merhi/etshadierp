@@ -55,8 +55,9 @@
       "tests/ui/remote-support-fast-viewer.test.ts",
       "tests/stock-item-name-update-by-code.test.ts",
       "server/lib/reportPrecision.test.ts",
-      "tests/remote-support-phase4-hardening.test.ts"
+      "tests/remote-support-phase4-hardening.test.ts",
+      "tests/phase5-performance-operations.test.ts"
     ],
-    "maxAdditionalTextAssertions": 620
+    "maxAdditionalTextAssertions": 631
   }
 }

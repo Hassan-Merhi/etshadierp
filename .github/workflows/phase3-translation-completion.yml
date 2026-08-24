@@ -16,6 +16,29 @@ jobs:
     if: github.head_ref == 'phase3-translation-ui-polish' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d heliumdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: phase3-ci-session-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+      PORT: "5000"
     steps:
       - name: Checkout Phase 3 branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -72,10 +95,13 @@ jobs:
             client/src/i18n/sharedUiPhase3Translations.ts \
             client/src/i18n/phase3TemplateTranslationRuntime.ts \
             'client/src/i18n/phase3RemainingTranslations.part*.ts' \
+            server/factoryTrilingualSchemaBridge.mjs \
             scripts/audit-i18n-phase14.mjs \
             config/i18n-phase14-baseline.json \
-            tests/phase3-translation-completion.test.ts \
-            docs/phase3-translation-completion.md
+            tests/phase3-translation-completion.test.ts
+
+      - name: Prepare test database schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
 
       - name: Certify translation contracts
         run: |
@@ -110,6 +136,7 @@ jobs:
           rm -f scripts/complete-phase3-translations-v3.mjs
           rm -f scripts/phase3-argos-server.py
           rm -f .github/workflows/phase3-translation-completion.yml
+          rm -f docs/phase3-translation-completion.md
           rm -f artifacts/phase3-translation-source.json
           rm -f artifacts/phase3-translation-final.json
           rm -f artifacts/phase3-translation-baseline.json
