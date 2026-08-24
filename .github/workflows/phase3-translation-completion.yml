@@ -136,6 +136,7 @@ jobs:
           rm -f scripts/complete-phase3-translations-v3.mjs
           rm -f scripts/phase3-argos-server.py
           rm -f .github/workflows/phase3-translation-completion.yml
+          rm -f .github/workflows/phase3-postgres-diagnose.yml
           rm -f docs/phase3-translation-completion.md
           rm -f artifacts/phase3-translation-source.json
           rm -f artifacts/phase3-translation-final.json
