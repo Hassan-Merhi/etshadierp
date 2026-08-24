@@ -1,16 +1,6 @@
 import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import {
-  Plus,
-  Download,
-  ArrowDown,
-  Upload,
-  FileSpreadsheet,
-  AlertCircle,
-  CheckCircle2,
-  Trash2,
-  Ship,
-} from "lucide-react";
+import { Plus, Download, FileSpreadsheet, AlertCircle, CheckCircle2, Trash2, Ship } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,12 +10,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
@@ -54,7 +38,6 @@ import {
   BulkDeleteDialog,
   SingleDeleteDialog,
   ReverseOffloadDialog,
-  exportContainers,
   downloadContainerTemplate,
 } from "./factory-containers/ContainerDialogs";
 
@@ -89,7 +72,6 @@ export default function FactoryContainers() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
-  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const { data: containers, isLoading } = useQuery<ContainerWithSupplier[]>({ queryKey: ["/api/factory/containers"] });
   const { data: suppliers } = useQuery<FactorySupplier[]>({ queryKey: ["/api/factory/suppliers"] });
   const { data: ledgerAccounts = [] } = useQuery<any[]>({
@@ -259,54 +241,23 @@ export default function FactoryContainers() {
               Delete Selected ({selectedIds.size})
             </Button>
           )}
-          {currentUser?.role === "Developer" && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" data-testid="button-import-export-menu">
-                  <ArrowDown className="h-4 w-4 mr-2" />
-                  Import / Export
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => exportContainers(containers || [], suppliers)}
-                  data-testid="button-export-containers"
-                >
-                  <Download className="h-4 w-4 mr-2" /> Export All
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setImportOpen(true);
-                    setImportPreview([]);
-                    setImportResult(null);
-                  }}
-                  data-testid="button-import-containers"
-                >
-                  <Upload className="h-4 w-4 mr-2" /> Import Excel
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          <div className="flex rounded-md border overflow-hidden">
+          {viewMode === "summary" && (
             <Button
-              variant={viewMode === "summary" ? "default" : "ghost"}
-              className="rounded-none"
-              onClick={() => setViewMode("summary")}
-              data-testid="button-view-summary"
-            >
-              <Ship className="h-4 w-4 mr-2" /> OTW Summary
-            </Button>
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              className="rounded-none"
+              variant="outline"
+              size="sm"
               onClick={() => setViewMode("list")}
               data-testid="button-view-list"
+              className="gap-2"
             >
-              <AlertCircle className="h-4 w-4 mr-2" /> All Containers
+              <AlertCircle className="h-4 w-4" /> All Containers
             </Button>
-          </div>
-          <Button onClick={() => navigate("/factory/containers/new")} data-testid="button-add-factory-container">
-            <Plus className="h-4 w-4 mr-2" /> Add Container
+          )}
+          <Button
+            onClick={() => navigate("/factory/containers/new")}
+            data-testid="button-add-factory-container"
+            className="gap-2 shadow-sm"
+          >
+            <Plus className="h-4 w-4" /> Add Container
           </Button>
         </div>
       </div>

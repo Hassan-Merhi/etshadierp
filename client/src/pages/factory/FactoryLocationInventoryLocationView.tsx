@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MapPin, Search, FileSpreadsheet, Pencil } from "lucide-react";
+import { MapPin, Search, FileSpreadsheet, Pencil, ChevronRight } from "lucide-react";
 import { RenameLocationDialog } from "./factory-location-inventory/dialogs/RenameLocationDialog";
 import type { useFactoryLocationInventory } from "./FactoryLocationInventoryModel";
 
@@ -26,12 +26,12 @@ export function FactoryLocationInventoryLocationView({ inventory }: { inventory:
     setRenameInput,
   } = inventory;
   return (
-    <div className="p-4 md:p-6 w-full space-y-5">
+    <div className="p-4 md:p-6 w-full space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight">Location Inventory</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Physical bales on ground by location</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Location Inventory</h1>
+          <p className="text-sm text-muted-foreground mt-1">Physical bales on ground by location</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Button
@@ -51,27 +51,38 @@ export function FactoryLocationInventoryLocationView({ inventory }: { inventory:
         </div>
       </div>
 
-      {/* Search + list */}
-      <div className="rounded-xl border overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
-          <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-          <div className="relative flex-1">
+      {/* Location selector */}
+      <div className="rounded-2xl border bg-card/30 overflow-hidden">
+        <div className="border-b px-4 py-3 sm:px-5">
+          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5" />
+            Select Location
+          </div>
+        </div>
+        <div className="flex flex-col gap-4 border-b px-4 py-4 sm:px-5 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Your Locations</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {locations.length} location{locations.length !== 1 ? "s" : ""} available
+            </p>
+          </div>
+          <div className="relative w-full md:max-w-sm">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Search locations..."
               value={locationSearch}
               onChange={(e) => setLocationSearch(e.target.value)}
-              className="pl-8 h-8 bg-transparent border-0 focus-visible:ring-0 text-sm"
+              className="pl-8 h-9 text-sm"
               data-testid="input-search-locations"
             />
           </div>
         </div>
-        <div className="p-4">
+        <div className="p-4 sm:p-5">
           {locationsLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-14 w-full" />
-              <Skeleton className="h-14 w-full" />
-              <Skeleton className="h-14 w-full" />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Skeleton key={i} className="h-20 w-full rounded-xl" />
+              ))}
             </div>
           ) : locations.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
@@ -81,28 +92,32 @@ export function FactoryLocationInventoryLocationView({ inventory }: { inventory:
           ) : filteredLocations.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground text-sm">No locations match your search.</div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {filteredLocations.map((location) => (
                 <div
                   key={location.id}
-                  className="relative flex flex-col items-center justify-center text-center px-4 py-6 rounded-xl border bg-muted/10 cursor-pointer hover-elevate gap-2"
+                  className="group relative flex min-h-[82px] cursor-pointer items-center gap-3 rounded-xl border bg-background px-3.5 py-3 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary/[0.02] hover:shadow-md"
                   onClick={() => handleLocationClick(location)}
                   data-testid={`row-location-${location.id}`}
                 >
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <MapPin className="h-5 w-5 text-primary" />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <MapPin className="h-5 w-5" />
                   </div>
-                  <span className="font-semibold text-sm leading-snug">{location.name}</span>
+                  <div className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold leading-snug">{location.name}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">Tap to view inventory</span>
+                  </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute top-1.5 right-1.5 h-7 w-7 opacity-40"
+                    className="h-7 w-7 shrink-0 text-muted-foreground opacity-70 hover:text-foreground"
                     onClick={(e) => openRenameDialog(location, e)}
                     data-testid={`button-rename-location-${location.id}`}
                     title="Rename location"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
                 </div>
               ))}
             </div>
