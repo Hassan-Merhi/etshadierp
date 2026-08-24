@@ -14,7 +14,9 @@ import { registerFactoryWorkerPhotoRoutes } from "./photos";
 import { registerFactoryWorkerDocumentRoutes } from "./documents";
 import { registerFactoryWorkerBaleSettleRoutes } from "./bales-settle";
 
-export function registerFactoryWorkerRoutes(app: Express, requireAuth: unknown, db: unknown) {
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
+
+export function registerFactoryWorkerRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   registerFactoryWorkerListRoutes(app, requireAuth, db);
   registerFactoryWorkerImportExportRoutes(app, requireAuth, db);
   registerFactoryWorkerPayrollDelegation(app, requireAuth, db);

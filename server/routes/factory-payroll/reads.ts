@@ -11,6 +11,8 @@ import { logger } from "../../lib/logger";
 import { parseId } from "../../lib/parseId";
 import { eq, and, asc, gte, lte, desc } from "drizzle-orm";
 import { factoryWorkers, factoryPayrolls, ledgerAccounts } from "@shared/schema";
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
+
 import {
   attachProductionBonusesToPayroll,
   getProductionBonusTotalsForPayrollIds,
@@ -28,7 +30,7 @@ const emptyTotals = () => ({
   rejectedCount: 0,
 });
 
-export function registerFactoryPayrollReadRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryPayrollReadRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   app.get("/api/factory/payroll", requireAuth, async (req: Request, res: Response) => {
     try {
       const { companyId, startDate, endDate, status } = req.query;
@@ -76,9 +78,9 @@ export function registerFactoryPayrollReadRoutes(app: Express, requireAuth: any,
 
       const bonusTotals = await getProductionBonusTotalsForPayrollIds(
         db,
-        results.map((result: any) => result.payroll.id)
+        results.map((result) => result.payroll.id)
       );
-      const formatted = results.map((r: any) => {
+      const formatted = results.map((r) => {
         const production = bonusTotals.get(r.payroll.id) ?? emptyTotals();
         const totalBonuses = Number(r.payroll.bonuses ?? 0);
         return {

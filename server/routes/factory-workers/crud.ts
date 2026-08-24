@@ -21,7 +21,9 @@ import {
 
 import { getFactoryCompanyId, writeDaybookEntry } from "./_helpers";
 
-export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: any, db: any) {
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
+
+export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   // GET /api/factory/workers/:id - Get single worker with computed stats
   app.get("/api/factory/workers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -44,14 +46,14 @@ export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: any, 
         .where(and(eq(factoryBales.finalizedBy, id), eq(factoryBales.companyId, companyId)));
 
       const totalBales = bales.length;
-      const totalKg = bales.reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0);
+      const totalKg = bales.reduce((sum: number, b) => sum + parseFloat(b.weightKg || "0"), 0);
 
       const payrolls = await db
         .select()
         .from(factoryPayrolls)
         .where(and(eq(factoryPayrolls.workerId, id), eq(factoryPayrolls.companyId, companyId)));
 
-      const totalEarnings = payrolls.reduce((sum: number, p: any) => sum + parseFloat(p.netSalary || "0"), 0);
+      const totalEarnings = payrolls.reduce((sum: number, p) => sum + parseFloat(p.netSalary || "0"), 0);
 
       res.json({
         ...worker,

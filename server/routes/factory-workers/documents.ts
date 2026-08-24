@@ -16,7 +16,9 @@ import { factoryWorkerDocuments } from "@shared/schema";
 import { getFactoryCompanyId } from "./_helpers";
 import multer from "multer";
 
-export function registerFactoryWorkerDocumentRoutes(app: Express, requireAuth: any, db: any) {
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
+
+export function registerFactoryWorkerDocumentRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   // Use memory storage so file bytes are always available in req.file.buffer —
   // no disk dependency for the primary save path. Ephemeral disk environments
   // (Replit/Render deployments) cannot reliably persist files across restarts,

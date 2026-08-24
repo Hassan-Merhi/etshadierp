@@ -16,7 +16,9 @@ import { factoryWorkers } from "@shared/schema";
 
 import { getFactoryCompanyId, workerUpload, writeDaybookEntry } from "./_helpers";
 
-export function registerFactoryWorkerImportExportRoutes(app: Express, requireAuth: any, db: any) {
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
+
+export function registerFactoryWorkerImportExportRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   // GET /api/factory/workers/template.xlsx - Download Excel import template
   app.get("/api/factory/workers/template.xlsx", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -253,13 +255,13 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
           return m ? Math.max(max, parseInt(m[1], 10)) : max;
         }, 0);
         const byCode = new Map<string, any>(
-          existingWorkers.filter((w: any) => w.employeeCode).map((w: any) => [w.employeeCode, w])
+          existingWorkers.filter((w) => w.employeeCode).map((w) => [w.employeeCode, w])
         );
         const byPassport = new Map<string, any>(
-          existingWorkers.filter((w: any) => w.passportNumber).map((w: any) => [w.passportNumber, w])
+          existingWorkers.filter((w) => w.passportNumber).map((w) => [w.passportNumber, w])
         );
         const byNationalId = new Map<string, any>(
-          existingWorkers.filter((w: any) => w.nationalId).map((w: any) => [w.nationalId, w])
+          existingWorkers.filter((w) => w.nationalId).map((w) => [w.nationalId, w])
         );
 
         const parseDate = (v: number): string | null => {

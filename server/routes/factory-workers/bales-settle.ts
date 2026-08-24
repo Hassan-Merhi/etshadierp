@@ -21,7 +21,9 @@ import {
 
 import { computeMonthlyPay, computeMonthlyPayFromAttendance, getFactoryCompanyId, writeDaybookEntry } from "./_helpers";
 
-export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth: any, db: any) {
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
+
+export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   // GET /api/factory/workers/:id/bales - Get bales associated with worker
   app.get("/api/factory/workers/:id/bales", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -171,7 +173,7 @@ export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth:
         if (salType === "Per Bale") {
           earned = bales.length * parseFloat(worker.perBaleRate || "0");
         } else {
-          const totalKg = bales.reduce((s: number, b: any) => s + parseFloat(b.weightKg || "0"), 0);
+          const totalKg = bales.reduce((s: number, b) => s + parseFloat(b.weightKg || "0"), 0);
           earned = totalKg * parseFloat(worker.perKgRate || "0");
         }
       } else {
@@ -220,7 +222,7 @@ export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth:
           )
         );
       const totalPaid = paidPayrolls.reduce(
-        (s: number, p: any) =>
+        (s: number, p) =>
           s + parseFloat(p.netSalary || "0") + parseFloat(p.advances || "0") + parseFloat(p.deductions || "0"),
         0
       );
@@ -236,10 +238,7 @@ export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth:
             eq(factoryWorkerAdvances.fullyPaid, false)
           )
         );
-      const totalAdvances = outstandingAdvances.reduce(
-        (s: number, a: any) => s + parseFloat(a.remainingBalance || "0"),
-        0
-      );
+      const totalAdvances = outstandingAdvances.reduce((s: number, a) => s + parseFloat(a.remainingBalance || "0"), 0);
 
       const balance = earned - totalPaid - totalAdvances;
 

@@ -11,6 +11,8 @@ import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import { checkFactoryAdmin } from "../factory/_helpers";
 import { eq, and, gte, lte, inArray } from "drizzle-orm";
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
+
 import {
   factoryWorkers,
   factoryPayrolls,
@@ -29,7 +31,7 @@ import {
   writeDaybookEntry,
 } from "./_helpers";
 
-export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   app.post("/api/factory/payroll/generate", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
@@ -47,7 +49,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
         return res.status(400).json({ message: "No active workers found for this company" });
       }
 
-      const _workerIds = workers.map((w: any) => w.id);
+      const _workerIds = workers.map((w) => w.id);
 
       const balesInRange = await db
         .select()
@@ -164,7 +166,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
             baleEarnings = balesCount * workerPerBaleRate;
             break;
           case "Per KG":
-            kgProcessed = workerBales.reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0);
+            kgProcessed = workerBales.reduce((sum: number, b) => sum + parseFloat(b.weightKg || "0"), 0);
             kgEarnings = kgProcessed * workerPerKgRate;
             break;
         }

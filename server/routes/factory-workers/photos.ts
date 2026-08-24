@@ -16,7 +16,9 @@ import { factoryWorkers } from "@shared/schema";
 
 import { getFactoryCompanyId, workerUpload, writeDaybookEntry } from "./_helpers";
 
-export function registerFactoryWorkerPhotoRoutes(app: Express, requireAuth: any, db: any) {
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
+
+export function registerFactoryWorkerPhotoRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   // POST /api/factory/workers/:id/photo - Upload photo
   app.post(
     "/api/factory/workers/:id/photo",

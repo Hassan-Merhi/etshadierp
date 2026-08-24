@@ -10,7 +10,9 @@ import { registerFactorySupplierUsageReportRoutes } from "./supplier-usage";
 import { registerFactoryMixBatchesByDateRoutes } from "./mix-batches";
 import { registerFactoryMixBatchWhatsappRoutes } from "./whatsapp";
 
-export function registerFactoryReportRoutes(app: Express, requireAuth: unknown, db: unknown) {
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
+
+export function registerFactoryReportRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   registerFactorySupplierUsageReportRoutes(app, requireAuth, db);
   registerFactoryMixBatchesByDateRoutes(app, requireAuth, db);
   registerFactoryMixBatchWhatsappRoutes(app, requireAuth, db);

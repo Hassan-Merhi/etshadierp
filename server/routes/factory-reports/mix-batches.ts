@@ -12,18 +12,21 @@ import {} from "@shared/schema";
 
 export function registerFactoryMixBatchesByDateRoutes(app: Express, requireAuth: any, _db: any) {
   // ── Mix batches by date ───────────────────────────────────────────────────
-  app.get("/api/factory/mix-batches-by-date", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
-    try {
-      const companyId = req.session?.factoryCompanyId || req.session?.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+  app.get(
+    "/api/factory/mix-batches-by-date",
+    requireAuth,
+    async (req: import("express").Request, res: import("express").Response) => {
+      try {
+        const companyId = req.session?.factoryCompanyId || req.session?.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const date = req.query.date as string;
-      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-        return res.status(400).json({ message: "date query param required (YYYY-MM-DD)" });
-      }
+        const date = req.query.date as string;
+        if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          return res.status(400).json({ message: "date query param required (YYYY-MM-DD)" });
+        }
 
-      const batchesResult = await pool.query(
-        `
+        const batchesResult = await pool.query(
+          `
         SELECT b.id, b.batch_code, b.name, b.status, b.total_weight_kg, b.used_kg,
                b.batch_date, b.created_at, b.notes
         FROM factory_mix_batches b
@@ -35,16 +38,16 @@ export function registerFactoryMixBatchesByDateRoutes(app: Express, requireAuth:
           )
         ORDER BY b.created_at DESC
       `,
-        [companyId, date]
-      );
+          [companyId, date]
+        );
 
-      const batches = batchesResult.rows;
-      const batchIds = batches.map((b) => b.id);
+        const batches = batchesResult.rows;
+        const batchIds = batches.map((b) => b.id);
 
-      let sources = [];
-      if (batchIds.length > 0) {
-        const sourcesResult = await pool.query(
-          `
+        let sources = [];
+        if (batchIds.length > 0) {
+          const sourcesResult = await pool.query(
+            `
           SELECT
             s.id, s.mix_batch_id, s.container_id, s.supplier_id, s.source_batch_id,
             s.weight_kg, s.cost_per_kg, s.total_cost,
@@ -58,95 +61,96 @@ export function registerFactoryMixBatchesByDateRoutes(app: Express, requireAuth:
           WHERE s.mix_batch_id = ANY($1)
           ORDER BY s.id
         `,
-          [batchIds]
-        );
-        sources = sourcesResult.rows;
-      }
+            [batchIds]
+          );
+          sources = sourcesResult.rows;
+        }
 
-      // Apply the same fallback cost enrichment as /api/factory/mix-batches/:id/sources
-      // When costPerKg is 0 in the DB, look up the weighted-average from factoryRawStock.
-      const enrichedSources = await Promise.all(
-        sources.map(async (s) => {
-          const storedCost = parseFloat(s.cost_per_kg) || 0;
-          if (storedCost > 0) return s;
+        // Apply the same fallback cost enrichment as /api/factory/mix-batches/:id/sources
+        // When costPerKg is 0 in the DB, look up the weighted-average from factoryRawStock.
+        const enrichedSources = await Promise.all(
+          sources.map(async (s) => {
+            const storedCost = parseFloat(s.cost_per_kg) || 0;
+            if (storedCost > 0) return s;
 
-          let fallbackCost = 0;
-          if (s.container_id) {
-            const rsRows = await pool.query(
-              `SELECT cost_per_kg_usd, cost_per_kg, received_kg
+            let fallbackCost = 0;
+            if (s.container_id) {
+              const rsRows = await pool.query(
+                `SELECT cost_per_kg_usd, cost_per_kg, received_kg
              FROM factory_raw_stock
              WHERE container_id = $1 AND company_id = $2`,
-              [s.container_id, companyId]
-            );
-            let wSum = 0,
-              wWeight = 0;
-            for (const r of rsRows.rows) {
-              const kg = parseFloat(r.received_kg) || 0;
-              const c = parseFloat(r.cost_per_kg_usd) || parseFloat(r.cost_per_kg) || 0;
-              wSum += kg * c;
-              wWeight += kg;
-            }
-            fallbackCost = wWeight > 0 ? wSum / wWeight : 0;
-          } else if (s.supplier_id) {
-            const rsRows = await pool.query(
-              `SELECT rs.cost_per_kg_usd, rs.cost_per_kg, rs.received_kg
+                [s.container_id, companyId]
+              );
+              let wSum = 0,
+                wWeight = 0;
+              for (const r of rsRows.rows) {
+                const kg = parseFloat(r.received_kg) || 0;
+                const c = parseFloat(r.cost_per_kg_usd) || parseFloat(r.cost_per_kg) || 0;
+                wSum += kg * c;
+                wWeight += kg;
+              }
+              fallbackCost = wWeight > 0 ? wSum / wWeight : 0;
+            } else if (s.supplier_id) {
+              const rsRows = await pool.query(
+                `SELECT rs.cost_per_kg_usd, rs.cost_per_kg, rs.received_kg
              FROM factory_raw_stock rs
              INNER JOIN factory_containers c ON c.id = rs.container_id
              WHERE c.supplier_id = $1 AND rs.company_id = $2`,
-              [s.supplier_id, companyId]
-            );
-            let wSum = 0,
-              wWeight = 0;
-            for (const r of rsRows.rows) {
-              const kg = parseFloat(r.received_kg) || 0;
-              const c = parseFloat(r.cost_per_kg_usd) || parseFloat(r.cost_per_kg) || 0;
-              wSum += kg * c;
-              wWeight += kg;
+                [s.supplier_id, companyId]
+              );
+              let wSum = 0,
+                wWeight = 0;
+              for (const r of rsRows.rows) {
+                const kg = parseFloat(r.received_kg) || 0;
+                const c = parseFloat(r.cost_per_kg_usd) || parseFloat(r.cost_per_kg) || 0;
+                wSum += kg * c;
+                wWeight += kg;
+              }
+              fallbackCost = wWeight > 0 ? wSum / wWeight : 0;
             }
-            fallbackCost = wWeight > 0 ? wSum / wWeight : 0;
-          }
 
-          if (fallbackCost <= 0) return s;
-          const weightKg = parseFloat(s.weight_kg) || 0;
+            if (fallbackCost <= 0) return s;
+            const weightKg = parseFloat(s.weight_kg) || 0;
+            return {
+              ...s,
+              cost_per_kg: String(fallbackCost),
+              total_cost: String(weightKg * fallbackCost),
+            };
+          })
+        );
+
+        const enriched = batches.map((b) => {
+          const batchSources = enrichedSources.filter((s) => s.mix_batch_id === b.id);
+          const totalWeight = parseFloat(b.total_weight_kg) || 0;
+          const totalCost = batchSources.reduce((sum: number, s) => sum + (parseFloat(s.total_cost) || 0), 0);
+          const costPerKg = totalWeight > 0 ? totalCost / totalWeight : 0;
           return {
-            ...s,
-            cost_per_kg: String(fallbackCost),
-            total_cost: String(weightKg * fallbackCost),
+            id: b.id,
+            batchCode: b.batch_code,
+            name: b.name,
+            status: b.status,
+            totalWeightKg: totalWeight,
+            totalCost,
+            costPerKg,
+            batchDate: b.batch_date,
+            createdAt: b.created_at,
+            sources: batchSources.map((s) => ({
+              id: s.id,
+              sourceName: s.source_name,
+              containerNumber: s.container_number,
+              weightKg: parseFloat(s.weight_kg) || 0,
+              costPerKg: parseFloat(s.cost_per_kg) || 0,
+              totalCost: parseFloat(s.total_cost) || 0,
+              percentOfBatch: totalWeight > 0 ? ((parseFloat(s.weight_kg) || 0) / totalWeight) * 100 : 0,
+            })),
           };
-        })
-      );
+        });
 
-      const enriched = batches.map((b) => {
-        const batchSources = enrichedSources.filter((s) => s.mix_batch_id === b.id);
-        const totalWeight = parseFloat(b.total_weight_kg) || 0;
-        const totalCost = batchSources.reduce((sum: number, s) => sum + (parseFloat(s.total_cost) || 0), 0);
-        const costPerKg = totalWeight > 0 ? totalCost / totalWeight : 0;
-        return {
-          id: b.id,
-          batchCode: b.batch_code,
-          name: b.name,
-          status: b.status,
-          totalWeightKg: totalWeight,
-          totalCost,
-          costPerKg,
-          batchDate: b.batch_date,
-          createdAt: b.created_at,
-          sources: batchSources.map((s) => ({
-            id: s.id,
-            sourceName: s.source_name,
-            containerNumber: s.container_number,
-            weightKg: parseFloat(s.weight_kg) || 0,
-            costPerKg: parseFloat(s.cost_per_kg) || 0,
-            totalCost: parseFloat(s.total_cost) || 0,
-            percentOfBatch: totalWeight > 0 ? ((parseFloat(s.weight_kg) || 0) / totalWeight) * 100 : 0,
-          })),
-        };
-      });
-
-      res.json(enriched);
-    } catch (err: unknown) {
-      logger.error("[mix-batches-by-date]", { error: err });
-      res.status(500).json({ message: getErrorMessage(err) });
+        res.json(enriched);
+      } catch (err: unknown) {
+        logger.error("[mix-batches-by-date]", { error: err });
+        res.status(500).json({ message: getErrorMessage(err) });
+      }
     }
-  });
+  );
 }

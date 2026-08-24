@@ -94,9 +94,7 @@ export function registerContainerLoadedItemImportRoutes(app: Express, requireAut
           return res.status(400).json({ message: "No line items found in purchase orders" });
         }
 
-        const itemsWithBarcode = lineItems.filter(
-          (item) => item.stockItemCode && item.stockItemCode.trim() !== ""
-        );
+        const itemsWithBarcode = lineItems.filter((item) => item.stockItemCode && item.stockItemCode.trim() !== "");
         const skippedCount = lineItems.length - itemsWithBarcode.length;
 
         if (itemsWithBarcode.length === 0) {

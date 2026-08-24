@@ -6,6 +6,8 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { parseId } from "../../lib/parseId";
 import { rebuildPayrollGenVoucher } from "../payroll/_payrollAccountingHelper";
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
+
 import {
   getProductionBonusDetailsForPayroll,
   getProductionBonusTotalsForPayrollIds,
@@ -44,7 +46,7 @@ const emptyTotals = () => ({
   rejectedCount: 0,
 });
 
-export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   app.get("/api/factory/payroll/:id/production-bonuses", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseId(req.params.id);
@@ -83,7 +85,7 @@ export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: 
       const note = typeof req.body?.note === "string" ? req.body.note.trim().slice(0, 1000) || null : null;
       const decidedBy = req.session?.userId ? String(req.session.userId) : null;
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const payrollResult = await tx.execute(sql`
           SELECT id, company_id AS "companyId", worker_id AS "workerId",
                  period_start::text AS "periodStart", period_end::text AS "periodEnd", status

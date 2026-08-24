@@ -2089,33 +2089,13 @@
         0,
         0
       ],
-      "server/routes/factory-payroll/delete.ts": [
-        3,
-        0,
-        0
-      ],
-      "server/routes/factory-payroll/exports.ts": [
-        4,
-        0,
-        0
-      ],
-      "server/routes/factory-payroll/generate.ts": [
-        4,
-        0,
-        0
-      ],
       "server/routes/factory-payroll/production-bonuses.ts": [
-        5,
-        0,
-        0
-      ],
-      "server/routes/factory-payroll/reads.ts": [
-        4,
+        2,
         0,
         0
       ],
       "server/routes/factory-payroll/update.ts": [
-        6,
+        1,
         0,
         0
       ],
@@ -2126,11 +2106,6 @@
       ],
       "server/routes/factory-reports/mix-batches.ts": [
         2,
-        0,
-        0
-      ],
-      "server/routes/factory-reports/supplier-usage.ts": [
-        11,
         0,
         0
       ],
@@ -2145,32 +2120,12 @@
         0
       ],
       "server/routes/factory-workers/bales-settle.ts": [
-        6,
-        0,
-        0
-      ],
-      "server/routes/factory-workers/crud.ts": [
-        4,
-        0,
-        0
-      ],
-      "server/routes/factory-workers/documents.ts": [
-        2,
+        1,
         0,
         0
       ],
       "server/routes/factory-workers/import-export.ts": [
-        13,
-        0,
-        0
-      ],
-      "server/routes/factory-workers/lists.ts": [
-        3,
-        0,
-        0
-      ],
-      "server/routes/factory-workers/photos.ts": [
-        2,
+        5,
         0,
         0
       ],
@@ -3752,6 +3707,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 2539
+    "typeEscapeCeiling": 2481
   }
 }

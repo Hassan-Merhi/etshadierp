@@ -1,26 +1,26 @@
 {
-  "generatedAt": "2026-08-24T13:14:34.762Z",
+  "generatedAt": "2026-08-24T13:19:51.236Z",
   "repositorySummary": {
     "scannedFiles": 2980,
-    "filesWithEscapes": 746,
-    "explicitAny": 2450,
+    "filesWithEscapes": 737,
+    "explicitAny": 2392,
     "asAny": 89,
     "suppressions": 0,
     "drizzleRowCasts": 1,
-    "typeEscapeTotal": 2539,
-    "ceiling": 2539,
+    "typeEscapeTotal": 2481,
+    "ceiling": 2481,
     "improvedFiles": 0,
     "failedFiles": 0
   },
   "candidateSummary": {
-    "files": 395,
-    "escapes": 1406,
+    "files": 386,
+    "escapes": 1348,
     "drizzleRowCasts": 1
   },
   "bucketTotals": {
     "server-route": {
-      "files": 294,
-      "escapes": 1010,
+      "files": 285,
+      "escapes": 952,
       "drizzleRowCasts": 1
     },
     "client-lib": {
@@ -280,22 +280,6 @@
       "signalTotal": 15
     },
     {
-      "path": "server/routes/factory-workers/import-export.ts",
-      "bucket": "server-route",
-      "explicitAny": 13,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 13,
-      "signals": {
-        "http": 10,
-        "db": 2,
-        "dto": 0,
-        "errors": 23
-      },
-      "signalTotal": 35
-    },
-    {
       "path": "server/routes/factory/stock/locationInventoryRoutes.ts",
       "bucket": "server-route",
       "explicitAny": 12,
@@ -342,22 +326,6 @@
         "errors": 6
       },
       "signalTotal": 8
-    },
-    {
-      "path": "server/routes/factory-reports/supplier-usage.ts",
-      "bucket": "server-route",
-      "explicitAny": 11,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 11,
-      "signals": {
-        "http": 5,
-        "db": 5,
-        "dto": 0,
-        "errors": 6
-      },
-      "signalTotal": 16
     },
     {
       "path": "server/routes/payroll/core/migrations.ts",
@@ -1128,38 +1096,6 @@
       "signalTotal": 40
     },
     {
-      "path": "server/routes/factory-payroll/update.ts",
-      "bucket": "server-route",
-      "explicitAny": 6,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 6,
-      "signals": {
-        "http": 20,
-        "db": 4,
-        "dto": 0,
-        "errors": 13
-      },
-      "signalTotal": 37
-    },
-    {
-      "path": "server/routes/factory-workers/bales-settle.ts",
-      "bucket": "server-route",
-      "explicitAny": 6,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 6,
-      "signals": {
-        "http": 21,
-        "db": 3,
-        "dto": 0,
-        "errors": 12
-      },
-      "signalTotal": 36
-    },
-    {
       "path": "server/routes/factoryAttendanceRoutes.ts",
       "bucket": "server-route",
       "explicitAny": 6,
@@ -1416,22 +1352,6 @@
       "signalTotal": 71
     },
     {
-      "path": "server/routes/factory-payroll/production-bonuses.ts",
-      "bucket": "server-route",
-      "explicitAny": 5,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 5,
-      "signals": {
-        "http": 18,
-        "db": 15,
-        "dto": 0,
-        "errors": 11
-      },
-      "signalTotal": 44
-    },
-    {
       "path": "server/services/stockTransferRevisionLifecycle.ts",
       "bucket": "server-service",
       "explicitAny": 5,
@@ -1462,6 +1382,22 @@
         "errors": 25
       },
       "signalTotal": 39
+    },
+    {
+      "path": "server/routes/factory-workers/import-export.ts",
+      "bucket": "server-route",
+      "explicitAny": 5,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 5,
+      "signals": {
+        "http": 10,
+        "db": 2,
+        "dto": 0,
+        "errors": 23
+      },
+      "signalTotal": 35
     },
     {
       "path": "server/routes/factory/stock/stockEntryRoutes.ts",
@@ -1736,22 +1672,6 @@
       "signalTotal": 68
     },
     {
-      "path": "server/routes/factory-workers/crud.ts",
-      "bucket": "server-route",
-      "explicitAny": 4,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 4,
-      "signals": {
-        "http": 35,
-        "db": 2,
-        "dto": 0,
-        "errors": 30
-      },
-      "signalTotal": 67
-    },
-    {
       "path": "server/routes/vouchers/voucherJournalRoutes.ts",
       "bucket": "server-route",
       "explicitAny": 4,
@@ -1912,22 +1832,6 @@
       "signalTotal": 27
     },
     {
-      "path": "server/routes/factory-payroll/exports.ts",
-      "bucket": "server-route",
-      "explicitAny": 4,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 4,
-      "signals": {
-        "http": 10,
-        "db": 3,
-        "dto": 0,
-        "errors": 13
-      },
-      "signalTotal": 26
-    },
-    {
       "path": "server/routes/factory/customers-core/statement-pdf.ts",
       "bucket": "server-route",
       "explicitAny": 4,
@@ -1960,22 +1864,6 @@
       "signalTotal": 22
     },
     {
-      "path": "server/routes/factory-payroll/reads.ts",
-      "bucket": "server-route",
-      "explicitAny": 4,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 4,
-      "signals": {
-        "http": 11,
-        "db": 1,
-        "dto": 0,
-        "errors": 8
-      },
-      "signalTotal": 20
-    },
-    {
       "path": "server/storage/employees.ts",
       "bucket": "server-storage",
       "explicitAny": 3,
@@ -2006,22 +1894,6 @@
         "errors": 4
       },
       "signalTotal": 18
-    },
-    {
-      "path": "server/routes/factory-payroll/generate.ts",
-      "bucket": "server-route",
-      "explicitAny": 4,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 4,
-      "signals": {
-        "http": 5,
-        "db": 2,
-        "dto": 0,
-        "errors": 9
-      },
-      "signalTotal": 16
     },
     {
       "path": "server/routes/performance/bandwidthPhase3FactoryReads.ts",
@@ -2264,22 +2136,6 @@
       "signalTotal": 53
     },
     {
-      "path": "server/routes/factory-workers/lists.ts",
-      "bucket": "server-route",
-      "explicitAny": 3,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 3,
-      "signals": {
-        "http": 25,
-        "db": 9,
-        "dto": 0,
-        "errors": 18
-      },
-      "signalTotal": 52
-    },
-    {
       "path": "server/routes/fiscal-transfers/create.ts",
       "bucket": "server-route",
       "explicitAny": 3,
@@ -2504,22 +2360,6 @@
       "signalTotal": 22
     },
     {
-      "path": "server/routes/factory-payroll/delete.ts",
-      "bucket": "server-route",
-      "explicitAny": 3,
-      "asAny": 0,
-      "suppressions": 0,
-      "drizzleRowCasts": 0,
-      "total": 3,
-      "signals": {
-        "http": 9,
-        "db": 2,
-        "dto": 0,
-        "errors": 9
-      },
-      "signalTotal": 20
-    },
-    {
       "path": "server/lib/trackTraceScraper.ts",
       "bucket": "server-lib",
       "explicitAny": 3,
@@ -2614,6 +2454,166 @@
         "errors": 0
       },
       "signalTotal": 12
+    },
+    {
+      "path": "server/routes/screenFeedTransportHardening.ts",
+      "bucket": "server-route",
+      "explicitAny": 3,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 9,
+        "db": 0,
+        "dto": 0,
+        "errors": 0
+      },
+      "signalTotal": 9
+    },
+    {
+      "path": "server/services/accounting/employeeBalancePosting.ts",
+      "bucket": "server-service",
+      "explicitAny": 3,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 0,
+        "db": 7,
+        "dto": 0,
+        "errors": 0
+      },
+      "signalTotal": 7
+    },
+    {
+      "path": "server/services/accounting/infrastructureVoucherIdentity.ts",
+      "bucket": "server-service",
+      "explicitAny": 3,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 0,
+        "db": 3,
+        "dto": 0,
+        "errors": 0
+      },
+      "signalTotal": 3
+    },
+    {
+      "path": "server/routes/factory/raw-stock/offloadCosting.ts",
+      "bucket": "server-route",
+      "explicitAny": 3,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 1,
+        "db": 0,
+        "dto": 0,
+        "errors": 1
+      },
+      "signalTotal": 2
+    },
+    {
+      "path": "server/services/pos/edit/rebuildSaleItems.ts",
+      "bucket": "server-service",
+      "explicitAny": 3,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 0,
+        "db": 1,
+        "dto": 1,
+        "errors": 0
+      },
+      "signalTotal": 2
+    },
+    {
+      "path": "server/services/security/securityAuditRuntime.ts",
+      "bucket": "server-service",
+      "explicitAny": 3,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 0,
+        "db": 2,
+        "dto": 0,
+        "errors": 0
+      },
+      "signalTotal": 2
+    },
+    {
+      "path": "client/src/lib/zebraPrint.ts",
+      "bucket": "client-lib",
+      "explicitAny": 2,
+      "asAny": 1,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 0,
+        "db": 0,
+        "dto": 0,
+        "errors": 1
+      },
+      "signalTotal": 1
+    },
+    {
+      "path": "server/services/export-excel/sheet-helpers.ts",
+      "bucket": "server-service",
+      "explicitAny": 3,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 0,
+        "db": 0,
+        "dto": 0,
+        "errors": 1
+      },
+      "signalTotal": 1
+    },
+    {
+      "path": "server/services/factory/post-offload-charge/loaders.ts",
+      "bucket": "server-service",
+      "explicitAny": 3,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 0,
+        "db": 1,
+        "dto": 0,
+        "errors": 0
+      },
+      "signalTotal": 1
+    },
+    {
+      "path": "server/helpers/generateNetPositionExcel.ts",
+      "bucket": "server-helper",
+      "explicitAny": 3,
+      "asAny": 0,
+      "suppressions": 0,
+      "drizzleRowCasts": 0,
+      "total": 3,
+      "signals": {
+        "http": 0,
+        "db": 0,
+        "dto": 0,
+        "errors": 0
+      },
+      "signalTotal": 0
     }
   ]
 }

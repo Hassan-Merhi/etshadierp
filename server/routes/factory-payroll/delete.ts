@@ -17,7 +17,9 @@ import { factoryPayrolls, factoryWorkerAdvances, factoryAdvanceRepayments } from
 
 import { writeDaybookEntry } from "./_helpers";
 
-export function registerFactoryPayrollDeleteRoutes(app: Express, requireAuth: any, db: any) {
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
+
+export function registerFactoryPayrollDeleteRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   app.delete("/api/factory/payroll/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId
@@ -37,7 +39,7 @@ export function registerFactoryPayrollDeleteRoutes(app: Express, requireAuth: an
       if (existing.status !== "DRAFT")
         return res.status(400).json({ message: "Only draft payroll records can be deleted" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // Restore advance balances that were settled at generate time
         const advDeducted = parseFloat(existing.advances || "0");
         if (advDeducted > 0) {
