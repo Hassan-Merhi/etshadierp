@@ -4,10 +4,8 @@ import pg from "pg";
 import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 
 const INSTALL_KEY = Symbol.for("erp.factory-trilingual-schema.applied");
-const STARTUP_SCHEMA_LOCK_SQL =
-  "SELECT pg_advisory_lock(hashtext('erp.startup'), hashtext('factory-schema'))";
-const STARTUP_SCHEMA_UNLOCK_SQL =
-  "SELECT pg_advisory_unlock(hashtext('erp.startup'), hashtext('factory-schema'))";
+const STARTUP_SCHEMA_LOCK_SQL = "SELECT pg_advisory_lock(hashtext('erp.startup'), hashtext('factory-schema'))";
+const STARTUP_SCHEMA_UNLOCK_SQL = "SELECT pg_advisory_unlock(hashtext('erp.startup'), hashtext('factory-schema'))";
 const DEADLOCK_RETRY_DELAYS_MS = [250, 750, 1500];
 
 function connectionStringFromEnvironment() {

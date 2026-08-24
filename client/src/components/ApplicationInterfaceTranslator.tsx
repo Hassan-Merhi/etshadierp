@@ -22,13 +22,9 @@ import {
 } from "@/i18n/backendMessagesPhase7Translations";
 import { translateFactoryProductionPlannerText } from "@/i18n/factoryProductionPlannerTranslations";
 
-const EXCLUDED_SELECTOR = [
+const HARD_EXCLUDED_SELECTOR = [
   "code",
   "pre",
-  "option",
-  "td:not([data-i18n-ui])",
-  "[role=cell]:not([data-i18n-ui])",
-  "[role=gridcell]:not([data-i18n-ui])",
   "[contenteditable=true]",
   "[data-no-translate]",
   "[data-business-value]",
@@ -44,6 +40,13 @@ const EXCLUDED_SELECTOR = [
   "[data-unit-name]",
   "[data-tenant-name]",
   "[data-contract-reference]",
+].join(",");
+
+const SOFT_EXCLUDED_SELECTOR = [
+  "option",
+  "td:not([data-i18n-ui])",
+  "[role=cell]:not([data-i18n-ui])",
+  "[role=gridcell]:not([data-i18n-ui])",
 ].join(",");
 
 const ELIGIBLE_TEXT_SELECTOR = [
@@ -80,8 +83,12 @@ interface TranslationMemory {
 const textTranslationMemory = new WeakMap<Text, TranslationMemory>();
 const attributeTranslationMemory = new WeakMap<Element, Map<TranslatableAttribute, TranslationMemory>>();
 
-function isProtected(element: Element): boolean {
-  return Boolean(element.closest(EXCLUDED_SELECTOR));
+function isHardProtected(element: Element): boolean {
+  return Boolean(element.closest(HARD_EXCLUDED_SELECTOR));
+}
+
+function isSoftProtected(element: Element): boolean {
+  return Boolean(element.closest(SOFT_EXCLUDED_SELECTOR));
 }
 
 function isEligibleTextElement(element: Element): boolean {
@@ -146,12 +153,14 @@ function getAttributeMemory(
 
 function translateTextNode(node: Text, language: ApplicationLanguage) {
   const parent = node.parentElement;
-  if (!parent || isProtected(parent)) return;
+  if (!parent || isHardProtected(parent)) return;
 
   const currentValue = node.nodeValue ?? "";
   const memory = getTextMemory(node, currentValue);
+  const approved = isApprovedNonVisualText(memory.source);
+  if (isSoftProtected(parent) && !approved) return;
 
-  if (!isEligibleTextElement(parent) && !isApprovedNonVisualText(memory.source)) {
+  if (!isEligibleTextElement(parent) && !approved) {
     if (currentValue !== memory.source) {
       memory.applied = memory.source;
       node.nodeValue = memory.source;
@@ -173,7 +182,7 @@ function translateTextNode(node: Text, language: ApplicationLanguage) {
 }
 
 function translateAttributes(element: Element, language: ApplicationLanguage) {
-  if (isProtected(element)) return;
+  if (isHardProtected(element) || isSoftProtected(element)) return;
 
   for (const attribute of TRANSLATABLE_ATTRIBUTES) {
     const currentValue = element.getAttribute(attribute);
