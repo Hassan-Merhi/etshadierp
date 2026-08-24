@@ -86,4 +86,41 @@ for (const [file, modelPath, hookName, alias] of targets) {
     console.log(`${file}: ${result.replacements} model-bound any prop type(s) replaced`);
   }
 }
+
+function rewrite(file, transform) {
+  const before = fs.readFileSync(file, "utf8");
+  const after = transform(before);
+  if (after !== before) {
+    fs.writeFileSync(file, after);
+    changedFiles += 1;
+  }
+}
+
+rewrite("client/src/components/SpOffloadDialog.tsx", (source) => {
+  const types = `interface SpContainerLine {\n  qty?: string | number | null;\n  unitRateUsd?: string | number | null;\n}\n\ninterface SpPrepaidCharge {\n  id: string | number;\n  chargeType: string;\n  amountPaidUsd: string | number;\n}\n\ninterface SpOffloadContainer {\n  id: number;\n  supplierName?: string | null;\n  containerNumber?: string | null;\n  invoiceNumber?: string | null;\n  discountPct?: string | number | null;\n  invoiceTotalUsd?: string | number | null;\n  lines?: SpContainerLine[];\n  prepaid?: SpPrepaidCharge[];\n}\n\ninterface SpSetupAccount {\n  id: string | number;\n  subType: string;\n  name?: string | null;\n}\n\ninterface SpBankAccount {\n  id: string | number;\n  bankName: string;\n}\n\ninterface SpSetupStatus {\n  spAccounts?: SpSetupAccount[];\n  bankAccounts?: SpBankAccount[];\n}\n\ninterface SpLedgerAccount {\n  id: string | number;\n  code?: string | null;\n  name: string;\n}\n\ninterface SpLocationOption {\n  id: string | number;\n  name: string;\n}\n\ninterface ParentAgentOption {\n  ledger_account_id: string | number;\n  account_name: string;\n}\n\n`;
+  source = source.replace("interface SpOffloadDialogProps {", `${types}interface SpOffloadDialogProps {`);
+  source = source.replace("  container: any;", "  container: SpOffloadContainer | null;");
+  source = source.replace("useQuery<any>({", "useQuery<SpSetupStatus>({");
+  source = source.replace("useQuery<any[]>({\n    queryKey: [\"/api/ledger-accounts\"]", "useQuery<SpLedgerAccount[]>({\n    queryKey: [\"/api/ledger-accounts\"]");
+  source = source.replace("useQuery<any[]>({\n    queryKey: [\"/api/locations\"]", "useQuery<SpLocationOption[]>({\n    queryKey: [\"/api/locations\"]");
+  source = source.replace("useQuery<any[]>({\n    queryKey: [\"/api/sp/parent-agents\"]", "useQuery<ParentAgentOption[]>({\n    queryKey: [\"/api/sp/parent-agents\"]");
+  source = source.replace(/\(s: number, l: any\)/g, "(s, l)");
+  source = source.replace(/\(([a-zA-Z_$][\w$]*): any\)/g, "($1)");
+  source = source.replace(/\((locationsList|ledgerAccounts|parentAgents) as any\[\]\)/g, "$1");
+  return source;
+});
+
+rewrite("client/src/components/OffloadDialog.tsx", (source) => {
+  const types = `interface LedgerAccountOption {\n  id: string | number;\n  name: string;\n}\n\ninterface SpSetupAccountOption {\n  id: string | number;\n  subType: string;\n  name?: string | null;\n}\n\ninterface SpSetupStatusData {\n  spAccounts?: SpSetupAccountOption[];\n}\n\ninterface ParentAgentOption {\n  ledger_account_id: string | number;\n  account_name: string;\n}\n\ninterface ContainerCharge {\n  amount?: string | number | null;\n}\n\ninterface ContainerOffloadData {\n  charges?: ContainerCharge[];\n}\n\n`;
+  source = source.replace("interface AccountComboboxProps {", `${types}interface AccountComboboxProps {`);
+  source = source.replace("  accounts: any[];", "  accounts: LedgerAccountOption[];");
+  source = source.replace("useQuery<any[]>({\n    queryKey: [\"/api/ledger-accounts\"]", "useQuery<LedgerAccountOption[]>({\n    queryKey: [\"/api/ledger-accounts\"]");
+  source = source.replace("useQuery<any>({\n    queryKey: [\"/api/sp/setup/status\"]", "useQuery<SpSetupStatusData>({\n    queryKey: [\"/api/sp/setup/status\"]");
+  source = source.replace("useQuery<any[]>({\n    queryKey: [\"/api/sp/parent-agents\"]", "useQuery<ParentAgentOption[]>({\n    queryKey: [\"/api/sp/parent-agents\"]");
+  source = source.replace("useQuery<any>({\n    queryKey: [`/api/containers/${containerId}`]", "useQuery<ContainerOffloadData>({\n    queryKey: [`/api/containers/${containerId}`]");
+  source = source.replace("containerData.charges.forEach((charge: any) =>", "containerData.charges.forEach((charge) =>");
+  source = source.replace(/\(parentAgents as any\[\]\)/g, "parentAgents");
+  return source;
+});
+
 console.log(`Phase 2.2 codemod changed ${changedFiles} files and model-bound ${replacedProps} prop declarations.`);
