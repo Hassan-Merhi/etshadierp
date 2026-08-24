@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../../db";
 import { and, eq, isNull, gt, sql } from "drizzle-orm";
 import {
   factoryContainers,
@@ -8,7 +9,7 @@ import {
 } from "../../../../shared/schema";
 
 export async function resolveLegacyPostOffloadAccountingLinks(
-  tx: any,
+  tx: DbTransaction,
   companyId: number,
   containerId: number,
   chargeRow: any
@@ -76,7 +77,12 @@ export async function resolveLegacyPostOffloadAccountingLinks(
  * (later containers offloaded, later active post-offload charges, later duty corrections).
  * Throws if a later event is found.
  */
-export async function assertNoLaterSupplierCostEvents(tx: any, companyId: number, supplierId: number, afterDate: Date) {
+export async function assertNoLaterSupplierCostEvents(
+  tx: DbTransaction,
+  companyId: number,
+  supplierId: number,
+  afterDate: Date
+) {
   // 1. Later offloaded container
   const laterContainers = await tx
     .select({ id: factoryContainers.id, containerNumber: factoryContainers.containerNumber })
@@ -118,7 +124,7 @@ export async function assertNoLaterSupplierCostEvents(tx: any, companyId: number
 }
 
 /** Update container landed totals (never touches purchase rate). */
-export async function updateContainerCost(tx: any, containerId: number, next: any) {
+export async function updateContainerCost(tx: DbTransaction, containerId: number, next: any) {
   await tx
     .update(factoryContainers)
     .set({
@@ -131,7 +137,7 @@ export async function updateContainerCost(tx: any, containerId: number, next: an
 }
 
 /** Capture supplier locked rate (FOR UPDATE lock). */
-export async function getSupplierRateForUpdate(tx: any, companyId: number, supplierId: number) {
+export async function getSupplierRateForUpdate(tx: DbTransaction, companyId: number, supplierId: number) {
   const [row] = await tx
     .select({ rate: factorySuppliers.currentRawMaterialCostPerKgUsd })
     .from(factorySuppliers)

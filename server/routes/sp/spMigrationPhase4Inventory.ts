@@ -89,7 +89,7 @@ export function ensurePhase4CutoverSchema(): Promise<void> {
   return phase4SchemaPromise;
 }
 
-async function loadTargetInventoryRows(targetId: number, targetItemIds: number[]): Promise<any[]> {
+async function loadTargetInventoryRows(targetId: number, targetItemIds: number[]) {
   if (targetItemIds.length === 0) return [];
   const result = await db.execute(sql`
     SELECT id, stock_item_id, location_id, quantity, average_rate, total_value
@@ -263,7 +263,11 @@ export async function buildExactInventoryPlan(sourceId: number, targetId: number
   };
 }
 
-async function snapshotDelta(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], cutoverId: number, entry: InventoryPlanEntry): Promise<void> {
+async function snapshotDelta(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  cutoverId: number,
+  entry: InventoryPlanEntry
+): Promise<void> {
   await tx.execute(sql`
     INSERT INTO sp_migration_cutover_stock_deltas
       (cutover_id, delta_key, source_inventory_id, target_inventory_id,
@@ -280,11 +284,7 @@ async function snapshotDelta(tx: Parameters<Parameters<typeof db.transaction>[0]
   `);
 }
 
-export async function synchronizeExactCutoverStock(
-  cutoverId: number,
-  sourceId: number,
-  targetId: number
-): Promise<any> {
+export async function synchronizeExactCutoverStock(cutoverId: number, sourceId: number, targetId: number) {
   const plan = await buildExactInventoryPlan(sourceId, targetId);
   if (plan.blockers.length > 0) {
     throw new Error(

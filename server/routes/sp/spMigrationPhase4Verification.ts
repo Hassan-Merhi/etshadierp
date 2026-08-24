@@ -24,12 +24,7 @@ function addUnique(target: VerificationIssue[], issue: VerificationIssue): void 
   if (!target.some((existing) => existing.code === issue.code)) target.push(issue);
 }
 
-async function completedPairLinks(
-  sourceId: number,
-  targetId: number,
-  sourceTable: string,
-  targetTable: string
-): Promise<any[]> {
+async function completedPairLinks(sourceId: number, targetId: number, sourceTable: string, targetTable: string) {
   const result = await db.execute(sql`
     SELECT DISTINCT ON (l.source_id) l.source_id, l.target_id
     FROM sp_migration_source_links l
@@ -439,7 +434,7 @@ async function verifyUserMappings(
   };
 }
 
-export async function buildFinalMigrationVerification(sourceId: number, targetId: number): Promise<any> {
+export async function buildFinalMigrationVerification(sourceId: number, targetId: number) {
   const base = await buildCutoverReadiness(sourceId, targetId);
   const blockers: VerificationIssue[] = (base.blockers ?? []).filter(
     (issue: VerificationIssue) => !["UNMAPPED_INVENTORY", "TARGET_ALREADY_LIVE"].includes(issue.code)

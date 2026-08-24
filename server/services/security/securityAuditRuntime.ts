@@ -1,3 +1,4 @@
+import type { Database } from "../../db";
 import { and, desc, eq, gte, like } from "drizzle-orm";
 import { auditLog } from "@shared/schema";
 import {
@@ -32,7 +33,11 @@ export function toAuditLogInsert(input: SecurityEventInput, username: string) {
   };
 }
 
-export async function persistSecurityEvent(db: any, input: SecurityEventInput, username: string): Promise<SecurityAuditRecord> {
+export async function persistSecurityEvent(
+  db: Database,
+  input: SecurityEventInput,
+  username: string
+): Promise<SecurityAuditRecord> {
   const { record, insert } = toAuditLogInsert(input, username);
   await db.insert(auditLog).values(insert);
   return record;
@@ -51,7 +56,7 @@ function isSecurityAuditRecord(value: unknown): value is SecurityAuditRecord {
 }
 
 export async function loadCompanySecurityAnomalies(
-  db: any,
+  db: Database,
   companyId: number,
   options: { now?: number; windowMs?: number; denialThreshold?: number; limit?: number } = {}
 ) {

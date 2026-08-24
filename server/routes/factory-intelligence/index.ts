@@ -5,7 +5,8 @@
  * Express resolves first-match, so reordering these calls can change which
  * handler serves a request - config/route-manifest.json pins the result.
  */
-import type { Express } from "express";
+import type { Database } from "../../db";
+import type { Express, RequestHandler } from "express";
 import { registerFactorySettingsRoutes } from "./settings";
 import { registerFactoryDashboardWasteRoutes } from "./dashboard-waste";
 import { registerFactoryKpiRoutes } from "./kpis";
@@ -16,7 +17,7 @@ import { registerFactoryMixOptimizeRoutes } from "./mix-optimize";
 import { registerFactoryBaleTracePhotoRoutes } from "./bale-trace-photos";
 import { registerFactoryCashflowRoutes } from "./cashflow";
 
-export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: unknown, db: unknown) {
+export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: RequestHandler, db: Database) {
   registerFactorySettingsRoutes(app, requireAuth, db);
   registerFactoryDashboardWasteRoutes(app, requireAuth, db);
   registerFactoryKpiRoutes(app, requireAuth, db);

@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../db";
 import { and, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import { factoryProductionPositionMemberships, factoryProductionPositions, factoryWorkers } from "@shared/schema";
 
@@ -35,7 +36,7 @@ interface EligiblePosition {
  * backdated Stock Entry from before its membership interval ended.
  */
 export async function resolveStockEntryProductionAttributions(
-  tx: any,
+  tx: DbTransaction,
   companyId: number,
   stockEntryDate: string,
   items: StockEntryProductionAttributionInput[]

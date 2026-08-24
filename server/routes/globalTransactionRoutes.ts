@@ -1,7 +1,7 @@
 import { parseId } from "../lib/parseId";
 import { logger } from "../lib/logger";
 import { requireNonPOS } from "../auth";
-import type { Express, Request } from "express";
+import type { Express, Request, RequestHandler } from "express";
 import { db } from "../db";
 import {
   vouchers,
@@ -24,7 +24,7 @@ import {
   fixedAssets,
   factorySuppliers,
 } from "../../shared/schema";
-import { eq, and, gte, lte, inArray, or, ilike, desc, sql, count, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, or, ilike, desc, sql, count, isNull, type SQL } from "drizzle-orm";
 import {
   assertCompaniesAccess,
   assertCompanyAccess,
@@ -43,7 +43,7 @@ async function resolveGlobalCompanyScope(req: Request): Promise<{ userId: string
   };
 }
 
-export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) {
+export function registerGlobalTransactionRoutes(app: Express, requireAuth: RequestHandler) {
   // GET /api/global/transactions
   // Returns vouchers across all ERP companies the user has access to.
   app.get("/api/global/transactions", requireAuth, requireNonPOS, async (req, res) => {
@@ -125,7 +125,10 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
       }
 
       // 3. Build WHERE conditions
-      const conditions: any[] = [inArray(vouchers.companyId, targetCompanyIds), isNull(vouchers.deletedAt)];
+      const conditions: (SQL | undefined)[] = [
+        inArray(vouchers.companyId, targetCompanyIds),
+        isNull(vouchers.deletedAt),
+      ];
 
       if (startDate) conditions.push(gte(vouchers.voucherDate, startDate));
       if (endDate) conditions.push(lte(vouchers.voucherDate, endDate));

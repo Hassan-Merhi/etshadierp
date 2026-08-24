@@ -2,7 +2,7 @@ import type { Express, NextFunction, Request, Response } from "express";
 import { and, eq } from "drizzle-orm";
 import { customers, factoryDaybookEntries, factorySettings, ledgerAccounts } from "@shared/schema";
 import { requireAuth, requireNonPOS } from "../../auth";
-import { db } from "../../db";
+import { db, type DbTransaction } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { autoReallocateLoansAccounts } from "../../lib/transporterAllocation";
@@ -40,7 +40,7 @@ function postingStatus(error: PostingValidationError): number {
 }
 
 async function resolvePaymentReceiptTargetTx(input: {
-  tx: any;
+  tx: DbTransaction;
   companyId: number;
   accountType: string;
   accountId: number;
@@ -105,7 +105,11 @@ async function resolvePaymentReceiptTargetTx(input: {
   return { [field]: accountId } as VoucherEntryInsertFields;
 }
 
-async function writeFactoryDaybookCompatibilityTx(input: { tx: any; companyId: number; voucher: any }): Promise<void> {
+async function writeFactoryDaybookCompatibilityTx(input: {
+  tx: DbTransaction;
+  companyId: number;
+  voucher: any;
+}): Promise<void> {
   const [settings] = await input.tx
     .select({ id: factorySettings.id })
     .from(factorySettings)

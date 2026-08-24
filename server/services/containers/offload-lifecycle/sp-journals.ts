@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../../db";
 import {
   infrastructurePostingIdentity,
   insertInfrastructureVoucherTx,
@@ -7,7 +8,7 @@ import * as schema from "@shared/schema";
 
 import { ContainerOffloadLifecycleError, ContainerOffloadLifecycleInput, amount } from "./types";
 
-async function getSpAccount(tx: any, companyId: number, subType: string) {
+async function getSpAccount(tx: DbTransaction, companyId: number, subType: string) {
   const [account] = await tx
     .select()
     .from(schema.ledgerAccounts)
@@ -23,7 +24,7 @@ async function getSpAccount(tx: any, companyId: number, subType: string) {
 }
 
 export async function postSupplierPartnerJournals(
-  tx: any,
+  tx: DbTransaction,
   container: typeof schema.containers.$inferSelect,
   purchaseOrders: Array<typeof schema.purchaseOrders.$inferSelect>,
   input: ContainerOffloadLifecycleInput

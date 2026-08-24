@@ -1,4 +1,4 @@
-import type { Request, Response } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../lib/parseId";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { and, eq, sql } from "drizzle-orm";
@@ -7,18 +7,18 @@ import { db } from "../../db";
 import { factoryV3Loads, factoryV3LoadBales } from "@shared/schema";
 import { requireAuth } from "../../auth";
 
-function getCompanyId(req: import("express").Request): number | null {
+function getCompanyId(req: Request): number | null {
   return req.session?.factoryCompanyId || req.session?.currentCompanyId || null;
 }
 
-function getUserInfo(req: import("express").Request) {
+function getUserInfo(req: Request) {
   return {
     id: req.user?.id ?? null,
     name: req.user?.username ?? null,
   };
 }
 
-export function registerFactoryStockAllocationV3Routes(app: any) {
+export function registerFactoryStockAllocationV3Routes(app: Express) {
   // ──────────────────────────────────────────────────────────────
   // GET /api/factory/v3/stock-overview
   // Per-article-code FTP: IN_STOCK - v3 expected_to_load - v3 loading

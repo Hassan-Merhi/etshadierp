@@ -42,12 +42,10 @@ export function registerPasskeyRoutes(app: Express) {
         sql`SELECT credential_id FROM passkey_credentials WHERE user_id = ${userId}`
       );
 
-      const excludeCredentials: { id: string; type: "public-key" }[] = (existingCreds.rows as any[]).map(
-        (row) => ({
-          id: row.credential_id as string,
-          type: "public-key" as const,
-        })
-      );
+      const excludeCredentials: { id: string; type: "public-key" }[] = existingCreds.rows.map((row) => ({
+        id: row.credential_id as string,
+        type: "public-key" as const,
+      }));
 
       const options = await generateRegistrationOptions({
         rpName: "HMD International Group",
@@ -114,10 +112,10 @@ export function registerPasskeyRoutes(app: Express) {
       let allowCredentials: { id: string; type: "public-key" }[] = [];
       if (username) {
         const userRow = await db.execute(sql`SELECT id FROM users WHERE username = ${username} LIMIT 1`);
-        if ((userRow.rows as any[]).length > 0) {
-          const uid = (userRow.rows as any[])[0].id;
+        if (userRow.rows.length > 0) {
+          const uid = userRow.rows[0].id;
           const creds = await db.execute(sql`SELECT credential_id FROM passkey_credentials WHERE user_id = ${uid}`);
-          allowCredentials = (creds.rows as any[]).map((r) => ({
+          allowCredentials = creds.rows.map((r) => ({
             id: r.credential_id as string,
             type: "public-key" as const,
           }));
