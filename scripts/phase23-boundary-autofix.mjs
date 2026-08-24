@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Compiler-gated Phase 2.3 transform: start with the factory-intelligence route boundary cluster.
+// Compiler-gated Phase 2.3 transform: repair injected route boundaries first so
+// Drizzle/query callback types can flow from the real database contract.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,7 +9,14 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const routeRoot = path.join(projectRoot, "server/routes");
 const helperPath = path.join(routeRoot, "routeBoundaryTypes.ts");
 
-const TARGET_PREFIXES = ["factory-intelligence/"];
+const TARGET_PREFIXES = [
+  "factory-intelligence/",
+  "factory-payroll/",
+  "factory-workers/",
+  "factory-reports/",
+  "container-loaded-items/",
+  "supplier-profit-check/",
+];
 
 const CALLBACK_METHODS = [
   "map",
