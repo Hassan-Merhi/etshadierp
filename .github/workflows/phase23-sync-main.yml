@@ -32,3 +32,5 @@ jobs:
           # retain all non-conflicting Phase 2.3 boundary-typing work.
           git merge --no-edit -X theirs origin/main -m "chore: sync Phase 2.3 with main [phase23-sync]"
           git push origin HEAD:phase-2-3-api-service-boundary-typing
+
+# Temporary synchronization runner; remove before Phase 2.3 certification.
