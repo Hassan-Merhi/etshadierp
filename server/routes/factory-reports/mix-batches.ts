@@ -4,13 +4,13 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { pool } from "../../db";
+import { pool, type Database } from "../../db";
 import {} from "@shared/schema";
 
-export function registerFactoryMixBatchesByDateRoutes(app: Express, requireAuth: any, _db: any) {
+export function registerFactoryMixBatchesByDateRoutes(app: Express, requireAuth: RequestHandler, _db: Database) {
   // ── Mix batches by date ───────────────────────────────────────────────────
   app.get(
     "/api/factory/mix-batches-by-date",

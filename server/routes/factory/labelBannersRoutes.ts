@@ -1,4 +1,4 @@
-import type { Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 /**
  * labelBannersRoutes.ts
  * Manages label banner color slots — both the color metadata (DB) and the
@@ -50,36 +50,42 @@ function rowInfo(row: { imageData: string | null; imageUpdatedAt: Date | null })
   };
 }
 
-export function registerLabelBannersRoutes(app: any, requireAuth: any) {
+export function registerLabelBannersRoutes(app: Express, requireAuth: RequestHandler) {
   // ── Serve custom banner image from DB when present, else fall through ────────
-  app.get("/labels/hmd-:slug.jpg", async (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {
-    const { slug } = req.params;
-    if (!/^[a-z0-9-]+$/.test(slug)) return next();
-    try {
-      const [row] = await db
-        .select({ imageData: labelDesignColors.imageData })
-        .from(labelDesignColors)
-        .where(eq(labelDesignColors.slug, slug));
-      if (row?.imageData) {
-        // imageData is stored as a data URL: "data:<mime>;base64,<data>"
-        const match = row.imageData.match(/^data:([^;]+);base64,(.+)$/s);
-        if (match) {
-          const mimeType = match[1];
-          const buffer = Buffer.from(match[2], "base64");
-          // If the caller passed ?t=<imageUpdatedAt ms> the URL is content-addressed:
-          // serve as immutable so the browser caches it indefinitely.
-          // Without ?t= (rare / legacy) give a short 10-minute TTL.
-          const hasTimestamp = !!req.query.t;
-          res.setHeader("Cache-Control", hasTimestamp ? "public, max-age=31536000, immutable" : "public, max-age=600");
-          res.setHeader("Content-Type", mimeType);
-          return res.send(buffer);
+  app.get(
+    "/labels/hmd-:slug.jpg",
+    async (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {
+      const { slug } = req.params;
+      if (!/^[a-z0-9-]+$/.test(slug)) return next();
+      try {
+        const [row] = await db
+          .select({ imageData: labelDesignColors.imageData })
+          .from(labelDesignColors)
+          .where(eq(labelDesignColors.slug, slug));
+        if (row?.imageData) {
+          // imageData is stored as a data URL: "data:<mime>;base64,<data>"
+          const match = row.imageData.match(/^data:([^;]+);base64,(.+)$/s);
+          if (match) {
+            const mimeType = match[1];
+            const buffer = Buffer.from(match[2], "base64");
+            // If the caller passed ?t=<imageUpdatedAt ms> the URL is content-addressed:
+            // serve as immutable so the browser caches it indefinitely.
+            // Without ?t= (rare / legacy) give a short 10-minute TTL.
+            const hasTimestamp = !!req.query.t;
+            res.setHeader(
+              "Cache-Control",
+              hasTimestamp ? "public, max-age=31536000, immutable" : "public, max-age=600"
+            );
+            res.setHeader("Content-Type", mimeType);
+            return res.send(buffer);
+          }
         }
+      } catch {
+        /* fall through to static on DB error */
       }
-    } catch {
-      /* fall through to static on DB error */
+      next();
     }
-    next();
-  });
+  );
 
   // ── GET /api/factory/label-design-colors — full list with image status ──────
   app.get("/api/factory/label-design-colors", requireAuth, async (_req: unknown, res: import("express").Response) => {

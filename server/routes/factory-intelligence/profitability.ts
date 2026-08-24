@@ -4,7 +4,8 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response } from "express";
+import type { Database } from "../../db";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { eq, and, sql } from "drizzle-orm";
@@ -20,7 +21,7 @@ import {
   customerOrderBales,
 } from "@shared/schema";
 
-export function registerFactoryProfitabilityRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
+export function registerFactoryProfitabilityRoutes(app: Express, requireAuth: RequestHandler, db: Database) {
   app.get("/api/factory/profitability/bales", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -72,7 +73,7 @@ export function registerFactoryProfitabilityRoutes(app: Express, requireAuth: Au
           )})`
         );
 
-      const orderBaleMap = new Map<number, any>(orderBales.map((ob) => [ob.baleId, ob]));
+      const orderBaleMap = new Map(orderBales.map((ob) => [ob.baleId, ob] as const));
 
       const _freightEntries = await db.select().from(containerFreight).where(eq(containerFreight.companyId, companyId));
 
@@ -165,7 +166,7 @@ export function registerFactoryProfitabilityRoutes(app: Express, requireAuth: Au
 
       const allOrderBales = await db.select().from(customerOrderBales);
 
-      const orderBaleMap = new Map<number, any>(allOrderBales.map((ob) => [ob.baleId, ob]));
+      const orderBaleMap = new Map(allOrderBales.map((ob) => [ob.baleId, ob] as const));
 
       const [settings] = await db.select().from(factorySettings).where(eq(factorySettings.companyId, companyId));
 

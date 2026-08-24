@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { eq } from "drizzle-orm";
 import { db } from "../../db";
@@ -14,7 +14,7 @@ import { supplierContainerLoadedItems } from "@shared/schema";
 
 import { verifyContainerOwnership } from "./_helpers";
 
-export function registerContainerLoadedItemCrudRoutes(app: Express, requireAuth: any) {
+export function registerContainerLoadedItemCrudRoutes(app: Express, requireAuth: RequestHandler) {
   app.get("/api/containers/:containerId/loaded-items", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;

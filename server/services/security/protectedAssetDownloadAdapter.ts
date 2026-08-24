@@ -1,3 +1,4 @@
+import type { Database } from "../../db";
 import type { NextFunction, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
@@ -62,7 +63,7 @@ export async function authorizeContainerDocumentDownload(
  * Serves container documents through the Program 3 protected-asset boundary.
  * Other legacy upload folders are delegated to the existing route.
  */
-export function createContainerDocumentDownloadHandler(db: any) {
+export function createContainerDocumentDownloadHandler(db: Database) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const folder = String(req.params.folder ?? "");
     if (folder !== "container-docs") return next();

@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../../db";
 import Decimal from "decimal.js";
 import { and, eq, isNull } from "drizzle-orm";
 import {
@@ -7,7 +8,7 @@ import {
   factoryContainerOtherCharges,
 } from "../../../../shared/schema";
 
-export async function loadCostInputs(tx: any, companyId: number, containerId: number) {
+export async function loadCostInputs(tx: DbTransaction, companyId: number, containerId: number) {
   const commissions = await tx
     .select()
     .from(factoryContainerCommissions)
@@ -33,7 +34,7 @@ export async function loadCostInputs(tx: any, companyId: number, containerId: nu
 }
 
 /** Load all active (non-deleted) additional-charge rows for this container. */
-export async function loadActiveCharges(tx: any, companyId: number, containerId: number) {
+export async function loadActiveCharges(tx: DbTransaction, companyId: number, containerId: number) {
   return tx
     .select()
     .from(factoryOffloadAdditionalCharges)
@@ -47,7 +48,7 @@ export async function loadActiveCharges(tx: any, companyId: number, containerId:
 }
 
 /** Compute remaining-fraction from raw-stock rows. */
-export async function computeRemainingFraction(tx: any, companyId: number, containerId: number) {
+export async function computeRemainingFraction(tx: DbTransaction, companyId: number, containerId: number) {
   const rows = await tx
     .select()
     .from(factoryRawStock)

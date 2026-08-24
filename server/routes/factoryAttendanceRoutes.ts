@@ -1,6 +1,7 @@
+import type { Database } from "../db";
 import { parseId } from "../lib/parseId";
 import { getErrorMessage } from "../lib/httpHandlers";
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { eq, and, inArray, gte, lte } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import { factoryAttendance, factoryWorkers } from "@shared/schema";
@@ -11,7 +12,7 @@ function getFactoryCompanyId(req: import("express").Request): number | undefined
   return req.session.factoryCompanyId || req.session.currentCompanyId;
 }
 
-export function registerFactoryAttendanceRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
+export function registerFactoryAttendanceRoutes(app: Express, requireAuth: RequestHandler, db: Database) {
   // GET /api/factory/attendance?date=YYYY-MM-DD&shift=
   // Returns active workers + merged attendance for that date
   app.get("/api/factory/attendance", requireAuth, async (req: Request, res: Response) => {
@@ -242,7 +243,9 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: AuthM
 
       const present = rows.filter((r: { status: string }) => r.status === "Present").length;
       const absent = rows.filter((r: { status: string }) => r.status === "Absent").length;
-      const other = rows.filter((r: { status: string }) => r.status !== "Present" && r.status !== "Absent" && r.status !== "—").length;
+      const other = rows.filter(
+        (r: { status: string }) => r.status !== "Present" && r.status !== "Absent" && r.status !== "—"
+      ).length;
       const unmarked = rows.filter((r: { status: string }) => r.status === "—").length;
 
       const doc = new PDFDocument({ margin: 40, size: "A4" });

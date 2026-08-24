@@ -9,7 +9,7 @@ import {
  * to keep PAYROLL-GEN-* vouchers in sync when payroll records are removed.
  */
 
-import { db as globalDb } from "../../db";
+import { db as globalDb, type DbTransaction } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { eq, and, sql, inArray, ne, isNull } from "drizzle-orm";
 import { ledgerAccounts, vouchers, voucherEntries, factoryPayrolls, factoryWorkers } from "@shared/schema";
@@ -117,7 +117,7 @@ export async function findOrCreateLedger(
  * @param excludePayrollId  The payroll id being deleted (excluded from "remaining" query)
  */
 export async function rebuildPayrollGenVoucher(
-  tx: any,
+  tx: DbTransaction,
   companyId: number,
   periodStart: string,
   periodEnd: string,

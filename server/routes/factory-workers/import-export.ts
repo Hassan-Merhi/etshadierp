@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
@@ -16,9 +16,7 @@ import { factoryWorkers } from "@shared/schema";
 
 import { getFactoryCompanyId, workerUpload, writeDaybookEntry } from "./_helpers";
 
-import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
-
-export function registerFactoryWorkerImportExportRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
+export function registerFactoryWorkerImportExportRoutes(app: Express, requireAuth: RequestHandler, db: any) {
   // GET /api/factory/workers/template.xlsx - Download Excel import template
   app.get("/api/factory/workers/template.xlsx", requireAuth, async (req: Request, res: Response) => {
     try {

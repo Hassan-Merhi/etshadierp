@@ -56,7 +56,7 @@ export async function writeDaybookEntry(
 }
 
 export const hmdLogo = path.join(process.cwd(), "server", "hmd-logo.png");
-export function addPdfBranding(doc: any) {
+export function addPdfBranding(doc: PDFKit.PDFDocument) {
   if (fs.existsSync(hmdLogo)) {
     try {
       doc.image(hmdLogo, (doc.page.width - 220) / 2, doc.y, { width: 220 });

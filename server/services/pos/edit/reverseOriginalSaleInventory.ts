@@ -4,6 +4,7 @@
  * Reversal of the original sale's inventory movements and removal of the old
  * sale rows before an edited sale is rebuilt.
  */
+import type { DbTransaction } from "../../../db";
 import { salesItems, voucherEntries } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { adjustInventory } from "../../../inventoryHelper";
@@ -18,7 +19,7 @@ const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
  * change the inventory cost basis during a reversal.
  */
 export async function reverseOriginalSaleInventory(
-  tx: any,
+  tx: DbTransaction,
   existingVoucher: any,
   oldSalesItems: any[],
   canonicalRevision?: number
@@ -59,7 +60,7 @@ export async function reverseOriginalSaleInventory(
   }
 }
 
-export async function clearOldSaleRecords(tx: any, voucherId: number): Promise<void> {
+export async function clearOldSaleRecords(tx: DbTransaction, voucherId: number): Promise<void> {
   await tx.delete(salesItems).where(eq(salesItems.voucherId, voucherId));
   await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 }

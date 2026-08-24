@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../../db";
 import type { Request } from "express";
 import { ledgerAccounts } from "@shared/schema";
 import { eq, and, sql, isNull } from "drizzle-orm";
@@ -9,7 +10,7 @@ export function getCompanyId(req: Request): number | null {
 }
 
 export async function findOrCreateLedgerAccount(
-  tx: any,
+  tx: DbTransaction,
   companyId: number,
   name: string,
   accountType: "Income" | "Liability" | "Indirect Expense" | "Indirect Income" | "Intercompany" | "Asset",

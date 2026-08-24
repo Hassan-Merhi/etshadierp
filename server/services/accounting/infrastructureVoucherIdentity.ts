@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../db";
 import { createHash } from "crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { accountingPostingRequests, auditLog, voucherEntries, vouchers } from "@shared/schema";
@@ -8,7 +9,7 @@ type VoucherInsert = typeof vouchers.$inferInsert;
 type VoucherRow = typeof vouchers.$inferSelect;
 
 interface DatabaseLike {
-  transaction: <T>(callback: (tx: any) => Promise<T>) => Promise<T>;
+  transaction: <T>(callback: (tx: DbTransaction) => Promise<T>) => Promise<T>;
 }
 
 function requiredText(value: unknown, field: string): string {
@@ -99,7 +100,7 @@ function assertStoredIdentityMatches(input: {
  * their entry writes into the same transaction.
  */
 export async function insertInfrastructureVoucherTx(
-  tx: any,
+  tx: DbTransaction,
   voucher: VoucherInsert,
   sourceInput: PostingSourceIdentity,
   fingerprintPayload?: unknown,
@@ -236,7 +237,10 @@ export async function insertInfrastructureVoucher(
 }
 
 /** Remove the durable marker before an intentional hard delete/rebuild. */
-export async function deleteInfrastructurePostingIdentityForVoucherTx(tx: any, voucherId: number): Promise<void> {
+export async function deleteInfrastructurePostingIdentityForVoucherTx(
+  tx: DbTransaction,
+  voucherId: number
+): Promise<void> {
   await tx.delete(accountingPostingRequests).where(eq(accountingPostingRequests.voucherId, voucherId));
 }
 

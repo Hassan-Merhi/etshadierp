@@ -8,13 +8,14 @@
  * Every message, status code, and query is byte-identical to the original —
  * only the code location changed.
  */
+import type { DbTransaction } from "../../../db";
 import { vouchers } from "@shared/schema";
 import { logger } from "../../../lib/logger";
 import { eq } from "drizzle-orm";
 
 /** Updates voucher description, total amount, location, and optionally date. */
 export async function updateVoucherRecord(
-  tx: any,
+  tx: DbTransaction,
   params: {
     voucherId: number;
     description: any;

@@ -3,7 +3,7 @@ import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { logAudit } from "./_helpers";
 import { Express } from "express";
-import type { Request, Response } from "express";
+import type { Request, Response, RequestHandler } from "express";
 import { db } from "../db";
 import { eq, and, ne } from "drizzle-orm";
 import ExcelJS from "exceljs";
@@ -34,7 +34,16 @@ function sanitizeDecimal(v: any): string {
  * Insert proforma lines in chunks inside a single transaction so partial imports
  * never leave orphan rows when a later chunk fails.
  */
-async function batchInsertProformaLines(rows: { proformaId: number; barcode: string; itemName: string; qty: number; weightPerBale: string; pricePerBale: string; }[]) {
+async function batchInsertProformaLines(
+  rows: {
+    proformaId: number;
+    barcode: string;
+    itemName: string;
+    qty: number;
+    weightPerBale: string;
+    pricePerBale: string;
+  }[]
+) {
   // Each row has 6 columns → 6 params; PostgreSQL limit is 65535.
   // 200 rows × 6 = 1200 params — well within limits.
   const CHUNK = 200;
@@ -45,7 +54,7 @@ async function batchInsertProformaLines(rows: { proformaId: number; barcode: str
   });
 }
 
-export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
+export function registerSupplierProformaRoutes(app: Express, requireAuth: RequestHandler) {
   app.get("/api/suppliers/:supplierId/proformas", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;

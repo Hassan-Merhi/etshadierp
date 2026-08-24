@@ -37,7 +37,7 @@ function companyKey(companyId?: number): string {
   return companyId ? `company:${companyId}` : "all-companies";
 }
 
-function stripInternalSupplierId(row: EntryRow): any {
+function stripInternalSupplierId(row: EntryRow) {
   const { __supplierId: _supplierId, ...entry } = row;
   return entry;
 }
@@ -114,7 +114,7 @@ async function flushBatch(key: string, companyId: number | undefined, batch: Pen
  * balances with Promise.all, so the previous one-query-per-supplier pattern is
  * reduced to one bounded query without changing the returned entry contract.
  */
-export function getVoucherEntriesBySupplierBatched(supplierId: number, companyId?: number): Promise<any[]> {
+export function getVoucherEntriesBySupplierBatched(supplierId: number, companyId?: number) {
   const key = companyKey(companyId);
   let batch = pendingByCompany.get(key);
   if (!batch) {

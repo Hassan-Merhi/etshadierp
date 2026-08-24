@@ -1,5 +1,6 @@
+import type { Database } from "../../db";
 import { toArrayBuffer } from "../../lib/bufferCompatibility";
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { logAudit } from "../helpers/auditHelpers";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -41,7 +42,7 @@ async function auditExport(
   }
 }
 
-export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
+export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: RequestHandler, db: Database) {
   app.post("/api/factory/payroll/export-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = Number(req.body?.companyId);

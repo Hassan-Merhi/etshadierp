@@ -5,7 +5,8 @@
  * legacy handlers. Production-bonus subroutes are additive and use distinct
  * paths below /api/factory/payroll/:id/production-bonuses.
  */
-import type { Express } from "express";
+import type { Database } from "../../db";
+import type { Express, RequestHandler } from "express";
 import { registerFactoryPayrollGenerateRoutes } from "./generate";
 import { registerFactoryPayrollReadRoutes } from "./reads";
 import { registerFactoryProductionBonusRoutes } from "./production-bonuses";
@@ -13,9 +14,7 @@ import { registerFactoryPayrollUpdateRoutes } from "./update";
 import { registerFactoryPayrollDeleteRoutes } from "./delete";
 import { registerFactoryPayrollExportRoutes } from "./exports";
 
-import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
-
-export function registerFactoryPayrollRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
+export function registerFactoryPayrollRoutes(app: Express, requireAuth: RequestHandler, db: Database) {
   registerFactoryPayrollGenerateRoutes(app, requireAuth, db);
   registerFactoryPayrollReadRoutes(app, requireAuth, db);
   registerFactoryProductionBonusRoutes(app, requireAuth, db);

@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../db";
 import { createHash } from "crypto";
 import Decimal from "decimal.js";
 import type { VoucherEntryInsertFields, VoucherInsertFields, VoucherWithEntries } from "./accountingTypes";
@@ -30,7 +31,7 @@ export interface PostingActor {
 
 export interface PostingOwnershipValidator {
   validateVoucherOwnership(input: {
-    tx: any;
+    tx: DbTransaction;
     companyId: number;
     voucher: VoucherInsertFields;
     entries: VoucherEntryInsertFields[];
@@ -39,13 +40,13 @@ export interface PostingOwnershipValidator {
 
 export interface PostingIdempotencyStore {
   findExisting(input: {
-    tx: any;
+    tx: DbTransaction;
     companyId: number;
     source: PostingSourceIdentity;
     requestFingerprint: string;
   }): Promise<VoucherWithEntries | null>;
   record(input: {
-    tx: any;
+    tx: DbTransaction;
     companyId: number;
     voucherId: number;
     source: PostingSourceIdentity;
@@ -55,7 +56,7 @@ export interface PostingIdempotencyStore {
 
 export interface PostingAuditWriter {
   recordPosting(input: {
-    tx: any;
+    tx: DbTransaction;
     companyId: number;
     voucherId: number;
     source: PostingSourceIdentity;
@@ -273,6 +274,7 @@ export function validateCentralPostingRequest(request: CentralPostingRequest): V
  * effects when the same idempotency key is submitted more than once.
  */
 export async function postBalancedVoucherTx(
+  // Reached with a caller-generic TTransaction as well as a drizzle handle.
   tx: any,
   request: CentralPostingRequest,
   dependencies: CentralPostingDependencies

@@ -12,6 +12,7 @@
  * Never throws — always returns a typed result.
  */
 
+import type { HTTPResponse } from "puppeteer";
 import { existsSync } from "fs";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "./logger";
@@ -170,7 +171,7 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
     // cross-origin iframes, so we need to catch responses from all sources.
     let capturedJson: unknown = null;
     const capturedResponses: Array<{ url: string; data: unknown }> = [];
-    page.on("response", async (response: any) => {
+    page.on("response", async (response: HTTPResponse) => {
       try {
         const url: string = response.url();
         // Skip noise: images, fonts, analytics, ads

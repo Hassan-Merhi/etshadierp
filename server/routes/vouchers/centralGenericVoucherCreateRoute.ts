@@ -2,7 +2,7 @@ import type { Express, NextFunction, Request, Response } from "express";
 import { and, eq, inArray } from "drizzle-orm";
 import { customers } from "@shared/schema";
 import { requireAuth, requireNonPOS } from "../../auth";
-import { db } from "../../db";
+import { db, type DbTransaction } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { autoReallocateLoansAccounts } from "../../lib/transporterAllocation";
@@ -25,7 +25,7 @@ type PersistedPostingResult = CentralPostingResult<any, any>;
 type CustomerLinkedLedgerRow = { id: number; ledgerAccountId: number | null };
 
 async function resolveCustomerLinkedLedgersTx(input: {
-  tx: any;
+  tx: DbTransaction;
   companyId: number;
   entries: Array<Record<string, unknown>>;
 }): Promise<Array<Record<string, unknown>>> {

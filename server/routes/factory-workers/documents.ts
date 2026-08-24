@@ -4,7 +4,8 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response } from "express";
+import type { Database } from "../../db";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { parseId } from "../../lib/parseId";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -16,9 +17,7 @@ import { factoryWorkerDocuments } from "@shared/schema";
 import { getFactoryCompanyId } from "./_helpers";
 import multer from "multer";
 
-import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
-
-export function registerFactoryWorkerDocumentRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
+export function registerFactoryWorkerDocumentRoutes(app: Express, requireAuth: RequestHandler, db: Database) {
   // Use memory storage so file bytes are always available in req.file.buffer —
   // no disk dependency for the primary save path. Ephemeral disk environments
   // (Replit/Render deployments) cannot reliably persist files across restarts,

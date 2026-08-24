@@ -1,3 +1,4 @@
+import ExcelJS from "exceljs";
 import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -86,7 +87,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
 
       const accountBalances = new Map<number, { debit: number; credit: number }>();
       const supplierBalances = new Map<number, { debit: number; credit: number }>();
-      for (const e of (ledgerAccEntries)) {
+      for (const e of ledgerAccEntries) {
         if (e.ledger_account_id) {
           const id = parseInt(e.ledger_account_id);
           const cur = accountBalances.get(id) || { debit: 0, credit: 0 };
@@ -96,7 +97,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
           });
         }
       }
-      for (const e of (companyEntries)) {
+      for (const e of companyEntries) {
         if (e.supplier_id) {
           const id = parseInt(e.supplier_id);
           const cur = supplierBalances.get(id) || { debit: 0, credit: 0 };
@@ -143,7 +144,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
             activeLocIds.map((locId: number) => calculateHistoricalLocationInventory(locId, companyId, toDate))
           );
           for (const items of allHistorical) {
-            for (const inv of items as any[]) {
+            for (const inv of items) {
               const qty = parseFloat(inv.quantity || "0");
               const rate = parseFloat(inv.averageRate || "0");
               if (qty > 0) stockOnFloor += qty * rate;
@@ -155,7 +156,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
             .from(inventory)
             .where(inArray(inventory.locationId, activeLocIds))
             .execute();
-          for (const inv of (invData))
+          for (const inv of invData)
             stockOnFloor += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
         }
       }
@@ -173,9 +174,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       // ERP employee advances are NOT included here — they belong in the ERP Net Position.
       // Factory workers live in factory_workers / factory_worker_advances tables, not employees.
       // Remove the "Factory Worker Advances" ledger account (replaced by table sum below).
-      const fwaLedgerIdx2 = forUsAccounts.findIndex(
-        (a) => (a.name || "").toLowerCase() === "factory worker advances"
-      );
+      const fwaLedgerIdx2 = forUsAccounts.findIndex((a) => (a.name || "").toLowerCase() === "factory worker advances");
       if (fwaLedgerIdx2 !== -1) {
         forUsTotal = round2(forUsTotal - forUsAccounts[fwaLedgerIdx2].value);
         forUsAccounts.splice(fwaLedgerIdx2, 1);
@@ -212,7 +211,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
             : [];
         let supplierLiabilities = 0;
         let supplierAssets = 0;
-        for (const sup of (allSuppliers)) {
+        for (const sup of allSuppliers) {
           const balance = supplierBalances.get(sup.id);
           if (balance) {
             const opening = parseFloat(sup.openingBalance || "0");
@@ -250,7 +249,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
         : and(eq(containers.companyId, companyId), eq(containers.status, "OTW"));
       const otwContainers = await db.select().from(containers).where(excelOtwQuery).execute();
       let stockOtwValue = 0;
-      for (const container of (otwContainers)) {
+      for (const container of otwContainers) {
         const gTotal = parseFloat(container.grandTotal ?? "0");
         stockOtwValue += gTotal || parseFloat(container.itemsTotal ?? "0");
       }
@@ -319,7 +318,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
         { key: "note", width: 40 },
       ];
 
-      const addTitle = (ws: any, text: string, argb: string) => {
+      const addTitle = (ws: ExcelJS.Worksheet, text: string, argb: string) => {
         const row = ws.addRow([text]);
         row.height = 28;
         const cell = row.getCell(1);
@@ -329,7 +328,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
         ws.mergeCells(`A${row.number}:C${row.number}`);
       };
 
-      const addSubheader = (ws: any, text: string, argb: string) => {
+      const addSubheader = (ws: ExcelJS.Worksheet, text: string, argb: string) => {
         const row = ws.addRow([text]);
         row.height = 18;
         const cell = row.getCell(1);

@@ -13,6 +13,7 @@
  * uses the rate that was in effect at the time of the original sale, never
  * the current company rate.
  */
+import type { DbTransaction } from "../../../db";
 import { voucherEntries } from "@shared/schema";
 import { logger } from "../../../lib/logger";
 import { normalizeVoucherEntryAmounts } from "../../../services/accounting/currencyAmounts";
@@ -87,7 +88,7 @@ function normalizePosEntry(
  * voucher row (existingVoucher.currency / existingVoucher.exchangeRate).
  */
 export async function rebuildSaleAccountingEntries(
-  tx: any,
+  tx: DbTransaction,
   params: {
     voucherId: number;
     oldEntries: any[];

@@ -5,7 +5,8 @@
  * APPROVED/PAID payrolls are read-only historical records and are never given
  * newly-created bonus proposals retroactively.
  */
-import type { Express, Request, Response } from "express";
+import type { Database } from "../../db";
+import type { Express, Request, Response, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { parseId } from "../../lib/parseId";
@@ -30,7 +31,7 @@ const emptyTotals = () => ({
   rejectedCount: 0,
 });
 
-export function registerFactoryPayrollReadRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
+export function registerFactoryPayrollReadRoutes(app: Express, requireAuth: RequestHandler, db: Database) {
   app.get("/api/factory/payroll", requireAuth, async (req: Request, res: Response) => {
     try {
       const { companyId, startDate, endDate, status } = req.query;

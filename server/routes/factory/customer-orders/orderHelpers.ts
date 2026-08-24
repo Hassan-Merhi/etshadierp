@@ -1,3 +1,4 @@
+import ExcelJS from "exceljs";
 import { toArrayBuffer } from "../../../lib/bufferCompatibility";
 import { db } from "../../../db";
 
@@ -121,11 +122,11 @@ export async function buildOrderExcelBuffer(
   const WHITE = "FFFFFFFF";
 
   const merge = (r: number, c1: number, c2: number) => sheet.mergeCells(r, c1, r, c2);
-  const setFill = (cell: any, argb: string) => {
+  const setFill = (cell: ExcelJS.Cell, argb: string) => {
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
   };
-  const setBorderH = (row: any) => {
-    row.eachCell((cell: any) => {
+  const setBorderH = (row: ExcelJS.Row) => {
+    row.eachCell((cell: ExcelJS.Cell) => {
       cell.border = {
         top: { style: "thin", color: { argb: "FFDDDDDD" } },
         bottom: { style: "thin", color: { argb: "FFDDDDDD" } },

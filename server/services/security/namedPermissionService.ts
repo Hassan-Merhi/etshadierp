@@ -1,3 +1,4 @@
+import type { DbTransaction } from "../../db";
 import { and, eq } from "drizzle-orm";
 import { userCompanyRoles, userSecurityPermissions } from "@shared/schema";
 
@@ -65,7 +66,7 @@ export async function assertUserBelongsToCompany(db: any, userId: string, compan
 }
 
 export async function replaceNamedPermissions(
-  tx: any,
+  tx: DbTransaction,
   params: { userId: string; companyId: number; permissions: string[]; grantedBy: string }
 ): Promise<string[]> {
   const permissions = normalizePermissionList(params.permissions);
