@@ -130,9 +130,5 @@ export async function ensureCompanyScopeRlsReadiness() {
 
 if (!globalThis[INSTALL_KEY]) {
   globalThis[INSTALL_KEY] = true;
-  if (resolveConnectionString()) {
-    await ensureCompanyScopeRlsReadiness();
-  } else {
-    log("WARN", "Company-scope RLS startup check skipped because no PostgreSQL configuration is available");
-  }
+  await ensureCompanyScopeRlsReadiness();
 }

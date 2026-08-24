@@ -1,232 +1,309 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClipboardList, Copy, Loader2, Save, Target, Users } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  ChevronsUpDown,
+  ClipboardList,
+  Copy,
+  Loader2,
+  Plus,
+  Save,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { cn } from "@/lib/utils";
 
-interface PlannerMember {
+interface Worker {
+  id: number;
+  fullName?: string;
+  full_name?: string;
+  position?: string;
+  active?: boolean;
+}
+
+interface WorkerCategory {
+  id: number;
+  name: string;
+  workerIds?: number[];
+  worker_ids?: number[];
+}
+
+interface PlanEntry {
+  id?: number;
   workerId: number;
   workerName: string;
-}
-
-interface PlannerAllocation extends PlannerMember {
-  amount: number;
-}
-
-interface PlannerEntry {
-  positionId: number;
-  positionName: string;
   targetBales: number;
-  bonusPerExtraBale: number;
-  bonusEnabled: boolean;
-  members: PlannerMember[];
-  saved: boolean;
-  actualBales: number;
-  memberCount: number;
-  extraBales: number;
-  bonusPool: number;
-  perWorkerMin: number;
-  perWorkerMax: number;
-  allocations: PlannerAllocation[];
-  distributable: boolean;
-  targetMet: boolean;
+  workerCount: number;
 }
 
-interface PlannerData {
-  plan: { id: number | null; planDate: string; notes: string; saved: boolean };
-  entries: PlannerEntry[];
-  summary: {
-    totalTarget: number;
-    totalActual: number;
-    totalExtra: number;
-    totalBonusPool: number;
-    unattributedBales: number;
-  };
+interface PlanData {
+  plan: { id: number; planDate: string; categoryIds: number[]; notes: string } | null;
+  entries: PlanEntry[];
+  actuals: Record<number, number>;
 }
 
 interface CopyPreviousResponse {
-  fromDate: string | null;
+  entries: PlanEntry[];
+  categoryIds: number[];
   notes: string;
-  entries: Array<{
-    positionId: number;
-    positionName: string;
-    targetBales: number;
-    bonusPerExtraBale: number;
-    bonusEnabled: boolean;
-    members: PlannerMember[];
-    saved: boolean;
-  }>;
+  fromDate: string | null;
 }
 
-function money(value: number): string {
-  return Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+type EditableEntry = PlanEntry & { key: string };
 
-function previewEntry(entry: PlannerEntry): PlannerEntry {
-  const targetBales = Math.max(0, Math.trunc(Number(entry.targetBales) || 0));
-  const actualBales = Math.max(0, Math.trunc(Number(entry.actualBales) || 0));
-  const rate = Math.max(0, Number(entry.bonusPerExtraBale) || 0);
-  const extraBales = targetBales > 0 ? Math.max(actualBales - targetBales, 0) : 0;
-  const poolCents = entry.bonusEnabled ? Math.max(0, Math.round(extraBales * rate * 100 + Number.EPSILON)) : 0;
-  const bonusPool = Number((poolCents / 100).toFixed(2));
-  const members = [...(entry.members || [])].sort((a, b) => a.workerId - b.workerId);
-  let allocations: PlannerAllocation[] = members.map((member) => ({ ...member, amount: 0 }));
-
-  if (poolCents > 0 && members.length > 0) {
-    const baseCents = Math.floor(poolCents / members.length);
-    const remainder = poolCents % members.length;
-    const remainderStart = members.length - remainder;
-    allocations = members.map((member, index) => ({
-      ...member,
-      amount: Number(((baseCents + (remainder > 0 && index >= remainderStart ? 1 : 0)) / 100).toFixed(2)),
-    }));
-  }
-
-  const amounts = allocations.map((allocation) => allocation.amount);
-  return {
-    ...entry,
-    targetBales,
-    actualBales,
-    bonusPerExtraBale: rate,
-    memberCount: members.length,
-    extraBales,
-    bonusPool,
-    allocations,
-    perWorkerMin: amounts.length ? Math.min(...amounts) : 0,
-    perWorkerMax: amounts.length ? Math.max(...amounts) : 0,
-    distributable: poolCents === 0 || members.length > 0,
-    targetMet: targetBales > 0 && actualBales >= targetBales,
-  };
+function workerName(worker: Worker): string {
+  return worker.fullName || worker.full_name || `Worker #${worker.id}`;
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { credentials: "include" });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(body?.message || `Request failed (${response.status})`);
-  return body as T;
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payload?.message || `Request failed (${response.status})`);
+  return payload as T;
+}
+
+function CategorySelector({
+  value,
+  onChange,
+  categories,
+}: {
+  value: number[];
+  onChange: (value: number[]) => void;
+  categories: WorkerCategory[];
+}) {
+  const label =
+    value.length === 0
+      ? "All workers"
+      : value.length === 1
+        ? (categories.find((category) => category.id === value[0])?.name ?? "1 selected")
+        : `${value.length} teams`;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="max-w-[220px] justify-between gap-1"
+          data-testid="button-category-filter"
+        >
+          <span className="truncate text-xs">{label}</span>
+          <ChevronsUpDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="max-h-64 w-56 overflow-y-auto p-2">
+        <div className="mb-2 px-1 text-xs font-medium text-muted-foreground">Filter workers by team</div>
+        <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted">
+          <Checkbox checked={value.length === 0} onCheckedChange={() => onChange([])} />
+          <span>All workers</span>
+        </label>
+        {categories.map((category) => (
+          <label
+            key={category.id}
+            className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted"
+          >
+            <Checkbox
+              checked={value.includes(category.id)}
+              onCheckedChange={() =>
+                onChange(
+                  value.includes(category.id) ? value.filter((id) => id !== category.id) : [...value, category.id]
+                )
+              }
+            />
+            <span className="truncate">{category.name}</span>
+          </label>
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function WorkerSelector({
+  entry,
+  workers,
+  onChange,
+}: {
+  entry: EditableEntry;
+  workers: Worker[];
+  onChange: (workerId: number, name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = workers.find((worker) => worker.id === entry.workerId);
+  const selectedName = selected ? workerName(selected) : entry.workerName || `Worker #${entry.workerId}`;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 w-full justify-between font-normal"
+          data-testid={`select-worker-${entry.key}`}
+        >
+          <span className="truncate">{selectedName}</span>
+          <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search worker…" className="h-9" />
+          <CommandList>
+            <CommandEmpty>No workers found.</CommandEmpty>
+            <CommandGroup>
+              {workers.map((worker) => (
+                <CommandItem
+                  key={worker.id}
+                  value={workerName(worker)}
+                  onSelect={() => {
+                    onChange(worker.id, workerName(worker));
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", worker.id === entry.workerId ? "opacity-100" : "opacity-0")} />
+                  <span className={cn("truncate", worker.active === false && "text-muted-foreground")}>
+                    {workerName(worker)}
+                    {worker.active === false && <span className="ml-1 text-xs">(inactive)</span>}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export default function ProductionPlannerDialog() {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(() => new Date().toLocaleDateString("en-CA"));
-  const [entries, setEntries] = useState<PlannerEntry[]>([]);
+  const [categoryIds, setCategoryIds] = useState<number[]>([]);
+  const [entries, setEntries] = useState<EditableEntry[]>([]);
   const [notes, setNotes] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const { data: allWorkers = [] } = useQuery<Worker[]>({
+    queryKey: ["/api/factory/workers"],
+    enabled: open,
+  });
+  const { data: categories = [] } = useQuery<WorkerCategory[]>({
+    queryKey: ["/api/factory/worker-categories"],
+    enabled: open,
+  });
+  const workers = useMemo(() => {
+    const selectedWorkerIds = new Set(
+      categories
+        .filter((category) => categoryIds.includes(category.id))
+        .flatMap((category) => category.workerIds ?? category.worker_ids ?? [])
+        .map(Number)
+    );
+    const activeWorkers = allWorkers.filter((worker) => worker.active !== false);
+    return selectedWorkerIds.size ? activeWorkers.filter((worker) => selectedWorkerIds.has(worker.id)) : activeWorkers;
+  }, [allWorkers, categories, categoryIds]);
+
   const {
-    data: planner,
-    isLoading,
+    data: planData,
+    isLoading: planLoading,
     isError,
     error,
-  } = useQuery<PlannerData>({
-    queryKey: ["/api/factory/production-position-planner", date],
-    queryFn: () => fetchJson<PlannerData>(`/api/factory/production-position-planner/${date}`),
+    refetch: refetchPlan,
+  } = useQuery<PlanData>({
+    queryKey: ["/api/factory/production-planner", date],
+    queryFn: () => fetchJson<PlanData>(`/api/factory/production-planner/${date}`),
     enabled: open,
-    staleTime: 0,
   });
 
   useEffect(() => {
-    if (!planner) return;
-    setEntries(planner.entries.map((entry) => previewEntry(entry)));
-    setNotes(planner.plan?.notes ?? "");
-  }, [planner]);
-
-  const previewEntries = useMemo(() => entries.map(previewEntry), [entries]);
-  const summary = useMemo(
-    () =>
-      previewEntries.reduce(
-        (acc, entry) => {
-          acc.totalTarget += entry.targetBales;
-          acc.totalActual += entry.actualBales;
-          acc.totalExtra += entry.extraBales;
-          acc.totalBonusPool = Number((acc.totalBonusPool + entry.bonusPool).toFixed(2));
-          return acc;
-        },
-        {
-          totalTarget: 0,
-          totalActual: 0,
-          totalExtra: 0,
-          totalBonusPool: 0,
-          unattributedBales: planner?.summary?.unattributedBales ?? 0,
-        }
-      ),
-    [previewEntries, planner?.summary?.unattributedBales]
-  );
+    if (!planData) return;
+    setCategoryIds(planData.plan?.categoryIds ?? []);
+    setNotes(planData.plan?.notes ?? "");
+    setEntries(
+      (planData.entries ?? []).map((entry, index) => ({
+        ...entry,
+        workerCount: entry.workerCount ?? 0,
+        key: `loaded-${entry.workerId}-${index}`,
+      }))
+    );
+  }, [planData]);
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/factory/production-position-planner/${date}`, {
+    mutationFn: () =>
+      apiRequest("POST", `/api/factory/production-planner/${date}`, {
         notes,
-        entries: previewEntries.map((entry) => ({
-          positionId: entry.positionId,
+        categoryIds,
+        entries: entries.map((entry) => ({
+          workerId: entry.workerId,
           targetBales: entry.targetBales,
-          bonusPerExtraBale: entry.bonusPerExtraBale,
-          bonusEnabled: entry.bonusEnabled,
+          workerCount: entry.workerCount,
         })),
-      });
-      const body = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(body?.message || "Failed to save production plan");
-      return body as PlannerData;
-    },
-    onSuccess: async (data) => {
-      setEntries(data.entries.map((entry) => previewEntry(entry)));
-      setNotes(data.plan?.notes ?? "");
-      await queryClient.invalidateQueries({ queryKey: ["/api/factory/production-position-planner", date] });
-      toast({
-        title: "Production plan saved",
-        description: "Team, target and bonus-rule snapshots were frozen for this date.",
-      });
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/factory/production-planner", date] });
+      await refetchPlan();
+      toast({ title: "Plan saved" });
     },
     onError: (saveError: Error) =>
-      toast({ title: "Could not save production plan", description: saveError.message, variant: "destructive" }),
+      toast({ title: "Could not save plan", description: saveError.message, variant: "destructive" }),
   });
 
   const copyPreviousMutation = useMutation({
-    mutationFn: () => fetchJson<CopyPreviousResponse>(`/api/factory/production-position-planner/${date}/copy-previous`),
+    mutationFn: () => fetchJson<CopyPreviousResponse>(`/api/factory/production-planner/${date}/copy-previous`),
     onSuccess: (data) => {
       if (!data.fromDate) {
-        toast({ title: "No previous position plan found" });
+        toast({ title: "No previous plan found" });
         return;
       }
-      const actualByPosition = new Map((planner?.entries ?? []).map((entry) => [entry.positionId, entry.actualBales]));
       setEntries(
-        data.entries.map((entry) =>
-          previewEntry({
-            ...entry,
-            actualBales: actualByPosition.get(entry.positionId) ?? 0,
-            memberCount: entry.members?.length ?? 0,
-            extraBales: 0,
-            bonusPool: 0,
-            perWorkerMin: 0,
-            perWorkerMax: 0,
-            allocations: [],
-            distributable: true,
-            targetMet: false,
-          })
-        )
+        data.entries.map((entry, index) => ({
+          ...entry,
+          workerCount: entry.workerCount ?? 0,
+          key: `copied-${entry.workerId}-${index}-${Date.now()}`,
+        }))
       );
+      setCategoryIds(data.categoryIds ?? []);
       setNotes(data.notes ?? "");
-      toast({
-        title: `Copied settings from ${data.fromDate}`,
-        description: "Current-date team membership is kept; target/rate settings were copied.",
-      });
+      toast({ title: `Copied plan from ${data.fromDate}` });
     },
     onError: (copyError: Error) =>
       toast({ title: "Could not copy previous plan", description: copyError.message, variant: "destructive" }),
   });
 
+  const addRow = useCallback(() => {
+    if (workers.length === 0) return;
+    const usedIds = new Set(entries.map((entry) => entry.workerId));
+    const worker = workers.find((candidate) => !usedIds.has(candidate.id)) ?? workers[0];
+    setEntries((current) => [
+      ...current,
+      {
+        workerId: worker.id,
+        workerName: workerName(worker),
+        targetBales: 0,
+        workerCount: 0,
+        key: `new-${worker.id}-${Date.now()}`,
+      },
+    ]);
+  }, [entries, workers]);
+
   const updateEntry = (
-    positionId: number,
-    patch: Partial<Pick<PlannerEntry, "targetBales" | "bonusPerExtraBale" | "bonusEnabled">>
-  ) => {
-    setEntries((current) => current.map((entry) => (entry.positionId === positionId ? { ...entry, ...patch } : entry)));
-  };
+    key: string,
+    patch: Partial<Pick<EditableEntry, "workerId" | "workerName" | "targetBales" | "workerCount">>
+  ) => setEntries((current) => current.map((entry) => (entry.key === key ? { ...entry, ...patch } : entry)));
+
+  const actuals = planData?.actuals ?? {};
+  const totalTarget = entries.reduce((sum, entry) => sum + (entry.targetBales || 0), 0);
+  const totalActual = entries.reduce((sum, entry) => sum + (actuals[entry.workerId] ?? 0), 0);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -236,12 +313,11 @@ export default function ProductionPlannerDialog() {
           Production Planner
         </Button>
       </DialogTrigger>
-
-      <DialogContent className="flex max-h-[92vh] max-w-[96vw] flex-col p-0 xl:max-w-7xl">
+      <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col p-0">
         <DialogHeader className="shrink-0 border-b px-6 pb-3 pt-5">
           <DialogTitle className="flex items-center gap-2">
             <ClipboardList className="h-5 w-5" />
-            Position Production Planner
+            Production Planner
           </DialogTitle>
         </DialogHeader>
 
@@ -253,16 +329,17 @@ export default function ProductionPlannerDialog() {
                 type="date"
                 value={date}
                 onChange={(event) => setDate(event.target.value)}
-                className="w-40"
+                className="w-40 text-sm"
                 data-testid="input-plan-date"
               />
             </div>
+            <CategorySelector value={categoryIds} onChange={setCategoryIds} categories={categories} />
             <Button
               variant="outline"
               size="sm"
               onClick={() => copyPreviousMutation.mutate()}
-              disabled={copyPreviousMutation.isPending || isLoading}
-              data-testid="button-copy-previous-position-plan"
+              disabled={copyPreviousMutation.isPending || planLoading}
+              data-testid="button-copy-yesterday"
             >
               {copyPreviousMutation.isPending ? (
                 <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -271,17 +348,12 @@ export default function ProductionPlannerDialog() {
               )}
               Copy Previous Plan
             </Button>
-            <div className="ml-auto flex items-center gap-2">
-              {planner?.plan?.saved ? (
-                <Badge variant="secondary">Saved snapshot</Badge>
-              ) : (
-                <Badge variant="outline">Preview / not saved</Badge>
-              )}
+            <div className="ml-auto">
               <Button
                 size="sm"
                 onClick={() => saveMutation.mutate()}
-                disabled={saveMutation.isPending || isLoading || isError}
-                data-testid="button-save-position-plan"
+                disabled={saveMutation.isPending || planLoading || isError}
+                data-testid="button-save-plan"
               >
                 {saveMutation.isPending ? (
                   <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -293,216 +365,171 @@ export default function ProductionPlannerDialog() {
             </div>
           </div>
 
-          {!isLoading && !isError && (
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-              <div className="rounded-lg border bg-muted/20 p-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Total Target
-                </div>
-                <div className="mt-1 text-xl font-bold">{summary.totalTarget}</div>
+          {entries.length > 0 && (
+            <div className="flex flex-wrap items-center gap-4 rounded-md bg-muted/50 p-3 text-sm">
+              <div>
+                <span className="text-muted-foreground">Total Target: </span>
+                <span className="font-semibold">{totalTarget} bales</span>
               </div>
-              <div className="rounded-lg border bg-muted/20 p-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Total Actual
-                </div>
-                <div className="mt-1 text-xl font-bold">{summary.totalActual}</div>
+              <div>
+                <span className="text-muted-foreground">Total Actual: </span>
+                <span className="font-semibold">{totalActual} bales</span>
               </div>
-              <div className="rounded-lg border bg-muted/20 p-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Extra Bales
+              {totalTarget > 0 && (
+                <div className="ml-auto">
+                  {totalActual >= totalTarget ? (
+                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                      Target Met
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                      {totalTarget - totalActual} short
+                    </Badge>
+                  )}
                 </div>
-                <div className="mt-1 text-xl font-bold">{summary.totalExtra}</div>
-              </div>
-              <div className="rounded-lg border bg-muted/20 p-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Suggested Bonus
-                </div>
-                <div className="mt-1 text-xl font-bold">${money(summary.totalBonusPool)}</div>
-              </div>
-              <div className="rounded-lg border bg-muted/20 p-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Bonus-Ineligible
-                </div>
-                <div className="mt-1 text-xl font-bold">{summary.unattributedBales}</div>
-                <div className="text-[10px] text-muted-foreground">worker-assigned bales with no position</div>
-              </div>
+              )}
             </div>
           )}
 
-          {isLoading ? (
-            <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading position production…
+          {planLoading ? (
+            <div className="flex items-center justify-center py-10 text-muted-foreground">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading plan…
             </div>
           ) : isError ? (
             <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
               Could not load the production planner: {(error as Error)?.message || "Unknown error"}
             </div>
-          ) : previewEntries.length === 0 ? (
-            <div className="rounded-xl border p-10 text-center text-muted-foreground">
-              <Target className="mx-auto mb-2 h-8 w-8 opacity-50" />
-              No Production Positions are configured for this date. Create positions and teams in Bale Stock Entry →
-              Production Positions.
-            </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border">
-              <table className="min-w-[1050px] w-full text-sm">
-                <thead className="border-b bg-muted/40">
+            <div className="overflow-x-auto rounded-md border">
+              <table className="min-w-[760px] w-full text-sm">
+                <thead className="border-b bg-muted/50">
                   <tr>
-                    <th className="px-3 py-2 text-left font-semibold">Position</th>
-                    <th className="px-3 py-2 text-left font-semibold">Team Members</th>
-                    <th className="w-24 px-3 py-2 text-right font-semibold">Target</th>
-                    <th className="w-20 px-3 py-2 text-right font-semibold">Actual</th>
-                    <th className="w-20 px-3 py-2 text-right font-semibold">Extra</th>
-                    <th className="w-28 px-3 py-2 text-right font-semibold">$/Extra Bale</th>
-                    <th className="w-28 px-3 py-2 text-right font-semibold">Bonus Pool</th>
-                    <th className="w-28 px-3 py-2 text-right font-semibold">Per Person</th>
-                    <th className="w-28 px-3 py-2 text-center font-semibold">Status</th>
+                    <th className="px-3 py-2 text-left font-semibold">Worker</th>
+                    <th className="w-36 px-3 py-2 text-left font-semibold">Role</th>
+                    <th className="w-28 px-3 py-2 text-right font-semibold">Target</th>
+                    <th className="w-24 px-3 py-2 text-right font-semibold">Actual</th>
+                    <th className="w-28 px-3 py-2 text-right font-semibold">Workers</th>
+                    <th className="w-24 px-3 py-2 text-center font-semibold">Status</th>
+                    <th className="w-10 px-2" />
                   </tr>
                 </thead>
                 <tbody>
-                  {previewEntries.map((entry) => {
-                    const shortBy = Math.max(entry.targetBales - entry.actualBales, 0);
-                    const splitText =
-                      entry.memberCount === 0
-                        ? "—"
-                        : entry.perWorkerMin === entry.perWorkerMax
-                          ? `$${money(entry.perWorkerMin)}`
-                          : `$${money(entry.perWorkerMin)}–$${money(entry.perWorkerMax)}`;
-                    return (
-                      <tr key={entry.positionId} className="border-b last:border-0 align-top hover:bg-muted/20">
-                        <td className="px-3 py-3">
-                          <div className="font-bold">{entry.positionName}</div>
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            <Badge variant={entry.bonusEnabled ? "default" : "outline"} className="text-[10px]">
-                              Bonus {entry.bonusEnabled ? "On" : "Off"}
-                            </Badge>
-                            {entry.saved && (
-                              <Badge variant="secondary" className="text-[10px]">
-                                Snapshotted
-                              </Badge>
-                            )}
-                          </div>
-                        </td>
-                        <td className="max-w-sm px-3 py-3">
-                          <div className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
-                            <Users className="h-3.5 w-3.5" /> {entry.memberCount} worker
-                            {entry.memberCount === 1 ? "" : "s"}
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {entry.members.length ? (
-                              entry.members.map((member) => {
-                                const allocation =
-                                  entry.allocations.find((item) => item.workerId === member.workerId)?.amount ?? 0;
-                                return (
-                                  <Badge
-                                    key={member.workerId}
-                                    variant="outline"
-                                    className="whitespace-normal text-[10px]"
-                                    title={`${member.workerName}: $${money(allocation)}`}
-                                  >
-                                    {member.workerName}
-                                    {entry.bonusPool > 0 ? ` · $${money(allocation)}` : ""}
-                                  </Badge>
-                                );
-                              })
-                            ) : (
-                              <span className="text-xs italic text-muted-foreground">No qualifying team members</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-3 py-3">
-                          <Input
-                            type="number"
-                            min={0}
-                            step={1}
-                            value={entry.targetBales}
-                            onChange={(event) =>
-                              updateEntry(entry.positionId, {
-                                targetBales: Math.max(0, parseInt(event.target.value) || 0),
-                              })
-                            }
-                            className="h-8 text-right font-mono"
-                            data-testid={`input-position-target-${entry.positionId}`}
-                          />
-                        </td>
-                        <td className="px-3 py-3 text-right font-mono font-bold">{entry.actualBales}</td>
-                        <td className="px-3 py-3 text-right font-mono font-bold">{entry.extraBales}</td>
-                        <td className="px-3 py-3">
-                          <div className="space-y-1">
+                  {entries.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                        No workers in plan. Add workers below or copy from a previous plan.
+                      </td>
+                    </tr>
+                  ) : (
+                    entries.map((entry) => {
+                      const actual = actuals[entry.workerId] ?? 0;
+                      const met = entry.targetBales > 0 && actual >= entry.targetBales;
+                      const notMet = entry.targetBales > 0 && actual < entry.targetBales;
+                      return (
+                        <tr key={entry.key} className="border-b last:border-0 hover:bg-muted/30">
+                          <td className="px-3 py-2">
+                            <WorkerSelector
+                              entry={entry}
+                              workers={
+                                workers.length ? workers : allWorkers.filter((worker) => worker.active !== false)
+                              }
+                              onChange={(workerId, name) => updateEntry(entry.key, { workerId, workerName: name })}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Select value="WORKER" onValueChange={() => undefined} disabled>
+                              <SelectTrigger className="h-8 text-sm" data-testid={`select-role-${entry.key}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="WORKER">Worker</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="px-3 py-2">
                             <Input
                               type="number"
                               min={0}
-                              step="0.01"
-                              value={entry.bonusPerExtraBale}
+                              step={1}
+                              value={entry.targetBales}
                               onChange={(event) =>
-                                updateEntry(entry.positionId, {
-                                  bonusPerExtraBale: Math.max(0, Number(event.target.value) || 0),
+                                updateEntry(entry.key, { targetBales: Math.max(0, parseInt(event.target.value) || 0) })
+                              }
+                              className="h-8 text-right"
+                              data-testid={`input-target-${entry.key}`}
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold">{actual}</td>
+                          <td className="px-3 py-2">
+                            <Input
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={entry.workerCount}
+                              onChange={(event) =>
+                                updateEntry(entry.key, {
+                                  workerCount: Math.max(0, parseInt(event.target.value) || 0),
                                 })
                               }
-                              className="h-8 text-right font-mono"
-                              disabled={!entry.bonusEnabled}
-                              data-testid={`input-position-bonus-rate-${entry.positionId}`}
+                              className="h-8 text-right"
+                              data-testid={`input-worker-count-${entry.key}`}
                             />
-                            <label className="flex cursor-pointer items-center justify-end gap-1.5 text-[10px] text-muted-foreground">
-                              <input
-                                type="checkbox"
-                                checked={entry.bonusEnabled}
-                                onChange={(event) =>
-                                  updateEntry(entry.positionId, { bonusEnabled: event.target.checked })
-                                }
-                              />
-                              Enabled
-                            </label>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3 text-right font-mono font-bold">${money(entry.bonusPool)}</td>
-                        <td className="px-3 py-3 text-right">
-                          <div className="font-mono font-bold">{splitText}</div>
-                          {!entry.distributable && entry.bonusPool > 0 && (
-                            <div className="mt-1 text-[10px] font-medium text-destructive">
-                              No workers to divide pool
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-3 py-3 text-center">
-                          {entry.targetBales <= 0 ? (
-                            <Badge variant="outline">No target</Badge>
-                          ) : entry.targetMet ? (
-                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-200">
-                              Target met
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-900 dark:text-red-200">
-                              {shortBy} short
-                            </Badge>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            {met ? (
+                              <CheckCircle2 className="mx-auto h-5 w-5 text-green-500" />
+                            ) : notMet ? (
+                              <XCircle className="mx-auto h-5 w-5 text-red-500" />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setEntries((current) => current.filter((item) => item.key !== entry.key))}
+                              data-testid={`button-remove-${entry.key}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
           )}
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Plan Notes</label>
-            <Textarea
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder="Optional notes for this production day…"
-              rows={3}
-              maxLength={5000}
-            />
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addRow}
+              disabled={workers.length === 0 && allWorkers.length === 0}
+              data-testid="button-add-worker-row"
+            >
+              <Plus className="mr-1 h-4 w-4" /> Add Worker
+            </Button>
+            {entries.length > 0 && <Badge variant="secondary">Workers in plan: {entries.length}</Badge>}
           </div>
 
-          <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-muted-foreground">
-            <strong className="text-foreground">Preview only:</strong> Phase 3 calculates suggested production bonuses
-            but does not create payroll, accounting entries, cash payments, or payable transactions.
-            Acceptance/rejection and payroll application are Phase 4.
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Notes (optional)</label>
+            <Input
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="e.g. short shift, holiday schedule…"
+              className="text-sm"
+              data-testid="input-plan-notes"
+            />
           </div>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
+
+// The planner intentionally remains team/worker based; position administration is a separate workflow.

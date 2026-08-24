@@ -57,7 +57,9 @@ async function runSchemaStatements(client, frenchSql, languagePreferenceSql) {
 
 async function ensureFactoryTrilingualSchema() {
   const connectionString = connectionStringFromEnvironment();
-  if (!connectionString) return;
+  if (!connectionString) {
+    throw new Error("Factory trilingual schema could not start because no PostgreSQL configuration is available.");
+  }
 
   const { Client } = pg;
   const client = new Client({
@@ -68,11 +70,11 @@ async function ensureFactoryTrilingualSchema() {
 
   const frenchSql = await readFile(
     new URL("../migrations/20260802_001_factory_french_catalog_snapshots.sql", import.meta.url),
-    "utf8",
+    "utf8"
   );
   const languagePreferenceSql = await readFile(
     new URL("../migrations/20260802_002_user_language_preferences.sql", import.meta.url),
-    "utf8",
+    "utf8"
   );
 
   let startupSchemaLockAcquired = false;
@@ -90,7 +92,7 @@ async function ensureFactoryTrilingualSchema() {
         level: "INFO",
         message: "Factory multilingual schema and language preferences verified",
         module: "factory-trilingual-schema",
-      }),
+      })
     );
   } catch (error) {
     console.error(
@@ -100,7 +102,7 @@ async function ensureFactoryTrilingualSchema() {
         message: "Factory trilingual schema verification failed",
         module: "factory-trilingual-schema",
         error: error instanceof Error ? error.message : String(error),
-      }),
+      })
     );
     throw error;
   } finally {

@@ -179,7 +179,7 @@ export function handleClientObservability(req: Request, res: Response, requestId
     path: route,
     buildVersion,
     browserRequestId,
-    error: new Error(stack ? [message, stack].join("\n") : message),
+    error: stack ? new Error(`${message}\n${stack}`) : new Error(message),
     componentStack,
   });
 
