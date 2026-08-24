@@ -730,8 +730,8 @@ export const phase3RemainingTranslationsPart09: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Insufficient stock for ${articleCode ||",
-    ar: "Insuffient stock for ${articleCode ||",
-    fr: "Stock insuffisant pour ${articleCode",
+    ar: "Insufficient stock for ${articleCode ||",
+    fr: "Insufficient stock for ${articleCode ||",
   },
   {
     en: "Insufficient stock for item ${stockItemId}. Available: ${currentQty.toString()}, Requested: ${sellQty.toString()}",

@@ -381,8 +381,8 @@ export const phase3RemainingTranslationsPart15: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Posted accounting for ${result.posted} advance(s)${result.skipped ?",
-    ar: "محاسبة مؤجلة عن السلف (المبالغ) (المبالغ) {الناتج.",
-    fr: "Posted comptabilisation pour ${result.posted} avance(s)${result.skipped ?",
+    ar: "Posted accounting for ${result.posted} advance(s)${result.skipped ?",
+    fr: "Posted accounting for ${result.posted} advance(s)${result.skipped ?",
   },
   {
     en: "Posting Impact — Journal: DR Factory Workers Salary Payable / CR Factory Worker Advances",

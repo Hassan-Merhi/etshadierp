@@ -723,13 +723,13 @@ export const phase3RemainingTranslationsPart07: readonly Phase3SharedUiEntry[] =
   { en: "FACTORY POS INVOICE", ar: "FACTORY POS INVOICE", fr: "FACTOIRE POS INVOICE" },
   {
     en: "Factory POS Sale ${existingSale.saleNumber}${customerName ?",
-    ar: "Factory POS Sale $ {existing Sale.saleNumber}${customerName {?",
-    fr: "Vente de POS en usine ${existingSale.saleNumber}${customerName ?",
+    ar: "Factory POS Sale ${existingSale.saleNumber}${customerName ?",
+    fr: "Factory POS Sale ${existingSale.saleNumber}${customerName ?",
   },
   {
     en: "Factory POS Sale ${saleNumber}${customerName ?",
-    ar: "Factory POS Sale $ {saleNumber} {customerName }?",
-    fr: "Vente de POS en usine ${numéro de vente}${nom du client ?",
+    ar: "Factory POS Sale ${saleNumber}${customerName ?",
+    fr: "Factory POS Sale ${saleNumber}${customerName ?",
   },
   { en: "Factory Price List", ar: "قائمة الأسعار", fr: "Liste des prix d'usine" },
   { en: "Factory Production", ar: "إنتاج العوامل", fr: "Production industrielle" },

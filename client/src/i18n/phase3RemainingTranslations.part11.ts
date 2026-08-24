@@ -529,8 +529,8 @@ export const phase3RemainingTranslationsPart11: readonly Phase3SharedUiEntry[] =
   { en: "Mix Batch — ${r.batchName || r.batchCode}", ar: "ميكس باتش{{0}}", fr: "Mélanger le lot —{{0}}" },
   {
     en: "Mix batch created: ${result.batchCode}${result.name ?",
-    ar: "مكس دفعة خلقت: {النتيجة.",
-    fr: "Mélanger le lot créé : ${result.batchCode}${result.name ?",
+    ar: "Mix batch created: ${result.batchCode}${result.name ?",
+    fr: "Mix batch created: ${result.batchCode}${result.name ?",
   },
   { en: "Mix batch deleted.", ar: "(إكس باك) حذف", fr: "Mélanger le lot supprimé." },
   { en: "Mix Batch Detail", ar: "Mix Batch Detail", fr: "Détail du lot de mélange" },
@@ -542,8 +542,8 @@ export const phase3RemainingTranslationsPart11: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Mix batch edited: ${result.batchCode}${result.name ?",
-    ar: "مكس دفعة محررة: {النتيجة.",
-    fr: "Mélanger le lot édité : ${result.batchCode}${result.name ?",
+    ar: "Mix batch edited: ${result.batchCode}${result.name ?",
+    fr: "Mix batch edited: ${result.batchCode}${result.name ?",
   },
   { en: "Mix Batch ID", ar: "ID Mix Batch", fr: "Mélanger l'ID du lot" },
   { en: "Mix Batch ID (optional)", ar: "ميكس باتش هويات (اختيارية)", fr: "Numéro de lot (facultatif)" },
@@ -571,8 +571,8 @@ export const phase3RemainingTranslationsPart11: readonly Phase3SharedUiEntry[] =
   { en: "Mix batch source links", ar: "وصلات من مصادر دفعة واحدة", fr: "Mélanger les liens source de lots" },
   {
     en: "Mix batch top-up: ${result.batchCode}${result.name ?",
-    ar: "(ميكس باتش)",
-    fr: "Mélanger le complément de lot : ${result.batchCode}${result.name ?",
+    ar: "Mix batch top-up: ${result.batchCode}${result.name ?",
+    fr: "Mix batch top-up: ${result.batchCode}${result.name ?",
   },
   { en: "Mix Batches on Tables", ar: "Mix Batches on Tables", fr: "Mélanger les piles sur les tables" },
   { en: "Mix Efficiency", ar: "الكفاءة القصوى", fr: "Efficacité du mélange" },

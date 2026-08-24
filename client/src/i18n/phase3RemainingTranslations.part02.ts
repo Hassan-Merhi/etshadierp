@@ -86,8 +86,8 @@ export const phase3RemainingTranslationsPart02: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Added freight charge ${row.currency} ${row.freightAmount} for container #${containerId}${row.vendorName ?",
-    ar: "مضافة شحنة شحن {البالغ. العملة} {مبلغ النفقة} للحاوية {$ {المحتوى}$ {الفائز.",
-    fr: "Ajout de frais de fret ${row.monnaie} ${row.freightMontant} pour conteneur #${containerId}${row.vendorName ?",
+    ar: "Added freight charge ${row.currency} ${row.freightAmount} for container #${containerId}${row.vendorName ?",
+    fr: "Added freight charge ${row.currency} ${row.freightAmount} for container #${containerId}${row.vendorName ?",
   },
   { en: "Added from group list", ar: "مضافة من قائمة المجموعات", fr: "Ajouté de la liste des groupes" },
   {
@@ -112,8 +112,8 @@ export const phase3RemainingTranslationsPart02: readonly Phase3SharedUiEntry[] =
   { en: "Additional Charges", ar: "رسوم إضافية", fr: "Frais supplémentaires" },
   {
     en: 'Additional charges cannot credit the "${account.name ??',
-    ar: 'لا يمكن لرسوم إضافية أن تُقيّد اسم "الحساب" ؟',
-    fr: 'Des frais supplémentaires ne peuvent pas créditer le "${count.name ??',
+    ar: 'Additional charges cannot credit the "${account.name ??',
+    fr: 'Additional charges cannot credit the "${account.name ??',
   },
   { en: "Additional details", ar: "تفاصيل إضافية", fr: "Renseignements supplémentaires" },
   { en: "Additional notes", ar: "ملاحظات إضافية", fr: "Notes complémentaires" },

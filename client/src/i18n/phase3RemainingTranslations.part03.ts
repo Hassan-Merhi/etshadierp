@@ -420,7 +420,7 @@ export const phase3RemainingTranslationsPart03: readonly Phase3SharedUiEntry[] =
   { en: "Bale Earnings", ar: "Bale Earnings", fr: "Gains de balles" },
   {
     en: 'Bale Excel import: ${totalBalesCreated} bale${totalBalesCreated !== 1 ? "s" : ""} created${skippedRows > 0 ?',
-    ar: "Bale Excel import: {totalBalesCreated} bale$ {total BalesCreated= 1 ?",
+    ar: 'Bale Excel import: ${totalBalesCreated} bale${totalBalesCreated !== 1 ? "s" : ""} created${skippedRows > 0 ?',
     fr: 'Bale Excel import: ${totalBalesCreated} bale${totalBalesCreated !== 1 ? "s" : ""} created${skippedRows > 0 ?',
   },
   {
@@ -580,8 +580,8 @@ export const phase3RemainingTranslationsPart03: readonly Phase3SharedUiEntry[] =
   { en: "Bales List: Cost/kg", ar: "قائمة المبيعات: التكلفة/كغ", fr: "Liste des balles: Coût/kg" },
   {
     en: 'Bales not found: ${notFound.slice(0, 5).join(", ")}${notFound.length > 5 ?',
-    ar: 'Bales not found: ${notFound.slice(0, 5).join(),","',
-    fr: 'Bales introuvables : ${notFound.slice(0, 5).join(), ")}${notFound.longueur > 5 ?',
+    ar: 'Bales not found: ${notFound.slice(0, 5).join(", ")}${notFound.length > 5 ?',
+    fr: 'Bales not found: ${notFound.slice(0, 5).join(", ")}${notFound.length > 5 ?',
   },
   { en: "Bales Out", ar: "Bales Out", fr: "Bales dehors" },
   { en: "Bales Pressed Today", ar: "Bales Pressed today", fr: "Bales pressés aujourd'hui" },
@@ -659,8 +659,8 @@ export const phase3RemainingTranslationsPart03: readonly Phase3SharedUiEntry[] =
   { en: "Barcode: ${barcode}", ar: "باركود:{{0}}", fr: "Code barre & #160;:{{0}}" },
   {
     en: 'Barcodes already exist in system: ${conflicting.slice(0, 10).join(", ")}${conflicting.length > 10 ?',
-    ar: 'Barcodes already exist in system: ${conflicting.slice(0, 10).join(),","',
-    fr: 'Des codes-barres existent déjà dans le système : ${conflicting.slice(0, 10).join(", ")}${conflicting.longueur > 10 ?',
+    ar: 'Barcodes already exist in system: ${conflicting.slice(0, 10).join(", ")}${conflicting.length > 10 ?',
+    fr: 'Barcodes already exist in system: ${conflicting.slice(0, 10).join(", ")}${conflicting.length > 10 ?',
   },
   { en: "barcodes imported successfully", ar: "الباراكوات المستوردة بنجاح", fr: "codes barres importés avec succès" },
   { en: "base", ar: "القاعدة", fr: "base" },

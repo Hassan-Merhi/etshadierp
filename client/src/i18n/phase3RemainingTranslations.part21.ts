@@ -407,8 +407,8 @@ export const phase3RemainingTranslationsPart21: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Your shift has been closed. ${variance !== 0 ?",
-    ar: "لقد أغلقت مناوبتك {الفارس}= صفر؟",
-    fr: "Votre équipe a été fermée. ${variance !== 0 ?",
+    ar: "Your shift has been closed. ${variance !== 0 ?",
+    fr: "Your shift has been closed. ${variance !== 0 ?",
   },
   {
     en: "Your shift has been opened successfully.",

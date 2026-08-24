@@ -287,8 +287,8 @@ export const phase3RemainingTranslationsPart14: readonly Phase3SharedUiEntry[] =
   },
   {
     en: 'Order verified for customer: ${verifyCustomer?.legalName || "Customer"}${notes ?',
-    ar: 'الأمر الذي تم التحقق منه للزبائن: {حوال (كوسيتر)؟ اسم "كوستومر" {ملاحظات؟',
-    fr: "Commande vérifiée pour le client: ${vérifyCustomer?.legal Nom du client}${notes ?",
+    ar: 'Order verified for customer: ${verifyCustomer?.legalName || "Customer"}${notes ?',
+    fr: 'Order verified for customer: ${verifyCustomer?.legalName || "Customer"}${notes ?',
   },
   {
     en: "orderBaleId and newBaleReference are required",
@@ -464,8 +464,8 @@ export const phase3RemainingTranslationsPart14: readonly Phase3SharedUiEntry[] =
   },
   {
     en: 'Parent freight - ${nums.join(", ")}${containerNumber ?',
-    ar: "الشحن الأبوي - {الآلاف..",
-    fr: 'Fret parent - ${nums.join(", ")}${containerNumber ?',
+    ar: 'Parent freight - ${nums.join(", ")}${containerNumber ?',
+    fr: 'Parent freight - ${nums.join(", ")}${containerNumber ?',
   },
   { en: "Parent Freight Account *", ar: "حساب النفقة للوالدين", fr: "Compte de fret parent *" },
   { en: "Parent freight account required", ar: "حساب شحن الوالدين", fr: "Compte de fret de base requis" },

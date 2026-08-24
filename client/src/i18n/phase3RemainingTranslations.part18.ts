@@ -824,8 +824,8 @@ export const phase3RemainingTranslationsPart18: readonly Phase3SharedUiEntry[] =
   { en: "Supplier Usage Report", ar: "تقرير المورد", fr: "Rapport d'utilisation du fournisseur" },
   {
     en: "Supplier Usage Report (${format.toUpperCase()}) – ${startDate} to ${endDate}${supplierId ?",
-    ar: "Supplier Usage Report (${format.to UpperCaselink}) — ${startDate} to ${endDate}${supplierId }?",
-    fr: "Rapport d'utilisation du fournisseur (${format.toUpperCase()}) – ${startDate} à ${endDate}${supplierId ?",
+    ar: "Supplier Usage Report (${format.toUpperCase()}) – ${startDate} to ${endDate}${supplierId ?",
+    fr: "Supplier Usage Report (${format.toUpperCase()}) – ${startDate} to ${endDate}${supplierId ?",
   },
   { en: "Supplier:", ar: "مورد:", fr: "Fournisseur & #160;:" },
   { en: "supplier(s).", ar: "المورِّد (الموردون).", fr: "fournisseur(s)." },

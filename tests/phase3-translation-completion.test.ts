@@ -60,4 +60,41 @@ describe("Phase 3 translation completion", () => {
       expect(entry.fr).not.toMatch(/ZXQPH\d+X\d+ZXQ/i);
     }
   });
+
+  // The generator normalises every interpolated value to a `{{N}}` slot before
+  // it reaches the translation engine, precisely so the engine never sees the
+  // expression inside. When a raw `${...}` did survive, the engine translated
+  // the identifier with the prose around it — `data.length` became
+  // `data.longueur`, `||` became `=`, and `{ confirm: true }` became
+  // `{ confirmer : true }`. Those are business identifiers and request
+  // payloads, so a surviving `${` is a corruption signal, not a style nit.
+  it("never leaves a raw template expression in the translated text", () => {
+    // `$` immediately before a slot is legitimate: it is the currency sign in
+    // sources like `total $${amount.toFixed(2)}`, so strip slots first.
+    const withoutSlots = (value: string) => value.replace(/\{\{\d+\}\}/g, "");
+
+    for (const entry of entries) {
+      // The extractor slices some template literals mid-expression, so a few
+      // English keys are fragments that never reach the DOM and can never be
+      // matched at runtime. Those carry the source text verbatim in all three
+      // languages — repeating English is safe, inventing an expression is not.
+      if (entry.fr === entry.en && entry.ar === entry.en) continue;
+
+      expect(withoutSlots(entry.fr)).not.toContain("${");
+      expect(withoutSlots(entry.ar)).not.toContain("${");
+    }
+  });
+
+  it("keeps the interpolation slot count identical across all three languages", () => {
+    const slots = (value: string) => (value.match(/\{\{(\d+)\}\}/g) ?? []).sort();
+
+    for (const entry of entries) {
+      // Entries whose English carries no slot at all are plain copy, and the
+      // mirrored source-text fragments repeat English verbatim; both trivially
+      // agree. The check that matters is that a translated message keeps every
+      // slot the English one declared, in the same multiset.
+      if (!entry.en.includes("${") && slots(entry.fr).length === 0 && slots(entry.ar).length === 0) continue;
+      expect(slots(entry.ar)).toEqual(slots(entry.fr));
+    }
+  });
 });

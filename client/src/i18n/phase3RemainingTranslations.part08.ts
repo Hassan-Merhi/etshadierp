@@ -704,8 +704,8 @@ export const phase3RemainingTranslationsPart08: readonly Phase3SharedUiEntry[] =
   { en: "Finalized", ar: "مُعتمد نهائيًا", fr: "Finalisé" },
   {
     en: 'Finalized ${result.updated} bale${result.updated !== 1 ? "s" : ""} to ${finalizeLocation?.name ||',
-    ar: "{نتائج مكتملة}بالدولار الطلقي {نتائج }",
-    fr: 'Finalized ${result.updated} bale${result.updated !== 1 ? "s" : ""} to ${finalizeLocation?.name="',
+    ar: 'Finalized ${result.updated} bale${result.updated !== 1 ? "s" : ""} to ${finalizeLocation?.name ||',
+    fr: 'Finalized ${result.updated} bale${result.updated !== 1 ? "s" : ""} to ${finalizeLocation?.name ||',
   },
   { en: "Finalized At", ar: "الصيغة النهائية", fr: "Finalisation à" },
   {
@@ -782,8 +782,8 @@ export const phase3RemainingTranslationsPart08: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Fiscal Period Close: ${periodStartDate} to ${periodEndDate}${notes ?",
-    ar: "Fiscal Period close: ${periodStartDate} to ${periodEndDate}${notes }?",
-    fr: "Exercice clos : {périodeDate de début} à {périodeDate de fin} {notes ?",
+    ar: "Fiscal Period Close: ${periodStartDate} to ${periodEndDate}${notes ?",
+    fr: "Fiscal Period Close: ${periodStartDate} to ${periodEndDate}${notes ?",
   },
   {
     en: "Fiscal period ending ${periodEndDate} has already been closed",
@@ -1001,8 +1001,8 @@ export const phase3RemainingTranslationsPart08: readonly Phase3SharedUiEntry[] =
   { en: "Freight Payment", ar: "مدفوعات الشحن", fr: "Paiement de fret" },
   {
     en: "Freight payment ${fr.currency} ${req.body.amount} for container #${fr.containerId}${fr.vendorName ?",
-    ar: "{req.body.amount}لحاوية {fr.containerId}${fr.vendorName {?",
-    fr: "Paiement de fret ${fr.monnaie} ${req.body.amount} pour conteneur #${fr.containerId}${fr.vendorName ?",
+    ar: "Freight payment ${fr.currency} ${req.body.amount} for container #${fr.containerId}${fr.vendorName ?",
+    fr: "Freight payment ${fr.currency} ${req.body.amount} for container #${fr.containerId}${fr.vendorName ?",
   },
   {
     en: "Freight posted to account — PO voucher updated (${poFreightAmt.toFixed(2)})",

@@ -127,8 +127,8 @@ export const phase3RemainingTranslationsPart06: readonly Phase3SharedUiEntry[] =
   { en: "Deduct damaged/wasted stock", ar: "الخصم المتضرر/المخزونات", fr: "Déduire les stocks endommagés/déchetés" },
   {
     en: "Deduct from received: ${deductKg} kg @ ${costPerKgNum} ${ccy} — ${supplierName}${notes ?",
-    ar: "خصم من المبلغ المستلم: {يخصم كيلوغراماً من كيلوغرامات } {تكلفة PerKgNum} {ccy} - {supplierName}${notes }?",
-    fr: "Déduction du reçu : ${deductKg} kg @ ${costPerKgNum} ${ccy} — ${supplierName} ${notes ?",
+    ar: "Deduct from received: ${deductKg} kg @ ${costPerKgNum} ${ccy} — ${supplierName}${notes ?",
+    fr: "Deduct from received: ${deductKg} kg @ ${costPerKgNum} ${ccy} — ${supplierName}${notes ?",
   },
   { en: "Deduct from Salary", ar: "الخصم من المرتبات", fr: "Déduction du salaire" },
   { en: "Deduct:", ar: "الخصم:", fr: "Déduct :" },
@@ -523,13 +523,13 @@ export const phase3RemainingTranslationsPart06: readonly Phase3SharedUiEntry[] =
   { en: "Driver's name", ar: "اسم السائق", fr: "Nom du conducteur" },
   {
     en: "Dry run: ${changes.length} bale(s) across ${allBatches.length} batch(es) would change. Re-submit with { confirm: true } to apply.",
-    ar: "ركض جاف:{{0}}bale(s) across{{1}}ستتغير الدفعة Re-submit with { confirm: true } to apply.",
-    fr: "Essai à sec:{{0}}chauve(s){{1}}Les lots changeraient. Re-soumettre avec { confirmer : true } pour appliquer.",
+    ar: "تشغيل تجريبي: {{0}} بالة عبر {{1}} دفعة سيتم تغييرها. أعد الإرسال مع { confirm: true } للتطبيق.",
+    fr: "Simulation : {{0}} balle(s) réparties sur {{1}} lot(s) seraient modifiées. Renvoyez avec { confirm: true } pour appliquer.",
   },
   {
     en: "Dry run: ${changes.length} of ${allRawStock.length} raw stock record(s) would change. Re-submit with { confirm: true } to apply.",
-    ar: "ركض جاف:{{0}}of of{{1}}وسيتغير سجل المخزون الخام. Re-submit with { confirm: true } to apply.",
-    fr: "Essai à sec:{{0}}des{{1}}Les données sur les stocks bruts seraient modifiées. Re-soumettre avec { confirmer : true } pour appliquer.",
+    ar: "تشغيل تجريبي: {{0}} من {{1}} من سجلات المخزون الخام سيتم تغييرها. أعد الإرسال مع { confirm: true } للتطبيق.",
+    fr: "Simulation : {{0}} enregistrement(s) de stock brut sur {{1}} seraient modifiés. Renvoyez avec { confirm: true } pour appliquer.",
   },
   {
     en: "Dry-run preview has expired — please re-run it.",

@@ -680,13 +680,13 @@ export const phase3RemainingTranslationsPart13: readonly Phase3SharedUiEntry[] =
   { en: "Office Charges", ar: "رسوم المكاتب", fr: "Frais de bureau" },
   {
     en: 'Office charges account "${account?.name ??',
-    ar: 'حساب رسوم المكتب "الحساب"',
-    fr: "Compte des frais de bureau « ${compte?.nom ??",
+    ar: 'Office charges account "${account?.name ??',
+    fr: 'Office charges account "${account?.name ??',
   },
   {
     en: 'Office charges account "${officeChargesAccount?.name ||',
-    ar: "حساب الرسوم المكتبية: {الحساب المكتبي }.",
-    fr: 'Compte des frais de bureau "${officeChargesCompte?.nom',
+    ar: 'Office charges account "${officeChargesAccount?.name ||',
+    fr: 'Office charges account "${officeChargesAccount?.name ||',
   },
   {
     en: "Office charges for container ${container.containerNumber}",

@@ -356,8 +356,8 @@ export const phase3RemainingTranslationsPart05: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "Container Receipt — ${r.containerNumber ||",
-    ar: "Receipt - $r.containerNumber ||",
-    fr: "Reçu du conteneur — ${r.containerNumber",
+    ar: "Container Receipt — ${r.containerNumber ||",
+    fr: "Container Receipt — ${r.containerNumber ||",
   },
   { en: "Container record deleted", ar: "مسح سجل الحاويات", fr: "Enregistrement du conteneur supprimé" },
   { en: "Container Ref", ar: "الحاويات", fr: "Réf." },

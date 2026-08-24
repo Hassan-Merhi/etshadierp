@@ -192,8 +192,8 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   { en: "${data.created} records created", ar: "{{0}}السجلات المنشأة", fr: "{{0}}enregistrements créés" },
   {
     en: "${data.deleted} account(s) deleted${data.skipped > 0 ?",
-    ar: "{data.deleted} account(s) removed${data.skipped ? 0 ?",
-    fr: "${data.supprimé} compte(s) supprimé(s)${data.supprimé(s) > 0 ?",
+    ar: "${data.deleted} account(s) deleted${data.skipped > 0 ?",
+    fr: "${data.deleted} account(s) deleted${data.skipped > 0 ?",
   },
   {
     en: '${data.deleted} container${data.deleted !== 1 ? "s" : ""} and all linked data removed successfully.',
@@ -235,8 +235,8 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   { en: "${data.imported} lines imported", ar: "{{0}}الخطوط المستوردة", fr: "{{0}}lignes importées" },
   {
     en: "${data.imported} of ${data.total} containers imported${data.errors.length > 0 ?",
-    ar: "${data.imported} of ${data.total} containers imported${data.errors.length ? 0 ?",
-    fr: "${data.imported} de conteneurs ${data.total} importés${data.errors.longueur > 0 ?",
+    ar: "${data.imported} of ${data.total} containers imported${data.errors.length > 0 ?",
+    fr: "${data.imported} of ${data.total} containers imported${data.errors.length > 0 ?",
   },
   {
     en: "${data.imported} opening stock records imported",
@@ -319,8 +319,8 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "${data.totalBalesCreated} bale(s) created${data.skippedRows > 0 ?",
-    ar: "$ {data.totalBalesCreated} bale(s) created${data.skippedRows ? 0 ?",
-    fr: "${data.totalBalesCréé} bale(s) créé(s)${data.skippedRows > 0 ?",
+    ar: "${data.totalBalesCreated} bale(s) created${data.skippedRows > 0 ?",
+    fr: "${data.totalBalesCreated} bale(s) created${data.skippedRows > 0 ?",
   },
   {
     en: "${data.updated} item(s) renamed successfully",
@@ -329,8 +329,8 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "${data.updated} items updated${data.notFound ?",
-    ar: "{data.updated} items updated${data.not وجدت؟",
-    fr: "Éléments mis à jour ${data.mise à jour} Trouvé ?",
+    ar: "${data.updated} items updated${data.notFound ?",
+    fr: "${data.updated} items updated${data.notFound ?",
   },
   {
     en: "${data.updated} line item(s) updated successfully.",
@@ -349,8 +349,8 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "${data.updated} updated, ${data.created} created${data.categoriesCreated > 0 ?",
-    ar: "{data.updated} updated, ${data.created} created ${data.categoriesCreated ? 0 ?",
-    fr: "${data.mise à jour} mise à jour, ${data.created} créé${data.categoryCréé > 0 ?",
+    ar: "${data.updated} updated, ${data.created} created${data.categoriesCreated > 0 ?",
+    fr: "${data.updated} updated, ${data.created} created${data.categoriesCreated > 0 ?",
   },
   {
     en: "${data.validRows.length} row(s) ready to import (${data.totalBales} bales, ${data.totalWeight.toFixed(1)} kg)",
@@ -392,13 +392,13 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   },
   {
     en: '${exp.description || "Deduction"} – POS ${existingSale.saleNumber}${customerName ?',
-    ar: "{مقتطفات {مقتطفات } BAR",
-    fr: '${exp.description="Déduction"} – POS ${existingSale.saleNumber}${clientNom ?',
+    ar: '${exp.description || "Deduction"} – POS ${existingSale.saleNumber}${customerName ?',
+    fr: '${exp.description || "Deduction"} – POS ${existingSale.saleNumber}${customerName ?',
   },
   {
     en: '${exp.description || "Deduction"} – POS ${saleNumber}${customerName ?',
-    ar: "{مقتطفات {مقتطفات } BAR",
-    fr: '${exp.description="Déduction"} – POS ${saleNumber}${clientName ?',
+    ar: '${exp.description || "Deduction"} – POS ${saleNumber}${customerName ?',
+    fr: '${exp.description || "Deduction"} – POS ${saleNumber}${customerName ?',
   },
   {
     en: "${failCount} transaction(s) failed to sync after ${MAX_RETRIES} attempts.",
@@ -448,8 +448,8 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "${inserted} bales uploaded${skipped > 0 ?",
-    ar: "{يُرسلُ }أحزمةَ مُحمّلةَ $ {مُصَدَّبَة } { مُصَدَّرةَ } { }؟",
-    fr: "${insert} balles téléchargées${supprimées > 0 ?",
+    ar: "${inserted} bales uploaded${skipped > 0 ?",
+    fr: "${inserted} bales uploaded${skipped > 0 ?",
   },
   {
     en: "${insertedCharge.description} on container ${container.containerNumber}",
@@ -513,14 +513,14 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "${newRows.length} item(s) added to the analysis${importPreview.notFound.length > 0 ?",
-    ar: "{البند (البنود) من {الجداول الجديدة} أضف إلى {الاستعراض بدولارات التحليل.",
-    fr: "${newRows.longueur} élément(s) ajouté(s) à l'analyse${importPreview.notFound.longueur > 0 ?",
+    ar: "${newRows.length} item(s) added to the analysis${importPreview.notFound.length > 0 ?",
+    fr: "${newRows.length} item(s) added to the analysis${importPreview.notFound.length > 0 ?",
   },
   { en: '${oc.description || "Additional Charge"} — ${supplierName}', ar: "{{0}} — {{1}}", fr: "{{0}} — {{1}}" },
   {
     en: '${oc.description || "Other Charge"} — ${oc.containerNumber ||',
-    ar: '{O.description || " Other Charge"} - {oc.containerNumber }',
-    fr: '${oc.description="Autres frais"} — ${oc.containerNumber="',
+    ar: '${oc.description || "Other Charge"} — ${oc.containerNumber ||',
+    fr: '${oc.description || "Other Charge"} — ${oc.containerNumber ||',
   },
   { en: "${parsed.length} line(s) imported", ar: "{{0}}السطر (الأصناف) المستوردة", fr: "{{0}}ligne(s) importée(s)" },
   {
@@ -541,8 +541,8 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   { en: "${productName} — ${status}", ar: "{{0}} — {{1}}", fr: "{{0}} — {{1}}" },
   {
     en: '${ready} name change${ready === 1 ? "" : "s"} ready to apply${missing > 0 ?',
-    ar: "{y: i} يَذْهبُ اسمَ يَتغيّرُ {y: {y: i} {y: {y: {y: i} يَستعدُّ لتَطبيل } {يَتْركُ ? 0 ?",
-    fr: '${ready} changement de nom ${ready === 1 ? "" : "s"} prêt à appliquer ${missing > 0 ?',
+    ar: '${ready} name change${ready === 1 ? "" : "s"} ready to apply${missing > 0 ?',
+    fr: '${ready} name change${ready === 1 ? "" : "s"} ready to apply${missing > 0 ?',
   },
   {
     en: '${repriced} bale${repriced !== 1 ? "s" : ""} updated',
@@ -551,8 +551,8 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "${res.imported} barcodes added${res.skipped ?",
-    ar: "{res.imported} barcodes added${res.skipped ?",
-    fr: "${res.imported} codes-barres ajoutés${res.skipped ?",
+    ar: "${res.imported} barcodes added${res.skipped ?",
+    fr: "${res.imported} barcodes added${res.skipped ?",
   },
   {
     en: "${reservedBale.referenceNumber || scanCode} is already loaded in this order",
@@ -582,8 +582,8 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   },
   {
     en: '${result.itemCount ?? 0} items${result.duplicate ? " were already processed" : " sent"}${result.pageCount ?',
-    ar: '{نتائج } بند {النتيجة /التكرار"؟" تم تجهيزه بالفعل"',
-    fr: '${resultats.itemCoût ?? 0} items${result.duplicate ? "a déjà été traité" : "expédié"}${result.pageContenu ?',
+    ar: '${result.itemCount ?? 0} items${result.duplicate ? " were already processed" : " sent"}${result.pageCount ?',
+    fr: '${result.itemCount ?? 0} items${result.duplicate ? " were already processed" : " sent"}${result.pageCount ?',
   },
   { en: '${result.provider ?? "unknown"} — ${etaLine}', ar: "{{0}} — {{1}}", fr: "{{0}} — {{1}}" },
   {
@@ -613,8 +613,8 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
   },
   {
     en: "${result.updated} product(s) updated${result.skipped > 0 ?",
-    ar: "{result.updated} product(s) updated${result.skipped ? 0 ?",
-    fr: "${result.mise à jour} produit(s) mis(s) à jour${result.scaped > 0 ?",
+    ar: "${result.updated} product(s) updated${result.skipped > 0 ?",
+    fr: "${result.updated} product(s) updated${result.skipped > 0 ?",
   },
   {
     en: "${result.updated} updated, ${result.notFound} not found. ${result.errors[0]}",
@@ -731,7 +731,7 @@ export const phase3RemainingTranslationsPart01: readonly Phase3SharedUiEntry[] =
     ar: "{{0}}الصفوف الصحيحة جاهزة للتحديث",
     fr: "{{0}}lignes valides prêtes à être mises à jour",
   },
-  { en: "${valid} valid rows${dups ?", ar: "{فالد} {الصفوف الصحيحة }", fr: "${valid} lignes valides${dups ?" },
+  { en: "${valid} valid rows${dups ?", ar: "${valid} valid rows${dups ?", fr: "${valid} valid rows${dups ?" },
   {
     en: "${validationErrors.length} errors found. Please fix them.",
     ar: "{{0}}الأخطاء وجدت من فضلك اصلحهم",
