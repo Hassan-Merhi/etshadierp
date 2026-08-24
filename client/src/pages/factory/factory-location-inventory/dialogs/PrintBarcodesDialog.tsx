@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useFactoryLocationInventory } from "../../FactoryLocationInventoryModel";
+
+type FactoryLocationInventoryModel = ReturnType<typeof useFactoryLocationInventory>;
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -27,15 +30,15 @@ export function PrintBarcodesDialog({
   setReprintDialogOpen,
   setReprintProduct,
 }: {
-  handleDoPrint: any;
-  reprintBales: any;
-  reprintDialogOpen: any;
-  reprintLoading: any;
-  reprintProduct: any;
-  selectedLocation: any;
-  setReprintBales: any;
-  setReprintDialogOpen: any;
-  setReprintProduct: any;
+  handleDoPrint: FactoryLocationInventoryModel["handleDoPrint"];
+  reprintBales: FactoryLocationInventoryModel["reprintBales"];
+  reprintDialogOpen: FactoryLocationInventoryModel["reprintDialogOpen"];
+  reprintLoading: FactoryLocationInventoryModel["reprintLoading"];
+  reprintProduct: FactoryLocationInventoryModel["reprintProduct"];
+  selectedLocation: FactoryLocationInventoryModel["selectedLocation"];
+  setReprintBales: FactoryLocationInventoryModel["setReprintBales"];
+  setReprintDialogOpen: FactoryLocationInventoryModel["setReprintDialogOpen"];
+  setReprintProduct: FactoryLocationInventoryModel["setReprintProduct"];
 }) {
   return (
     <Dialog
@@ -56,7 +59,7 @@ export function PrintBarcodesDialog({
           <DialogDescription>
             {reprintLoading
               ? "Loading bales…"
-              : `${reprintBales.length} bale(s) in stock at ${selectedLocation.name}. Click Print to generate labels for all of them.`}
+              : `${reprintBales.length} bale(s) in stock at ${selectedLocation?.name ?? "selected location"}. Click Print to generate labels for all of them.`}
           </DialogDescription>
         </DialogHeader>
         {reprintLoading ? (
@@ -76,12 +79,12 @@ export function PrintBarcodesDialog({
                 </tr>
               </thead>
               <tbody>
-                {reprintBales.map((row: any) => (
+                {reprintBales.map((row) => (
                   <tr key={row.bale.id} className="border-t h-9" data-testid={`row-reprint-bale-${row.bale.id}`}>
                     <td className="px-3 font-mono text-xs text-muted-foreground">
                       {row.bale.referenceNumber || row.bale.baleCode}
                     </td>
-                    <td className="px-3 text-right font-mono text-xs">{parseFloat(row.bale.weightKg).toFixed(1)}</td>
+                    <td className="px-3 text-right font-mono text-xs">{Number(row.bale.weightKg ?? 0).toFixed(1)}</td>
                     <td className="px-3 text-right font-mono text-xs">{row.bale.quantity}</td>
                   </tr>
                 ))}

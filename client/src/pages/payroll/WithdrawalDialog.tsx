@@ -1,3 +1,6 @@
+import type { usePayrollModel } from "./usePayrollModel";
+
+type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,11 +11,11 @@ import { Button } from "@/components/ui/button";
 interface WithdrawalDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  selectedEmployee: { firstName?: string; lastName?: string; currentBalance?: string } | null;
-  form: any;
-  mutation: any;
-  cashAccounts: any[];
-  bankAccounts: any[] | undefined;
+  selectedEmployee: PayrollModel["selectedEmployee"];
+  form: PayrollModel["withdrawalForm"];
+  mutation: PayrollModel["withdrawalMutation"];
+  cashAccounts: PayrollModel["cashAccounts"];
+  bankAccounts: PayrollModel["bankAccounts"];
   bankAccountsLoading: boolean;
 }
 
@@ -38,7 +41,7 @@ export function WithdrawalDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form noValidate onSubmit={form.handleSubmit((data: unknown) => mutation.mutate(data))} className="space-y-4">
+          <form noValidate onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
             <FormField
               control={form.control}
               name="amount"

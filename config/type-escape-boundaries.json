@@ -39,18 +39,8 @@
         0,
         0
       ],
-      "client/src/components/OffloadDialog.tsx": [
-        8,
-        0,
-        0
-      ],
       "client/src/components/PropertiesSidebar.tsx": [
         1,
-        0,
-        0
-      ],
-      "client/src/components/SpOffloadDialog.tsx": [
-        24,
         0,
         0
       ],
@@ -89,11 +79,6 @@
         0,
         0
       ],
-      "client/src/hooks/use-admin-override.tsx": [
-        1,
-        0,
-        0
-      ],
       "client/src/hooks/useLabelDesignColors.ts": [
         1,
         0,
@@ -110,18 +95,13 @@
         0
       ],
       "client/src/lib/excelImport.ts": [
-        16,
+        14,
         1,
         0
       ],
       "client/src/lib/excelSync.ts": [
         4,
         1,
-        0
-      ],
-      "client/src/lib/factoryApi.ts": [
-        3,
-        0,
         0
       ],
       "client/src/lib/lazyRetry.ts": [
@@ -131,11 +111,6 @@
       ],
       "client/src/lib/offlinePrep.ts": [
         5,
-        0,
-        0
-      ],
-      "client/src/lib/queryClient.ts": [
-        3,
         0,
         0
       ],
@@ -167,11 +142,6 @@
       "client/src/pages/AccountTransfer.tsx": [
         1,
         0,
-        0
-      ],
-      "client/src/pages/AccountsLegacy.tsx": [
-        0,
-        2,
         0
       ],
       "client/src/pages/Agents.tsx": [
@@ -210,12 +180,12 @@
         0
       ],
       "client/src/pages/ContainerVerification.tsx": [
-        6,
+        4,
         0,
         0
       ],
       "client/src/pages/Daybook.tsx": [
-        8,
+        5,
         1,
         0
       ],
@@ -399,14 +369,9 @@
         0,
         0
       ],
-      "client/src/pages/accountslegacy/EditAccountDialog.tsx": [
-        0,
-        1,
-        0
-      ],
       "client/src/pages/accountslegacy/useAccountsLegacyModel.ts": [
         6,
-        1,
+        0,
         0
       ],
       "client/src/pages/analytics/ContainerReportPanel.tsx": [
@@ -429,6 +394,11 @@
         0,
         0
       ],
+      "client/src/pages/baleproducts/useBaleProductsModel.tsx": [
+        7,
+        0,
+        0
+      ],
       "client/src/pages/bales/BaleFormDialog.tsx": [
         1,
         0,
@@ -441,6 +411,21 @@
       ],
       "client/src/pages/barcodelookup/components/BaleStatusBadge.tsx": [
         1,
+        0,
+        0
+      ],
+      "client/src/pages/containerdetail/components/ContainerDetailErpView.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/containerdetail/components/ContainerDetailSpView.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/containerdetail/useContainerDetailModel.tsx": [
+        12,
         0,
         0
       ],
@@ -501,7 +486,7 @@
       ],
       "client/src/pages/daybook/voucherdetailsdialog/PurchaseVoucherEntries.tsx": [
         2,
-        1,
+        0,
         0
       ],
       "client/src/pages/daybook/voucherdetailsdialog/VoucherRevisionHistory.tsx": [
@@ -754,6 +739,11 @@
         0,
         0
       ],
+      "client/src/pages/factory/baleshistory/useBalesHistoryModel.tsx": [
+        7,
+        0,
+        0
+      ],
       "client/src/pages/factory/daybook/ViewEntryModal.tsx": [
         5,
         0,
@@ -819,78 +809,8 @@
         0,
         0
       ],
-      "client/src/pages/factory/factory-location-inventory/dialogs/FinalizeProformaDialog.tsx": [
-        30,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-location-inventory/dialogs/PrintBarcodesDialog.tsx": [
-        10,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-location-inventory/dialogs/RemoveBalesDialog.tsx": [
-        14,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-location-inventory/dialogs/RenameLocationDialog.tsx": [
-        6,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-proformas/dialogs/AddPriceLineDialog.tsx": [
-        18,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-proformas/dialogs/CreatePendingLoadingDialog.tsx": [
-        7,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-proformas/dialogs/EditPriceLineDialog.tsx": [
-        6,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-proformas/dialogs/ImportProformaExcelDialog.tsx": [
-        1,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-proformas/dialogs/RenameProformaDialog.tsx": [
-        5,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-proformas/dialogs/TransferProformaDialog.tsx": [
-        6,
-        0,
-        0
-      ],
       "client/src/pages/factory/factory-suppliers/BrokerOverviewPanel.tsx": [
         2,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-suppliers/SupplierDialogs.tsx": [
-        21,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-suppliers/SupplierFormDialog.tsx": [
-        8,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-suppliers/SupplierOtherDialogs.tsx": [
-        14,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-suppliers/SupplierPaymentFxDialogs.tsx": [
-        24,
         0,
         0
       ],
@@ -901,71 +821,6 @@
       ],
       "client/src/pages/factory/factory-suppliers/SupplierStatementRows.tsx": [
         2,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-worker-detail/dialogs/EndContractDialog.tsx": [
-        21,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-worker-detail/dialogs/GenerateMissingAccountingEntryDialog.tsx": [
-        10,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-worker-detail/dialogs/MarkPayrollPaidDialog.tsx": [
-        10,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-worker-detail/dialogs/PayrollDetailDialog.tsx": [
-        5,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/BulkAdvanceDialog.tsx": [
-        22,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/CashAccountAdjustmentDialog.tsx": [
-        13,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/ConfirmRepaymentDialog.tsx": [
-        8,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/PostAccountingPreviewDialog.tsx": [
-        18,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/ReconcileBalancesDialog.tsx": [
-        12,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/RecordAdvanceDialog.tsx": [
-        9,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/RepayByMonthDialog.tsx": [
-        17,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/RepaymentAuditDialog.tsx": [
-        22,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/ReverseAdvanceDialog.tsx": [
-        3,
         0,
         0
       ],
@@ -1034,6 +889,11 @@
         0,
         0
       ],
+      "client/src/pages/factory/factoryproformas/useFactoryProformasModel.ts": [
+        1,
+        0,
+        0
+      ],
       "client/src/pages/factory/factorysettings/useFactorySettingsModel.ts": [
         0,
         1,
@@ -1051,6 +911,11 @@
       ],
       "client/src/pages/factory/factorystockallocationv3/components/ScanningPanel.tsx": [
         1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorystockallocationv5/useFactoryStockAllocationV5Model.tsx": [
+        2,
         0,
         0
       ],
@@ -1199,79 +1064,14 @@
         0,
         0
       ],
-      "client/src/pages/payroll/AdvanceDialogs.tsx": [
-        8,
-        0,
-        0
-      ],
       "client/src/pages/payroll/AdvancesTab.tsx": [
-        5,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/BonusDialog.tsx": [
-        8,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/BulkDialogs.tsx": [
-        11,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/BulkPaymentDialog.tsx": [
-        6,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/DepositDialog.tsx": [
-        2,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/EditEmployeeDialog.tsx": [
-        16,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/EmployeeCrudDialogs.tsx": [
-        12,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/EmployeeStatementDialog.tsx": [
         3,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/PayrollDialogs.tsx": [
-        1,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/WithdrawalDialog.tsx": [
-        4,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/WorkerDialogs.tsx": [
-        13,
         0,
         0
       ],
       "client/src/pages/payroll/WorkerProfilesTab.tsx": [
         5,
         1,
-        0
-      ],
-      "client/src/pages/payroll/WorkersTab.tsx": [
-        12,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/WorkersTable.tsx": [
-        3,
-        3,
         0
       ],
       "client/src/pages/pendinginvoiceverify/types.ts": [
@@ -1830,7 +1630,7 @@
         0
       ],
       "client/src/pages/vouchers/stock-transfer-form/dialogs/ImportTransferExcelDialog.tsx": [
-        25,
+        2,
         0,
         0
       ],
@@ -1889,18 +1689,13 @@
         0,
         0
       ],
-      "server/chat/erpContext.ts": [
-        35,
+      "server/chat/lookupDrafts.ts": [
+        3,
         0,
         0
       ],
       "server/chat/persistence.ts": [
         1,
-        0,
-        0
-      ],
-      "server/chat/prompts.ts": [
-        21,
         0,
         0
       ],
@@ -1940,6 +1735,16 @@
         0
       ],
       "server/chat/reports/types.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/chat/stockTransferDrafts.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/chat/voucherAndStockDrafts.ts": [
         1,
         0,
         0
@@ -1989,13 +1794,8 @@
         0,
         0
       ],
-      "server/lib/aiSnapshots.ts": [
-        2,
-        0,
-        0
-      ],
       "server/lib/httpTrackingScraper.ts": [
-        12,
+        8,
         0,
         0
       ],
@@ -2015,17 +1815,17 @@
         0
       ],
       "server/lib/trackingProviders/cmaPublicProvider.ts": [
-        2,
+        1,
         0,
         0
       ],
       "server/lib/trackingProviders/maerskProvider.ts": [
-        3,
+        2,
         0,
         0
       ],
       "server/lib/trackingProviders/maerskPublicProvider.ts": [
-        4,
+        3,
         0,
         0
       ],
@@ -2150,7 +1950,7 @@
         0
       ],
       "server/routes/baleLookupRoutes.ts": [
-        7,
+        1,
         0,
         0
       ],
@@ -2158,11 +1958,6 @@
         1,
         0,
         0
-      ],
-      "server/routes/baleRoutes.ts": [
-        0,
-        0,
-        1
       ],
       "server/routes/bankAssetRoutes.ts": [
         6,
@@ -2235,7 +2030,7 @@
         0
       ],
       "server/routes/creditSalesImportRoutes.ts": [
-        5,
+        4,
         0,
         0
       ],
@@ -2300,7 +2095,7 @@
         0
       ],
       "server/routes/factory-intelligence/settings.ts": [
-        5,
+        3,
         0,
         0
       ],
@@ -2570,12 +2365,12 @@
         0
       ],
       "server/routes/factory/dispatch-batches/batches.ts": [
-        4,
+        1,
         0,
         0
       ],
       "server/routes/factory/dispatch-batches/invoicing.ts": [
-        4,
+        2,
         0,
         0
       ],
@@ -2815,7 +2610,7 @@
         0
       ],
       "server/routes/factory/raw-stock/rawStockContainerRoutes.ts": [
-        8,
+        7,
         0,
         0
       ],
@@ -2910,7 +2705,7 @@
         0
       ],
       "server/routes/factory/stock/stockEntryRoutes.ts": [
-        6,
+        5,
         0,
         0
       ],
@@ -3180,14 +2975,14 @@
         0
       ],
       "server/routes/posImportRoutes.ts": [
-        6,
+        5,
         0,
         0
       ],
       "server/routes/productionBaleRoutes.ts": [
-        4,
         1,
-        1
+        1,
+        0
       ],
       "server/routes/rental/rentalPaymentsAccrualRoutes.ts": [
         5,
@@ -3264,11 +3059,6 @@
         0,
         0
       ],
-      "server/routes/sp/spMigrationCutoverHardening.ts": [
-        1,
-        0,
-        0
-      ],
       "server/routes/sp/spMigrationCutoverReadiness.ts": [
         2,
         0,
@@ -3280,7 +3070,7 @@
         0
       ],
       "server/routes/sp/spMigrationCutoverState.ts": [
-        2,
+        1,
         0,
         0
       ],
@@ -3325,7 +3115,7 @@
         0
       ],
       "server/routes/sp/spMigrationPhase4Routes.ts": [
-        21,
+        20,
         0,
         0
       ],
@@ -3440,7 +3230,7 @@
         0
       ],
       "server/routes/stockTransferImportRoutes.ts": [
-        8,
+        6,
         0,
         0
       ],
@@ -3675,7 +3465,7 @@
         0
       ],
       "server/services/factory/post-offload-charge/apply.ts": [
-        7,
+        6,
         0,
         0
       ],
@@ -3880,7 +3670,7 @@
         0
       ],
       "server/services/sp/spInventoryIntegrity.ts": [
-        2,
+        1,
         0,
         0
       ],
@@ -3978,65 +3768,10 @@
         0,
         2,
         0
-      ],
-      "client/src/pages/factory/factoryproformas/useFactoryProformasModel.ts": [
-        1,
-        0,
-        0
-      ],
-      "client/src/pages/factory/baleshistory/useBalesHistoryModel.tsx": [
-        7,
-        0,
-        0
-      ],
-      "client/src/pages/baleproducts/useBaleProductsModel.tsx": [
-        7,
-        0,
-        0
-      ],
-      "client/src/pages/containerdetail/components/ContainerDetailErpView.tsx": [
-        3,
-        0,
-        0
-      ],
-      "client/src/pages/containerdetail/components/ContainerDetailSpView.tsx": [
-        5,
-        0,
-        0
-      ],
-      "client/src/pages/containerdetail/useContainerDetailModel.tsx": [
-        12,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factorystockallocationv5/useFactoryStockAllocationV5Model.tsx": [
-        2,
-        0,
-        0
-      ],
-      "server/chat/earlyMultiSourceTransfer.ts": [
-        0,
-        0,
-        0
-      ],
-      "server/chat/voucherAndStockDrafts.ts": [
-        1,
-        0,
-        0
-      ],
-      "server/chat/lookupDrafts.ts": [
-        3,
-        0,
-        0
-      ],
-      "server/chat/stockTransferDrafts.ts": [
-        2,
-        0,
-        0
       ]
     }
   },
   "totals": {
-    "typeEscapeCeiling": 3174
+    "typeEscapeCeiling": 2613
   }
 }

@@ -139,12 +139,19 @@ describe("Wave H zero-coverage production surfaces", () => {
       },
     ];
 
-    renderWithProviders(
+    const view = renderWithProviders(
       <CreateProformaV5Drawer open onClose={vi.fn()} onSuccess={vi.fn()} articleRows={articleRows} />
     );
 
     expect(await screen.findByTestId("dialog-create-proforma-v5")).toBeInTheDocument();
     expect(screen.getByTestId("select-v5-proforma-customer")).toBeInTheDocument();
     expect(screen.getByText("BAL-101")).toBeInTheDocument();
+
+    // Radix FocusScope dispatches its unmount autofocus event from a zero-delay
+    // timer. Flush it while this file's jsdom Event realm is still active; if
+    // it leaks into the next serialized test file, jsdom correctly rejects the
+    // prior realm's CustomEvent and Vitest reports an unhandled exception.
+    view.unmount();
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 });

@@ -59,11 +59,15 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
+          # The static step scopes its formatting check to HEAD^..HEAD, so the
+          # parent commit has to exist. checkout's default shallow clone has
+          # only HEAD, which made `--base HEAD^` abort the whole step.
+          fetch-depth: 2
 
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
-          node-version-file: .node-version
+          node-version: "24.19.0"
           cache: npm
 
       - name: Normalize package registry URLs
@@ -83,7 +87,7 @@ jobs:
         run: |
           npm run verify:lockfile
           npm run verify:production-dependencies
-           npm run format:check:changed -- --base HEAD^
+          npm run format:check:changed -- --base HEAD^
           npm run lint
           npm run audit:lint-ratchet
           npm run check
@@ -105,6 +109,38 @@ jobs:
           node node_modules/drizzle-kit/bin.cjs push --force
           node scripts/verify-ci-disposable-schema.mjs
 
+          # drizzle-kit push only builds the declared schema. Tables and columns
+          # created by the application's own startup migrations — passkey
+          # credentials, the WhatsApp group settings columns — are absent until
+          # the server boots once, and the API smoke sweep meets them as 5xx.
+          # CI runs the same boot for this reason; without it the certification
+          # suite measures a half-provisioned database.
+          node dist/index.js > "$RUNNER_TEMP/startup-migrations.txt" 2>&1 &
+          app_pid=$!
+          # shellcheck disable=SC2317
+          cleanup() {
+            kill "$app_pid" 2>/dev/null || true
+            wait "$app_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for _attempt in $(seq 1 180); do
+            if curl --fail --silent --show-error "http://127.0.0.1:${PORT}/api/health/db"; then
+              echo
+              exit 0
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              echo "Application exited before startup migrations became ready."
+              cat "$RUNNER_TEMP/startup-migrations.txt"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo "Timed out waiting for application startup migrations."
+          cat "$RUNNER_TEMP/startup-migrations.txt"
+          exit 1
+
       - name: Backend regression and coverage
         id: backend
         if: always() && steps.schema.outcome == 'success'
@@ -122,12 +158,14 @@ jobs:
           npm run test:frontend
           npm run test:frontend:coverage
 
-      - name: I18n and security gates
+      # The phase-9 i18n baseline stays a release-only check: the script
+      # inventory contract requires it to remain manual, and Release
+      # Verification already runs it for every main push.
+      - name: Security gates
         id: security
         if: always() && steps.install.outcome == 'success'
         continue-on-error: true
         run: |
-          node scripts/verify-phase9-final-i18n-baseline.mjs
           npm run check:security
           npm audit --omit=dev --audit-level=critical
 

@@ -1,3 +1,6 @@
+import type { usePayrollModel } from "./usePayrollModel";
+
+type PayrollModel = ReturnType<typeof usePayrollModel>;
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -23,11 +26,11 @@ import { getThisMonthRange } from "./payrollSchemas";
 interface BonusDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  selectedEmployee: any;
+  selectedEmployee: PayrollModel["selectedEmployee"];
   bonusTab: "sales" | "bales";
   setBonusTab: (v: "sales" | "bales") => void;
-  bonusSalesPreview: any;
-  setBonusSalesPreview: (v: any) => void;
+  bonusSalesPreview: PayrollModel["bonusSalesPreview"];
+  setBonusSalesPreview: PayrollModel["setBonusSalesPreview"];
   bonusSalesCustomPct: string;
   setBonusSalesCustomPct: (v: string) => void;
   bonusSalesLocationId: string;
@@ -40,8 +43,8 @@ interface BonusDialogProps {
   setBonusSalesEnd: (v: string) => void;
   bonusSalesLoading: boolean;
   fetchSalesPreview: () => void;
-  balesRows: any[];
-  setBalesRows: (fn: (prev: any[]) => any[]) => void;
+  balesRows: PayrollModel["balesRows"];
+  setBalesRows: PayrollModel["setBalesRows"];
   balesPeriod: "thisMonth" | "custom";
   setBalesPeriod: (v: "thisMonth" | "custom") => void;
   balesStart: string;
@@ -55,8 +58,8 @@ interface BonusDialogProps {
   setBonusNotes: (v: string) => void;
   saveBonusToPending: () => void;
   submitSmartBonus: () => void;
-  locations: any[];
-  allCompanyLocations: any[];
+  locations: PayrollModel["locations"];
+  allCompanyLocations: PayrollModel["allCompanyLocations"];
 }
 
 export function BonusDialog({

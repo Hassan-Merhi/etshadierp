@@ -29,8 +29,11 @@ BACKEND_TEST_SHARD_INDEX=3 node scripts/run-backend-verification.mjs
 node scripts/run-backend-verification.mjs --list
 ```
 
-Each shard has a 180-second budget by default. Override the budget only when
-the measured group is understood:
+Each shard has a 180-second budget by default, raised to 300 seconds whenever
+that shard runs under coverage — instrumentation is measurably slower, and
+`--complete` runs a plain pass followed by a coverage pass, so a single
+invocation applies both budgets. Override them only when the measured group is
+understood:
 
 ```sh
 BACKEND_TEST_SHARD_BUDGET_SECONDS=240 npm run test:backend:verify

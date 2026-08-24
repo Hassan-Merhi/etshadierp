@@ -21,6 +21,7 @@ import { registerSmartTransferPreviewRoutes } from "./vouchers/smartTransferPrev
 import { registerStockTransferLifecycleRoutes } from "./vouchers/stockTransferLifecycleRoutes";
 import { registerStockTransferRevisionLifecycleRoutes } from "./vouchers/stockTransferRevisionLifecycleRoutes";
 import { registerImmutableStockTransferRevisionRoutes } from "./vouchers/immutableStockTransferRevisionRoutes";
+import { registerAdminPostUpdateStockTransferRevisionRoute } from "./vouchers/adminPostUpdateStockTransferRevisionRoute";
 
 function registerVoucherDetailCompatibility(app: Express) {
   app.get("/api/vouchers/:id", (_req, res, next) => {
@@ -56,6 +57,10 @@ export function registerVoucherRoutes(app: Express) {
 
   // Stock-transfer lifecycle routes must shadow the older direct transfer editor.
   registerStockTransferLifecycleRoutes(app);
+  // The current admin editor writes the transfer first and then posts the
+  // immutable revision snapshot. Accept that already-applied baseline before
+  // the canonical stale guard; untouched and POS revisions still fall through.
+  registerAdminPostUpdateStockTransferRevisionRoute(app);
   registerImmutableStockTransferRevisionRoutes(app);
   registerStockTransferRevisionLifecycleRoutes(app);
 

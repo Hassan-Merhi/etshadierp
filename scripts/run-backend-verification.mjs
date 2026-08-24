@@ -10,18 +10,33 @@ const ROOT = process.cwd();
 const VITEST = resolve(ROOT, "node_modules/vitest/vitest.mjs");
 const coverage = process.argv.includes("--coverage");
 const SHARD_COUNT = Number(process.env.BACKEND_TEST_SHARDS ?? 8);
-const SHARD_BUDGET_SECONDS = Number(
+// The budget belongs to the pass being run, not to the command line. --complete
+// runs a plain pass and then a coverage pass, and coverage instrumentation is
+// measurably slower: in one certification run the same shard took 127.5s plain
+// and 188.2s under coverage. Deriving the budget from `--coverage` being present
+// in argv charged that coverage pass the plain 180s budget and aborted a run
+// whose shards had all passed.
+const PLAIN_SHARD_BUDGET_SECONDS = Number(process.env.BACKEND_TEST_SHARD_BUDGET_SECONDS ?? 180);
+const COVERAGE_SHARD_BUDGET_SECONDS = Number(
   process.env.BACKEND_TEST_SHARD_BUDGET_SECONDS ??
-    (coverage ? process.env.BACKEND_TEST_COVERAGE_SHARD_BUDGET_SECONDS ?? 300 : 180)
+    process.env.BACKEND_TEST_COVERAGE_SHARD_BUDGET_SECONDS ??
+    300
 );
+
+function shardBudgetSeconds(withCoverage) {
+  return withCoverage ? COVERAGE_SHARD_BUDGET_SECONDS : PLAIN_SHARD_BUDGET_SECONDS;
+}
 const requestedShard = process.env.BACKEND_TEST_SHARD_INDEX;
 const complete = process.argv.includes("--complete");
 const listOnly = process.argv.includes("--list");
 const mergeOnly = process.argv.includes("--merge-only");
 
 if (!Number.isInteger(SHARD_COUNT) || SHARD_COUNT < 1) throw new Error("BACKEND_TEST_SHARDS must be a positive integer");
-if (!Number.isFinite(SHARD_BUDGET_SECONDS) || SHARD_BUDGET_SECONDS <= 0) {
+if (!Number.isFinite(PLAIN_SHARD_BUDGET_SECONDS) || PLAIN_SHARD_BUDGET_SECONDS <= 0) {
   throw new Error("BACKEND_TEST_SHARD_BUDGET_SECONDS must be positive");
+}
+if (!Number.isFinite(COVERAGE_SHARD_BUDGET_SECONDS) || COVERAGE_SHARD_BUDGET_SECONDS <= 0) {
+  throw new Error("BACKEND_TEST_COVERAGE_SHARD_BUDGET_SECONDS must be positive");
 }
 if (requestedShard !== undefined && (!/^\d+$/.test(requestedShard) || Number(requestedShard) >= SHARD_COUNT)) {
   throw new Error(`BACKEND_TEST_SHARD_INDEX must be between 0 and ${SHARD_COUNT - 1}`);
@@ -119,8 +134,9 @@ function runShard(index, shard, withCoverage) {
     args.splice(4, 0, "--coverage", `--coverage.reportsDirectory=${shardCoverageDir}`);
   }
   const seconds = run(process.execPath, args, `backend shard ${index + 1}/${SHARD_COUNT}`);
-  if (seconds > SHARD_BUDGET_SECONDS) {
-    console.error(`Shard ${index} exceeded its ${SHARD_BUDGET_SECONDS}s budget (${seconds.toFixed(1)}s).`);
+  const budget = shardBudgetSeconds(withCoverage);
+  if (seconds > budget) {
+    console.error(`Shard ${index} exceeded its ${budget}s budget (${seconds.toFixed(1)}s).`);
     process.exit(1);
   }
   return { index, seconds, files: shard.length, tests: parseReporterOutput(reporterPath) };

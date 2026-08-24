@@ -31,6 +31,7 @@ import { queryClient } from "@/lib/queryClient";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useAppMode } from "@/contexts/AppModeContext";
 import type { Employee } from "@shared/schema";
+import type { AccountOption } from "./payrollTypes";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   salaryAdvanceSchema,
@@ -42,7 +43,7 @@ import {
 import { calculateAdvanceStats } from "./advanceStats";
 
 interface AdvancesTabProps {
-  cashAccounts?: any[];
+  cashAccounts?: AccountOption[];
 }
 
 export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
@@ -64,7 +65,7 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
   const { data: workerStaff = [] } = useQuery<Employee[]>({
     queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id],
     enabled: !!selectedCompany,
-    select: (data: any[]) => data.filter((e) => e.employeeType === "Worker"),
+    select: (data) => data.filter((e) => e.employeeType === "Worker"),
   });
 
   const { data: salaryAdvances = [], isLoading: advancesLoading } = useQuery<SalaryAdvance[]>({
@@ -255,9 +256,7 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
         </TableCell>
         <TableCell>
           <Badge variant="outline" className="text-[10px]">
-            {(advance as unknown as SalaryAdvance & { isOpeningBalance: React.ReactNode }).isOpeningBalance
-              ? "Opening Balance"
-              : "Advance"}
+            {advance.isOpeningBalance ? "Opening Balance" : "Advance"}
           </Badge>
         </TableCell>
         <TableCell>

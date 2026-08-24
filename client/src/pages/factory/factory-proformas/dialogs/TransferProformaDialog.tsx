@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useFactoryProformasModel } from "../../factoryproformas/useFactoryProformasModel";
+
+type FactoryProformasModel = ReturnType<typeof useFactoryProformasModel>;
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -18,12 +21,12 @@ export function TransferProformaDialog({
   transferProformaMutation,
   transferTargetCustomerId,
 }: {
-  customers: any;
-  setTransferProforma: any;
-  setTransferTargetCustomerId: any;
-  transferProforma: any;
-  transferProformaMutation: any;
-  transferTargetCustomerId: any;
+  customers: FactoryProformasModel["customers"];
+  setTransferProforma: FactoryProformasModel["setTransferProforma"];
+  setTransferTargetCustomerId: FactoryProformasModel["setTransferTargetCustomerId"];
+  transferProforma: FactoryProformasModel["transferProforma"];
+  transferProformaMutation: FactoryProformasModel["transferProformaMutation"];
+  transferTargetCustomerId: FactoryProformasModel["transferTargetCustomerId"];
 }) {
   return (
     <Dialog

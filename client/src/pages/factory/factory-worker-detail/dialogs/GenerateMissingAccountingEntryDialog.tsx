@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useFactoryWorkerDetailModel } from "../../factoryworkerdetail/useFactoryWorkerDetailModel";
+
+type FactoryWorkerDetailModel = ReturnType<typeof useFactoryWorkerDetailModel>;
 import { Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -28,15 +31,15 @@ export function GenerateMissingAccountingEntryDialog({
   setFixAcctTargetId,
   wrapAdminAction,
 }: {
-  cashAccounts: any;
-  fixAcctCashId: any;
-  fixAcctMutation: any;
-  fixAcctOpen: any;
-  fixAcctTargetId: any;
-  setFixAcctCashId: any;
-  setFixAcctOpen: any;
-  setFixAcctTargetId: any;
-  wrapAdminAction: any;
+  cashAccounts: FactoryWorkerDetailModel["cashAccounts"];
+  fixAcctCashId: FactoryWorkerDetailModel["fixAcctCashId"];
+  fixAcctMutation: FactoryWorkerDetailModel["fixAcctMutation"];
+  fixAcctOpen: FactoryWorkerDetailModel["fixAcctOpen"];
+  fixAcctTargetId: FactoryWorkerDetailModel["fixAcctTargetId"];
+  setFixAcctCashId: FactoryWorkerDetailModel["setFixAcctCashId"];
+  setFixAcctOpen: FactoryWorkerDetailModel["setFixAcctOpen"];
+  setFixAcctTargetId: FactoryWorkerDetailModel["setFixAcctTargetId"];
+  wrapAdminAction: FactoryWorkerDetailModel["wrapAdminAction"];
 }) {
   return (
     <Dialog
@@ -68,7 +71,7 @@ export function GenerateMissingAccountingEntryDialog({
                 <SelectValue placeholder="Select account" />
               </SelectTrigger>
               <SelectContent>
-                {cashAccounts?.map((a: any) => (
+                {cashAccounts?.map((a) => (
                   <SelectItem key={a.id} value={String(a.id)}>
                     {a.name} ({a.code})
                   </SelectItem>

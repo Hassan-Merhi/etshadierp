@@ -62,7 +62,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v6
         with:
-          node-version-file: .node-version
+          node-version: "24.19.0"
           cache: npm
 
       - name: Normalize package registry URLs

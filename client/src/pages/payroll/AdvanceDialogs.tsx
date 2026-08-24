@@ -1,3 +1,12 @@
+import type { UseFormReturn } from "react-hook-form";
+import type { Employee } from "@shared/schema";
+import type { AccountOption } from "./payrollTypes";
+import type { DeductionFormData, SalaryAdvance, SalaryAdvanceFormData } from "./payrollSchemas";
+
+interface MutationController<TVariables> {
+  isPending: boolean;
+  mutate: (variables: TVariables) => void;
+}
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -26,20 +35,20 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 interface AdvanceDialogsProps {
   advanceDialogOpen: boolean;
   setAdvanceDialogOpen: (open: boolean) => void;
-  advanceForm: any;
-  advanceMutation: any;
+  advanceForm: UseFormReturn<SalaryAdvanceFormData>;
+  advanceMutation: MutationController<SalaryAdvanceFormData>;
   advanceWorkerComboOpen: boolean;
   setAdvanceWorkerComboOpen: (open: boolean) => void;
-  workerStaff: any[];
-  cashAccounts: any[];
+  workerStaff: Employee[];
+  cashAccounts: AccountOption[];
   deductionDialogOpen: boolean;
   setDeductionDialogOpen: (open: boolean) => void;
-  selectedAdvance: any;
-  deductionForm: any;
-  deductionMutation: any;
+  selectedAdvance: SalaryAdvance | null;
+  deductionForm: UseFormReturn<DeductionFormData>;
+  deductionMutation: MutationController<DeductionFormData>;
   advanceToDelete: number | null;
   setAdvanceToDelete: (v: number | null) => void;
-  deleteAdvanceMutation: any;
+  deleteAdvanceMutation: MutationController<number>;
 }
 
 export function AdvanceDialogs({
@@ -76,7 +85,7 @@ export function AdvanceDialogs({
           <Form {...advanceForm}>
             <form
               noValidate
-              onSubmit={advanceForm.handleSubmit((data: unknown) => advanceMutation.mutate(data))}
+              onSubmit={advanceForm.handleSubmit((data) => advanceMutation.mutate(data))}
               className="space-y-4"
             >
               <FormField
@@ -313,7 +322,7 @@ export function AdvanceDialogs({
           <Form {...deductionForm}>
             <form
               noValidate
-              onSubmit={deductionForm.handleSubmit((data: unknown) => deductionMutation.mutate(data))}
+              onSubmit={deductionForm.handleSubmit((data) => deductionMutation.mutate(data))}
               className="space-y-4"
             >
               <FormField

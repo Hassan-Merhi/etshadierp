@@ -3,9 +3,9 @@
   "backend": {
     "global": {
       "lines": 33,
-      "statements": 28,
+      "statements": 31,
       "functions": 38,
-      "branches": 19
+      "branches": 21
     },
     "perFile": {
       "server/services/accounting/centralPostingEngine.ts": {
@@ -126,10 +126,10 @@
   },
   "frontend": {
     "global": {
-      "lines": 16,
-      "statements": 15,
-      "functions": 9,
-      "branches": 10
+      "lines": 18,
+      "statements": 17,
+      "functions": 11,
+      "branches": 12
     },
     "perFile": {
       "client/src/pages/StockHub.tsx": {
@@ -181,7 +181,7 @@
         "branches": 74
       },
       "client/src/lib/frontendDataArchitecture.ts": {
-        "lines": 86,
+        "lines": 87,
         "statements": 86,
         "functions": 77,
         "branches": 81
@@ -194,7 +194,7 @@
       },
       "client/src/pages/StockInSalesReport.tsx": {
         "lines": 45,
-        "statements": 40,
+        "statements": 41,
         "functions": 44,
         "branches": 43
       }

@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useStockTransferFormModel } from "../useStockTransferFormModel";
+
+type StockTransferFormModel = ReturnType<typeof useStockTransferFormModel>;
 import { formatNumber } from "@/lib/formatNumber";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,29 +43,29 @@ export function ImportTransferExcelDialog({
   setImportDialogOpen,
   setImportNotes,
 }: {
-  downloadImportTemplate: any;
-  handleImportFileChange: any;
-  handleImportParse: any;
-  handleImportSubmit: any;
-  handleImportValidate: any;
-  importDate: any;
-  importDestLocation: any;
-  importDialogOpen: any;
-  importFile: any;
-  importHasErrors: any;
-  importIsValidated: any;
-  importMutation: any;
-  importNotes: any;
-  importParseMutation: any;
-  importPreview: any;
-  importValidItemsCount: any;
-  importValidateMutation: any;
-  importValidationResult: any;
-  locations: any;
-  setImportDate: any;
-  setImportDestLocation: any;
-  setImportDialogOpen: any;
-  setImportNotes: any;
+  downloadImportTemplate: StockTransferFormModel["downloadImportTemplate"];
+  handleImportFileChange: StockTransferFormModel["handleImportFileChange"];
+  handleImportParse: StockTransferFormModel["handleImportParse"];
+  handleImportSubmit: StockTransferFormModel["handleImportSubmit"];
+  handleImportValidate: StockTransferFormModel["handleImportValidate"];
+  importDate: StockTransferFormModel["importDate"];
+  importDestLocation: StockTransferFormModel["importDestLocation"];
+  importDialogOpen: StockTransferFormModel["importDialogOpen"];
+  importFile: StockTransferFormModel["importFile"];
+  importHasErrors: StockTransferFormModel["importHasErrors"];
+  importIsValidated: StockTransferFormModel["importIsValidated"];
+  importMutation: StockTransferFormModel["importMutation"];
+  importNotes: StockTransferFormModel["importNotes"];
+  importParseMutation: StockTransferFormModel["importParseMutation"];
+  importPreview: StockTransferFormModel["importPreview"];
+  importValidItemsCount: StockTransferFormModel["importValidItemsCount"];
+  importValidateMutation: StockTransferFormModel["importValidateMutation"];
+  importValidationResult: StockTransferFormModel["importValidationResult"];
+  locations: StockTransferFormModel["locations"];
+  setImportDate: StockTransferFormModel["setImportDate"];
+  setImportDestLocation: StockTransferFormModel["setImportDestLocation"];
+  setImportDialogOpen: StockTransferFormModel["setImportDialogOpen"];
+  setImportNotes: StockTransferFormModel["setImportNotes"];
 }) {
   return (
     <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>

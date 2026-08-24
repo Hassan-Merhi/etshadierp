@@ -3,6 +3,7 @@ import cron from "node-cron";
 import { logger } from "./logger";
 import { installOperationalAlertRuntime } from "./operationalAlertRuntime";
 import { captureRuntimeFailures, recordRuntimePerformance } from "./runtimePerformance";
+import { resolveSchedulerMetricName } from "./schedulerObservability";
 import { getTraceContext, runWithTraceContext, withTraceSpan } from "./traceContext";
 
 const BOOTSTRAP_KEY = "__erpObservabilityBootstrapInstalled";
@@ -88,8 +89,12 @@ function installCronTracing(): void {
   if (cronAny.__erpTracePatched) return;
   cronAny.__erpTracePatched = true;
   const originalSchedule = cron.schedule.bind(cron);
-  cronAny.schedule = (expression: string, callback: (...args: unknown[]) => unknown, options?: Record<string, unknown>) => {
-    const jobName = `cron:${String(expression).slice(0, 80)}`;
+  cronAny.schedule = (
+    expression: string,
+    callback: (...args: unknown[]) => unknown,
+    options?: Record<string, unknown>
+  ) => {
+    const jobName = resolveSchedulerMetricName(expression, callback);
     const wrapped = (...args: unknown[]) => {
       const requestId = `scheduler-${randomUUID()}`;
       let loggedFailure = false;

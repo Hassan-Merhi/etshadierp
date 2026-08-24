@@ -4,6 +4,9 @@
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
  */
+import type { useFactoryLocationInventory } from "../../FactoryLocationInventoryModel";
+
+type FactoryLocationInventoryModel = ReturnType<typeof useFactoryLocationInventory>;
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,20 +35,20 @@ export function RemoveBalesDialog({
   setDeleteSupervisorPass,
   setDeleteSupervisorUser,
 }: {
-  deleteDialogOpen: any;
-  deleteProduct: any;
-  deleteQty: any;
-  deleteReason: any;
-  deleteSupervisorPass: any;
-  deleteSupervisorUser: any;
-  removeBalesMutation: any;
-  selectedLocation: any;
-  setDeleteDialogOpen: any;
-  setDeleteProduct: any;
-  setDeleteQty: any;
-  setDeleteReason: any;
-  setDeleteSupervisorPass: any;
-  setDeleteSupervisorUser: any;
+  deleteDialogOpen: FactoryLocationInventoryModel["deleteDialogOpen"];
+  deleteProduct: FactoryLocationInventoryModel["deleteProduct"];
+  deleteQty: FactoryLocationInventoryModel["deleteQty"];
+  deleteReason: FactoryLocationInventoryModel["deleteReason"];
+  deleteSupervisorPass: FactoryLocationInventoryModel["deleteSupervisorPass"];
+  deleteSupervisorUser: FactoryLocationInventoryModel["deleteSupervisorUser"];
+  removeBalesMutation: FactoryLocationInventoryModel["removeBalesMutation"];
+  selectedLocation: FactoryLocationInventoryModel["selectedLocation"];
+  setDeleteDialogOpen: FactoryLocationInventoryModel["setDeleteDialogOpen"];
+  setDeleteProduct: FactoryLocationInventoryModel["setDeleteProduct"];
+  setDeleteQty: FactoryLocationInventoryModel["setDeleteQty"];
+  setDeleteReason: FactoryLocationInventoryModel["setDeleteReason"];
+  setDeleteSupervisorPass: FactoryLocationInventoryModel["setDeleteSupervisorPass"];
+  setDeleteSupervisorUser: FactoryLocationInventoryModel["setDeleteSupervisorUser"];
 }) {
   return (
     <Dialog
@@ -67,8 +70,8 @@ export function RemoveBalesDialog({
             {deleteProduct && (
               <>
                 Remove bales of <strong>{deleteProduct.productName}</strong> from{" "}
-                <strong>{selectedLocation.name}</strong>. Current stock: <strong>{deleteProduct.baleCount}</strong>{" "}
-                bale(s).
+                <strong>{selectedLocation?.name ?? "selected location"}</strong>. Current stock:{" "}
+                <strong>{deleteProduct.baleCount}</strong> bale(s).
               </>
             )}
           </DialogDescription>

@@ -5,6 +5,7 @@ import { getWaSettings, getActiveRecipients, sendWhatsAppFile, sendWhatsAppText 
 import { generateNetPositionExcel } from "../../helpers/generateNetPositionExcel";
 import { storage } from "../../storage";
 import { getTodayLabel } from "./daily-export";
+import { loadOverdueCustomerBalances } from "./overdueCustomerQuery";
 
 export async function isScheduleEnabled(): Promise<boolean> {
   try {
@@ -40,7 +41,7 @@ export async function runMonthlyWhatsAppNetPosition() {
       return d.toISOString().split("T")[0];
     })();
 
-    for (const company of (companies)) {
+    for (const company of companies) {
       try {
         logger.info(`[WhatsApp] Generating net-position Excel for ${company.name}…`);
         const buffer = await generateNetPositionExcel(company.id, company.name, startDate, endDate);
@@ -76,52 +77,14 @@ export async function checkOverdueCustomers(): Promise<void> {
   try {
     // Find customers with payment terms set, their net balance (debit = they owe us),
     // and the earliest finalized invoice date per customer.
-    const result = await pool.query(`
-      SELECT
-        c.id,
-        c.legal_name,
-        c.payment_terms_days,
-        c.company_id,
-        COALESCE(SUM(
-          CASE
-            WHEN cb.entry_type = 'DEBIT'  THEN cb.amount::numeric
-            WHEN cb.entry_type = 'CREDIT' THEN -cb.amount::numeric
-            ELSE 0
-          END
-        ), 0) + COALESCE(
-          CASE WHEN c.opening_balance_side = 'Dr' THEN c.opening_balance::numeric
-               WHEN c.opening_balance_side = 'Cr' THEN -c.opening_balance::numeric
-               ELSE 0 END, 0
-        ) AS net_balance,
-        MIN(
-          CASE WHEN cb.entry_type = 'DEBIT' THEN cb.entry_date ELSE NULL END
-        ) AS earliest_invoice_date
-      FROM customers c
-      LEFT JOIN customer_balances cb ON cb.customer_id = c.id
-      WHERE c.payment_terms_days IS NOT NULL
-        AND c.deleted_at IS NULL
-        AND c.active = true
-      GROUP BY c.id, c.legal_name, c.payment_terms_days, c.company_id,
-               c.opening_balance, c.opening_balance_side
-      HAVING COALESCE(SUM(
-          CASE
-            WHEN cb.entry_type = 'DEBIT'  THEN cb.amount::numeric
-            WHEN cb.entry_type = 'CREDIT' THEN -cb.amount::numeric
-            ELSE 0
-          END
-        ), 0) + COALESCE(
-          CASE WHEN c.opening_balance_side = 'Dr' THEN c.opening_balance::numeric
-               WHEN c.opening_balance_side = 'Cr' THEN -c.opening_balance::numeric
-               ELSE 0 END, 0
-        ) > 0
-    `);
+    const customerBalances = await loadOverdueCustomerBalances();
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const overdue: { name: string; balance: number; dueDate: string; daysOverdue: number }[] = [];
 
-    for (const row of result.rows) {
+    for (const row of customerBalances) {
       const earliestInvoiceDate = row.earliest_invoice_date ? new Date(row.earliest_invoice_date) : null;
       if (!earliestInvoiceDate) continue;
 
