@@ -118,7 +118,7 @@ export function createPhase3TemplateTranslator(entries: readonly Phase3SharedUiE
     translate(
       value: string,
       language: ApplicationLanguage,
-      translateCapture: (capture: string) => string,
+      translateCapture: (capture: string) => string
     ): string | null {
       const leading = value.match(/^\s*/)?.[0] ?? "";
       const trailing = value.match(/\s*$/)?.[0] ?? "";
