@@ -75,7 +75,10 @@ export async function ensureCompanyScopeRlsReadiness() {
 
     const relationCheck = await client.query(
       `
-        SELECT c.relname AS table_name, c.relrowsecurity AS rls_enabled
+        SELECT
+          c.relname AS table_name,
+          c.relrowsecurity AS rls_enabled,
+          c.relforcerowsecurity AS rls_forced
         FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'public'
@@ -83,11 +86,21 @@ export async function ensureCompanyScopeRlsReadiness() {
       `,
       [[...REQUIRED_DIRECT_TABLES, "voucher_entries"]]
     );
-    const relationState = new Map(relationCheck.rows.map((row) => [row.table_name, row.rls_enabled]));
+    const relationState = new Map(
+      relationCheck.rows.map((row) => [
+        row.table_name,
+        { enabled: row.rls_enabled === true, forced: row.rls_forced === true },
+      ])
+    );
     const existingTables = relationCheck.rows.map((row) => row.table_name);
-    const rlsDisabled = existingTables.filter((tableName) => relationState.get(tableName) !== true);
+    const rlsDisabled = existingTables.filter((tableName) => relationState.get(tableName)?.enabled !== true);
     if (rlsDisabled.length > 0) {
       throw new Error(`RLS was not enabled on: ${rlsDisabled.join(", ")}`);
+    }
+
+    const rlsNotForced = existingTables.filter((tableName) => relationState.get(tableName)?.forced !== true);
+    if (rlsNotForced.length > 0) {
+      throw new Error(`RLS was not forced on: ${rlsNotForced.join(", ")}`);
     }
 
     const policyCheck = await client.query(
@@ -112,6 +125,7 @@ export async function ensureCompanyScopeRlsReadiness() {
     log("INFO", "Company-scope RLS readiness verified", {
       tablesPresent: existingTables.length,
       policiesPresent: policyCheck.rows.length,
+      forcedTables: existingTables.length,
       startupMigrationsEnabled: process.env.RUN_STARTUP_MIGRATIONS !== "false",
     });
   } catch (error) {

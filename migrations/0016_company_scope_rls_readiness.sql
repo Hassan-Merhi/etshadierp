@@ -1,24 +1,26 @@
--- ERP 90/100 Phase 3: staged row-level tenant isolation readiness.
+-- ERP 90/100 tenant isolation: row-level company-scope protection.
 --
 -- This migration adds a transaction-local company setting helper and compatible
 -- RLS policies to high-risk tables that carry company_id directly.
 --
 -- Compatibility design:
---   * Existing application connections do not currently SET LOCAL
+--   * Existing application connections do not yet SET LOCAL
 --     app.current_company_id for every transaction.
 --   * Therefore each policy preserves legacy behaviour while the setting is
 --     absent, but becomes company-restrictive as soon as a transaction supplies
 --     app.current_company_id.
 --   * A malformed or non-positive setting raises instead of becoming an absent
 --     context, so an invalid tenant assertion fails closed.
---   * Phase 4 central transaction services can adopt SET LOCAL without another
---     policy rewrite, after which enforcement can be tightened further.
---   * FORCE ROW LEVEL SECURITY is deliberately NOT enabled here because the app
---     may connect as the table owner. That cutover belongs to an explicitly
---     rehearsed migration after all write paths carry transaction-local scope.
+--   * Central transaction services adopt SET LOCAL through
+--     assertTransactionCompanyScope; Phase 4 additionally binds that assertion
+--     to the canonical authenticated request company.
+--   * FORCE ROW LEVEL SECURITY is enabled on the already-protected tables so a
+--     table-owner application connection cannot bypass an asserted tenant scope.
+--     The compatibility predicate still returns true when no scope is asserted,
+--     so legacy unscoped paths retain their existing visibility during rollout.
 --   * No UPDATE, DELETE, repair, backfill, or historical data rewrite occurs.
 --
--- Wave G startup cutover:
+-- Startup cutover:
 --   * server/companyScopeRlsBridge.mjs applies this reviewed migration at startup,
 --     including when the legacy bulk startup migration pass is disabled.
 --   * The bridge wraps execution in a transaction, serializes concurrent startup
@@ -81,6 +83,7 @@ BEGIN
     END IF;
 
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', tenant_table);
+    EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', tenant_table);
     policy_name := tenant_table || '_company_scope_policy';
 
     IF EXISTS (
@@ -108,6 +111,7 @@ DO $voucher_entry_rls$
 BEGIN
   IF to_regclass('public.voucher_entries') IS NOT NULL THEN
     ALTER TABLE voucher_entries ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE voucher_entries FORCE ROW LEVEL SECURITY;
 
     IF EXISTS (
       SELECT 1 FROM pg_policies
@@ -139,12 +143,13 @@ BEGIN
 END
 $voucher_entry_rls$;
 
--- Example transaction-local adoption for Phase 4 central services:
+-- Example transaction-local adoption for central services:
 --   BEGIN;
 --   SELECT set_config('app.current_company_id', '42', true);
 --   ... tenant-scoped reads/writes ...
 --   COMMIT;
 --
--- Rollback strategy if this migration needs to be reversed before FORCE RLS:
--- disable RLS on the listed tables, drop the *_company_scope_policy policies,
--- then drop erp_company_scope_matches(integer) and erp_current_company_id().
+-- Rollback strategy if the RLS policy package needs to be reversed:
+-- NO FORCE ROW LEVEL SECURITY and disable RLS on the listed tables, drop the
+-- *_company_scope_policy policies, then drop erp_company_scope_matches(integer)
+-- and erp_current_company_id().
