@@ -3,7 +3,7 @@ import { formatNumber } from "@/lib/formatNumber";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronRight, ChevronDown, FlaskRound, Plus, MinusCircle, Layers } from "lucide-react";
+import { ChevronRight, ChevronDown, Eye, EyeOff, FlaskRound, Plus, MinusCircle, Layers } from "lucide-react";
 import { SupplierMixBatchHistoryDialog } from "./SupplierMixBatchHistoryDialog";
 
 interface RawStockRow {
@@ -36,16 +36,29 @@ interface RawStockTableProps {
 export function RawStockTable({ rawStock, onAdjust, onDeduct, onAddToBatch }: RawStockTableProps) {
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({ Uncategorized: true });
   const [historyDialog, setHistoryDialog] = useState<{ supplierId: number; supplierName: string } | null>(null);
+  const [showZeroBalance, setShowZeroBalance] = useState(false);
+
+  const zeroBalanceCount = useMemo(
+    () => (rawStock || []).filter((row) => parseFloat(row.freeKg || "0") <= 0.001).length,
+    [rawStock]
+  );
+  const visibleStock = useMemo(
+    () =>
+      showZeroBalance
+        ? rawStock || []
+        : (rawStock || []).filter((row) => parseFloat(row.freeKg || "0") > 0.001),
+    [rawStock, showZeroBalance]
+  );
 
   const groupedStock = useMemo(() => {
     const groups: Record<string, RawStockRow[]> = {};
-    (rawStock || []).forEach((r) => {
+    visibleStock.forEach((r) => {
       const cat = r.categoryName || "Uncategorized";
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(r);
     });
     return groups;
-  }, [rawStock]);
+  }, [visibleStock]);
 
   const categories = useMemo(() => Object.keys(groupedStock).sort(), [groupedStock]);
 
@@ -55,14 +68,33 @@ export function RawStockTable({ rawStock, onAdjust, onDeduct, onAddToBatch }: Ra
 
   return (
     <>
-    <div className="border rounded-md overflow-hidden bg-card shadow-sm">
-      <Table>
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          {showZeroBalance ? "Showing all sources, including empty balances." : "Sources with no free balance are hidden."}
+        </p>
+        {zeroBalanceCount > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowZeroBalance((visible) => !visible)}
+            className="h-8 gap-2 rounded-lg border-slate-300 bg-background px-3 text-xs font-semibold shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/5 hover:shadow-md dark:border-slate-700"
+            aria-pressed={showZeroBalance}
+            data-testid="button-toggle-zero-balance"
+          >
+            {showZeroBalance ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            {showZeroBalance ? "Hide 0 Balance" : `Show 0 Balance (${zeroBalanceCount})`}
+          </Button>
+        )}
+      </div>
+      <div className="overflow-hidden rounded-md border bg-card shadow-sm">
+        <Table>
         <TableHeader className="bg-muted/50">
           <TableRow className="hover:bg-transparent">
             <TableHead className="w-[300px] py-4">Source / Supplier</TableHead>
             <TableHead className="text-right py-4">Total Received</TableHead>
             <TableHead className="text-right py-4">Total Used</TableHead>
-            <TableHead className="text-right py-4">Reserved (Mix)</TableHead>
             <TableHead className="text-right py-4 font-semibold text-foreground">Available (Free)</TableHead>
             <TableHead className="text-right py-4">Value (USD)</TableHead>
             <TableHead className="w-[120px] py-4"></TableHead>
@@ -71,8 +103,8 @@ export function RawStockTable({ rawStock, onAdjust, onDeduct, onAddToBatch }: Ra
         <TableBody>
           {categories.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                No raw stock available
+              <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                {zeroBalanceCount > 0 ? "All sources currently have a zero free balance." : "No raw stock available"}
               </TableCell>
             </TableRow>
           ) : (
@@ -111,9 +143,6 @@ export function RawStockTable({ rawStock, onAdjust, onDeduct, onAddToBatch }: Ra
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm py-3 text-muted-foreground">
                       {formatNumber(catUsed)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm py-3 text-muted-foreground">
-                      {formatNumber(catRemaining - catFree)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm py-3 font-semibold text-foreground">
                       {formatNumber(catFree)}
@@ -159,9 +188,6 @@ export function RawStockTable({ rawStock, onAdjust, onDeduct, onAddToBatch }: Ra
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs text-muted-foreground py-3">
                           {formatNumber(parseFloat(row.usedKg))}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs text-muted-foreground py-3">
-                          {formatNumber(parseFloat(row.reservedKg || "0"))}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm py-3 font-medium text-foreground">
                           {formatNumber(parseFloat(row.freeKg || "0"))}
@@ -221,8 +247,8 @@ export function RawStockTable({ rawStock, onAdjust, onDeduct, onAddToBatch }: Ra
             })
           )}
         </TableBody>
-      </Table>
-    </div>
+        </Table>
+      </div>
 
       {historyDialog && (
         <SupplierMixBatchHistoryDialog
