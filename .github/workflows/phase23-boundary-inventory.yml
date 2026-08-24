@@ -17,36 +17,36 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+      - name: Apply boundary typing batch
+        run: node scripts/phase23-boundary-autofix.mjs
+      - name: Publish transformed source for normal PR CI
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/routes/factory-intelligence server/routes/routeBoundaryTypes.ts scripts/phase23-boundary-autofix.mjs
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "refactor(types): type factory intelligence boundaries [phase23-autofix]"
+          git push
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
           cache: npm
       - run: npm ci --ignore-scripts
-      - name: Apply boundary typing batch
-        run: node scripts/phase23-boundary-autofix.mjs
       - name: Format touched code
         run: >-
           node node_modules/prettier/bin/prettier.cjs --write
           "server/routes/factory-intelligence/**/*.ts"
           "server/routes/routeBoundaryTypes.ts"
           "scripts/phase23-boundary-autofix.mjs"
-      - name: Ratchet improved type-escape baselines
-        run: UPDATE_TYPE_ESCAPE_BASELINE=1 npm run audit:type-escapes
-      - name: Refresh boundary inventory
-        run: node scripts/phase23-boundary-inventory.mjs --write
-      - name: Commit batch for PR certification
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add server/routes/factory-intelligence server/routes/routeBoundaryTypes.ts scripts/phase23-boundary-autofix.mjs config/type-escape-boundaries.json artifacts/phase23-boundary-inventory.json
-          if git diff --cached --quiet; then
-            exit 0
-          fi
-          git commit -m "refactor(types): type factory intelligence boundaries [phase23-autofix]"
-          git push
       - name: TypeScript certification
         run: npm run check
       - name: ESLint certification
         run: npm run lint
+      - name: Ratchet improved type-escape baselines
+        run: UPDATE_TYPE_ESCAPE_BASELINE=1 npm run audit:type-escapes
+      - name: Refresh boundary inventory
+        run: node scripts/phase23-boundary-inventory.mjs --write
       - name: Verify exact type-escape audit
         run: npm run audit:type-escapes
