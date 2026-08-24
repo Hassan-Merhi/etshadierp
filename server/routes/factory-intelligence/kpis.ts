@@ -99,7 +99,7 @@ export function registerFactoryKpiRoutes(app: Express, requireAuth: RequestHandl
 
       const workers = await db.select().from(factoryWorkers).where(eq(factoryWorkers.companyId, companyId));
 
-      const workerMap = new Map<number, any>(workers.map((w: any) => [w.id, w]));
+      const workerMap = new Map(workers.map((w) => [w.id, w] as const));
 
       const workerStats: Record<number, { workerId: number; workerName: string; balesCount: number; totalKg: number }> =
         {};

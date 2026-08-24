@@ -71,7 +71,7 @@ export function registerFactoryProfitabilityRoutes(app: Express, requireAuth: Re
           )})`
         );
 
-      const orderBaleMap = new Map<number, any>(orderBales.map((ob: any) => [ob.baleId, ob]));
+      const orderBaleMap = new Map(orderBales.map((ob) => [ob.baleId, ob] as const));
 
       const _freightEntries = await db.select().from(containerFreight).where(eq(containerFreight.companyId, companyId));
 
@@ -164,7 +164,7 @@ export function registerFactoryProfitabilityRoutes(app: Express, requireAuth: Re
 
       const allOrderBales = await db.select().from(customerOrderBales);
 
-      const orderBaleMap = new Map<number, any>(allOrderBales.map((ob: any) => [ob.baleId, ob]));
+      const orderBaleMap = new Map(allOrderBales.map((ob) => [ob.baleId, ob] as const));
 
       const [settings] = await db.select().from(factorySettings).where(eq(factorySettings.companyId, companyId));
 
