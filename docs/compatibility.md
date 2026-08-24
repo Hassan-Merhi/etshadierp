@@ -28,21 +28,24 @@ PDF exports and print layouts are optimized for A4 paper.
 
 | Version | Status |
 |---------|--------|
-| 20.x LTS | ✅ Recommended |
-| 18.x LTS | ✅ Supported |
-| 16.x | ⚠️ Not tested |
+| 24.19.0 | ✅ Pinned and certified (`.node-version`) |
+| Other 24.x | ⚠️ Meets the package engine but is not the CI reference runtime |
+| 22.x and earlier | ❌ Unsupported |
 
 ---
 
 ## Database
 
-- **PostgreSQL 14+** required
-- Uses Drizzle ORM — no manual SQL migrations needed; schema is auto-synced on server start
+- **PostgreSQL 16** is the certified production and CI baseline.
+- Versioned SQL and idempotent startup migrations manage persistent databases.
+- `drizzle-kit push` is limited to disposable CI/test databases; never use it to
+  update a persistent or production database.
 
 ---
 
 ## Environment
 
-- Runs on Linux (tested on Ubuntu 22.04 and Replit's NixOS environment)
-- Not tested on Windows natively; use WSL2 if running locally on Windows
-- All environment variables must be set before starting (see `.env.example` if present)
+- Linux is the production and CI runtime (`ubuntu-24.04` for final certification).
+- Windows is supported for the packaged desktop application; use WSL2 for local
+  server development.
+- Required and optional environment variables are documented in `.env.example`.
