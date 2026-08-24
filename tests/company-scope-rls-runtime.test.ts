@@ -41,12 +41,16 @@ describeDatabase("company-scope RLS runtime", () => {
       `CREATE TABLE ${probeTable} (id serial PRIMARY KEY, company_id integer NOT NULL, marker text NOT NULL)`
     );
     await client.query(`ALTER TABLE ${probeTable} ENABLE ROW LEVEL SECURITY`);
+    await client.query(`ALTER TABLE ${probeTable} FORCE ROW LEVEL SECURITY`);
     await client.query(`CREATE POLICY ${probeTable}_company_scope_policy ON ${probeTable}
       USING (erp_company_scope_matches(company_id))
       WITH CHECK (erp_company_scope_matches(company_id))`);
     await client.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ${probeTable} TO ${roleName}`);
     await client.query(`GRANT USAGE, SELECT ON SEQUENCE ${probeTable}_id_seq TO ${roleName}`);
     await client.query(`INSERT INTO ${probeTable} (company_id, marker) VALUES (101, 'company-a'), (202, 'company-b')`);
+    // Make the non-superuser probe the table owner. FORCE RLS must still apply;
+    // without FORCE, PostgreSQL table owners bypass ordinary row security.
+    await client.query(`ALTER TABLE ${probeTable} OWNER TO ${roleName}`);
   });
 
   afterAll(async () => {
@@ -58,7 +62,7 @@ describeDatabase("company-scope RLS runtime", () => {
     await client.end();
   });
 
-  it("installs RLS and the expected policies on every present protected table", async () => {
+  it("installs and forces RLS with the expected policies on every present protected table", async () => {
     const protectedTables = [
       "vouchers",
       "customers",
@@ -71,7 +75,9 @@ describeDatabase("company-scope RLS runtime", () => {
       "voucher_entries",
     ];
     const result = await client.query(
-      `SELECT c.relname AS table_name, c.relrowsecurity AS rls_enabled,
+      `SELECT c.relname AS table_name,
+              c.relrowsecurity AS rls_enabled,
+              c.relforcerowsecurity AS rls_forced,
               EXISTS (
                 SELECT 1 FROM pg_policies p
                 WHERE p.schemaname = 'public'
@@ -89,6 +95,7 @@ describeDatabase("company-scope RLS runtime", () => {
 
     for (const row of result.rows) {
       expect(row.rls_enabled, `${row.table_name} should have RLS enabled`).toBe(true);
+      expect(row.rls_forced, `${row.table_name} should force RLS for its owner`).toBe(true);
       expect(row.policy_present, `${row.table_name} should have a company policy`).toBe(true);
     }
   });
@@ -101,8 +108,15 @@ describeDatabase("company-scope RLS runtime", () => {
     await client.query("RESET ROLE");
   });
 
-  it("isolates reads and rejects cross-company writes when context is asserted", async () => {
+  it("isolates the table owner and rejects cross-company writes when context is asserted", async () => {
     await client.query(`SET ROLE ${roleName}`);
+    const identity = await client.query(
+      `SELECT current_user, pg_get_userbyid(c.relowner) AS owner, c.relforcerowsecurity AS forced
+       FROM pg_class c WHERE c.relname = $1`,
+      [probeTable]
+    );
+    expect(identity.rows[0]).toMatchObject({ current_user: roleName, owner: roleName, forced: true });
+
     await client.query("SELECT set_config('app.current_company_id', '101', false)");
     const result = await client.query(`SELECT marker FROM ${probeTable} ORDER BY marker`);
     expect(result.rows.map((row) => row.marker)).toEqual(["company-a"]);
