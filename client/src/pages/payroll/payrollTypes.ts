@@ -24,6 +24,10 @@ export interface WorkerGroup {
 
 export interface EmployeeTransaction {
   id?: number;
+  voucherId?: number;
+  voucherDescription?: string | null;
+  voucherType?: string | null;
+  narration?: string | null;
   debitAmount?: string | number | null;
   debit?: string | number | null;
   creditAmount?: string | number | null;
