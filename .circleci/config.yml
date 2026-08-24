@@ -162,7 +162,7 @@ jobs:
       - run:
           name: Run application startup migrations
           command: |
-            node dist/index.js > /tmp/circleci-startup-migrations.txt 2>&1 &
+            npm start > /tmp/circleci-startup-migrations.txt 2>&1 &
             app_pid=$!
             cleanup() {
               kill "$app_pid" 2>/dev/null || true
