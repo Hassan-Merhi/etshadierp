@@ -42,6 +42,7 @@ const compatibilityTranslationFiles = [
   "client/src/i18n/phase3RemainingTranslations.part21.ts",
   "client/src/i18n/phase3RemainingTranslations.part22.ts",
   "client/src/i18n/phase3RemainingTranslations.part23.ts",
+  "client/src/i18n/phase3RemainingTranslations.part24.ts",
   "client/src/i18n/supplierPartnerPhase4Translations.part1.ts",
   "client/src/i18n/supplierPartnerPhase4Translations.part2.ts",
   "client/src/i18n/supplierPartnerPhase4Translations.part3.ts",
@@ -97,6 +98,9 @@ const reviewedTechnicalValues = new Set([
   "${unitNameById.get(r.unitId) ??",
   "new Date().toISOString().slice(0, 10) && (",
   "unit${row.unitId}${unit.unitNumber ?",
+  // Detector false positive: this is a calculation expression embedded in a
+  // customer table cell, not user-facing copy.
+  "Math.abs(customer.balance ?? 0)",
 ]);
 
 function argumentValue(name) {
