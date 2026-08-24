@@ -71,6 +71,7 @@ const FACTORY_COMPANY_PREFIXES = new Set([
   "advmgt",
   "dspbat",
   "canonfse",
+  "custload",
 ]);
 
 function testCompanyType(prefix: string): "erp" | "factory" {
