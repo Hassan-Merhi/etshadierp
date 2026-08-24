@@ -1,0 +1,79 @@
+name: Phase 2.4 DB Boundary Workbench
+
+on:
+  push:
+    branches: [phase-2.4-backend-db-type-safety]
+    paths: [.phase24-db-trigger]
+
+permissions:
+  contents: write
+
+jobs:
+  db-boundaries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout Phase 2.4 branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: phase-2.4-backend-db-type-safety
+
+      - name: Set up Node.js 24.19.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24.19.0"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Measure starting ratchet
+        run: node scripts/audit-type-escapes.mjs --json > /tmp/phase24-before.json
+
+      - name: Type route DB boundaries and inferred callbacks
+        env:
+          PHASE24_PATH_FILTER: server/routes/
+        run: node scripts/phase24-db-boundary-codemod.mjs
+
+      - name: Format generated route edits
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(git diff --name-only -- 'server/routes/**/*.ts')
+          if (( ${#files[@]} > 0 )); then
+            node node_modules/prettier/bin/prettier.cjs --write "${files[@]}"
+          fi
+
+      - name: Full TypeScript certification
+        run: npm run check
+
+      - name: Lock earned ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/audit-type-escapes.mjs --json > /tmp/phase24-after.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const before = JSON.parse(fs.readFileSync('/tmp/phase24-before.json', 'utf8'));
+          const after = JSON.parse(fs.readFileSync('/tmp/phase24-after.json', 'utf8'));
+          const reduction = before.summary.typeEscapeTotal - after.summary.typeEscapeTotal;
+          console.log(`Type escapes: ${before.summary.typeEscapeTotal} -> ${after.summary.typeEscapeTotal} (${reduction} removed in DB-boundary pass)`);
+          if (reduction <= 0) process.exitCode = 1;
+          NODE
+          UPDATE_TYPE_ESCAPE_BASELINE=1 node scripts/audit-type-escapes.mjs
+          npm run audit:type-escapes
+
+      - name: Commit validated DB-boundary pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "No validated changes"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/routes config/type-escape-boundaries.json
+          git commit -m "refactor: Phase 2.4 type backend database boundaries"
+          git push origin HEAD:phase-2.4-backend-db-type-safety
