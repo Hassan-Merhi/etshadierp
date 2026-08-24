@@ -20,6 +20,8 @@ import { phase3RemainingTranslationsPart18 } from "../client/src/i18n/phase3Rema
 import { phase3RemainingTranslationsPart19 } from "../client/src/i18n/phase3RemainingTranslations.part19";
 import { phase3RemainingTranslationsPart20 } from "../client/src/i18n/phase3RemainingTranslations.part20";
 import { phase3RemainingTranslationsPart21 } from "../client/src/i18n/phase3RemainingTranslations.part21";
+import { phase3RemainingTranslationsPart22 } from "../client/src/i18n/phase3RemainingTranslations.part22";
+import { phase3RemainingTranslationsPart23 } from "../client/src/i18n/phase3RemainingTranslations.part23";
 
 const entries = [
   ...phase3RemainingTranslationsPart01,
@@ -43,6 +45,8 @@ const entries = [
   ...phase3RemainingTranslationsPart19,
   ...phase3RemainingTranslationsPart20,
   ...phase3RemainingTranslationsPart21,
+  ...phase3RemainingTranslationsPart22,
+  ...phase3RemainingTranslationsPart23,
 ] as const;
 
 describe("Phase 3 translation completion", () => {
