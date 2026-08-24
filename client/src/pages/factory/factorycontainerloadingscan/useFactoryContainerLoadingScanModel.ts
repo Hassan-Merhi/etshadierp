@@ -51,6 +51,7 @@ export function useFactoryContainerLoadingScanModel() {
   const search = useSearch();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
+  const continuationFromOrderId = new URLSearchParams(search).get("continuationFromOrderId");
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
@@ -150,7 +151,8 @@ export function useFactoryContainerLoadingScanModel() {
   const { data: orderDetail } = useQuery<OrderDetail>({
     queryKey: ["/api/factory/customer-orders", orderId],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/customer-orders/${orderId}`, {
+       const continuationQuery = continuationFromOrderId ? `?continuationFromOrderId=${continuationFromOrderId}` : "";
+       const res = await fetch(`/api/factory/customer-orders/${orderId}${continuationQuery}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch order");
@@ -366,20 +368,28 @@ export function useFactoryContainerLoadingScanModel() {
   });
 
   const finalizeMutation = useMutation({
-    mutationFn: async (txDate?: string) => {
-      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize-loading`, { txDate });
+    mutationFn: async (variables: { txDate?: string; createContinuation?: boolean }) => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize-loading`, variables);
+      return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries(
         { predicate: keyStartsWith("/api/factory/customer-orders"), refetchType: "active" },
         { cancelRefetch: false }
       );
+      const continuationId = data?.continuationOrder?.id;
       toast({
         title: "Loading finalized",
-        description: "Loading has been sent for office verification",
+        description: continuationId
+          ? `Loading sent for verification. Continuation loading #${continuationId} is ready.`
+          : "Loading has been sent for office verification",
       });
       setShowFinalizeDialog(false);
-      navigate("/factory/invoicing?tab=invoices");
+      navigate(
+        continuationId
+          ? `/factory/sales/loading/new?orderId=${continuationId}&continuationFromOrderId=${orderId}`
+          : "/factory/invoicing?tab=invoices"
+      );
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -654,6 +664,7 @@ export function useFactoryContainerLoadingScanModel() {
   const linkedProforma = orderDetail?.proformaIdUsed
     ? proformas.find((p) => p.id === orderDetail.proformaIdUsed)
     : proformas.find((p) => p.isActive) || null;
+  const effectiveProformaLines = orderDetail?.proformaRemainingLines ?? linkedProforma?.lines ?? [];
 
   const loadedByArticle = bales.reduce<Record<string, number>>((map, b) => {
     const key = b.articleCode ?? "__unknown__";
@@ -662,7 +673,7 @@ export function useFactoryContainerLoadingScanModel() {
   }, {});
 
   const proformaProgress =
-    (Array.isArray(linkedProforma?.lines) ? linkedProforma!.lines : []).map((line) => {
+    effectiveProformaLines.map((line) => {
       const loaded = loadedByArticle[line.articleCode] || 0;
       const remaining = line.quantity - loaded;
       const status: ProformaLineStatus =
@@ -688,8 +699,9 @@ export function useFactoryContainerLoadingScanModel() {
 
   // Extra bales not in proforma
   const proformaArticleCodes = new Set(
-    (Array.isArray(linkedProforma?.lines) ? linkedProforma!.lines : []).map((l) => l.articleCode)
+    effectiveProformaLines.map((l) => l.articleCode)
   );
+  const remainingProformaBales = proformaProgress.reduce((sum, line) => sum + Math.max(0, line.remaining), 0);
   const extraArticles = Object.keys(loadedByArticle).filter((code) => !proformaArticleCodes.has(code));
 
   const scanInputClass =
@@ -768,6 +780,7 @@ export function useFactoryContainerLoadingScanModel() {
     // proforma comparison
     linkedProforma,
     proformaProgress,
+    remainingProformaBales,
     loadedByArticle,
     extraArticles,
     fulfilledCount,

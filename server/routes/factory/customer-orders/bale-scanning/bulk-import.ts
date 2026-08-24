@@ -119,6 +119,33 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
             if (!bale) return { kind: "notFound" as const };
             if (alreadyAddedBaleIds.has(bale.id)) return { kind: "skipDuplicate" as const };
 
+            if (order.proformaIdUsed && bale.articleCode) {
+              const [proformaLine] = await tx
+                .select({ quantity: customerProformaLines.quantity })
+                .from(customerProformaLines)
+                .where(
+                  and(
+                    eq(customerProformaLines.proformaId, order.proformaIdUsed),
+                    sql`LOWER(TRIM(${customerProformaLines.articleCode})) = LOWER(TRIM(${bale.articleCode}))`
+                  )
+                );
+              if (proformaLine) {
+                const [loadedCount] = await tx
+                  .select({ count: sql<number>`COUNT(*)::int` })
+                  .from(customerOrderBales)
+                  .innerJoin(customerOrders, eq(customerOrders.id, customerOrderBales.orderId))
+                  .where(
+                    and(
+                      eq(customerOrders.companyId, companyId),
+                      eq(customerOrders.proformaIdUsed, order.proformaIdUsed),
+                      sql`${customerOrders.status} != 'CANCELLED'`,
+                      sql`LOWER(TRIM(COALESCE(${customerOrderBales.articleCode}, ''))) = LOWER(TRIM(${bale.articleCode}))`
+                    )
+                  );
+                if ((loadedCount?.count || 0) >= proformaLine.quantity) return { kind: "notFound" as const };
+              }
+            }
+
             // Universal cross-order duplicate check: block if this bale is already in any other
             // active (non-CANCELLED) order regardless of V5/non-V5 type.
             const bulkCrossOrderCheck = await tx.execute(
@@ -295,6 +322,33 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
                     LIMIT 1`
               );
               if (firstRow(v5DupCheck)) continue;
+            }
+
+            if (order.proformaIdUsed && bale.articleCode) {
+              const [proformaLine] = await tx
+                .select({ quantity: customerProformaLines.quantity })
+                .from(customerProformaLines)
+                .where(
+                  and(
+                    eq(customerProformaLines.proformaId, order.proformaIdUsed),
+                    sql`LOWER(TRIM(${customerProformaLines.articleCode})) = LOWER(TRIM(${bale.articleCode}))`
+                  )
+                );
+              if (proformaLine) {
+                const [loadedCount] = await tx
+                  .select({ count: sql<number>`COUNT(*)::int` })
+                  .from(customerOrderBales)
+                  .innerJoin(customerOrders, eq(customerOrders.id, customerOrderBales.orderId))
+                  .where(
+                    and(
+                      eq(customerOrders.companyId, companyId),
+                      eq(customerOrders.proformaIdUsed, order.proformaIdUsed),
+                      sql`${customerOrders.status} != 'CANCELLED'`,
+                      sql`LOWER(TRIM(COALESCE(${customerOrderBales.articleCode}, ''))) = LOWER(TRIM(${bale.articleCode}))`
+                    )
+                  );
+                if ((loadedCount?.count || 0) >= proformaLine.quantity) continue;
+              }
             }
 
             // Determine price

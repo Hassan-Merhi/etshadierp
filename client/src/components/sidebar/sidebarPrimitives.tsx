@@ -445,7 +445,7 @@ export function ModuleFooter({ user, avatarClassName, accent }: ModuleFooterProp
         </Button>
       </div>
       <div className="mt-2 flex items-center justify-between">
-        <span className="text-[10px] text-muted-foreground/40 font-mono tracking-wide select-none">v.1.9.HMD</span>
+        <span className="text-[10px] text-muted-foreground/40 font-mono tracking-wide select-none">V.2.5</span>
         <span className="text-[10px] text-muted-foreground/40 select-none">© Dakzo Systems.</span>
       </div>
     </SidebarFooter>

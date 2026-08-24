@@ -116,8 +116,9 @@ function ReviewTotals({ model }: { model: FactoryContainerLoadingScanModel }) {
 }
 
 export function FinalizeLoadingDialog({ model }: { model: FactoryContainerLoadingScanModel }) {
-  const { linkedProforma, proformaProgress, bales, totalWeight, finalizeMutation } = model;
+  const { linkedProforma, proformaProgress, bales, totalWeight, finalizeMutation, remainingProformaBales } = model;
   const hasProformaReview = !!linkedProforma && proformaProgress.length > 0;
+  const hasRemaining = !!linkedProforma && remainingProformaBales > 0;
   return (
     <Dialog open={model.showFinalizeDialog} onOpenChange={model.setShowFinalizeDialog}>
       <DialogContent className="max-w-lg">
@@ -170,14 +171,35 @@ export function FinalizeLoadingDialog({ model }: { model: FactoryContainerLoadin
             >
               Cancel
             </Button>
-            <Button
-              onClick={() => finalizeMutation.mutate(model.finalizeDate)}
-              disabled={finalizeMutation.isPending}
-              data-testid="button-confirm-finalize"
-            >
-              <CheckCircle className="mr-2 h-4 w-4" />
-              {finalizeMutation.isPending ? "Finalizing..." : "Confirm Finalize"}
-            </Button>
+            {hasRemaining ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => finalizeMutation.mutate({ txDate: model.finalizeDate, createContinuation: false })}
+                  disabled={finalizeMutation.isPending}
+                  data-testid="button-finalize-only"
+                >
+                  NVM — Finalize Only
+                </Button>
+                <Button
+                  onClick={() => finalizeMutation.mutate({ txDate: model.finalizeDate, createContinuation: true })}
+                  disabled={finalizeMutation.isPending}
+                  data-testid="button-create-continuation"
+                >
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  {finalizeMutation.isPending ? "Creating..." : `Move ${remainingProformaBales} Remaining`}
+                </Button>
+              </>
+            ) : (
+              <Button
+                onClick={() => finalizeMutation.mutate({ txDate: model.finalizeDate })}
+                disabled={finalizeMutation.isPending}
+                data-testid="button-confirm-finalize"
+              >
+                <CheckCircle className="mr-2 h-4 w-4" />
+                {finalizeMutation.isPending ? "Finalizing..." : "Confirm Finalize"}
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>

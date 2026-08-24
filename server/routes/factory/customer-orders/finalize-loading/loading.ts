@@ -13,8 +13,15 @@ import { getClientDate } from "../../../../lib/dateUtils";
 import { db } from "../../../../db";
 import { requireAuth } from "../../../../auth";
 import { writeDaybookEntry } from "../../_helpers";
-import { factoryBales, customerOrders, customerOrderBales, customers, factoryDaybookEntries } from "@shared/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import {
+  factoryBales,
+  customerOrders,
+  customerOrderBales,
+  customerProformaLines,
+  customers,
+  factoryDaybookEntries,
+} from "@shared/schema";
+import { eq, and, inArray, isNull, ne } from "drizzle-orm";
 
 export function registerOrderLoadingRoutes(app: Express) {
   app.post("/api/factory/customer-orders-loading", requireAuth, async (req: Request, res: Response) => {
@@ -78,6 +85,7 @@ export function registerOrderLoadingRoutes(app: Express) {
 
       const orderId = parseId(req.params.id);
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
+      const createContinuation = req.body?.createContinuation === true;
 
       const finalized = await db.transaction(async (tx) => {
         const [order] = await tx
@@ -89,6 +97,68 @@ export function registerOrderLoadingRoutes(app: Express) {
 
         const bales = await tx.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
         if (bales.length === 0) throw new Error("Order has no bales scanned");
+
+        let continuationOrder: typeof order | null = null;
+        if (createContinuation && order.proformaIdUsed) {
+          const proformaLines = await tx
+            .select()
+            .from(customerProformaLines)
+            .where(eq(customerProformaLines.proformaId, order.proformaIdUsed));
+          const relatedOrders = await tx
+            .select({ id: customerOrders.id })
+            .from(customerOrders)
+            .where(
+              and(
+                eq(customerOrders.companyId, companyId),
+                eq(customerOrders.proformaIdUsed, order.proformaIdUsed),
+                ne(customerOrders.status, "CANCELLED"),
+                isNull(customerOrders.deletedAt)
+              )
+            );
+          const relatedOrderIds = relatedOrders.map((related) => related.id);
+          const relatedBales =
+            relatedOrderIds.length > 0
+              ? await tx
+                  .select({ articleCode: customerOrderBales.articleCode })
+                  .from(customerOrderBales)
+                  .where(inArray(customerOrderBales.orderId, relatedOrderIds))
+              : [];
+          const loadedByArticle = new Map<string, number>();
+          for (const bale of relatedBales) {
+            if (bale.articleCode) {
+              loadedByArticle.set(bale.articleCode, (loadedByArticle.get(bale.articleCode) || 0) + 1);
+            }
+          }
+          const remainingTotal = proformaLines.reduce(
+            (sum, line) => sum + Math.max(0, line.quantity - (loadedByArticle.get(line.articleCode) || 0)),
+            0
+          );
+
+          if (remainingTotal > 0) {
+            [continuationOrder] = await tx
+              .insert(customerOrders)
+              .values({
+                companyId,
+                customerId: order.customerId,
+                proformaIdUsed: order.proformaIdUsed,
+                locationId: order.locationId,
+                orderDate: order.orderDate,
+                status: "LOADING",
+                totalQtyBales: remainingTotal,
+                containerNotes: order.containerNotes,
+                loadingStartedAt: new Date(),
+              })
+              .returning();
+            await writeDaybookEntry(tx, {
+              companyId,
+              txDate: order.orderDate,
+              txType: "LOADING_CREATED",
+              referenceId: continuationOrder.id,
+              referenceTable: "customer_orders",
+              description: `Continuation loading created from order #${orderId}`,
+            });
+          }
+        }
 
         const now = new Date();
         const [updated] = await tx
@@ -162,6 +232,7 @@ export function registerOrderLoadingRoutes(app: Express) {
           updated,
           customerName: loadingCustomer?.legalName || "customer",
           baleCount: bales.length,
+          continuationOrder,
         };
       });
 
@@ -176,7 +247,7 @@ export function registerOrderLoadingRoutes(app: Express) {
         companyId,
       }).catch(() => {});
 
-      res.json(finalized.updated);
+      res.json({ ...finalized.updated, continuationOrder: finalized.continuationOrder });
     } catch (error: unknown) {
       logger.error("Error finalizing loading:", { error: error });
       res.status(400).json({ message: getErrorMessage(error) });

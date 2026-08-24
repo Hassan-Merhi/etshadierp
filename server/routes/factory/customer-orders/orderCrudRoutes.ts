@@ -18,7 +18,7 @@ import {
   customers,
   insertCustomerOrderSchema,
 } from "@shared/schema";
-import { eq, and, or, desc, sql, inArray, isNull, gte, lte } from "drizzle-orm";
+import { eq, and, or, desc, sql, inArray, isNull, gte, lte, ne } from "drizzle-orm";
 import { parseListPagination, setListPaginationHeaders } from "../../../lib/listPagination";
 import { resultRows } from "../../../lib/queryResult";
 
@@ -164,6 +164,60 @@ export function registerOrderCrudRoutes(app: Express) {
         customerCode: r.customer_code ?? null,
         dispatchBatchId: r.dispatch_batch_id ?? null,
       };
+      const orderProformaId = order.proformaIdUsed == null ? null : Number(order.proformaIdUsed);
+
+      let proformaRemainingLines:
+        | Array<{
+            id: number;
+            articleCode: string;
+            productName: string;
+            quantity: number;
+            pricePerBale: string;
+            pricingMode: string;
+            pricePerKg: string | null;
+          }>
+        | undefined;
+      if (req.query.continuationFromOrderId && orderProformaId) {
+        const proformaLines = await db
+          .select()
+          .from(customerProformaLines)
+          .where(eq(customerProformaLines.proformaId, orderProformaId));
+        const relatedOrders = await db
+          .select({ id: customerOrders.id })
+          .from(customerOrders)
+          .where(
+            and(
+              eq(customerOrders.companyId, companyId),
+              eq(customerOrders.proformaIdUsed, orderProformaId),
+              ne(customerOrders.status, "CANCELLED"),
+              isNull(customerOrders.deletedAt),
+              ne(customerOrders.id, id)
+            )
+          );
+        const relatedOrderIds = relatedOrders.map((related) => related.id);
+        const relatedBales =
+          relatedOrderIds.length > 0
+            ? await db
+                .select({ articleCode: customerOrderBales.articleCode })
+                .from(customerOrderBales)
+                .where(inArray(customerOrderBales.orderId, relatedOrderIds))
+            : [];
+        const loadedByArticle = new Map<string, number>();
+        for (const bale of relatedBales) {
+          if (bale.articleCode) {
+            loadedByArticle.set(bale.articleCode, (loadedByArticle.get(bale.articleCode) || 0) + 1);
+          }
+        }
+        proformaRemainingLines = proformaLines.map((line) => ({
+          id: line.id,
+          articleCode: line.articleCode,
+          productName: line.productName,
+          quantity: Math.max(0, line.quantity - (loadedByArticle.get(line.articleCode) || 0)),
+          pricePerBale: line.pricePerBale,
+          pricingMode: line.pricingMode,
+          pricePerKg: line.pricePerKg,
+        }));
+      }
 
       // customer_order_lines has no known schema drift — Drizzle is fine here
       const lines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, id));
@@ -196,7 +250,7 @@ export function registerOrderCrudRoutes(app: Express) {
         voucherId: c.voucher_id ?? null,
       }));
 
-      res.json({ ...order, lines, bales, charges });
+      res.json({ ...order, lines, bales, charges, ...(proformaRemainingLines ? { proformaRemainingLines } : {}) });
     } catch (error: unknown) {
       logger.error("Error fetching customer order:", { error: error });
       res.status(500).json({ message: getErrorMessage(error) });

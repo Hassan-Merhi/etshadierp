@@ -53,6 +53,7 @@ export interface OrderDetail {
   totalQtyBales: number;
   containerNotes: string | null;
   bales: OrderBale[];
+  proformaRemainingLines?: ProformaLine[];
 }
 
 export interface BaleRemoval {

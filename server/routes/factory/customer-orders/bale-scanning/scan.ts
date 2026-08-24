@@ -254,9 +254,12 @@ export function registerOrderBaleScanRoutes(app: Express) {
               const [countResult] = await tx
                 .select({ count: sql<number>`COUNT(*)::int` })
                 .from(customerOrderBales)
+                .innerJoin(customerOrders, eq(customerOrders.id, customerOrderBales.orderId))
                 .where(
                   and(
-                    eq(customerOrderBales.orderId, orderId),
+                    eq(customerOrders.companyId, companyId),
+                    eq(customerOrders.proformaIdUsed, order.proformaIdUsed),
+                    sql`${customerOrders.status} != 'CANCELLED'`,
                     sql`LOWER(TRIM(COALESCE(${customerOrderBales.articleCode}, ''))) = ${normalizedEffectiveArticleCode}`
                   )
                 );
