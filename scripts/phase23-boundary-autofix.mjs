@@ -9,9 +9,6 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const routeRoot = path.join(projectRoot, "server/routes");
 const helperPath = path.join(routeRoot, "routeBoundaryTypes.ts");
 
-// Apply only where a route registrar explicitly injects both auth and db as
-// untyped dependencies. The transform is intentionally pattern-gated rather
-// than rewriting arbitrary `any` throughout route code.
 const TARGET_PREFIXES = [""];
 
 const CALLBACK_METHODS = [
@@ -47,7 +44,7 @@ function importPath(fromFile, toFile) {
   return rel;
 }
 
-function addBoundaryImport(source, filePath) {
+function ensureBoundaryImport(source, filePath) {
   if (source.includes("routeBoundaryTypes")) return source;
   const specifier = importPath(filePath, helperPath);
   const line = `import type { AppDb, AuthMiddleware } from "${specifier}";\n`;
@@ -71,25 +68,40 @@ function stripInferredCallbackAny(source) {
   });
 }
 
+function cleanupBoundaryImport(source) {
+  if (!source.includes("routeBoundaryTypes")) return source;
+  const usesAppDb = /\bAppDb\b/.test(source.replace(/^import[^\n]*routeBoundaryTypes[^\n]*\n?/m, ""));
+  const usesAuth = /\bAuthMiddleware\b/.test(source.replace(/^import[^\n]*routeBoundaryTypes[^\n]*\n?/m, ""));
+  if (!usesAppDb && !usesAuth) {
+    return source.replace(/^import type \{ AppDb, AuthMiddleware \} from "[^"]*routeBoundaryTypes";\n\n?/m, "");
+  }
+  return source;
+}
+
 function transformRouteFile(filePath, source) {
   let next = source;
   let dependencyTyped = false;
 
-  const dependencyPattern = /requireAuth:\s*any\s*,\s*db:\s*any/g;
-  if (dependencyPattern.test(next)) {
-    next = next.replace(dependencyPattern, "requireAuth: AuthMiddleware, db: AppDb");
+  const patterns = [
+    /requireAuth:\s*any\s*,\s*db:\s*any/g,
+    /requireAuth:\s*unknown\s*,\s*db:\s*unknown/g,
+    /requireAuth:\s*RequestHandler\s*,\s*db:\s*any/g,
+    /requireAuth:\s*RequestHandler\s*,\s*db:\s*unknown/g,
+  ];
+
+  for (const pattern of patterns) {
+    if (!pattern.test(next)) continue;
+    pattern.lastIndex = 0;
+    next = next.replace(pattern, "requireAuth: AuthMiddleware, db: AppDb");
     dependencyTyped = true;
   }
 
-  const compositionPattern = /requireAuth:\s*unknown\s*,\s*db:\s*unknown/g;
-  if (compositionPattern.test(next)) {
-    next = next.replace(compositionPattern, "requireAuth: AuthMiddleware, db: AppDb");
-    dependencyTyped = true;
+  if (dependencyTyped) {
+    next = ensureBoundaryImport(next, filePath);
+    next = stripInferredCallbackAny(next);
   }
 
-  if (!dependencyTyped) return source;
-  next = addBoundaryImport(next, filePath);
-  next = stripInferredCallbackAny(next);
+  next = cleanupBoundaryImport(next);
   return next;
 }
 
