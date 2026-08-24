@@ -20,6 +20,29 @@ jobs:
     if: github.event_name == 'push' || github.head_ref == 'phase-2-1-mechanical-type-escapes-clean'
     runs-on: ubuntu-latest
     timeout-minutes: 70
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d heliumdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: ci-session-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+      PORT: "5000"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -27,9 +50,11 @@ jobs:
           ref: phase-2-1-mechanical-type-escapes-clean
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 24.19.0
           cache: npm
       - run: npm ci --ignore-scripts
+      - name: Prepare test database schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
       - name: Measure starting scanner state
         run: npm run audit:type-escapes
       - name: Verify backend test baseline
