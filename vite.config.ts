@@ -52,6 +52,10 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // Spreadsheet/export libraries are intentionally isolated into lazy vendor
+    // chunks. Fortune Sheet is large by design; warning on that known lazy
+    // boundary obscures actionable build diagnostics.
+    chunkSizeWarningLimit: 3000,
     rollupOptions: {
       output: {
         manualChunks(id) {

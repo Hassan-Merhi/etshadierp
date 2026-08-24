@@ -1,12 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
+import { queryClient } from "./queryClient";
 
-let resolvedQueryClient: QueryClient | null = null;
-const queryClientReady = import("./queryClient")
-  .then(({ queryClient }) => {
-    resolvedQueryClient = queryClient;
-    return queryClient;
-  })
-  .catch(() => null);
+const resolvedQueryClient: QueryClient = queryClient;
 
 function resolveUrl(input: RequestInfo | URL): URL | null {
   try {
@@ -47,11 +42,7 @@ function clearProfiledQueries(): void {
     client?.removeQueries({ predicate: isProfiledQuery });
   };
 
-  if (resolvedQueryClient) {
-    clear(resolvedQueryClient);
-    return;
-  }
-  void queryClientReady.then(clear);
+  clear(resolvedQueryClient);
 }
 
 function installNavigationCacheIsolation(): void {

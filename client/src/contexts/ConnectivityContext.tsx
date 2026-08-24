@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useRef, useCallback, type ReactNode } from "react";
 import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
+import { queryClient } from "@/lib/queryClient";
 import {
   getBrowserConnection,
   getConnectivityPollDelay,
@@ -261,7 +262,6 @@ function FullConnectivityProvider({ children }: Props) {
       if (evt.detail.lastSyncedAt) {
         setLastSyncedAt(evt.detail.lastSyncedAt);
         const { upsertGlobalSyncState } = await import("@/lib/db");
-        const { queryClient } = await import("@/lib/queryClient");
         void upsertGlobalSyncState({ lastSyncedAt: evt.detail.lastSyncedAt });
         runWhenIdle(() => {
           // Let in-flight requests land rather than aborting and restarting

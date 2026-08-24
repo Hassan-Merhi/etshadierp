@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { authenticatedUserQueryOptions } from "@/contracts/sessionQueryContracts";
+import { clearBiometricCredentials } from "@/pages/Login";
 
 /**
  * Manages the authenticated user session:
@@ -26,7 +27,6 @@ export function useAuthenticatedUser() {
       await apiRequest("POST", "/api/auth/logout", {});
       queryClient.clear();
       try {
-        const { clearBiometricCredentials } = await import("@/pages/Login");
         await clearBiometricCredentials();
       } catch {
         // Biometric support is optional and must not block logout.
