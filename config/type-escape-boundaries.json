@@ -39,18 +39,8 @@
         0,
         0
       ],
-      "client/src/components/OffloadDialog.tsx": [
-        8,
-        0,
-        0
-      ],
       "client/src/components/PropertiesSidebar.tsx": [
         1,
-        0,
-        0
-      ],
-      "client/src/components/SpOffloadDialog.tsx": [
-        24,
         0,
         0
       ],
@@ -824,78 +814,13 @@
         0,
         0
       ],
-      "client/src/pages/factory/factory-location-inventory/dialogs/FinalizeProformaDialog.tsx": [
-        30,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-location-inventory/dialogs/PrintBarcodesDialog.tsx": [
-        10,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-location-inventory/dialogs/RemoveBalesDialog.tsx": [
-        14,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-location-inventory/dialogs/RenameLocationDialog.tsx": [
-        6,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-proformas/dialogs/AddPriceLineDialog.tsx": [
-        18,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-proformas/dialogs/CreatePendingLoadingDialog.tsx": [
-        7,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-proformas/dialogs/EditPriceLineDialog.tsx": [
-        6,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-proformas/dialogs/ImportProformaExcelDialog.tsx": [
-        1,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-proformas/dialogs/RenameProformaDialog.tsx": [
-        5,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-proformas/dialogs/TransferProformaDialog.tsx": [
-        6,
-        0,
-        0
-      ],
       "client/src/pages/factory/factory-suppliers/BrokerOverviewPanel.tsx": [
         2,
         0,
         0
       ],
-      "client/src/pages/factory/factory-suppliers/SupplierDialogs.tsx": [
-        21,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-suppliers/SupplierFormDialog.tsx": [
-        8,
-        0,
-        0
-      ],
       "client/src/pages/factory/factory-suppliers/SupplierOtherDialogs.tsx": [
-        14,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-suppliers/SupplierPaymentFxDialogs.tsx": [
-        24,
+        1,
         0,
         0
       ],
@@ -909,68 +834,13 @@
         0,
         0
       ],
-      "client/src/pages/factory/factory-worker-detail/dialogs/EndContractDialog.tsx": [
-        21,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-worker-detail/dialogs/GenerateMissingAccountingEntryDialog.tsx": [
-        10,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-worker-detail/dialogs/MarkPayrollPaidDialog.tsx": [
-        10,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factory-worker-detail/dialogs/PayrollDetailDialog.tsx": [
-        5,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/BulkAdvanceDialog.tsx": [
-        22,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/CashAccountAdjustmentDialog.tsx": [
-        13,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/ConfirmRepaymentDialog.tsx": [
-        8,
-        0,
-        0
-      ],
       "client/src/pages/factory/factoryadvancestab/dialogs/PostAccountingPreviewDialog.tsx": [
-        18,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/ReconcileBalancesDialog.tsx": [
-        12,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/RecordAdvanceDialog.tsx": [
-        9,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/RepayByMonthDialog.tsx": [
-        17,
+        6,
         0,
         0
       ],
       "client/src/pages/factory/factoryadvancestab/dialogs/RepaymentAuditDialog.tsx": [
-        22,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/dialogs/ReverseAdvanceDialog.tsx": [
-        3,
+        8,
         0,
         0
       ],
@@ -1214,43 +1084,13 @@
         0,
         0
       ],
-      "client/src/pages/payroll/AdvanceDialogs.tsx": [
-        8,
-        0,
-        0
-      ],
       "client/src/pages/payroll/AdvancesTab.tsx": [
         5,
         0,
         0
       ],
-      "client/src/pages/payroll/BonusDialog.tsx": [
-        8,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/BulkDialogs.tsx": [
-        11,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/BulkPaymentDialog.tsx": [
-        6,
-        0,
-        0
-      ],
       "client/src/pages/payroll/DepositDialog.tsx": [
         2,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/EditEmployeeDialog.tsx": [
-        16,
-        0,
-        0
-      ],
-      "client/src/pages/payroll/EmployeeCrudDialogs.tsx": [
-        12,
         0,
         0
       ],
@@ -1269,23 +1109,13 @@
         0,
         0
       ],
-      "client/src/pages/payroll/WorkerDialogs.tsx": [
-        13,
-        0,
-        0
-      ],
       "client/src/pages/payroll/WorkerProfilesTab.tsx": [
         5,
         1,
         0
       ],
-      "client/src/pages/payroll/WorkersTab.tsx": [
-        12,
-        0,
-        0
-      ],
       "client/src/pages/payroll/WorkersTable.tsx": [
-        3,
+        0,
         3,
         0
       ],
@@ -1845,7 +1675,7 @@
         0
       ],
       "client/src/pages/vouchers/stock-transfer-form/dialogs/ImportTransferExcelDialog.tsx": [
-        25,
+        2,
         0,
         0
       ],
@@ -3987,6 +3817,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 3113
+    "typeEscapeCeiling": 2644
   }
 }

@@ -91,6 +91,60 @@ interface ParentAgentOption {
   account_name: string;
 }
 
+interface SpContainerLine {
+  qty?: string | number | null;
+  unitRateUsd?: string | number | null;
+}
+
+interface SpPrepaidCharge {
+  id: string | number;
+  chargeType: string;
+  amountPaidUsd: string | number;
+}
+
+interface SpOffloadContainer {
+  id: number;
+  supplierName?: string | null;
+  containerNumber?: string | null;
+  invoiceNumber?: string | null;
+  discountPct?: string | number | null;
+  invoiceTotalUsd?: string | number | null;
+  lines?: SpContainerLine[];
+  prepaid?: SpPrepaidCharge[];
+}
+
+interface SpSetupAccount {
+  id: string | number;
+  subType: string;
+  name?: string | null;
+}
+
+interface SpBankAccount {
+  id: string | number;
+  bankName: string;
+}
+
+interface SpSetupStatus {
+  spAccounts?: SpSetupAccount[];
+  bankAccounts?: SpBankAccount[];
+}
+
+interface SpLedgerAccount {
+  id: string | number;
+  code?: string | null;
+  name: string;
+}
+
+interface SpLocationOption {
+  id: string | number;
+  name: string;
+}
+
+interface ParentAgentOption {
+  ledger_account_id: string | number;
+  account_name: string;
+}
+
 interface SpOffloadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;

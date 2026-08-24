@@ -67,6 +67,34 @@ interface ContainerOffloadData {
   charges?: ContainerCharge[];
 }
 
+interface LedgerAccountOption {
+  id: string | number;
+  name: string;
+}
+
+interface SpSetupAccountOption {
+  id: string | number;
+  subType: string;
+  name?: string | null;
+}
+
+interface SpSetupStatusData {
+  spAccounts?: SpSetupAccountOption[];
+}
+
+interface ParentAgentOption {
+  ledger_account_id: string | number;
+  account_name: string;
+}
+
+interface ContainerCharge {
+  amount?: string | number | null;
+}
+
+interface ContainerOffloadData {
+  charges?: ContainerCharge[];
+}
+
 interface AccountComboboxProps {
   value: string;
   onValueChange: (value: string) => void;
