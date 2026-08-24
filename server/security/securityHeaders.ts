@@ -33,9 +33,7 @@ export function buildSecurityHeaderOptions(nodeEnv = process.env.NODE_ENV): Helm
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "blob:", "https:"],
-        connectSrc: isProduction
-          ? ["'self'", "https:", "wss:"]
-          : ["'self'", "http:", "https:", "ws:", "wss:"],
+        connectSrc: isProduction ? ["'self'", "https:", "wss:"] : ["'self'", "http:", "https:", "ws:", "wss:"],
         workerSrc: ["'self'", "blob:"],
         manifestSrc: ["'self'"],
         upgradeInsecureRequests: isProduction ? [] : null,
