@@ -53,6 +53,9 @@ export async function fetchSessionCompany(signal?: AbortSignal): Promise<Session
 }
 
 export function authenticatedUserQueryOptions() {
+  const isLoginRoute =
+    typeof window !== "undefined" &&
+    (window.location.pathname === "/login" || window.location.pathname.startsWith("/login/"));
   return queryOptions({
     queryKey: authenticatedUserQueryKey,
     queryFn: ({ signal }) => fetchAuthenticatedUser(signal),
@@ -66,6 +69,10 @@ export function authenticatedUserQueryOptions() {
     gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
+    // The login page is public. Avoid starting an authenticated session probe
+    // while it is already being displayed; a stale render can otherwise turn
+    // the expected 401 into browser error noise.
+    enabled: !isLoginRoute,
   });
 }
 

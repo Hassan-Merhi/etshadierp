@@ -61,7 +61,7 @@ export function FactoryLocationInventoryLocationView({ inventory }: { inventory:
         </div>
         <div className="border-b px-4 py-4 sm:px-5">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Location Inventory</h2>
+            <div className="text-lg font-semibold tracking-tight">Location Inventory</div>
             <p className="text-xs text-muted-foreground mt-0.5">
               {locations.length} location{locations.length !== 1 ? "s" : ""} available
             </p>

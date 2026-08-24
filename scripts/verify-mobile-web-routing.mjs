@@ -93,7 +93,7 @@ for (const token of [
   'register("/sw.js", { updateViaCache: "none" })',
   'return navigator.serviceWorker.register("/sw.js")',
 ]) {
-  if (!indexHtml.includes(token)) failures.push(`Service-worker registration contract missing: ${token}`);
+  if (!main.includes(token)) failures.push(`Service-worker registration contract missing: ${token}`);
 }
 
 for (const token of [

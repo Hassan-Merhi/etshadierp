@@ -169,7 +169,6 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
     queryKey: transferInventorySource ? [`/api/locations/${transferInventorySource}/inventory`] : [],
     enabled: !!transferInventorySource && transferInventorySource > 0,
   });
-
   useEffect(() => {
     if (isPOS && posSelectedSourceId && posSelectedSourceName) {
       const entries = stockTransferForm.getValues("entries");
@@ -180,11 +179,9 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
       setTransferInventorySource(posSelectedSourceId);
     }
   }, [isPOS, posSelectedSourceId, posSelectedSourceName]); // eslint-disable-line
-
   const filteredTransferInventory = useFilteredTransferInventory(transferInventory, transferSearchTerm);
 
   useTransferRateAutofill(transferEntries, stockTransferForm);
-
   useEffect(() => {
     if (
       stockTransferToEdit &&
@@ -900,5 +897,4 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
     downloadImportTemplate,
   };
 }
-
 export type StockTransferFormModel = ReturnType<typeof useStockTransferFormModel>;

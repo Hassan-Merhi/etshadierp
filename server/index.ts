@@ -20,11 +20,7 @@ import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 import { requestLogger } from "./middleware/requestLogger";
 import { bandwidthDebugMiddleware } from "./middleware/bandwidthDebug";
 import { logger } from "./lib/logger";
-import {
-  startupMigrations,
-  ensureCanonicalStockMovementJournal,
-  ensureFinancialOperationRequests,
-} from "./startup-schema";
+import { startupMigrations, ensureCanonicalStockMovementJournal, ensureFinancialOperationRequests } from "./startup-schema";
 import { registerProcessErrorHandlers } from "./startup/registerProcessErrorHandlers";
 import { runStartupMigrations, warmupDb } from "./startup/runServerStartupMigrations";
 
