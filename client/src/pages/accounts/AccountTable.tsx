@@ -44,13 +44,15 @@ export function AccountTable({
     );
   }, [filteredAccounts, showZeroBalances]);
 
-  const accountIds = new Set(visibleAccounts.map((a) => a.accountId as number));
+  const accountIds = new Set(visibleAccounts.map((a) => a.accountId));
   const parents = visibleAccounts.filter((a) => !a.parentId || !accountIds.has(a.parentId));
   const childrenList = visibleAccounts.filter((a) => a.parentId && accountIds.has(a.parentId));
   const childMap = new Map<number, Account[]>();
-  childrenList.forEach((c) => {
-    if (!childMap.has(c.parentId)) childMap.set(c.parentId, []);
-    childMap.get(c.parentId)!.push(c);
+  childrenList.forEach((child) => {
+    if (child.parentId == null) return;
+    const parentId = child.parentId;
+    if (!childMap.has(parentId)) childMap.set(parentId, []);
+    childMap.get(parentId)!.push(child);
   });
 
   return (
