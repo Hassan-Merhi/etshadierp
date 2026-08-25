@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, CheckCircle2, FileDown, FileSpreadsheet, Loader2 } from "lucide-react";
 import { getErrorDetails } from "@shared/errorUtils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -182,15 +183,22 @@ export function LocationCostPriceOverride({ locations }: LocationCostPriceOverri
 
   return (
     <>
-      <Card className="border-amber-500/40">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-600" />
-            {t("settings.dataTools.costOverride.title")}
-          </CardTitle>
-          <CardDescription>{t("settings.dataTools.costOverride.description")}</CardDescription>
+      <Card className="group flex h-full flex-col overflow-hidden border-amber-500/30 bg-card/80 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-500/50 hover:shadow-md">
+        <CardHeader className="space-y-3 pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <Badge variant="secondary" className="border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300">
+              Developer
+            </Badge>
+          </div>
+          <div className="space-y-1">
+            <CardTitle className="text-base tracking-tight">{t("settings.dataTools.costOverride.title")}</CardTitle>
+            <CardDescription className="text-sm leading-5">{t("settings.dataTools.costOverride.description")}</CardDescription>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="mt-auto space-y-4 pt-1">
           <div className="space-y-2">
             <Label>{t("settings.dataTools.costOverride.selectLocation")}</Label>
             <Select value={locationId} onValueChange={setLocationId}>
@@ -208,7 +216,7 @@ export function LocationCostPriceOverride({ locations }: LocationCostPriceOverri
           </div>
           <Button
             variant="outline"
-            className="w-full"
+            className="h-10 w-full"
             onClick={() => {
               resetDialog();
               setOpen(true);
