@@ -39,6 +39,9 @@ requireMarkers("docs/operations/database-backup-rollback-recovery.md", [
   "verify-database-backup.mjs",
   "Restore rehearsal on a disposable database",
   "/api/health/ready",
+  "Repository rehearsal objectives",
+  "critical-row fingerprint",
+  "Production RPO and RTO",
 ]);
 
 requireMarkers(".github/workflows/resilience-rehearsal.yml", [
@@ -49,6 +52,26 @@ requireMarkers(".github/workflows/resilience-rehearsal.yml", [
   "verify-ci-disposable-schema.mjs",
   "ENABLE_SCHEDULERS: \"false\"",
   "scheduler-tick-guard.test.ts",
+  "schedule:",
+  "source-critical-counts.tsv",
+  "restore-critical-counts.tsv",
+  "resilience-evidence.json",
+  "DR_REHEARSAL_RTO_SECONDS",
+  "verify-phase11-12-observability-disaster-recovery.mjs",
+]);
+
+requireMarkers(".github/workflows/exact-main-certification.yml", [
+  "exact-main-source-critical-counts.tsv",
+  "exact-main-restore-critical-counts.tsv",
+  "DR_REHEARSAL_RTO_SECONDS",
+  "verify-phase11-12-observability-disaster-recovery.mjs",
+]);
+
+requireMarkers("scripts/verify-phase11-12-observability-disaster-recovery.mjs", [
+  "Phase 11/12 observability and disaster-recovery contracts verified.",
+  "source-critical-counts.tsv",
+  "resilience-evidence.json",
+  "DR_REHEARSAL_RTO_SECONDS",
 ]);
 
 requireMarkers("tests/scheduler-tick-guard.test.ts", [
