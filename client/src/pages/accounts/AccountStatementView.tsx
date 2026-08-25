@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type { Dispatch, RefObject, SetStateAction } from "react";
 import {
   FileText,
   TrendingUp,
@@ -18,9 +19,51 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PeriodFilter } from "@/components/ui/period-filter";
-import { AccountStatementViewProps } from "./accountTypes";
+import type { PeriodFilterValue } from "@/components/ui/period-filter";
+import type { Account, Transaction, WaRule } from "./accountTypes";
 import { AccountTransactionRows } from "./AccountTransactionRows";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+
+interface AccountStatementRow extends Transaction {
+  totalDebit: number;
+  totalCredit: number;
+  runningBalance: number;
+}
+
+interface StatementSendMutation {
+  isPending: boolean;
+  mutate: (input: { accountId: number; month: string }) => void;
+}
+
+interface AccountStatementViewProps {
+  selectedAccount: Account;
+  onClose: () => void;
+  periodFilter: PeriodFilterValue;
+  setPeriodFilter: Dispatch<SetStateAction<PeriodFilterValue>>;
+  vouchersWithBalance: AccountStatementRow[];
+  closingBalance: number;
+  openingBalance: number;
+  transactionsLoading: boolean;
+  transactionError?: string | null;
+  selectedVoucherIds: Set<number>;
+  toggleSelectAll: () => void;
+  setShowBulkDeleteConfirm: Dispatch<SetStateAction<boolean>>;
+  showDeletedVouchers: boolean;
+  setShowDeletedVouchers: Dispatch<SetStateAction<boolean>>;
+  formatAmount: (amt: number) => string;
+  hideBalances: boolean;
+  printRef: RefObject<HTMLDivElement | null>;
+  appMode: string;
+  formatDisplayDate: (date: Date | string) => string;
+  toggleVoucherSelection: (id: number) => void;
+  handleOpenVoucher: (voucher: AccountStatementRow) => void;
+  waRule: WaRule | null;
+  openWaRuleDialog: () => void;
+  sendWaStatementMutation: StatementSendMutation;
+  isBrokerSupplier: boolean;
+  factoryStatementLoading: boolean;
+  brokerStatementLoading: boolean;
+}
 
 export function AccountStatementView({
   selectedAccount,
@@ -36,7 +79,6 @@ export function AccountStatementView({
   setShowBulkDeleteConfirm,
   showDeletedVouchers,
   setShowDeletedVouchers,
-  currentUser: _currentUser,
   formatAmount,
   hideBalances,
   printRef,
@@ -47,10 +89,7 @@ export function AccountStatementView({
   openWaRuleDialog,
   waRule,
   sendWaStatementMutation,
-  handlePrint: _handlePrint,
   isBrokerSupplier,
-  brokerStatementData: _brokerStatementData,
-  factorySupplierStatement: _factorySupplierStatement,
   factoryStatementLoading,
   brokerStatementLoading,
   transactionError,
@@ -166,12 +205,12 @@ export function AccountStatementView({
                 <Button
                   size="icon"
                   variant="ghost"
-                  disabled={sendWaStatementMutation?.isPending}
+                  disabled={sendWaStatementMutation.isPending}
                   onClick={() => {
                     const month = periodFilter?.toDate
                       ? periodFilter.toDate.substring(0, 7)
                       : new Date().toISOString().substring(0, 7);
-                    sendWaStatementMutation?.mutate({
+                    sendWaStatementMutation.mutate({
                       accountId: selectedAccount.accountId,
                       month,
                     });
@@ -179,7 +218,7 @@ export function AccountStatementView({
                   title="Send statement via WhatsApp"
                   data-testid="button-wa-send"
                 >
-                  {sendWaStatementMutation?.isPending ? (
+                  {sendWaStatementMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Send className="h-4 w-4 text-green-500" />
