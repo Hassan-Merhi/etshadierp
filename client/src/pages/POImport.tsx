@@ -1,6 +1,7 @@
 import type { ClientErrorLike } from "@/lib/clientError";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 
 const formatCurrency = (num: number) => {
@@ -95,6 +96,7 @@ function SupplierCombobox({
 }
 
 export default function POImport() {
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [file, setFile] = useState<File | null>(null);
@@ -190,6 +192,7 @@ export default function POImport() {
         description: `Container ${data.containerNumber} imported with ${data.itemsCount} items`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
+      navigate("/containers");
     },
     onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
