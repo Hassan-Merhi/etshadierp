@@ -11,9 +11,13 @@ import { getClientDate } from "../../../lib/dateUtils";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { adjustInventory } from "../../../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../../services/inventory/stockMovementIntegrityService";
 import { writeDaybookEntry, verifySupervisorPassword } from "../_helpers";
 import { factoryBaleProducts, factoryBales, stockItems, users, userCompanyRoles } from "@shared/schema";
 import { eq, and, inArray } from "drizzle-orm";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerFactoryStockRemovalRoutes(app: Express) {
   app.post("/api/factory/stock-entry/remove", requireAuth, async (req: Request, res: Response) => {
@@ -106,7 +110,30 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
               }
 
               if (erpStockItemId) {
-                await adjustInventory(tx, bale.erpLocationId!, erpStockItemId, -1, companyId);
+                const adjustment = await adjustInventory(tx, bale.erpLocationId!, erpStockItemId, -1, companyId);
+                await postStockMovementTx(
+                  tx,
+                  {
+                    companyId,
+                    stockItemId: erpStockItemId,
+                    kind: "adjustment",
+                    quantity: "1",
+                    unitCost: String(adjustment.averageRate),
+                    fromLocationId: bale.erpLocationId,
+                    occurredAt: now.toISOString(),
+                    source: {
+                      sourceType: "factory_bale_removal",
+                      sourceId: String(bale.id),
+                      idempotencyKey: `factory-bale-removal:${companyId}:${bale.id}`,
+                    },
+                    actor: {
+                      userId: supervisor.id,
+                      username: supervisorUsername,
+                      reason: reason || "Factory bale stock removal",
+                    },
+                  },
+                  canonicalStockMovementAdapter,
+                );
               }
             }
           }
@@ -216,7 +243,30 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
             productName: factoryProduct?.name || factoryProduct?.articleCode || "Unknown",
           });
           if (erpStockItemId) {
-            await adjustInventory(tx, bale.erpLocationId!, erpStockItemId, -1, companyId);
+            const adjustment = await adjustInventory(tx, bale.erpLocationId!, erpStockItemId, -1, companyId);
+            await postStockMovementTx(
+              tx,
+              {
+                companyId,
+                stockItemId: erpStockItemId,
+                kind: "adjustment",
+                quantity: "1",
+                unitCost: String(adjustment.averageRate),
+                fromLocationId: bale.erpLocationId,
+                occurredAt: now.toISOString(),
+                source: {
+                  sourceType: "factory_bale_removal",
+                  sourceId: String(bale.id),
+                  idempotencyKey: `factory-bale-removal:${companyId}:${bale.id}`,
+                },
+                actor: {
+                  userId: supervisor.id,
+                  username: supervisorUsername,
+                  reason: reason || "Factory bale stock removal",
+                },
+              },
+              canonicalStockMovementAdapter,
+            );
           }
         }
         return { removed: removedBales };
