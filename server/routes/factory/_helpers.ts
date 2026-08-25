@@ -281,11 +281,11 @@ export async function recalculateOrderTotals(dbConn: DatabaseOrTransaction, orde
 
   const charges = await dbConn.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
   const freightAmount = charges
-    .filter((c: any) => c.chargeType === "FREIGHT")
-    .reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
+    .filter((c) => c.chargeType === "FREIGHT")
+    .reduce((sum: number, c) => sum + parseFloat(c.amount), 0);
   const otherChargesTotal = charges
-    .filter((c: any) => c.chargeType === "OTHER")
-    .reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
+    .filter((c) => c.chargeType === "OTHER")
+    .reduce((sum: number, c) => sum + parseFloat(c.amount), 0);
 
   // For per_kg articles: always use proformaRate × totalWeight as the authoritative price.
   // This matches the totalPrice stored in the order lines above and the verify-page display.
@@ -407,7 +407,7 @@ export async function recalculateContainerCosts(
         eq(factoryOffloadAdditionalCharges.companyId, companyId)
       )
     );
-  const additionalTotal = additionalCharges.reduce((sum: number, c: any) => {
+  const additionalTotal = additionalCharges.reduce((sum: number, c) => {
     const amt = parseFloat(c.amount || "0");
     const ccy = c.currencyCode || containerCcy;
     const cfx = parseFloat(c.fxRateToUsd || String(fxRate));
@@ -470,8 +470,8 @@ export async function recalculateContainerCosts(
         .select()
         .from(factoryMixBatchSources)
         .where(eq(factoryMixBatchSources.mixBatchId, batchId));
-      const batchTotalCost = allSrc.reduce((s: number, r: any) => s + parseFloat(r.totalCost || "0"), 0);
-      const batchTotalWeight = allSrc.reduce((s: number, r: any) => s + parseFloat(r.weightKg || "0"), 0);
+      const batchTotalCost = allSrc.reduce((s: number, r) => s + parseFloat(r.totalCost || "0"), 0);
+      const batchTotalWeight = allSrc.reduce((s: number, r) => s + parseFloat(r.weightKg || "0"), 0);
       const batchCostPerKg = batchTotalWeight > 0 ? batchTotalCost / batchTotalWeight : 0;
       await tx
         .update(factoryMixBatches)
@@ -493,10 +493,10 @@ export async function recalculateContainerCosts(
  * Use in POST handlers that aren't covered by the global PUT/PATCH/DELETE guard:
  *   if (!checkFactoryAdmin(req, res)) return;
  */
-export function checkFactoryAdmin(req: any, res: import("express").Response): boolean {
+export function checkFactoryAdmin(req: import("express").Request, res: import("express").Response): boolean {
   const role = req.session?.currentRole as string | undefined;
   if (["Admin", "Owner", "Developer"].includes(role || "")) return true;
-  const overrideUntil = req.session?.factoryAdminOverrideUntil as number | undefined;
+  const overrideUntil = req.session?.factoryAdminOverrideUntil;
   if (overrideUntil && Date.now() < overrideUntil) return true;
   res.status(403).json({
     message: "Admin authorization required for this action.",

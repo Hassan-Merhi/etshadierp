@@ -137,7 +137,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: RequestHandler,
     try {
       const context = await getActiveCompanyPermissionContext(req);
       if (["Admin", "Owner", "Developer"].includes(context.role)) return next();
-      const overrideUntil = req.session?.factoryAdminOverrideUntil as number | undefined;
+      const overrideUntil = req.session?.factoryAdminOverrideUntil;
       if (overrideUntil && Date.now() < overrideUntil) return next();
       return res.status(403).json({
         message: "Admin authorization required for this action.",
