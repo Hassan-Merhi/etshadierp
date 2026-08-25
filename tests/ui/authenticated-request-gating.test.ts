@@ -52,12 +52,26 @@ describe("authenticated request gating", () => {
   });
 
   it("keeps the unauthenticated login entry path quiet without hiding real API failures", () => {
-    const authHook = source("client/src/app/useAuthenticatedUser.ts");
     const languageProvider = source("client/src/contexts/ApplicationLanguageContext.tsx");
     const app = source("client/src/App.tsx");
 
-    expect(authHook).toContain('window.location.pathname === "/login"');
-    expect(authHook).toContain("enabled: !isLoginRoute");
+    // Asserted through the contract rather than the source of
+    // useAuthenticatedUser.ts. That file only *describes* the guard in a
+    // comment — the implementation is authenticatedUserQueryOptions() — so a
+    // toContain against it matched the comment and would have kept passing if
+    // the guard itself were deleted.
+    const originalPath = window.location.pathname;
+    try {
+      window.history.replaceState({}, "", "/login");
+      expect(authenticatedUserQueryOptions().enabled).toBe(false);
+      window.history.replaceState({}, "", "/login/reset");
+      expect(authenticatedUserQueryOptions().enabled).toBe(false);
+      window.history.replaceState({}, "", "/dashboard");
+      expect(authenticatedUserQueryOptions().enabled).toBe(true);
+    } finally {
+      window.history.replaceState({}, "", originalPath);
+    }
+
     expect(languageProvider).toContain("enabled: !isLoginRoute");
     expect(app).toContain('<Route path="/login">');
     expect(app).toContain("<Login />");
