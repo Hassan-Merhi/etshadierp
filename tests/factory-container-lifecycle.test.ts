@@ -7,19 +7,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
 import { and, eq } from "drizzle-orm";
-import {
-  cleanupTestData,
-  closeTestServer,
-  seedTestData,
-  type TestContext,
-} from "./setup";
+import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 import { db, pool } from "../server/db";
 import * as schema from "../shared/schema";
-import {
-  spContainerLines,
-  spContainers,
-  spOffloads,
-} from "../shared/schema/sp";
+import { spContainerLines, spContainers, spOffloads } from "../shared/schema/sp";
 
 const RUN_ID = Date.now().toString(36);
 const TEST_PREFIX = `facttest-${RUN_ID}`;
@@ -42,7 +33,7 @@ async function cleanupSpTables(companyId: number): Promise<void> {
     `DELETE FROM sp_offload_charges WHERE offload_id IN (
        SELECT id FROM sp_offloads WHERE company_id = $1
      )`,
-    [companyId],
+    [companyId]
   );
   await pool.query(`DELETE FROM sp_offloads WHERE company_id = $1`, [companyId]);
   await pool.query(`DELETE FROM sp_container_lines WHERE company_id = $1`, [companyId]);
@@ -52,7 +43,7 @@ async function cleanupSpTables(companyId: number): Promise<void> {
 async function offloadCount(): Promise<number> {
   const result = await pool.query<{ count: string }>(
     `SELECT COUNT(*)::text AS count FROM sp_offloads WHERE company_id = $1 AND container_id = $2`,
-    [spCompanyId, createdContainerId],
+    [spCompanyId, createdContainerId]
   );
   return Number(result.rows[0]?.count ?? 0);
 }
@@ -65,8 +56,8 @@ async function inventoryQuantity(): Promise<number> {
       and(
         eq(schema.inventory.companyId, spCompanyId),
         eq(schema.inventory.locationId, spLocationId),
-        eq(schema.inventory.stockItemId, spStockItemId),
-      ),
+        eq(schema.inventory.stockItemId, spStockItemId)
+      )
     )
     .limit(1);
   return Number(row?.quantity ?? 0);
@@ -147,7 +138,7 @@ afterAll(async () => {
     await cleanupSpTables(spCompanyId);
     await pool.query(
       `DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`,
-      [spCompanyId],
+      [spCompanyId]
     );
     await pool.query(`DELETE FROM vouchers WHERE company_id = $1`, [spCompanyId]);
     await pool.query(`DELETE FROM canonical_stock_movement_audit WHERE company_id = $1`, [spCompanyId]);
@@ -216,10 +207,7 @@ describe("SP container creation", () => {
     createdContainerId = response.body.id;
     expect(createdContainerId).toBeDefined();
 
-    const [container] = await db
-      .select()
-      .from(spContainers)
-      .where(eq(spContainers.id, createdContainerId));
+    const [container] = await db.select().from(spContainers).where(eq(spContainers.id, createdContainerId));
     expect(container.status).toBe("open");
     expect(container.goodsOtwVoucherId).not.toBeNull();
 
@@ -228,15 +216,12 @@ describe("SP container creation", () => {
               COALESCE(SUM(credit_amount::numeric), 0) AS cr
        FROM voucher_entries
        WHERE voucher_id = $1`,
-      [container.goodsOtwVoucherId],
+      [container.goodsOtwVoucherId]
     );
     expect(Number(totals.rows[0].dr)).toBeCloseTo(INVOICE_TOTAL, 0);
     expect(Number(totals.rows[0].dr)).toBeCloseTo(Number(totals.rows[0].cr), 2);
 
-    const [line] = await db
-      .select()
-      .from(spContainerLines)
-      .where(eq(spContainerLines.containerId, createdContainerId));
+    const [line] = await db.select().from(spContainerLines).where(eq(spContainerLines.containerId, createdContainerId));
     expect(Number(line.qty)).toBeCloseTo(CONTAINER_QTY, 1);
     expect(line.stockItemId).toBe(spStockItemId);
   });
@@ -259,16 +244,13 @@ describe("SP container offload", () => {
     });
     expect(response.status).toBe(200);
 
-    const [offload] = await db
-      .select()
-      .from(spOffloads)
-      .where(eq(spOffloads.containerId, createdContainerId));
+    const [offload] = await db.select().from(spOffloads).where(eq(spOffloads.containerId, createdContainerId));
     expect(offload).toBeDefined();
     expect(Number(offload.totalQty)).toBeCloseTo(CONTAINER_QTY, 1);
     expect(Number(offload.totalBaseCostUsd)).toBeCloseTo(CONTAINER_QTY * UNIT_RATE, 0);
 
     offloadVoucherIds = [offload.voucherIdReversal, offload.voucherIdStock].filter(
-      (id): id is number => Number.isInteger(id),
+      (id): id is number => Number.isInteger(id)
     );
     expect(offloadVoucherIds.length).toBeGreaterThan(0);
     for (const voucherId of offloadVoucherIds) {
@@ -277,15 +259,12 @@ describe("SP container offload", () => {
                 COALESCE(SUM(credit_amount::numeric), 0) AS cr
          FROM voucher_entries
          WHERE voucher_id = $1`,
-        [voucherId],
+        [voucherId]
       );
       expect(Number(totals.rows[0].dr)).toBeCloseTo(Number(totals.rows[0].cr), 2);
     }
 
-    const [container] = await db
-      .select()
-      .from(spContainers)
-      .where(eq(spContainers.id, createdContainerId));
+    const [container] = await db.select().from(spContainers).where(eq(spContainers.id, createdContainerId));
     expect(container.status).toBe("offloaded");
 
     const [inventory] = await db
@@ -295,8 +274,8 @@ describe("SP container offload", () => {
         and(
           eq(schema.inventory.companyId, spCompanyId),
           eq(schema.inventory.locationId, spLocationId),
-          eq(schema.inventory.stockItemId, spStockItemId),
-        ),
+          eq(schema.inventory.stockItemId, spStockItemId)
+        )
       )
       .limit(1);
     expect(Number(inventory.quantity)).toBeCloseTo(CONTAINER_QTY, 1);
