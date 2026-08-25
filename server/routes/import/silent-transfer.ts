@@ -4,6 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
+import { randomUUID } from "node:crypto";
 import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -15,6 +16,10 @@ import { inventory } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, writeWorkbook } from "../../excelHelper";
 import { adjustInventory } from "../../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerSilentTransferRoutes(app: Express) {
   // Template download
@@ -176,13 +181,38 @@ export function registerSilentTransferRoutes(app: Express) {
       const dstId = parseInt(destinationLocationId);
       if (srcId === dstId) return res.status(400).json({ message: "Source and destination must be different" });
 
+      const operationId = randomUUID();
+      const occurredAt = new Date().toISOString();
+
       await db.transaction(async (tx) => {
-        for (const item of items) {
+        for (let index = 0; index < items.length; index++) {
+          const item = items[index];
           const qty = parseFloat(item.quantity);
-          const rate = parseFloat(item.averageRate || "0");
+          const parsedRate = parseFloat(item.averageRate || "0");
+          const rate = Number.isFinite(parsedRate) && parsedRate >= 0 ? parsedRate : 0;
           if (qty <= 0) continue;
           await adjustInventory(tx, srcId, item.stockItemId, -qty, companyId);
           await adjustInventory(tx, dstId, item.stockItemId, qty, companyId, rate);
+          await postStockMovementTx(
+            tx,
+            {
+              companyId,
+              stockItemId: item.stockItemId,
+              kind: "transfer",
+              quantity: String(qty),
+              unitCost: String(rate),
+              fromLocationId: srcId,
+              toLocationId: dstId,
+              occurredAt,
+              source: {
+                sourceType: "silent_transfer_import",
+                sourceId: operationId,
+                idempotencyKey: `silent-transfer:${companyId}:${operationId}:${index}:${item.stockItemId}`,
+              },
+              allowNegativeStock: true,
+            },
+            canonicalStockMovementAdapter
+          );
         }
       });
 
