@@ -26,9 +26,16 @@ export async function applyVoucherOptionalInventoryChange(
 ): Promise<void> {
   if (voucher.optional === willBeOptional) return;
 
-  const revision = await nextCanonicalSourceRevision(tx, voucher.companyId, "voucher-optional-toggle", String(voucher.id));
+  const revision = await nextCanonicalSourceRevision(
+    tx,
+    voucher.companyId,
+    "voucher-optional-toggle",
+    String(voucher.id)
+  );
   const occurredAt = new Date().toISOString();
-  const evidenceActor = actor ?? { reason: `${willBeOptional ? "Suspend" : "Activate"} voucher ${voucher.voucherNumber}` };
+  const evidenceActor = actor ?? {
+    reason: `${willBeOptional ? "Suspend" : "Activate"} voucher ${voucher.voucherNumber}`,
+  };
 
   const [transfer] = await tx
     .select()
@@ -108,7 +115,10 @@ export async function applyVoucherOptionalInventoryChange(
     .where(eq(stockAdjustmentVouchers.voucherId, voucher.id))
     .limit(1);
   if (adjustment) {
-    const items = await tx.select().from(stockAdjustmentItems).where(eq(stockAdjustmentItems.adjustmentId, adjustment.id));
+    const items = await tx
+      .select()
+      .from(stockAdjustmentItems)
+      .where(eq(stockAdjustmentItems.adjustmentId, adjustment.id));
     for (const item of items) {
       const rawQuantity = parseFloat(item.quantity);
       const quantity = Math.abs(rawQuantity);

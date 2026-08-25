@@ -85,7 +85,10 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
       const _oldPOItems = await db.select().from(poLineItems).where(eq(poLineItems.poId, po.id));
       await db.delete(poLineItems).where(eq(poLineItems.poId, po.id));
       await db.insert(poLineItems).values(poItemsData);
-      await db.update(purchaseOrders).set({ itemsTotal: totalAmount.toFixed(2) }).where(eq(purchaseOrders.id, po.id));
+      await db
+        .update(purchaseOrders)
+        .set({ itemsTotal: totalAmount.toFixed(2) })
+        .where(eq(purchaseOrders.id, po.id));
 
       const [container] = await db.select().from(containers).where(eq(containers.id, po.containerId)).limit(1);
       if (container) {
@@ -114,8 +117,20 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
         if (existingVoucher.description !== updated[0].description)
           _purChanges.description = { old: existingVoucher.description ?? "", new: updated[0].description ?? "" };
         const _itemDiff = await buildItemLevelChanges(
-          _oldPOItems.map((it) => ({ stockItemId: it.stockItemId, itemName: it.itemName, quantity: it.quantity, rate: it.rate, lineTotal: it.lineTotal })),
-          poItemsData.map((it) => ({ stockItemId: it.stockItemId, itemName: it.itemName, quantity: it.quantity, rate: it.rate, lineTotal: it.lineTotal }))
+          _oldPOItems.map((it) => ({
+            stockItemId: it.stockItemId,
+            itemName: it.itemName,
+            quantity: it.quantity,
+            rate: it.rate,
+            lineTotal: it.lineTotal,
+          })),
+          poItemsData.map((it) => ({
+            stockItemId: it.stockItemId,
+            itemName: it.itemName,
+            quantity: it.quantity,
+            rate: it.rate,
+            lineTotal: it.lineTotal,
+          }))
         );
         await logAudit({
           userId: req.session.userId!,
@@ -149,7 +164,9 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
       const existingVoucher = await storage.getVoucherById(id);
       if (!existingVoucher) return res.status(404).json({ message: "Voucher not found" });
       if (!["Consumption", "Production", "Mixed"].includes(existingVoucher.voucherType)) {
-        return res.status(400).json({ message: "This endpoint only updates Consumption, Production, or Mixed vouchers" });
+        return res
+          .status(400)
+          .json({ message: "This endpoint only updates Consumption, Production, or Mixed vouchers" });
       }
       if (existingVoucher.companyId !== req.session.currentCompanyId) {
         return res.status(403).json({ message: "Access denied: Voucher belongs to a different company" });
@@ -180,7 +197,10 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
         .limit(1)
         .then((rows) => rows[0]);
       const _oldAdjItems = adjustmentVoucher
-        ? await db.select().from(stockAdjustmentItems).where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id))
+        ? await db
+            .select()
+            .from(stockAdjustmentItems)
+            .where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id))
         : [];
       if (!adjustmentVoucher) {
         let adjustmentType = "production";
@@ -215,7 +235,12 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
           .from(stockAdjustmentItems)
           .where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
         const oldLocationId = adjustmentVoucher.locationId;
-        const revision = await nextCanonicalSourceRevision(tx, existingVoucher.companyId, "voucher-adjustment-edit", String(id));
+        const revision = await nextCanonicalSourceRevision(
+          tx,
+          existingVoucher.companyId,
+          "voucher-adjustment-edit",
+          String(id)
+        );
         const occurredAt = new Date().toISOString();
         const actor = {
           userId: req.session.userId,
@@ -308,10 +333,21 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
           _adjChanges.location = { old: existingVoucher.locationId, new: updated.locationId };
         if ((existingVoucher.description ?? "") !== (updated.description ?? ""))
           _adjChanges.description = { old: existingVoucher.description ?? "", new: updated.description ?? "" };
-        const _resolveAdjName = async (itemId: number) => (await storage.getStockItemById(itemId))?.name ?? `Item #${itemId}`;
+        const _resolveAdjName = async (itemId: number) =>
+          (await storage.getStockItemById(itemId))?.name ?? `Item #${itemId}`;
         const _adjItemDiff = await buildItemLevelChanges(
-          _oldAdjItems.map((it) => ({ stockItemId: it.stockItemId, quantity: it.quantity, rate: it.rate, totalAmount: it.totalAmount })),
-          adjustmentItemsData.map((it) => ({ stockItemId: it.stockItemId, quantity: it.quantity, rate: it.rate, totalAmount: it.totalAmount })),
+          _oldAdjItems.map((it) => ({
+            stockItemId: it.stockItemId,
+            quantity: it.quantity,
+            rate: it.rate,
+            totalAmount: it.totalAmount,
+          })),
+          adjustmentItemsData.map((it) => ({
+            stockItemId: it.stockItemId,
+            quantity: it.quantity,
+            rate: it.rate,
+            totalAmount: it.totalAmount,
+          })),
           _resolveAdjName
         );
         await logAudit({

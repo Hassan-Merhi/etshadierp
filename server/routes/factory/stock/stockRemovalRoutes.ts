@@ -147,7 +147,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
                     },
                     allowNegativeStock: true,
                   },
-                  canonicalStockMovementAdapter,
+                  canonicalStockMovementAdapter
                 );
               }
             }
@@ -295,7 +295,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
                 },
                 allowNegativeStock: true,
               },
-              canonicalStockMovementAdapter,
+              canonicalStockMovementAdapter
             );
           }
         }

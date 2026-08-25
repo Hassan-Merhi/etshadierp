@@ -373,142 +373,150 @@ export function registerBalesReimportRoutes(app: Express) {
   });
 
   // GET /api/factory/bales/export-names.xlsx — Export all bales for bulk product-name editing
-  app.get("/api/factory/bales/export-names.xlsx", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
-    try {
-      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-      const bales = await db
-        .select()
-        .from(factoryBales)
-        .where(eq(factoryBales.companyId, companyId))
-        .orderBy(factoryBales.id);
-
-      const ExcelJS = (await import("exceljs")).default;
-      const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet("Bales");
-
-      sheet.columns = [
-        { header: "ID (do not edit)", key: "id", width: 18 },
-        { header: "Bale Code", key: "baleCode", width: 18 },
-        { header: "Reference Number", key: "referenceNumber", width: 22 },
-        { header: "Category", key: "category", width: 16 },
-        { header: "Grade", key: "grade", width: 12 },
-        { header: "Product Name", key: "productName", width: 30 },
-      ];
-
-      const headerRow = sheet.getRow(1);
-      headerRow.eachCell((cell) => {
-        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF374151" } };
-      });
-      const idHeaderCell = sheet.getCell("A1");
-      idHeaderCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF6B7280" } };
-
-      for (const bale of bales) {
-        const row = sheet.addRow({
-          id: bale.id,
-          baleCode: bale.baleCode,
-          referenceNumber: bale.referenceNumber,
-          category: bale.category ?? "",
-          grade: bale.grade ?? "",
-          productName: bale.productName ?? "",
-        });
-        const idCell = row.getCell("id");
-        idCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
-        idCell.font = { color: { argb: "FF6B7280" } };
-      }
-
-      sheet.protect("", { selectLockedCells: true, selectUnlockedCells: true });
-
-      const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
-      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="bale_names_${companyId}.xlsx"`);
-      res.setHeader("Content-Length", xlsBuffer.byteLength);
-      res.end(xlsBuffer);
-    } catch (error: unknown) {
-      logger.error("Error exporting bale names:", { error: error });
-      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
-    }
-  });
-
-  // POST /api/factory/bales/bulk-update-names — Upload Excel and update product_name in bulk
-  app.post("/api/factory/bales/bulk-update-names", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
-    const multer = (await import("multer")).default;
-    const upload = multer({ storage: multer.memoryStorage() });
-    upload.single("file")(req, res, async (err: string) => {
-      if (err) return res.status(400).json({ message: "File upload error" });
-      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-
+  app.get(
+    "/api/factory/bales/export-names.xlsx",
+    requireAuth,
+    async (req: import("express").Request, res: import("express").Response) => {
       try {
         const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-        const { read: readXlsx, utils } = await import("xlsx-js-style");
-        const wb = readXlsx(req.file.buffer, { type: "buffer" });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        const rows: any[] = utils.sheet_to_json(sheet, { defval: "" });
+        const bales = await db
+          .select()
+          .from(factoryBales)
+          .where(eq(factoryBales.companyId, companyId))
+          .orderBy(factoryBales.id);
 
-        let updated = 0;
-        let skipped = 0;
-        const errors: string[] = [];
+        const ExcelJS = (await import("exceljs")).default;
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet("Bales");
 
-        for (const row of rows) {
-          const id = parseInt(row["ID (do not edit)"] ?? row["id"] ?? row["ID"]);
-          const productName = String(row["Product Name"] ?? row["productName"] ?? "").trim();
+        sheet.columns = [
+          { header: "ID (do not edit)", key: "id", width: 18 },
+          { header: "Bale Code", key: "baleCode", width: 18 },
+          { header: "Reference Number", key: "referenceNumber", width: 22 },
+          { header: "Category", key: "category", width: 16 },
+          { header: "Grade", key: "grade", width: 12 },
+          { header: "Product Name", key: "productName", width: 30 },
+        ];
 
-          if (!id || isNaN(id)) {
-            skipped++;
-            continue;
-          }
-          if (!productName) {
-            skipped++;
-            continue;
-          }
+        const headerRow = sheet.getRow(1);
+        headerRow.eachCell((cell) => {
+          cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF374151" } };
+        });
+        const idHeaderCell = sheet.getCell("A1");
+        idHeaderCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF6B7280" } };
 
-          const [bale] = await db
-            .select()
-            .from(factoryBales)
-            .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
-
-          if (!bale) {
-            errors.push(`Bale ID ${id} not found`);
-            skipped++;
-            continue;
-          }
-
-          if (bale.productId) {
-            await db
-              .update(factoryBaleProducts)
-              .set({ name: productName, updatedAt: new Date() })
-              .where(and(eq(factoryBaleProducts.id, bale.productId), eq(factoryBaleProducts.companyId, companyId)));
-          }
-
-          await db.update(factoryBales).set({ productName, updatedAt: new Date() }).where(eq(factoryBales.id, id));
-
-          updated++;
+        for (const bale of bales) {
+          const row = sheet.addRow({
+            id: bale.id,
+            baleCode: bale.baleCode,
+            referenceNumber: bale.referenceNumber,
+            category: bale.category ?? "",
+            grade: bale.grade ?? "",
+            productName: bale.productName ?? "",
+          });
+          const idCell = row.getCell("id");
+          idCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+          idCell.font = { color: { argb: "FF6B7280" } };
         }
+
+        sheet.protect("", { selectLockedCells: true, selectUnlockedCells: true });
+
+        const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        res.setHeader("Content-Disposition", `attachment; filename="bale_names_${companyId}.xlsx"`);
+        res.setHeader("Content-Length", xlsBuffer.byteLength);
+        res.end(xlsBuffer);
+      } catch (error: unknown) {
+        logger.error("Error exporting bale names:", { error: error });
+        if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
+      }
+    }
+  );
+
+  // POST /api/factory/bales/bulk-update-names — Upload Excel and update product_name in bulk
+  app.post(
+    "/api/factory/bales/bulk-update-names",
+    requireAuth,
+    async (req: import("express").Request, res: import("express").Response) => {
+      const multer = (await import("multer")).default;
+      const upload = multer({ storage: multer.memoryStorage() });
+      upload.single("file")(req, res, async (err: string) => {
+        if (err) return res.status(400).json({ message: "File upload error" });
+        if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
         try {
-          await logAudit({
-            userId: req.session.userId!,
-            username: req.session.username || req.session.userId!,
-            companyId,
-            action: "update",
-            tableName: "factory_bales",
-            recordId: null,
-            recordIdentifier: `bulk-rename: ${updated} bale(s) updated, ${skipped} skipped`,
-            changes: null,
-          });
-        } catch (auditErr) {
-          logger.error("[bulk-update-names audit] non-fatal:", { error: auditErr });
-        }
+          const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
+          if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-        res.json({ updated, skipped, errors });
-      } catch (error: unknown) {
-        logger.error("Error bulk-updating bale names:", { error: error });
-        res.status(500).json({ message: getErrorMessage(error) });
-      }
-    });
-  });
+          const { read: readXlsx, utils } = await import("xlsx-js-style");
+          const wb = readXlsx(req.file.buffer, { type: "buffer" });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const rows: any[] = utils.sheet_to_json(sheet, { defval: "" });
+
+          let updated = 0;
+          let skipped = 0;
+          const errors: string[] = [];
+
+          for (const row of rows) {
+            const id = parseInt(row["ID (do not edit)"] ?? row["id"] ?? row["ID"]);
+            const productName = String(row["Product Name"] ?? row["productName"] ?? "").trim();
+
+            if (!id || isNaN(id)) {
+              skipped++;
+              continue;
+            }
+            if (!productName) {
+              skipped++;
+              continue;
+            }
+
+            const [bale] = await db
+              .select()
+              .from(factoryBales)
+              .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
+
+            if (!bale) {
+              errors.push(`Bale ID ${id} not found`);
+              skipped++;
+              continue;
+            }
+
+            if (bale.productId) {
+              await db
+                .update(factoryBaleProducts)
+                .set({ name: productName, updatedAt: new Date() })
+                .where(and(eq(factoryBaleProducts.id, bale.productId), eq(factoryBaleProducts.companyId, companyId)));
+            }
+
+            await db.update(factoryBales).set({ productName, updatedAt: new Date() }).where(eq(factoryBales.id, id));
+
+            updated++;
+          }
+
+          try {
+            await logAudit({
+              userId: req.session.userId!,
+              username: req.session.username || req.session.userId!,
+              companyId,
+              action: "update",
+              tableName: "factory_bales",
+              recordId: null,
+              recordIdentifier: `bulk-rename: ${updated} bale(s) updated, ${skipped} skipped`,
+              changes: null,
+            });
+          } catch (auditErr) {
+            logger.error("[bulk-update-names audit] non-fatal:", { error: auditErr });
+          }
+
+          res.json({ updated, skipped, errors });
+        } catch (error: unknown) {
+          logger.error("Error bulk-updating bale names:", { error: error });
+          res.status(500).json({ message: getErrorMessage(error) });
+        }
+      });
+    }
+  );
 }

@@ -282,170 +282,171 @@ export function registerCreditSalesImportRoutes(app: Express) {
           }),
         },
         async (tx) => {
-        const voucherNumber = `CREDIT-SALES-${Date.now()}`;
+          const voucherNumber = `CREDIT-SALES-${Date.now()}`;
 
-        const [voucher] = await tx
-          .insert(vouchers)
-          .values({
-            companyId: req.session.currentCompanyId!,
-            locationId,
-            locationName: location.name,
-            voucherNumber,
-            voucherType: "Sales",
-            voucherDate: saleDate,
-            description: `Credit Sale Import - ${items.length} items - Customer: ${customer.legalName}`,
-            totalAmount: "0",
-            isCreditSale: true,
-          })
-          .returning();
+          const [voucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId: req.session.currentCompanyId!,
+              locationId,
+              locationName: location.name,
+              voucherNumber,
+              voucherType: "Sales",
+              voucherDate: saleDate,
+              description: `Credit Sale Import - ${items.length} items - Customer: ${customer.legalName}`,
+              totalAmount: "0",
+              isCreditSale: true,
+            })
+            .returning();
 
-        for (const item of items) {
-          const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
-          if (!stockItem) {
-            throw new Error(`Stock item not found for barcode: ${item.barcode}`);
+          for (const item of items) {
+            const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
+            if (!stockItem) {
+              throw new Error(`Stock item not found for barcode: ${item.barcode}`);
+            }
+
+            const [inventoryRecord] = await tx
+              .select()
+              .from(inventory)
+              .where(and(eq(inventory.stockItemId, stockItem.id), eq(inventory.locationId, locationId)))
+              .limit(1);
+
+            let costPrice = 0;
+            let _currentQty = 0;
+
+            if (inventoryRecord) {
+              costPrice = parseFloat(inventoryRecord.averageRate || "0");
+              _currentQty = parseFloat(inventoryRecord.quantity);
+            }
+
+            const itemSales = item.quantity * item.rate;
+            const itemCost = item.quantity * costPrice;
+            const profit = itemSales - itemCost;
+
+            totalSales += itemSales;
+
+            // Look up configured price for this item/location
+            const [importCreditLocPrice] = await tx
+              .select()
+              .from(stockItemLocationPrices)
+              .where(
+                and(
+                  eq(stockItemLocationPrices.stockItemId, stockItem.id),
+                  eq(stockItemLocationPrices.locationId, locationId)
+                )
+              )
+              .limit(1);
+            const importCreditConfiguredPrice = parseFloat(
+              importCreditLocPrice?.sellingPrice || stockItem.sellingPrice || "0"
+            );
+
+            const [saleItem] = await tx
+              .insert(salesItems)
+              .values({
+                voucherId: voucher.id,
+                stockItemId: stockItem.id,
+                quantity: item.quantity.toString(),
+                sellingPrice: item.rate.toString(),
+                costPrice: costPrice.toString(),
+                totalSales: itemSales.toString(),
+                totalCost: itemCost.toString(),
+                profit: profit.toString(),
+                configuredPrice: importCreditConfiguredPrice > 0 ? importCreditConfiguredPrice.toFixed(6) : null,
+              })
+              .returning({ id: salesItems.id });
+
+            await adjustInventory(tx, locationId, stockItem.id, -item.quantity, req.session.currentCompanyId!);
+            await postStockMovementTx(
+              tx,
+              {
+                companyId: req.session.currentCompanyId!,
+                stockItemId: stockItem.id,
+                kind: "issue",
+                quantity: String(Math.abs(item.quantity)),
+                unitCost: String(Math.max(costPrice, 0)),
+                fromLocationId: locationId,
+                occurredAt: new Date(`${saleDate}T00:00:00.000Z`).toISOString(),
+                source: {
+                  sourceType: "credit-sales-import",
+                  sourceId: String(voucher.id),
+                  idempotencyKey: `credit-sales-import:${voucher.id}:${saleItem.id}`,
+                },
+                actor: {
+                  userId: req.session.userId,
+                  username: req.session.username,
+                  reason: `Credit sales import ${voucher.voucherNumber}`,
+                },
+                allowNegativeStock: true,
+              },
+              canonicalStockMovementAdapter
+            );
           }
 
-          const [inventoryRecord] = await tx
+          // Create voucher entries for credit sale
+          // Entry 1: Debit Customer's Ledger Account (Customer owes money)
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: customerLedgerAccountId!,
+            debitAmount: totalSales.toString(),
+            creditAmount: "0",
+            narration: `Credit Sale to ${customer.legalName} - ${items.length} items`,
+          });
+
+          // Entry 2: Credit Sales Revenue (Income increases with credit)
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: salesRevenueAccount.id,
+            debitAmount: "0",
+            creditAmount: totalSales.toString(),
+            narration: `Credit Sale Revenue - ${items.length} items`,
+          });
+
+          // Update voucher with total amount
+          await tx
+            .update(vouchers)
+            .set({
+              totalAmount: totalSales.toString(),
+            })
+            .where(eq(vouchers.id, voucher.id));
+
+          createdVoucher = voucher;
+
+          // Add customer balance transaction (credit sale = debit to customer = they owe us)
+          // Get current running balance for this customer
+          const [lastBalance] = await tx
             .select()
-            .from(inventory)
-            .where(and(eq(inventory.stockItemId, stockItem.id), eq(inventory.locationId, locationId)))
-            .limit(1);
-
-          let costPrice = 0;
-          let _currentQty = 0;
-
-          if (inventoryRecord) {
-            costPrice = parseFloat(inventoryRecord.averageRate || "0");
-            _currentQty = parseFloat(inventoryRecord.quantity);
-          }
-
-          const itemSales = item.quantity * item.rate;
-          const itemCost = item.quantity * costPrice;
-          const profit = itemSales - itemCost;
-
-          totalSales += itemSales;
-
-          // Look up configured price for this item/location
-          const [importCreditLocPrice] = await tx
-            .select()
-            .from(stockItemLocationPrices)
+            .from(customerBalances)
             .where(
               and(
-                eq(stockItemLocationPrices.stockItemId, stockItem.id),
-                eq(stockItemLocationPrices.locationId, locationId)
+                eq(customerBalances.customerId, customerId),
+                eq(customerBalances.companyId, req.session.currentCompanyId!)
               )
             )
+            .orderBy(desc(customerBalances.id))
             .limit(1);
-          const importCreditConfiguredPrice = parseFloat(
-            importCreditLocPrice?.sellingPrice || stockItem.sellingPrice || "0"
-          );
 
-          const [saleItem] = await tx
-            .insert(salesItems)
-            .values({
-              voucherId: voucher.id,
-              stockItemId: stockItem.id,
-              quantity: item.quantity.toString(),
-              sellingPrice: item.rate.toString(),
-              costPrice: costPrice.toString(),
-              totalSales: itemSales.toString(),
-              totalCost: itemCost.toString(),
-              profit: profit.toString(),
-              configuredPrice: importCreditConfiguredPrice > 0 ? importCreditConfiguredPrice.toFixed(6) : null,
-            })
-            .returning({ id: salesItems.id });
+          const previousBalance = lastBalance ? parseFloat(lastBalance.balance || "0") : 0;
+          const newBalance = previousBalance + totalSales;
 
-          await adjustInventory(tx, locationId, stockItem.id, -item.quantity, req.session.currentCompanyId!);
-          await postStockMovementTx(
-            tx,
-            {
-              companyId: req.session.currentCompanyId!,
-              stockItemId: stockItem.id,
-              kind: "issue",
-              quantity: String(Math.abs(item.quantity)),
-              unitCost: String(Math.max(costPrice, 0)),
-              fromLocationId: locationId,
-              occurredAt: new Date(`${saleDate}T00:00:00.000Z`).toISOString(),
-              source: {
-                sourceType: "credit-sales-import",
-                sourceId: String(voucher.id),
-                idempotencyKey: `credit-sales-import:${voucher.id}:${saleItem.id}`,
-              },
-              actor: {
-                userId: req.session.userId,
-                username: req.session.username,
-                reason: `Credit sales import ${voucher.voucherNumber}`,
-              },
-              allowNegativeStock: true,
-            },
-            canonicalStockMovementAdapter
-          );
+          await tx.insert(customerBalances).values({
+            customerId,
+            companyId: req.session.currentCompanyId!,
+            transactionDate: saleDate,
+            transactionType: "Credit Sale",
+            referenceId: voucher.id,
+            referenceType: "voucher",
+            debitAmount: totalSales.toString(),
+            creditAmount: "0",
+            balance: newBalance.toString(),
+            currency: "USD",
+            description: `Credit Sale Import - ${items.length} items`,
+          });
+          return {
+            value: { voucher, totalSales },
+            resultReference: voucher.id,
+          };
         }
-
-        // Create voucher entries for credit sale
-        // Entry 1: Debit Customer's Ledger Account (Customer owes money)
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: customerLedgerAccountId!,
-          debitAmount: totalSales.toString(),
-          creditAmount: "0",
-          narration: `Credit Sale to ${customer.legalName} - ${items.length} items`,
-        });
-
-        // Entry 2: Credit Sales Revenue (Income increases with credit)
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: salesRevenueAccount.id,
-          debitAmount: "0",
-          creditAmount: totalSales.toString(),
-          narration: `Credit Sale Revenue - ${items.length} items`,
-        });
-
-        // Update voucher with total amount
-        await tx
-          .update(vouchers)
-          .set({
-            totalAmount: totalSales.toString(),
-          })
-          .where(eq(vouchers.id, voucher.id));
-
-        createdVoucher = voucher;
-
-        // Add customer balance transaction (credit sale = debit to customer = they owe us)
-        // Get current running balance for this customer
-        const [lastBalance] = await tx
-          .select()
-          .from(customerBalances)
-          .where(
-            and(
-              eq(customerBalances.customerId, customerId),
-              eq(customerBalances.companyId, req.session.currentCompanyId!)
-            )
-          )
-          .orderBy(desc(customerBalances.id))
-          .limit(1);
-
-        const previousBalance = lastBalance ? parseFloat(lastBalance.balance || "0") : 0;
-        const newBalance = previousBalance + totalSales;
-
-        await tx.insert(customerBalances).values({
-          customerId,
-          companyId: req.session.currentCompanyId!,
-          transactionDate: saleDate,
-          transactionType: "Credit Sale",
-          referenceId: voucher.id,
-          referenceType: "voucher",
-          debitAmount: totalSales.toString(),
-          creditAmount: "0",
-          balance: newBalance.toString(),
-          currency: "USD",
-          description: `Credit Sale Import - ${items.length} items`,
-        });
-        return {
-          value: { voucher, totalSales },
-          resultReference: voucher.id,
-        };
-      });
+      );
       createdVoucher = operation.value.voucher;
       totalSales = operation.value.totalSales;
 

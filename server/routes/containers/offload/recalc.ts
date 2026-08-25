@@ -29,7 +29,8 @@ export function registerContainerOffloadRecalcRoutes(app: Express) {
     async (req, res) => {
       try {
         const containerId = parseId(req.params.id);
-        if (containerId === null || isNaN(containerId)) return res.status(400).json({ message: "Invalid container ID" });
+        if (containerId === null || isNaN(containerId))
+          return res.status(400).json({ message: "Invalid container ID" });
 
         const container = await storage.getContainerByIdForCompany(containerId, req.session.currentCompanyId!);
         if (!container) return res.status(404).json({ message: "Container not found" });
@@ -97,7 +98,10 @@ export function registerContainerOffloadRecalcRoutes(app: Express) {
             }
             await tx.delete(containerOffloadItems).where(eq(containerOffloadItems.offloadId, offloadRecord.id));
           } else {
-            const pos = await storage.getPurchaseOrdersByContainerForCompany(containerId, req.session.currentCompanyId!);
+            const pos = await storage.getPurchaseOrdersByContainerForCompany(
+              containerId,
+              req.session.currentCompanyId!
+            );
             const allLineItems = [];
             for (const po of pos) allLineItems.push(...(await storage.getLineItemsByPO(po.id)));
 

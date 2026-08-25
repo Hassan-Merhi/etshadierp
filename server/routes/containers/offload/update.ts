@@ -173,7 +173,13 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
         }
 
         const additionalChargesTotal = addInventoryValues(...additionalCharges.map((charge) => charge.amount));
-        const totalCharges = addInventoryValues(duties, officeCharges, transferCharges, transportFees, additionalChargesTotal);
+        const totalCharges = addInventoryValues(
+          duties,
+          officeCharges,
+          transferCharges,
+          transportFees,
+          additionalChargesTotal
+        );
         const totalBales = toInventoryDecimal(currentOffload.totalBales);
         const additionalCostPerBale = divideInventoryValues(totalCharges, totalBales);
         newAdditionalCostPerBale = additionalCostPerBale;
@@ -224,7 +230,10 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
 
           let stockItemIds: number[] = [...new Set(offloadItems.map((i) => i.stockItemId))];
           if (stockItemIds.length === 0) {
-            const pos = await storage.getPurchaseOrdersByContainerForCompany(containerId, req.session.currentCompanyId!);
+            const pos = await storage.getPurchaseOrdersByContainerForCompany(
+              containerId,
+              req.session.currentCompanyId!
+            );
             const idSet = new Set<number>();
             for (const po of pos) {
               const lineItems = await storage.getLineItemsByPO(po.id);

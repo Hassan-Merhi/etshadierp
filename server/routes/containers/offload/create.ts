@@ -15,9 +15,7 @@ import { requireAuth, requireNonPOS } from "../../../auth";
 import { containerOffloadItems, offloadRequestSchema } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { syncSalesItemCostsForStockItems } from "../../../services/syncSalesItemCosts";
-import {
-  executeContainerOffloadLifecycle,
-} from "../../../services/containers/offload-lifecycle/execute";
+import { executeContainerOffloadLifecycle } from "../../../services/containers/offload-lifecycle/execute";
 import { ContainerOffloadLifecycleError } from "../../../services/containers/offload-lifecycle/types";
 
 export function registerContainerOffloadCreateRoutes(app: Express) {

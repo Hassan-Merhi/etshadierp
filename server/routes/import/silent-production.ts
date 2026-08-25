@@ -66,14 +66,7 @@ export function registerSilentProductionRoutes(app: Express) {
           }
 
           const delta = type === "Production" ? normalizedQty : -normalizedQty;
-          await adjustInventory(
-            tx,
-            locId,
-            stockItemId,
-            delta,
-            companyId,
-            type === "Production" ? rate : undefined
-          );
+          await adjustInventory(tx, locId, stockItemId, delta, companyId, type === "Production" ? rate : undefined);
           await postStockMovementTx(
             tx,
             {

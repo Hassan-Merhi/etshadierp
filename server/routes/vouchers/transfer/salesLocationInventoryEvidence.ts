@@ -20,7 +20,12 @@ export async function moveSalesVoucherInventoryLocation(
   const items = await tx.select().from(salesItems).where(eq(salesItems.voucherId, voucher.id)).for("update");
   if (items.length === 0) return;
 
-  const revision = await nextCanonicalSourceRevision(tx, voucher.companyId, "voucher-sales-location-edit", String(voucher.id));
+  const revision = await nextCanonicalSourceRevision(
+    tx,
+    voucher.companyId,
+    "voucher-sales-location-edit",
+    String(voucher.id)
+  );
   const occurredAt = new Date().toISOString();
   const evidenceActor = actor ?? { reason: `Move sales voucher ${voucher.voucherNumber} inventory location` };
 

@@ -15,21 +15,14 @@ import type { InventoryAuditActor, QuickAdjustmentInput } from "./inventoryReque
 
 const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
-export async function quickAdjustInventory(
-  companyId: number,
-  input: QuickAdjustmentInput,
-  actor: InventoryAuditActor,
-) {
+export async function quickAdjustInventory(companyId: number, input: QuickAdjustmentInput, actor: InventoryAuditActor) {
   const [company] = await db
     .select({ companyType: companies.companyType })
     .from(companies)
     .where(eq(companies.id, companyId))
     .limit(1);
   if (company?.companyType === "supplier_partner") {
-    throw new InventoryRouteError(
-      403,
-      "Supplier Partner companies must use SP Sales / SP Containers for this action.",
-    );
+    throw new InventoryRouteError(403, "Supplier Partner companies must use SP Sales / SP Containers for this action.");
   }
 
   const [location, stockItem] = await Promise.all([
@@ -51,12 +44,7 @@ export async function quickAdjustInventory(
       const [existingInventory] = await tx
         .select()
         .from(inventory)
-        .where(
-          and(
-            eq(inventory.stockItemId, input.stockItemId),
-            eq(inventory.locationId, input.locationId),
-          ),
-        )
+        .where(and(eq(inventory.stockItemId, input.stockItemId), eq(inventory.locationId, input.locationId)))
         .limit(1);
 
       const normalizedQuantity = Number.parseFloat(inventoryQuantity(input.quantity));
@@ -70,18 +58,12 @@ export async function quickAdjustInventory(
       if (newQuantity < 0) {
         throw new InventoryRouteError(
           400,
-          `Cannot subtract ${normalizedQuantity} units. Only ${currentQuantity} units available at this location.`,
+          `Cannot subtract ${normalizedQuantity} units. Only ${currentQuantity} units available at this location.`
         );
       }
 
       const preAdjustmentRate = existingInventory ? Number.parseFloat(existingInventory.averageRate || "0") : 0;
-      const adjustment = await adjustInventory(
-        tx,
-        input.locationId,
-        input.stockItemId,
-        adjustedQuantity,
-        companyId,
-      );
+      const adjustment = await adjustInventory(tx, input.locationId, input.stockItemId, adjustedQuantity, companyId);
       const operationId = randomUUID();
       const movementUnitCost =
         input.type === "subtract" && Number.isFinite(preAdjustmentRate)
@@ -105,7 +87,7 @@ export async function quickAdjustInventory(
           },
           allowNegativeStock: true,
         },
-        canonicalStockMovementAdapter,
+        canonicalStockMovementAdapter
       );
       return {
         currentQuantity: adjustment.previousQuantity,

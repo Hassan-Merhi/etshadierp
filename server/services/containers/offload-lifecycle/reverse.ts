@@ -30,13 +30,7 @@ export async function reverseExistingOffload(
     for (const item of storedItems) {
       const quantity = amount(item.quantity);
       const totalValue = amount(item.totalValue);
-      await reverseInventoryByExactValue(
-        tx,
-        existingOffload.locationId,
-        item.stockItemId,
-        quantity,
-        totalValue
-      );
+      await reverseInventoryByExactValue(tx, existingOffload.locationId, item.stockItemId, quantity, totalValue);
       await postStockMovementTx(
         tx,
         {

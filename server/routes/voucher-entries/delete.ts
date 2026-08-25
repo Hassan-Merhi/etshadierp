@@ -108,13 +108,7 @@ export function registerVoucherDeleteRoutes(app: Express) {
               await adjustInventory(tx, itemSourceId, item.stockItemId, qty, companyId, transferRate);
 
               // Remove from destination location (reverse the addition)
-              await adjustInventory(
-                tx,
-                transferVoucher.destinationLocationId!,
-                item.stockItemId,
-                -qty,
-                companyId
-              );
+              await adjustInventory(tx, transferVoucher.destinationLocationId!, item.stockItemId, -qty, companyId);
 
               await postStockMovementTx(
                 tx,
@@ -371,7 +365,14 @@ export function registerVoucherDeleteRoutes(app: Express) {
               } else {
                 // Debit Note forward: removed qty from inventory
                 // Reversal: add qty back to inventory
-                const result = await adjustInventory(tx, item.locationId, item.stockItemId, qty, companyId, inventoryCost);
+                const result = await adjustInventory(
+                  tx,
+                  item.locationId,
+                  item.stockItemId,
+                  qty,
+                  companyId,
+                  inventoryCost
+                );
                 await postStockMovementTx(
                   tx,
                   {

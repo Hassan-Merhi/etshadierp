@@ -113,7 +113,9 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
         await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, id));
 
         const editVoucherCurrency: string = String(existingVoucher.currency || "USD");
-        const editVoucherRate: string | null = existingVoucher.exchangeRate ? String(existingVoucher.exchangeRate) : null;
+        const editVoucherRate: string | null = existingVoucher.exchangeRate
+          ? String(existingVoucher.exchangeRate)
+          : null;
 
         for (const entry of entries) {
           let dualCurrencyFields: Record<string, unknown> = {};
@@ -245,7 +247,10 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
             if (otherVoucher) {
               const oldTotal = parseFloat(otherVoucher.totalAmount || "0");
               const ratio = oldTotal > 0 ? newTotal / oldTotal : 1;
-              const otherEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, otherVoucherId));
+              const otherEntries = await db
+                .select()
+                .from(voucherEntries)
+                .where(eq(voucherEntries.voucherId, otherVoucherId));
               for (const e of otherEntries) {
                 await db
                   .update(voucherEntries)
@@ -255,7 +260,10 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
                   })
                   .where(eq(voucherEntries.id, e.id));
               }
-              await db.update(vouchers).set({ totalAmount: newTotal.toFixed(2) }).where(eq(vouchers.id, otherVoucherId));
+              await db
+                .update(vouchers)
+                .set({ totalAmount: newTotal.toFixed(2) })
+                .where(eq(vouchers.id, otherVoucherId));
               await db
                 .update(fde)
                 .set({ amountCurrency: newTotal.toFixed(2), amountUsd: newTotal.toFixed(2) })
@@ -288,7 +296,9 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
             await db
               .update(customerBalances)
               .set({ debitAmount: String(updatedOrd.grandTotal), balance: String(updatedOrd.grandTotal) })
-              .where(and(eq(customerBalances.referenceId, charge.orderId), eq(customerBalances.referenceType, "INVOICE")));
+              .where(
+                and(eq(customerBalances.referenceId, charge.orderId), eq(customerBalances.referenceType, "INVOICE"))
+              );
           }
         }
       }
