@@ -13,19 +13,32 @@ import { inArray } from "drizzle-orm";
 
 // ─── Audit log ────────────────────────────────────────────────────────────────
 export type AuditAction =
-  | "create" | "update" | "delete"
-  | "restore" | "reverse" | "void" | "return"
-  | "recalculate" | "repair"
-  | "import" | "export"
-  | "send_whatsapp" | "send_email"
-  | "approve" | "cancel"
-  | "offload" | "transfer" | "adjust"
-  | "login" | "permission_change" | "settings_change";
+  | "create"
+  | "update"
+  | "delete"
+  | "restore"
+  | "reverse"
+  | "void"
+  | "return"
+  | "recalculate"
+  | "repair"
+  | "import"
+  | "export"
+  | "send_whatsapp"
+  | "send_email"
+  | "approve"
+  | "cancel"
+  | "offload"
+  | "transfer"
+  | "adjust"
+  | "login"
+  | "permission_change"
+  | "settings_change";
 
 function normalizeAuditAction(params: {
   action: AuditAction;
   tableName: string;
-  changes?: Record<string, { old?: any; new?: any }> | null;
+  changes?: Record<string, { old?: AuditChangeValue; new?: AuditChangeValue }> | null;
 }): AuditAction {
   if (params.action !== "update" || params.tableName !== "factory_customer_orders") {
     return params.action;
@@ -50,7 +63,7 @@ export async function logAudit(
     tableName: string;
     recordId?: number | null;
     recordIdentifier?: string | null;
-    changes?: Record<string, { old?: any; new?: any }> | null;
+    changes?: Record<string, { old?: AuditChangeValue; new?: AuditChangeValue }> | null;
   },
   // Optional transaction/connection handle. Pass the same `tx` used for the
   // financial write so the audit INSERT is atomic with it — if the audit
@@ -79,6 +92,16 @@ export async function logAudit(
 // ─── Voucher audit helpers ─────────────────────────────────────────────────────
 
 type EntrySnap = { account: string; debit: string; credit: string; narration?: string };
+/**
+ * A recorded before/after value. Audit entries carry whatever the changed
+ * column held, so the value is only ever serialised, never inspected.
+ */
+type AuditChangeValue = unknown;
+/**
+ * Entries as recorded on an audit row: either the resolved snapshot or the raw
+ * voucher-entry rows a caller already has. Both are only compared and stored.
+ */
+type RecordedEntries = readonly (EntrySnap | Record<string, unknown>)[];
 type VoucherSnap = {
   voucherType?: string | null;
   voucherDate?: string | null;
@@ -202,8 +225,11 @@ export async function snapshotVoucherEntries(
   });
 }
 
-export function buildVoucherChangesForCreate(v: VoucherSnap, entries: EntrySnap[]): Record<string, { new: any }> {
-  const c: Record<string, { new: any }> = {};
+export function buildVoucherChangesForCreate(
+  v: VoucherSnap,
+  entries: RecordedEntries
+): Record<string, { new: AuditChangeValue }> {
+  const c: Record<string, { new: AuditChangeValue }> = {};
   if (v.voucherType) c.voucherType = { new: v.voucherType };
   if (v.voucherDate) c.date = { new: v.voucherDate };
   if (v.totalAmount) c.amount = { new: v.totalAmount };
@@ -213,8 +239,11 @@ export function buildVoucherChangesForCreate(v: VoucherSnap, entries: EntrySnap[
   return c;
 }
 
-export function buildVoucherChangesForDelete(v: VoucherSnap, entries: EntrySnap[]): Record<string, { old: any }> {
-  const c: Record<string, { old: any }> = {};
+export function buildVoucherChangesForDelete(
+  v: VoucherSnap,
+  entries: RecordedEntries
+): Record<string, { old: AuditChangeValue }> {
+  const c: Record<string, { old: AuditChangeValue }> = {};
   if (v.voucherType) c.voucherType = { old: v.voucherType };
   if (v.voucherDate) c.date = { old: v.voucherDate };
   if (v.totalAmount) c.amount = { old: v.totalAmount };
@@ -227,10 +256,10 @@ export function buildVoucherChangesForDelete(v: VoucherSnap, entries: EntrySnap[
 export function buildVoucherChangesForUpdate(
   oldV: VoucherSnap,
   newV: VoucherSnap,
-  oldEntries: EntrySnap[],
-  newEntries: EntrySnap[]
-): Record<string, { old?: any; new?: any }> {
-  const c: Record<string, { old?: any; new?: any }> = {};
+  oldEntries: RecordedEntries,
+  newEntries: RecordedEntries
+): Record<string, { old?: AuditChangeValue; new?: AuditChangeValue }> {
+  const c: Record<string, { old?: AuditChangeValue; new?: AuditChangeValue }> = {};
   if (oldV.voucherType !== newV.voucherType) c.voucherType = { old: oldV.voucherType, new: newV.voucherType };
   if (oldV.voucherDate !== newV.voucherDate) c.date = { old: oldV.voucherDate, new: newV.voucherDate };
   if (parseFloat(oldV.totalAmount || "0") !== parseFloat(newV.totalAmount || "0"))

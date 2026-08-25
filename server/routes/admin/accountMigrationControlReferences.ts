@@ -1,5 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { userCompanyRoles, userLocationCashAccounts } from "@shared/schema";
+import type { DbTransaction } from "../../db";
 
 export type AccountMigrationControlSnapshot = {
   roleCashAccounts: Array<{ roleId: number; accountId: number }>;
@@ -24,19 +25,14 @@ export class AccountMigrationControlConflict extends Error {
 }
 
 export async function detachAccountMigrationControlReferences(
-  tx: any,
+  tx: DbTransaction,
   sourceCompanyId: number,
-  accountIds: number[],
+  accountIds: number[]
 ): Promise<AccountMigrationControlSnapshot> {
   const roleRows = await tx
     .select({ id: userCompanyRoles.id, cashAccountId: userCompanyRoles.cashAccountId })
     .from(userCompanyRoles)
-    .where(
-      and(
-        eq(userCompanyRoles.companyId, sourceCompanyId),
-        inArray(userCompanyRoles.cashAccountId, accountIds),
-      ),
-    );
+    .where(and(eq(userCompanyRoles.companyId, sourceCompanyId), inArray(userCompanyRoles.cashAccountId, accountIds)));
 
   const locationRows = await tx
     .select()
@@ -44,28 +40,36 @@ export async function detachAccountMigrationControlReferences(
     .where(
       and(
         eq(userLocationCashAccounts.companyId, sourceCompanyId),
-        inArray(userLocationCashAccounts.cashAccountId, accountIds),
-      ),
+        inArray(userLocationCashAccounts.cashAccountId, accountIds)
+      )
     );
 
   if (roleRows.length > 0) {
     await tx
       .update(userCompanyRoles)
       .set({ cashAccountId: null })
-      .where(inArray(userCompanyRoles.id, roleRows.map((row: any) => row.id)));
+      .where(
+        inArray(
+          userCompanyRoles.id,
+          roleRows.map((row: any) => row.id)
+        )
+      );
   }
 
   if (locationRows.length > 0) {
-    await tx
-      .delete(userLocationCashAccounts)
-      .where(inArray(userLocationCashAccounts.id, locationRows.map((row: any) => row.id)));
+    await tx.delete(userLocationCashAccounts).where(
+      inArray(
+        userLocationCashAccounts.id,
+        locationRows.map((row) => row.id)
+      )
+    );
   }
 
   return {
     roleCashAccounts: roleRows
-      .filter((row: { cashAccountId: null }) => row.cashAccountId !== null)
-      .map((row: any) => ({ roleId: row.id, accountId: row.cashAccountId })),
-    locationCashAccounts: locationRows.map((row: any) => ({
+      .filter((row): row is { id: number; cashAccountId: number } => row.cashAccountId !== null)
+      .map((row) => ({ roleId: row.id, accountId: row.cashAccountId })),
+    locationCashAccounts: locationRows.map((row) => ({
       userId: row.userId,
       companyId: row.companyId,
       locationId: row.locationId,
@@ -77,18 +81,15 @@ export async function detachAccountMigrationControlReferences(
 }
 
 export async function assertDestinationControlReferencesAreClear(
-  tx: any,
+  tx: DbTransaction,
   destinationCompanyId: number,
-  accountIds: number[],
+  accountIds: number[]
 ): Promise<void> {
   const roleRows = await tx
     .select({ id: userCompanyRoles.id })
     .from(userCompanyRoles)
     .where(
-      and(
-        eq(userCompanyRoles.companyId, destinationCompanyId),
-        inArray(userCompanyRoles.cashAccountId, accountIds),
-      ),
+      and(eq(userCompanyRoles.companyId, destinationCompanyId), inArray(userCompanyRoles.cashAccountId, accountIds))
     );
   const locationRows = await tx
     .select({ id: userLocationCashAccounts.id })
@@ -96,21 +97,21 @@ export async function assertDestinationControlReferencesAreClear(
     .where(
       and(
         eq(userLocationCashAccounts.companyId, destinationCompanyId),
-        inArray(userLocationCashAccounts.cashAccountId, accountIds),
-      ),
+        inArray(userLocationCashAccounts.cashAccountId, accountIds)
+      )
     );
 
   if (roleRows.length > 0 || locationRows.length > 0) {
     throw new AccountMigrationControlConflict(
-      "The migrated account is assigned to a destination-company user or POS location. Remove that assignment before undoing.",
+      "The migrated account is assigned to a destination-company user or POS location. Remove that assignment before undoing."
     );
   }
 }
 
 export async function restoreAccountMigrationControlReferences(
-  tx: any,
+  tx: DbTransaction,
   sourceCompanyId: number,
-  snapshot: AccountMigrationControlSnapshot,
+  snapshot: AccountMigrationControlSnapshot
 ): Promise<void> {
   for (const role of snapshot.roleCashAccounts) {
     const [current] = await tx
@@ -118,9 +119,7 @@ export async function restoreAccountMigrationControlReferences(
       .from(userCompanyRoles)
       .where(eq(userCompanyRoles.id, role.roleId));
     if (!current || current.companyId !== sourceCompanyId || current.cashAccountId !== null) {
-      throw new AccountMigrationControlConflict(
-        `Source-company user role ${role.roleId} changed after migration.`,
-      );
+      throw new AccountMigrationControlConflict(`Source-company user role ${role.roleId} changed after migration.`);
     }
   }
 
@@ -134,14 +133,20 @@ export async function restoreAccountMigrationControlReferences(
       .from(userLocationCashAccounts)
       .where(eq(userLocationCashAccounts.companyId, sourceCompanyId));
     const occupied = new Set(
-      existing.map((row: { companyId: string | number | bigint | boolean | null | undefined; locationId: string | number | bigint | boolean | null | undefined; userId: string | number | bigint | boolean | null | undefined }) => `${row.userId}:${row.companyId}:${row.locationId}`),
+      existing.map(
+        (row: {
+          companyId: string | number | bigint | boolean | null | undefined;
+          locationId: string | number | bigint | boolean | null | undefined;
+          userId: string | number | bigint | boolean | null | undefined;
+        }) => `${row.userId}:${row.companyId}:${row.locationId}`
+      )
     );
     const conflict = snapshot.locationCashAccounts.find((row) =>
-      occupied.has(`${row.userId}:${row.companyId}:${row.locationId}`),
+      occupied.has(`${row.userId}:${row.companyId}:${row.locationId}`)
     );
     if (conflict) {
       throw new AccountMigrationControlConflict(
-        `A POS cash mapping now exists for user ${conflict.userId} and location ${conflict.locationId}.`,
+        `A POS cash mapping now exists for user ${conflict.userId} and location ${conflict.locationId}.`
       );
     }
   }
@@ -162,7 +167,7 @@ export async function restoreAccountMigrationControlReferences(
         cashAccountId: row.cashAccountId,
         posStation: row.posStation,
         createdAt: row.createdAt ? new Date(row.createdAt) : undefined,
-      })),
+      }))
     );
   }
 }

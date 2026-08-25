@@ -11,18 +11,15 @@ import {
 import { getStableSupplierCost } from "./rawStockStableCost";
 import { db as sharedDb } from "../../db";
 import { FACTORY_HISTORICAL_REPLAY_V7_SCHEMA_SQL } from "./historicalReplayV7MigrationSql";
-import {
-  calculateCostLine,
-  calculateMovingAverageRate,
-  formatFactoryLockedRate,
-} from "./factoryCostingEngine";
+import { calculateCostLine, calculateMovingAverageRate, formatFactoryLockedRate } from "./factoryCostingEngine";
+import type { DatabaseOrTransaction } from "../../db";
 
 /**
  * Authoritative supplier raw-material quantity. This is the same quantity shown by
  * the Raw Materials API and used by the moving-average offload formula.
  */
 export async function getAuthoritativeSupplierRemainingKg(
-  tx: any,
+  tx: DatabaseOrTransaction,
   companyId: number,
   supplierId: number
 ): Promise<number> {
@@ -105,12 +102,12 @@ export async function getAuthoritativeSupplierRemainingKgWithExecutor(
  * the stable historical receipt cost and persisted; subsequent reads remain stable.
  */
 export async function getLockedSupplierRate(
-  tx: any,
+  tx: DatabaseOrTransaction,
   companyId: number,
   supplierId: number,
   opts: { forUpdate?: boolean } = {}
 ): Promise<number> {
-  let query = tx
+  const query = tx
     .select({
       id: factorySuppliers.id,
       currentRawMaterialCostPerKgUsd: factorySuppliers.currentRawMaterialCostPerKgUsd,
@@ -118,9 +115,7 @@ export async function getLockedSupplierRate(
     .from(factorySuppliers)
     .where(and(eq(factorySuppliers.id, supplierId), eq(factorySuppliers.companyId, companyId)));
 
-  if (opts.forUpdate) query = query.for("update");
-
-  const [supplier] = await query;
+  const [supplier] = await (opts.forUpdate ? query.for("update") : query);
   if (!supplier) return 0;
 
   const existing = supplier.currentRawMaterialCostPerKgUsd;
@@ -140,7 +135,7 @@ export async function getLockedSupplierRate(
 
 /** Pure read-only variant: never performs the legacy lazy-backfill write. */
 export async function getLockedSupplierRateReadOnly(
-  tx: any,
+  tx: DatabaseOrTransaction,
   companyId: number,
   supplierId: number
 ): Promise<{ rate: number; wasBackfilled: boolean }> {
@@ -176,9 +171,7 @@ export interface LockedRateDiagnosticRow {
 }
 
 /** Shared read-only locked-rate reconciliation used by diagnostics and UI. */
-export async function getLockedRateDiagnosticsForCompany(
-  companyId: number
-): Promise<LockedRateDiagnosticRow[]> {
+export async function getLockedRateDiagnosticsForCompany(companyId: number): Promise<LockedRateDiagnosticRow[]> {
   const db = sharedDb;
   const suppliers = await db
     .select({
@@ -217,9 +210,8 @@ export async function getLockedRateDiagnosticsForCompany(
     const rows: LockedRateDiagnosticRow[] = [];
     for (const supplier of suppliers) {
       const persistedRaw = supplier.currentRawMaterialCostPerKgUsd;
-      const persistedLockedRate = persistedRaw !== null && persistedRaw !== undefined
-        ? parseFloat(persistedRaw as string) || 0
-        : null;
+      const persistedLockedRate =
+        persistedRaw !== null && persistedRaw !== undefined ? parseFloat(persistedRaw as string) || 0 : null;
       const { rate } = await getLockedSupplierRateReadOnly(tx, companyId, supplier.id);
       const remainingKg = await getAuthoritativeSupplierRemainingKg(tx, companyId, supplier.id);
       const reservedKg = reservedBySupplierId.get(supplier.id) || 0;
@@ -251,7 +243,7 @@ export async function getLockedRateDiagnosticsForCompany(
  * supplier receipt. Fully consumed historical stock never re-enters the average.
  */
 export async function applyOffloadMovingAverage(
-  tx: any,
+  tx: DatabaseOrTransaction,
   params: {
     companyId: number;
     supplierId: number;
@@ -263,10 +255,7 @@ export async function applyOffloadMovingAverage(
   const oldLockedRate = await getLockedSupplierRate(tx, companyId, supplierId, {
     forUpdate: true,
   });
-  const oldRemainingKg = Math.max(
-    0,
-    await getAuthoritativeSupplierRemainingKg(tx, companyId, supplierId)
-  );
+  const oldRemainingKg = Math.max(0, await getAuthoritativeSupplierRemainingKg(tx, companyId, supplierId));
   const newLockedRate = calculateMovingAverageRate({
     existingQuantityKg: oldRemainingKg,
     existingRatePerKg: oldLockedRate,
@@ -287,7 +276,7 @@ export async function applyOffloadMovingAverage(
 
 /** Quantity-only manual ADDs require an already-established locked rate. */
 export async function requireExistingLockedRate(
-  tx: any,
+  tx: DatabaseOrTransaction,
   companyId: number,
   supplierId: number
 ): Promise<number | null> {

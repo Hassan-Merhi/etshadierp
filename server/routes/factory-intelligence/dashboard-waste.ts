@@ -4,14 +4,15 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response, RequestHandler } from "express";
+import type { Express, Request, Response } from "express";
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
 import { getClientDate } from "../../lib/dateUtils";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { factoryWasteEntries, factoryWorkers, customerOrders } from "@shared/schema";
 
-export function registerFactoryDashboardWasteRoutes(app: Express, requireAuth: RequestHandler, db: any) {
+export function registerFactoryDashboardWasteRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   app.get("/api/factory/dashboard", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -123,7 +124,9 @@ export function registerFactoryDashboardWasteRoutes(app: Express, requireAuth: R
           wasteType: wasteType || null,
           kgWaste: String(kgWaste),
           reason: reason || null,
-          createdBy: req.session.userId ?? null,
+          // factory_waste_entries.created_by is an integer column; session ids are
+          // numeric strings, matching how the POS routes coerce them.
+          createdBy: Number.isFinite(Number(req.session.userId)) ? Number(req.session.userId) : null,
         })
         .returning();
 

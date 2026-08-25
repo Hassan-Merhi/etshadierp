@@ -66,12 +66,12 @@ export async function importHistoricalSales(req: Request, res: Response): Promis
     for (const [sourceAccountId, sourceAccount] of sourceAccounts.entries()) {
       if (sourceAccount.sub_type && targetAccounts.bySubType.has(String(sourceAccount.sub_type))) {
         accountMap.set(sourceAccountId, {
-          targetId: pn(targetAccounts.bySubType.get(String(sourceAccount.sub_type)).id),
+          targetId: pn(targetAccounts.bySubType.get(String(sourceAccount.sub_type))!.id),
           method: "exact_sub_type",
         });
       } else if (sourceAccount.code && targetAccounts.byCode.has(String(sourceAccount.code).trim().toLowerCase())) {
         accountMap.set(sourceAccountId, {
-          targetId: pn(targetAccounts.byCode.get(String(sourceAccount.code).trim().toLowerCase()).id),
+          targetId: pn(targetAccounts.byCode.get(String(sourceAccount.code).trim().toLowerCase())!.id),
           method: "exact_code",
         });
       } else if (
@@ -79,7 +79,7 @@ export async function importHistoricalSales(req: Request, res: Response): Promis
         targetAccounts.bySubType.has(erpTypeFallback[String(sourceAccount.account_type)])
       ) {
         accountMap.set(sourceAccountId, {
-          targetId: pn(targetAccounts.bySubType.get(erpTypeFallback[String(sourceAccount.account_type)]).id),
+          targetId: pn(targetAccounts.bySubType.get(erpTypeFallback[String(sourceAccount.account_type)])!.id),
           method: "account_type_policy",
         });
       } else {

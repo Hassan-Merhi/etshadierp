@@ -1,4 +1,4 @@
-import type { DbTransaction } from "../../db";
+import type { DbTransaction, DatabaseOrTransaction } from "../../db";
 import { createHash } from "crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { accountingPostingRequests, auditLog, voucherEntries, vouchers } from "@shared/schema";
@@ -100,7 +100,7 @@ function assertStoredIdentityMatches(input: {
  * their entry writes into the same transaction.
  */
 export async function insertInfrastructureVoucherTx(
-  tx: DbTransaction,
+  tx: DatabaseOrTransaction,
   voucher: VoucherInsert,
   sourceInput: PostingSourceIdentity,
   fingerprintPayload?: unknown,
@@ -238,7 +238,7 @@ export async function insertInfrastructureVoucher(
 
 /** Remove the durable marker before an intentional hard delete/rebuild. */
 export async function deleteInfrastructurePostingIdentityForVoucherTx(
-  tx: DbTransaction,
+  tx: DatabaseOrTransaction,
   voucherId: number
 ): Promise<void> {
   await tx.delete(accountingPostingRequests).where(eq(accountingPostingRequests.voucherId, voucherId));

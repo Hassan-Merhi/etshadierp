@@ -9,10 +9,13 @@
 import { db } from "../../db";
 import { inventory, stockItems } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
-import type { HandlerErrorResult, ValidatedInventoryItem } from "./posSaleTypes";
+import type { HandlerErrorResult, PosSaleItemInput, ValidatedInventoryItem } from "./posSaleTypes";
 
 /** Input validation assertions for inventory safety. */
-export function validateItemsBasic(locationId: any, items: any[]): { error: HandlerErrorResult } | null {
+export function validateItemsBasic(
+  locationId: number | string | null | undefined,
+  items: PosSaleItemInput[]
+): { error: HandlerErrorResult } | null {
   const parsedLocationId = Number(locationId);
   if (!locationId || isNaN(parsedLocationId)) {
     return { error: { status: 400, body: { message: `Invalid locationId: ${locationId}` } } };
@@ -21,7 +24,7 @@ export function validateItemsBasic(locationId: any, items: any[]): { error: Hand
     if (!item.stockItemId || isNaN(Number(item.stockItemId))) {
       return { error: { status: 400, body: { message: `Invalid stockItemId: ${item.stockItemId}` } } };
     }
-    const qty = parseFloat(item.quantity);
+    const qty = parseFloat(String(item.quantity));
     if (isNaN(qty) || !isFinite(qty) || qty <= 0) {
       return {
         error: { status: 400, body: { message: `Invalid quantity for item ${item.stockItemId}: ${item.quantity}` } },
@@ -32,19 +35,19 @@ export function validateItemsBasic(locationId: any, items: any[]): { error: Hand
 }
 
 /** Validate and calculate total. */
-export function calculateGrandTotal(items: any[]): { grandTotal: number } | { error: HandlerErrorResult } {
+export function calculateGrandTotal(items: PosSaleItemInput[]): { grandTotal: number } | { error: HandlerErrorResult } {
   let grandTotal = 0;
   for (const item of items) {
     if (!item.stockItemId) {
       return { error: { status: 400, body: { message: "Stock item ID is required for all items" } } };
     }
-    if (!item.quantity || parseFloat(item.quantity) <= 0) {
+    if (!item.quantity || parseFloat(String(item.quantity)) <= 0) {
       return { error: { status: 400, body: { message: "Quantity must be positive for all items" } } };
     }
-    if (!item.rate || parseFloat(item.rate) < 0) {
+    if (!item.rate || parseFloat(String(item.rate)) < 0) {
       return { error: { status: 400, body: { message: "Rate must be non-negative for all items" } } };
     }
-    grandTotal += parseFloat(item.quantity) * parseFloat(item.rate);
+    grandTotal += parseFloat(String(item.quantity)) * parseFloat(String(item.rate));
   }
   return { grandTotal };
 }
@@ -55,8 +58,8 @@ export function calculateGrandTotal(items: any[]): { grandTotal: number } | { er
  * stock so the route's outer catch block can map them to the correct status codes.
  */
 export async function validateInventoryAvailability(
-  locationId: any,
-  items: any[],
+  locationId: number,
+  items: PosSaleItemInput[],
   canSellNegativeStock: boolean
 ): Promise<ValidatedInventoryItem[]> {
   const inventoryValidation: ValidatedInventoryItem[] = [];
@@ -80,7 +83,7 @@ export async function validateInventoryAvailability(
     }
 
     const currentQty = parseFloat(inventoryRecord.quantity);
-    const saleQty = parseFloat(item.quantity);
+    const saleQty = parseFloat(String(item.quantity));
     const itemDisplayName = inventoryRecord.itemName || `item ${item.stockItemId}`;
 
     if (currentQty < saleQty && !canSellNegativeStock) {

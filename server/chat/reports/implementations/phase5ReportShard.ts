@@ -20,7 +20,13 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
 
   switch (params.queryType) {
     case "trial_balance": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{
+        name: string;
+        account_type: string;
+        code: string | null;
+        total_dr: string;
+        total_cr: string;
+      }>(sql`
         SELECT la.name, la.account_type, la.code,
           COALESCE(SUM(CAST(ve.debit_amount AS numeric)), 0) AS total_dr,
           COALESCE(SUM(CAST(ve.credit_amount AS numeric)), 0) AS total_cr
@@ -39,7 +45,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let grandDr = 0,
         grandCr = 0;
-      const tableRows5 = (rows.rows as any[]).map((r) => {
+      const tableRows5 = rows.rows.map((r) => {
         const dr = parseFloat(r.total_dr || "0");
         const cr = parseFloat(r.total_cr || "0");
         const net = dr - cr;
@@ -98,7 +104,21 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const poRow = await db.execute(sql`
+      const poRow = await db.execute<{
+        id: number;
+        po_number: string;
+        currency: string;
+        status: string;
+        supplier: string | null;
+        container_number: string | null;
+        items_total: string;
+        freight: string;
+        surcharge: string;
+        fumigation: string;
+        doc_charges: string;
+        other_charges: string;
+        discount: string;
+      }>(sql`
         SELECT po.id, po.po_number, po.currency, po.status,
           s.legal_name AS supplier, c.container_number,
           CAST(po.items_total AS numeric) AS items_total,
@@ -123,12 +143,15 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const po5 = poRow.rows[0] as unknown as { id: unknown } & { freight: string } & { surcharge: string } & {
-        fumigation: string;
-      } & { doc_charges: string } & { other_charges: string } & { discount: string } & { items_total: string } & {
-        supplier: unknown;
-      } & { container_number: unknown } & { currency: unknown } & { status: unknown } & { po_number: unknown };
-      const lineRows = await db.execute(sql`
+      const po5 = poRow.rows[0];
+      const lineRows = await db.execute<{
+        item_name: string;
+        code: string | null;
+        uom: string | null;
+        qty: string;
+        rate: string;
+        line_total: string;
+      }>(sql`
         SELECT pli.item_name, si.code, si.uom,
           CAST(pli.quantity AS numeric) AS qty,
           CAST(pli.rate AS numeric) AS rate,
@@ -139,7 +162,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY pli.id
       `);
       let _lineTotal = 0;
-      const tableRows5 = (lineRows.rows as any[]).map((r) => {
+      const tableRows5 = lineRows.rows.map((r) => {
         const lt = parseFloat(r.line_total || "0");
         _lineTotal += lt;
         return [r.item_name, r.code, `${fmtDec(parseFloat(r.qty))} ${r.uom}`, fmtDec(parseFloat(r.rate)), fmt(lt)];
@@ -191,7 +214,22 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const cRow = await db.execute(sql`
+      const cRow = await db.execute<{
+        container_number: string;
+        status: string;
+        import_date: string | null;
+        currency: string;
+        supplier: string | null;
+        items_total: string;
+        charges_total: string;
+        grand_total: string;
+        total_kg: string | null;
+        rate_per_kg: string | null;
+        transport_fee: string | null;
+        duty_fee: string | null;
+        transporter: string | null;
+        agent: string | null;
+      }>(sql`
         SELECT c.container_number, c.status, c.import_date, c.currency,
           s.legal_name AS supplier,
           CAST(c.items_total AS numeric) AS items_total,
@@ -216,14 +254,18 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const cc = cRow.rows[0] as unknown as { supplier: unknown } & { status: unknown } & {
-        import_date: Parameters<typeof String>[0];
-      } & { total_kg: string } & { rate_per_kg: string } & { grand_total: string } & { currency: string } & {
+      const cc = cRow.rows[0];
+      const poRows5 = await db.execute<{
+        po_number: string;
+        currency: string;
         items_total: string;
-      } & { charges_total: string } & { transport_fee: string } & { duty_fee: string } & {
-        container_number: unknown;
-      } & { transporter: unknown } & { agent: unknown };
-      const poRows5 = await db.execute(sql`
+        freight: string;
+        surcharge: string;
+        fumigation: string;
+        doc_charges: string;
+        other_charges: string;
+        discount: string;
+      }>(sql`
         SELECT po.po_number, po.currency,
           CAST(po.items_total AS numeric) AS items_total,
           CAST(po.freight AS numeric) AS freight,
@@ -250,10 +292,10 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ["Charges Total", cc.currency, fmt(parseFloat(cc.charges_total || "0"))],
       ];
       if (parseFloat(cc.transport_fee || "0") > 0)
-        breakdownRows.push(["Transport Fee", cc.currency, fmt(parseFloat(cc.transport_fee))]);
+        breakdownRows.push(["Transport Fee", cc.currency, fmt(parseFloat(cc.transport_fee || "0"))]);
       if (parseFloat(cc.duty_fee || "0") > 0)
-        breakdownRows.push(["Duty Fee", cc.currency, fmt(parseFloat(cc.duty_fee))]);
-      for (const po of poRows5.rows as any[]) {
+        breakdownRows.push(["Duty Fee", cc.currency, fmt(parseFloat(cc.duty_fee || "0"))]);
+      for (const po of poRows5.rows) {
         if (parseFloat(po.freight || "0") > 0)
           breakdownRows.push([`Freight (${po.po_number})`, po.currency, fmt(parseFloat(po.freight))]);
         if (parseFloat(po.fumigation || "0") > 0)
@@ -280,7 +322,16 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     case "worker_document_expiry": {
       const daysWindow = 60;
       const futureDoc = new Date(todayDate.getTime() + daysWindow * 86400000).toISOString().slice(0, 10);
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{
+        full_name: string;
+        employee_code: string | null;
+        nationality: string | null;
+        visa_expiry: string | null;
+        work_permit_expiry: string | null;
+        residential_permit_expiry: string | null;
+        visa_number: string | null;
+        work_permit_number: string | null;
+      }>(sql`
         SELECT fw.full_name, fw.employee_code, fw.nationality,
           fw.visa_expiry, fw.work_permit_expiry, fw.residential_permit_expiry,
           fw.visa_number, fw.work_permit_number
@@ -300,7 +351,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       const expired: string[] = [],
         _expiringSoon: string[] = [];
-      const tableRows5 = (rows.rows as any[]).map((r) => {
+      const tableRows5 = rows.rows.map((r) => {
         const visaExp = r.visa_expiry ? String(r.visa_expiry).slice(0, 10) : "—";
         const wpExp = r.work_permit_expiry ? String(r.work_permit_expiry).slice(0, 10) : "—";
         const rpExp = r.residential_permit_expiry ? String(r.residential_permit_expiry).slice(0, 10) : "—";
@@ -334,7 +385,19 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
 
     case "stock_transfers": {
       const locFilter5 = params.locationName || params.entityName;
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{
+        voucher_date: string;
+        voucher_number: string;
+        from_location: string | null;
+        to_location: string | null;
+        item_name: string;
+        code: string | null;
+        qty: string;
+        uom: string | null;
+        rate: string;
+        total_amount: string;
+        notes: string | null;
+      }>(sql`
         SELECT v.voucher_date, v.voucher_number,
           sl.name AS from_location, dl.name AS to_location,
           si.name AS item_name, si.code,
@@ -355,7 +418,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let totalTransferred = 0;
-      const tableRows5 = (rows.rows as any[]).map((r) => {
+      const tableRows5 = rows.rows.map((r) => {
         const amt = parseFloat(r.total_amount || "0");
         totalTransferred += amt;
         return [
@@ -379,7 +442,13 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "cash_flow_summary": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{
+        account_name: string;
+        account_type: string;
+        total_in: string;
+        total_out: string;
+        tx_count: string;
+      }>(sql`
         SELECT la.name AS account_name, la.account_type,
           COALESCE(SUM(CAST(ve.debit_amount AS numeric)), 0) AS total_in,
           COALESCE(SUM(CAST(ve.credit_amount AS numeric)), 0) AS total_out,
@@ -396,7 +465,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let grandIn = 0,
         grandOut = 0;
-      const tableRows5 = (rows.rows as any[]).map((r) => {
+      const tableRows5 = rows.rows.map((r) => {
         const inflow = parseFloat(r.total_in || "0");
         const outflow = parseFloat(r.total_out || "0");
         const net = inflow - outflow;
@@ -452,7 +521,14 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const acctRow5 = await db.execute(sql`
+      const acctRow5 = await db.execute<{
+        id: number;
+        name: string;
+        account_type: string;
+        code: string | null;
+        opening_balance: string;
+        opening_balance_side: string | null;
+      }>(sql`
         SELECT id, name, account_type, code,
           CAST(opening_balance AS numeric) AS opening_balance, opening_balance_side
         FROM ledger_accounts
@@ -468,10 +544,15 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const la5 = acctRow5.rows[0] as unknown as { id: unknown } & { opening_balance: string } & {
-        opening_balance_side: unknown;
-      } & { code: unknown } & { code: string } & { name: unknown } & { account_type: unknown };
-      const txRows5 = await db.execute(sql`
+      const la5 = acctRow5.rows[0];
+      const txRows5 = await db.execute<{
+        voucher_date: string;
+        voucher_type: string;
+        voucher_number: string;
+        description: string | null;
+        dr: string;
+        cr: string;
+      }>(sql`
         SELECT v.voucher_date, v.voucher_type, v.voucher_number, v.description,
           CAST(ve.debit_amount AS numeric) AS dr,
           CAST(ve.credit_amount AS numeric) AS cr
@@ -487,7 +568,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       let runningBal = ob;
       let totalDr = 0,
         totalCr = 0;
-      const tableRows5 = (txRows5.rows as any[]).map((r) => {
+      const tableRows5 = txRows5.rows.map((r) => {
         const dr = parseFloat(r.dr || "0");
         const cr = parseFloat(r.cr || "0");
         runningBal += dr - cr;
@@ -530,7 +611,14 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
 
     case "daily_report": {
       const reportDate = params.dateFrom || todayStr;
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{
+        voucher_number: string;
+        voucher_type: string;
+        description: string | null;
+        amount: string;
+        currency: string;
+        location: string | null;
+      }>(sql`
         SELECT v.voucher_number, v.voucher_type, v.description,
           CAST(v.total_amount AS numeric) AS amount,
           v.currency, l.name AS location
@@ -545,7 +633,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       const typeMap5: Record<string, number> = {};
       let grandAmt = 0;
-      const tableRows5 = (rows.rows as any[]).map((r) => {
+      const tableRows5 = rows.rows.map((r) => {
         const amt = parseFloat(r.amount || "0");
         typeMap5[r.voucher_type] = (typeMap5[r.voucher_type] || 0) + amt;
         grandAmt += amt;
@@ -579,7 +667,13 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "profit_by_location": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{
+        location: string;
+        sales_count: string;
+        total_revenue: string | null;
+        total_cost: string | null;
+        total_profit: string | null;
+      }>(sql`
         SELECT COALESCE(l.name, v.location_name, 'Unassigned') AS location,
           COUNT(DISTINCT v.id) AS sales_count,
           SUM(CAST(sal.total_sales AS numeric)) AS total_revenue,
@@ -597,7 +691,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       let grandRev = 0,
         grandCost = 0,
         grandProfit = 0;
-      const tableRows5 = (rows.rows as any[]).map((r) => {
+      const tableRows5 = rows.rows.map((r) => {
         const rev = parseFloat(r.total_revenue || "0");
         const cost = parseFloat(r.total_cost || "0");
         const profit5 = parseFloat(r.total_profit || "0");
@@ -630,7 +724,13 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "debit_note_summary": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{
+        voucher_date: string;
+        voucher_number: string;
+        description: string | null;
+        amount: string;
+        currency: string;
+      }>(sql`
         SELECT v.voucher_date, v.voucher_number, v.description,
           CAST(v.total_amount AS numeric) AS amount, v.currency
         FROM vouchers v
@@ -642,7 +742,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let totalDN = 0;
-      const tableRows5 = (rows.rows as any[]).map((r) => {
+      const tableRows5 = rows.rows.map((r) => {
         const amt = parseFloat(r.amount || "0");
         totalDN += amt;
         return [

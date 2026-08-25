@@ -1,6 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { factorySuppliers } from "@shared/schema";
 import { getStableSupplierCost } from "./rawStockStableCost";
+import type { DatabaseOrTransaction } from "../../db";
 
 /**
  * Read the current locked USD rate for many suppliers without the normal
@@ -15,7 +16,7 @@ import { getStableSupplierCost } from "./rawStockStableCost";
 export async function getLockedSupplierRatesReadOnlyBulk(
   // Callers pass either the pooled db or a transaction; unified in the
   // database-abstraction phase, not here.
-  tx: any,
+  tx: DatabaseOrTransaction,
   companyId: number,
   supplierIds: readonly number[]
 ): Promise<Map<number, number>> {

@@ -4,6 +4,7 @@ import { db } from "../../db";
 import { storage } from "../../storage";
 import { vouchers, voucherEntries, intercompanyPosConfigs } from "@shared/schema";
 import { eq, and, or, sql, like } from "drizzle-orm";
+import type { DatabaseOrTransaction } from "../../db";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Centralised PO amount calculator — single source of truth for gross/interco
@@ -59,7 +60,7 @@ interface SyncIntercoResult {
 }
 
 export async function syncIntercoParentVoucher(
-  dbOrTx: any,
+  dbOrTx: DatabaseOrTransaction,
   poNumbers: string | string[],
   grossTotal: number,
   containerNumber?: string,
@@ -219,7 +220,6 @@ export async function syncIntercoParentVoucher(
             const entriesToInsert = [
               {
                 voucherId: newFV.id,
-                companyId: parentCompanyId,
                 ledgerAccountId: freightOpts.freightParentAccountId,
                 debitAmount: "0",
                 creditAmount: freightAmtStr,
@@ -229,7 +229,6 @@ export async function syncIntercoParentVoucher(
             if (drAccountId) {
               entriesToInsert.push({
                 voucherId: newFV.id,
-                companyId: parentCompanyId,
                 ledgerAccountId: drAccountId,
                 debitAmount: freightAmtStr,
                 creditAmount: "0",
@@ -311,9 +310,9 @@ export async function syncIntercoParentVoucher(
         }
       }
       if (!freightEntryFound) {
+        // voucher_entries has no company_id column — scope comes from the parent voucher.
         await dbOrTx.insert(voucherEntries).values({
           voucherId: parentVoucher.id,
-          companyId: parentCompanyId,
           ledgerAccountId: freightOpts.freightParentAccountId,
           debitAmount: "0",
           creditAmount: freightAmtStr,

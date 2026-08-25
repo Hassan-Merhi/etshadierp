@@ -24,47 +24,51 @@ import { eq, and, sql, ilike } from "drizzle-orm";
 
 export function registerOrderBaleSwapRoutes(app: Express) {
   // GET /api/factory/bales/:id/order-info — get the order a bale is allocated to (for the confirmation dialog)
-  app.get("/api/factory/bales/:id/order-info", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
-    try {
-      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+  app.get(
+    "/api/factory/bales/:id/order-info",
+    requireAuth,
+    async (req: import("express").Request, res: import("express").Response) => {
+      try {
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const baleId = parseId(req.params.id);
-      if (baleId === null) return res.status(400).json({ message: "Invalid bale id" });
+        const baleId = parseId(req.params.id);
+        if (baleId === null) return res.status(400).json({ message: "Invalid bale id" });
 
-      const [orderBale] = await db.select().from(customerOrderBales).where(eq(customerOrderBales.baleId, baleId));
-      if (!orderBale) return res.json(null);
+        const [orderBale] = await db.select().from(customerOrderBales).where(eq(customerOrderBales.baleId, baleId));
+        if (!orderBale) return res.json(null);
 
-      const [order] = await db
-        .select({
-          id: customerOrders.id,
-          status: customerOrders.status,
-          invoiceNumber: customerOrders.invoiceNumber,
-          grandTotal: customerOrders.grandTotal,
-          customerName: customers.legalName,
-          orderDate: customerOrders.orderDate,
-          containerNumber: customerOrders.containerNumber,
-          totalQtyBales: customerOrders.totalQtyBales,
-        })
-        .from(customerOrders)
-        .leftJoin(customers, eq(customers.id, customerOrders.customerId))
-        .where(and(eq(customerOrders.id, orderBale.orderId), eq(customerOrders.companyId, companyId)));
+        const [order] = await db
+          .select({
+            id: customerOrders.id,
+            status: customerOrders.status,
+            invoiceNumber: customerOrders.invoiceNumber,
+            grandTotal: customerOrders.grandTotal,
+            customerName: customers.legalName,
+            orderDate: customerOrders.orderDate,
+            containerNumber: customerOrders.containerNumber,
+            totalQtyBales: customerOrders.totalQtyBales,
+          })
+          .from(customerOrders)
+          .leftJoin(customers, eq(customers.id, customerOrders.customerId))
+          .where(and(eq(customerOrders.id, orderBale.orderId), eq(customerOrders.companyId, companyId)));
 
-      if (!order) return res.json(null);
+        if (!order) return res.json(null);
 
-      // Count remaining bales so the frontend can warn if this is the last one
-      const baleCount = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(customerOrderBales)
-        .where(eq(customerOrderBales.orderId, order.id));
-      const remainingCount = Number(baleCount[0]?.count ?? 0);
+        // Count remaining bales so the frontend can warn if this is the last one
+        const baleCount = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(customerOrderBales)
+          .where(eq(customerOrderBales.orderId, order.id));
+        const remainingCount = Number(baleCount[0]?.count ?? 0);
 
-      res.json({ ...order, totalBalesInOrder: remainingCount });
-    } catch (error: unknown) {
-      logger.error("Error fetching bale order info:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
+        res.json({ ...order, totalBalesInOrder: remainingCount });
+      } catch (error: unknown) {
+        logger.error("Error fetching bale order info:", { error: error });
+        res.status(500).json({ message: getErrorMessage(error) });
+      }
     }
-  });
+  );
 
   // POST /api/factory/bales/swap — swap a loaded bale (SOLD/RESERVED) with an IN_STOCK bale by reference number
   // The current bale is returned to stock; the replacement bale takes its place in the order.
@@ -132,7 +136,7 @@ export function registerOrderBaleSwapRoutes(app: Express) {
         .where(and(eq(customerOrders.id, orderBale.orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Associated order not found" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // 5. Update customerOrderBales to point to the replacement bale (keep priceUsed unchanged)
         await tx
           .update(customerOrderBales)
@@ -212,7 +216,7 @@ export function registerOrderBaleSwapRoutes(app: Express) {
           if (daybookEntry) {
             await tx
               .update(factoryDaybookEntries)
-              .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
+              .set({ amountCurrency: String(newGrandTotal), amountUsd: String(newGrandTotal) })
               .where(eq(factoryDaybookEntries.id, daybookEntry.id));
           }
         }
@@ -238,7 +242,7 @@ export function registerOrderBaleSwapRoutes(app: Express) {
           if (verifiedEntry) {
             await tx
               .update(factoryDaybookEntries)
-              .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
+              .set({ amountCurrency: String(newGrandTotal), amountUsd: String(newGrandTotal) })
               .where(eq(factoryDaybookEntries.id, verifiedEntry.id));
           }
         }

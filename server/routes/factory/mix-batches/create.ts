@@ -43,7 +43,7 @@ export function registerFactoryMixBatchCreateRoutes(app: Express) {
         return res.status(400).json({ message: "At least one source is required" });
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const year = new Date().getFullYear();
         const existingBatches = await tx
           .select({ batchCode: factoryMixBatches.batchCode })
@@ -217,7 +217,7 @@ export function registerFactoryMixBatchCreateRoutes(app: Express) {
           if (ctnSupplierId) {
             costUsd = await getLockedSupplierRate(tx, companyId, ctnSupplierId, { forUpdate: true });
           } else {
-            costUsd = parseFloat(rawStock.costPerKgUsd) || parseFloat(rawStock.costPerKg) || 0;
+            costUsd = parseFloat(rawStock.costPerKgUsd || "0") || parseFloat(rawStock.costPerKg || "0") || 0;
           }
 
           // Allow over-use: usedKg may exceed receivedKg, driving stock negative

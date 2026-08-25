@@ -171,7 +171,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
 
         // 4b. OTW containers must have a Goods-OTW accounting voucher posted
         const missingOtwVouchers = (
-          await db.execute(sql`
+          await db.execute<{ container_number: string }>(sql`
           SELECT c.container_number FROM containers c
           WHERE c.company_id = ${sourceId} AND (c.status = 'OTW' OR c.status = 'Open')
             AND EXISTS (
@@ -184,7 +184,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
             )
           ORDER BY c.container_number LIMIT 50
         `)
-        ).rows as any[];
+        ).rows;
         areas.push({
           area: "Container OTW accounting",
           status: missingOtwVouchers.length === 0 ? "PASS" : "WARN",

@@ -157,7 +157,7 @@ export function registerSupplierStatementRoutes(app: Express) {
       // Use otherChargesCurrencyCode when set, otherwise default to USD
       const allSupplierCharges = [
         ...supplierOffloadCharges,
-        ...(containerColCharges as any[]).map((c) => ({
+        ...containerColCharges.map((c) => ({
           ...c,
           amount: c.amount,
           currencyCode: c.otherChargesCurrencyCode || "USD",
@@ -280,7 +280,7 @@ export function registerSupplierStatementRoutes(app: Express) {
       const byCurrency: Record<
         string,
         {
-          containers: any[];
+          containers: (typeof statement)[number][];
           totalKg: number;
           totalValue: number;
           totalCommission: number;
@@ -585,15 +585,17 @@ export function registerSupplierStatementRoutes(app: Express) {
         // Weighted-average fxRateToUsd across this currency's containers whose rate actually
         // looks resolved (confirmed non-USD rate, or legacy heuristic where no flag exists yet).
         const ctrs = cg.containers;
+        // The statement rows do not carry fxRateConfirmed, so this has always
+        // fallen back to the legacy heuristic inside resolveStoredFxRate.
         const resolvedCtrs = ctrs.filter((c) => {
-          const { looksSet } = resolveStoredFxRate(cg.currencyCode, c.fxRateToUsd, c.fxRateConfirmed);
+          const { looksSet } = resolveStoredFxRate(cg.currencyCode, c.fxRateToUsd, undefined);
           return looksSet;
         });
         const totalRawVal = resolvedCtrs.reduce((s: number, c) => s + parseFloat(c.value || "0"), 0);
         if (totalRawVal <= 0) return sum; // no resolved-rate containers → exclude rather than guess
         const weightedRate =
           resolvedCtrs.reduce((s: number, c) => {
-            const { fxRate } = resolveStoredFxRate(cg.currencyCode, c.fxRateToUsd, c.fxRateConfirmed);
+            const { fxRate } = resolveStoredFxRate(cg.currencyCode, c.fxRateToUsd, undefined);
             return s + parseFloat(c.value || "0") * fxRate;
           }, 0) / totalRawVal;
         return sum + netPay * weightedRate;
@@ -626,7 +628,9 @@ export function registerSupplierStatementRoutes(app: Express) {
       }
 
       // Fetch commission supplier names for the statement
-      const commSupplierIds = (obRawStockWithCommission as any[]).map((r) => r.commissionSupplierId).filter(Boolean);
+      const commSupplierIds = obRawStockWithCommission
+        .map((r) => r.commissionSupplierId)
+        .filter((id): id is number => id != null);
       const commSupplierMap: Record<number, string> = {};
       if (commSupplierIds.length > 0) {
         const commSuppliers = await db
@@ -635,7 +639,7 @@ export function registerSupplierStatementRoutes(app: Express) {
           .where(sql`${factorySuppliers.id} = ANY(${sqlArray(commSupplierIds)})`);
         for (const s of commSuppliers) commSupplierMap[s.id] = s.name;
       }
-      const obCommissions = (obRawStockWithCommission as any[])
+      const obCommissions = obRawStockWithCommission
         .filter((r) => r.commissionAmount && parseFloat(r.commissionAmount) > 0)
         .map((r) => ({
           rawStockId: r.id,
@@ -692,7 +696,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         };
       });
       // ── Phase 5: Build pre-sorted unified ledger ─────────────────────────────
-      const fmtAmt = (amt: string, cc: string, neg: boolean) => {
+      const fmtAmt = (amt: string | null, cc: string, neg: boolean) => {
         const prefix = cc !== "USD" ? `${cc} ` : "$";
         const sign = neg ? "-" : "+";
         return `${sign}${prefix}${parseFloat(amt || "0").toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -710,17 +714,18 @@ export function registerSupplierStatementRoutes(app: Express) {
           allocatedAmount: s.allocatedAmount,
           remainingAmount: s.remainingAmount,
         })),
-        ...(payments as any[]).map((p) => ({
+        ...payments.map((p) => ({
           key: `p-${p.id}`,
           date: p.date,
           type: "payment",
           ref: null,
-          detail: p.method || "Payment",
+          // factory_supplier_payments has no method column; the label is constant.
+          detail: "Payment",
           amount: fmtAmt(p.amount, p.currencyCode || "USD", true),
           amountIsNeg: true,
           notes: p.notes,
         })),
-        ...(voucherPaymentRows as any[]).map((p) => ({
+        ...voucherPaymentRows.map((p) => ({
           key: `vp-${p.id}`,
           date: p.voucherDate,
           type: "payment",

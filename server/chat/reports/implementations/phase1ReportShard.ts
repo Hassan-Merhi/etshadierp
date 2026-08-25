@@ -21,7 +21,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
 
   switch (params.queryType) {
     case "pl_summary": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ account_type: string; total_debit: string; total_credit: string }>(sql`
         SELECT la.account_type,
           COALESCE(SUM(CAST(ve.debit_amount AS numeric)), 0) AS total_debit,
           COALESCE(SUM(CAST(ve.credit_amount AS numeric)), 0) AS total_credit
@@ -35,7 +35,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       let revenue = 0,
         cogs = 0,
         opex = 0;
-      for (const row of rows.rows as any[]) {
+      for (const row of rows.rows) {
         const dr = parseFloat(row.total_debit || "0");
         const cr = parseFloat(row.total_credit || "0");
         if (row.account_type === "Income") revenue += cr - dr;
@@ -60,7 +60,14 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "cash_position": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{
+        name: string;
+        account_type: string;
+        opening_balance: string | null;
+        opening_balance_side: string | null;
+        total_debit: string;
+        total_credit: string;
+      }>(sql`
         SELECT la.name, la.account_type, la.opening_balance, la.opening_balance_side,
           COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.debit_amount AS numeric) ELSE 0 END), 0) AS total_debit,
           COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.credit_amount AS numeric) ELSE 0 END), 0) AS total_credit
@@ -72,7 +79,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY la.account_type, la.name
       `);
       let grandTotal = 0;
-      const stats = (rows.rows as any[]).map((row) => {
+      const stats = rows.rows.map((row) => {
         const ob = parseFloat(row.opening_balance || "0");
         const obAdj = row.opening_balance_side === "Cr" ? -ob : ob;
         const bal = obAdj + parseFloat(row.total_debit || "0") - parseFloat(row.total_credit || "0");
@@ -98,7 +105,14 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "overdue_payments": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{
+        name: string;
+        opening_balance: string | null;
+        opening_balance_side: string | null;
+        total_debit: string;
+        total_credit: string;
+        last_tx: string | null;
+      }>(sql`
         SELECT la.name, la.opening_balance, la.opening_balance_side,
           COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.debit_amount AS numeric) ELSE 0 END), 0) AS total_debit,
           COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.credit_amount AS numeric) ELSE 0 END), 0) AS total_credit,
@@ -121,7 +135,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ) DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows = (rows.rows as any[]).map((row) => {
+      const tableRows = rows.rows.map((row) => {
         const ob = parseFloat(row.opening_balance || "0");
         const obAdj = row.opening_balance_side === "Cr" ? -ob : ob;
         const bal = obAdj + parseFloat(row.total_debit || "0") - parseFloat(row.total_credit || "0");
@@ -273,7 +287,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "top_customers": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ name: string; tx_count: string; total_received: string }>(sql`
         SELECT la.name,
           COUNT(DISTINCT v.id) AS tx_count,
           COALESCE(SUM(CAST(ve.credit_amount AS numeric)), 0) AS total_received
@@ -288,7 +302,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY total_received DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows = (rows.rows as any[]).map((r, i) => [
+      const tableRows = rows.rows.map((r, i) => [
         String(i + 1),
         r.name,
         String(r.tx_count),
@@ -305,7 +319,13 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "outstanding_suppliers": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{
+        name: string;
+        opening_balance: string | null;
+        opening_balance_side: string | null;
+        total_debit: string;
+        total_credit: string;
+      }>(sql`
         SELECT la.name, la.opening_balance, la.opening_balance_side,
           COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.debit_amount AS numeric) ELSE 0 END), 0) AS total_debit,
           COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.credit_amount AS numeric) ELSE 0 END), 0) AS total_credit
@@ -327,7 +347,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ) ASC
         LIMIT ${rowLimit}
       `);
-      const tableRows = (rows.rows as any[]).map((row) => {
+      const tableRows = rows.rows.map((row) => {
         const ob = parseFloat(row.opening_balance || "0");
         const obAdj = row.opening_balance_side === "Cr" ? -ob : ob;
         const bal = obAdj + parseFloat(row.total_debit || "0") - parseFloat(row.total_credit || "0");
@@ -344,14 +364,14 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "worker_attendance": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ status: string; count: string; workers: string }>(sql`
         SELECT fa.status, COUNT(*) AS count, COUNT(DISTINCT fa.worker_id) AS workers
         FROM factory_attendance fa
         WHERE fa.company_id = ${companyId}
           AND fa.attendance_date BETWEEN ${dateFrom} AND ${dateTo}
         GROUP BY fa.status ORDER BY fa.status
       `);
-      const totalRecords = (rows.rows as any[]).reduce((s: number, r) => s + parseInt(r.count || "0"), 0);
+      const totalRecords = rows.rows.reduce((s: number, r) => s + parseInt(r.count || "0"), 0);
       const stats = rows.rows.map((r) => ({
         label: r.status,
         value: `${r.count} records · ${r.workers} worker(s)`,
@@ -369,7 +389,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "bale_production": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ status: string; count: string; total_weight: string }>(sql`
         SELECT fb.status, COUNT(*) AS count,
           COALESCE(SUM(CAST(fb.weight_kg AS numeric)), 0) AS total_weight
         FROM factory_bales fb
@@ -377,9 +397,9 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
           AND fb.created_at::date BETWEEN ${dateFrom} AND ${dateTo}
         GROUP BY fb.status ORDER BY count DESC
       `);
-      const totalBales = (rows.rows as any[]).reduce((s: number, r) => s + parseInt(r.count || "0"), 0);
-      const totalWeight = (rows.rows as any[]).reduce((s: number, r) => s + parseFloat(r.total_weight || "0"), 0);
-      const tableRows = (rows.rows as any[]).map((r) => [
+      const totalBales = rows.rows.reduce((s: number, r) => s + parseInt(r.count || "0"), 0);
+      const totalWeight = rows.rows.reduce((s: number, r) => s + parseFloat(r.total_weight || "0"), 0);
+      const tableRows = rows.rows.map((r) => [
         String(r.status).replace(/_/g, " "),
         String(r.count),
         fmtDec(parseFloat(r.total_weight || "0")) + " kg",

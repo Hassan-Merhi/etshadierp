@@ -9,7 +9,7 @@ import {
  * to keep PAYROLL-GEN-* vouchers in sync when payroll records are removed.
  */
 
-import { db as globalDb, type DbTransaction } from "../../db";
+import { db as globalDb, type DatabaseOrTransaction } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { eq, and, sql, inArray, ne, isNull } from "drizzle-orm";
 import { ledgerAccounts, vouchers, voucherEntries, factoryPayrolls, factoryWorkers } from "@shared/schema";
@@ -59,12 +59,12 @@ export async function findOrCreateLedger(
 
   for (let attempt = 0; attempt < 5; attempt++) {
     const [maxCodeRow] = await globalDb
-      .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+      .select({ maxCode: sql<number | null>`MAX(CAST(code AS INTEGER))` })
       .from(ledgerAccounts)
       .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
-    const nextCode = String((parseInt((maxCodeRow as { maxCode: string })?.maxCode || "0") || 0) + 1 + attempt);
+    const nextCode = String((maxCodeRow?.maxCode ?? 0) + 1 + attempt);
     try {
-      const insertVals: any = {
+      const insertVals: typeof ledgerAccounts.$inferInsert = {
         companyId,
         code: nextCode,
         name,
@@ -117,7 +117,7 @@ export async function findOrCreateLedger(
  * @param excludePayrollId  The payroll id being deleted (excluded from "remaining" query)
  */
 export async function rebuildPayrollGenVoucher(
-  tx: DbTransaction,
+  tx: DatabaseOrTransaction,
   companyId: number,
   periodStart: string,
   periodEnd: string,

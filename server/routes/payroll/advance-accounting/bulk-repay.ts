@@ -73,7 +73,7 @@ export function registerAdvanceBulkRepayRoutes(app: Express) {
         return res.status(400).json({ message: "No outstanding manual repayment advances found for this worker" });
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         let advancesAccountId: number | null = null;
         if (cashAccountId) {
           let [found] = await tx
@@ -82,10 +82,10 @@ export function registerAdvanceBulkRepayRoutes(app: Express) {
             .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Worker Advances")));
           if (!found) {
             const maxCodeResult = await tx
-              .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+              .select({ maxCode: sql<number | null>`MAX(CAST(code AS INTEGER))` })
               .from(ledgerAccounts)
               .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
-            const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
+            const nextCode = String((maxCodeResult[0]?.maxCode ?? 0) + 1);
             [found] = await tx
               .insert(ledgerAccounts)
               .values({

@@ -434,7 +434,7 @@ export function registerOrderChargesRoutes(app: Express) {
         .where(and(eq(customerOrderCharges.orderId, orderId), eq(customerOrderCharges.id, chargeId)));
       if (!chargeBeforeUpdate) return res.status(404).json({ message: "Charge not found" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         await tx
           .update(customerOrderCharges)
           .set(updateData)
@@ -608,7 +608,7 @@ export function registerOrderChargesRoutes(app: Express) {
           if (daybookEntry) {
             await tx
               .update(factoryDaybookEntries)
-              .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
+              .set({ amountCurrency: String(newGrandTotal), amountUsd: String(newGrandTotal) })
               .where(eq(factoryDaybookEntries.id, daybookEntry.id));
           }
         }
@@ -633,7 +633,7 @@ export function registerOrderChargesRoutes(app: Express) {
           if (verifiedDaybookEntry) {
             await tx
               .update(factoryDaybookEntries)
-              .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
+              .set({ amountCurrency: String(newGrandTotal), amountUsd: String(newGrandTotal) })
               .where(eq(factoryDaybookEntries.id, verifiedDaybookEntry.id));
           }
         }

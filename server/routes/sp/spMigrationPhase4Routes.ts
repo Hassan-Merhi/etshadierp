@@ -207,33 +207,69 @@ function installPhase4WriteGuard(app: Express): void {
   stack.splice(firstRouteIndex, 0, layer);
 }
 
-async function invokeMigrationHandler(
-  handler: (req: Request, res: Response) => Promise<any>,
-  req: any,
-  body: any
-): Promise<any> {
+/** The slice of the Express response API the migration handlers reach for. */
+type CapturedResponse = {
+  status(code: number): CapturedResponse;
+  json(value: unknown): CapturedResponse;
+  send(value: unknown): CapturedResponse;
+};
+
+/** A migration endpoint handler, reused both as a route and programmatically. */
+type MigrationHandler = (req: Request, res: Response) => Promise<Response | void>;
+
+/** Counts of genuine (non-migration) activity already present in the target company. */
+type TargetLiveActivity = {
+  vouchers: number;
+  sales: number;
+  offloads: number;
+  prepaid: number;
+  containers: number;
+  total: number;
+};
+
+/** A row of sp_migration_cutovers. */
+type CutoverRow = Record<string, unknown> & {
+  id: number;
+  source_company_id: number;
+  target_company_id: number;
+  source_company_name: string;
+  status: string;
+  activated_at: string | null;
+  rollback_deadline: string | null;
+};
+
+/** The `{ runId }` acknowledgement the delta-import handlers return. */
+type MigrationRunAck = { runId: string | number };
+
+async function invokeMigrationHandler(handler: MigrationHandler, req: Request, body: unknown): Promise<unknown> {
   let statusCode = 200;
-  let payload: any = null;
-  const response: any = {
+  let payload: unknown = null;
+  const response: CapturedResponse = {
     status(code: number) {
       statusCode = code;
       return this;
     },
-    json(value: any) {
+    json(value: unknown) {
       payload = value;
       return this;
     },
-    send(value: any) {
+    send(value: unknown) {
       payload = value;
       return this;
     },
   };
-  await handler({ ...req, body }, response);
-  if (statusCode >= 400) throw new Error(payload?.message ?? `Migration handler failed with status ${statusCode}`);
+  // The handlers only read `body` off the request and only call the three
+  // response methods captured above, so a shallow clone and this recorder
+  // stand in for the real Express pair.
+  await handler({ ...req, body } as Request, response as unknown as Response);
+  if (statusCode >= 400) {
+    const message = (payload as { message?: string } | null)?.message;
+    throw new Error(message ?? `Migration handler failed with status ${statusCode}`);
+  }
   return payload;
 }
 
-async function targetLiveActivity(targetId: number, activatedAt?: string | null): Promise<any> {
+async function targetLiveActivity(targetId: number, activatedAt?: string | null): Promise<TargetLiveActivity> {
   const vouchers = await db.execute(
     activatedAt
       ? sql`
@@ -302,7 +338,7 @@ async function targetLiveActivity(targetId: number, activatedAt?: string | null)
   return { ...counts, total: Object.values(counts).reduce((sum, value) => sum + value, 0) };
 }
 
-async function normalizedVerification(sourceId: number, targetId: number, requireUnusedTarget = true): Promise<any> {
+async function normalizedVerification(sourceId: number, targetId: number, requireUnusedTarget = true) {
   const verification = await buildFinalMigrationVerification(sourceId, targetId);
   verification.blockers = (verification.blockers ?? []).filter(
     (issue: { code: string }) => issue.code !== "TARGET_ALREADY_LIVE"
@@ -323,12 +359,12 @@ async function normalizedVerification(sourceId: number, targetId: number, requir
   return verification;
 }
 
-async function loadCutover(cutoverId: number): Promise<any | null> {
+async function loadCutover(cutoverId: number): Promise<CutoverRow | null> {
   const result = await db.execute(sql`SELECT * FROM sp_migration_cutovers WHERE id = ${cutoverId} LIMIT 1`);
-  return firstRow(result) ?? null;
+  return firstRow<CutoverRow>(result) ?? null;
 }
 
-async function prepareCutover(req: Request, res: Response): Promise<any> {
+async function prepareCutover(req: Request, res: Response): Promise<Response | void> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const error = exactCutoverConfirmation(
@@ -371,7 +407,7 @@ async function prepareCutover(req: Request, res: Response): Promise<any> {
   });
 }
 
-async function finalizeCutover(req: Request, res: Response): Promise<any> {
+async function finalizeCutover(req: Request, res: Response): Promise<Response | void> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const error = exactCutoverConfirmation(
@@ -405,7 +441,7 @@ async function finalizeCutover(req: Request, res: Response): Promise<any> {
       companyNameConfirm: pair.sourceCompany.name,
       confirmation: "MIGRATE",
     };
-    const salesDelta = await invokeMigrationHandler(importHistoricalSales, req, migrationBody);
+    const salesDelta = (await invokeMigrationHandler(importHistoricalSales, req, migrationBody)) as MigrationRunAck;
     partialDeltaSummary.salesDelta = salesDelta;
     const salesRepair = await reconcileHistoricalSalesCopy({
       runId: String(salesDelta.runId),
@@ -413,7 +449,7 @@ async function finalizeCutover(req: Request, res: Response): Promise<any> {
       targetId: pair.targetId,
     });
     partialDeltaSummary.salesRepair = salesRepair;
-    const containerDelta = await invokeMigrationHandler(importContainers, req, migrationBody);
+    const containerDelta = (await invokeMigrationHandler(importContainers, req, migrationBody)) as MigrationRunAck;
     partialDeltaSummary.containerDelta = containerDelta;
     const containerRepair = await reconcileMigrationOwnedContainers({
       runId: String(containerDelta.runId),
@@ -521,7 +557,7 @@ async function finalizeCutover(req: Request, res: Response): Promise<any> {
   }
 }
 
-async function rollbackCutover(req: Request, res: Response): Promise<any> {
+async function rollbackCutover(req: Request, res: Response): Promise<Response | void> {
   const cutoverId = pn(req.body?.cutoverId);
   if (!cutoverId) return res.status(400).json({ message: "cutoverId is required" });
   await ensurePhase4Schema();
@@ -571,7 +607,7 @@ async function rollbackCutover(req: Request, res: Response): Promise<any> {
   });
 }
 
-async function cancelPreparedCutover(req: Request, res: Response): Promise<any> {
+async function cancelPreparedCutover(req: Request, res: Response): Promise<Response | void> {
   const cutoverId = pn(req.body?.cutoverId);
   if (!cutoverId) return res.status(400).json({ message: "cutoverId is required" });
   await ensurePhase4Schema();
@@ -624,7 +660,7 @@ async function cancelPreparedCutover(req: Request, res: Response): Promise<any> 
   });
 }
 
-async function releaseTargetHold(req: Request, res: Response): Promise<any> {
+async function releaseTargetHold(req: Request, res: Response): Promise<Response | void> {
   const cutoverId = pn(req.body?.cutoverId);
   if (!cutoverId) return res.status(400).json({ message: "cutoverId is required" });
   await ensurePhase4Schema();
@@ -666,7 +702,7 @@ async function releaseTargetHold(req: Request, res: Response): Promise<any> {
   return res.json({ success: true, cutover: resultRows(released)[0] });
 }
 
-async function statusCutover(req: Request, res: Response): Promise<any> {
+async function statusCutover(req: Request, res: Response): Promise<Response | void> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   await ensurePhase4Schema();
@@ -683,7 +719,7 @@ async function statusCutover(req: Request, res: Response): Promise<any> {
   });
 }
 
-async function finalVerification(req: Request, res: Response): Promise<any> {
+async function finalVerification(req: Request, res: Response): Promise<Response | void> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const live = await getLiveCutover(pair.sourceId, pair.targetId);

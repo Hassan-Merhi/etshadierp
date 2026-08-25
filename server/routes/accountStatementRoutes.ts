@@ -22,10 +22,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
 import { isParentCompanyContext } from "./helpers/supplierBalanceHelpers";
-import {
-  projectExportCurrencyRow,
-  summarizeExportCurrencyRows,
-} from "../services/accounting/exportCurrency";
+import { projectExportCurrencyRow, summarizeExportCurrencyRows } from "../services/accounting/exportCurrency";
 import {
   bankAccounts,
   companies,
@@ -39,6 +36,7 @@ import {
   voucherEntries,
   vouchers,
 } from "@shared/schema";
+import type { AccountStatementEntryRow } from "../storage/accounting/vouchers";
 
 export function registerAccountStatementRoutes(app: Express) {
   app.get("/api/accounts/:type/:id/deleted-vouchers", requireAuth, async (req, res) => {
@@ -407,7 +405,7 @@ export function registerAccountStatementRoutes(app: Express) {
         accountName = `${acct.firstName} ${acct.lastName}`.trim();
       }
 
-      let txRows = [];
+      let txRows: AccountStatementEntryRow[] = [];
       if (accountType === "ledger") {
         txRows = await storage.getVoucherEntriesByLedger(accountId, startDate, endDate, companyId);
       } else if (accountType === "bank") {
@@ -418,7 +416,7 @@ export function registerAccountStatementRoutes(app: Express) {
         txRows = await storage.getVoucherEntriesByEmployee(accountId, companyId, startDate, endDate);
       }
 
-      let allTxForBF = [];
+      let allTxForBF: AccountStatementEntryRow[] = [];
       if (startDate && accountType === "ledger") {
         allTxForBF = await storage.getVoucherEntriesByLedger(accountId, undefined, undefined, companyId);
       }
@@ -428,8 +426,7 @@ export function registerAccountStatementRoutes(app: Express) {
           const rDate = statementDateKey(r.voucherDate);
           if (rDate && rDate < startDate) {
             const projected = projectExportCurrencyRow(r as Record<string, unknown>);
-            bfBalance +=
-              parseFloat(projected.historicalBaseDebit) - parseFloat(projected.historicalBaseCredit);
+            bfBalance += parseFloat(projected.historicalBaseDebit) - parseFloat(projected.historicalBaseCredit);
           }
         }
       }
@@ -664,10 +661,7 @@ export function registerAccountStatementRoutes(app: Express) {
       currencySheet.addRow(["Historical base currency", "USD"]);
       currencySheet.addRow(["Rate convention", "TRANSACTION_PER_BASE"]);
       const currencySummary = summarizeExportCurrencyRows(txRows as unknown[]);
-      currencySheet.addRow([
-        "Totals provisional",
-        currencySummary.totalsProvisional ? "YES" : "NO",
-      ]);
+      currencySheet.addRow(["Totals provisional", currencySummary.totalsProvisional ? "YES" : "NO"]);
       currencySheet.addRow(["Unresolved legacy entries", currencySummary.unresolvedEntryCount]);
       currencySheet.addRow([]);
       const nativeHeaders = currencySheet.addRow([
@@ -721,8 +715,16 @@ export function registerAccountStatementRoutes(app: Express) {
       currencySheet.addRow(["Historical base debit total (USD)", Number(currencySummary.historicalBaseDebitTotal)]);
       currencySheet.addRow(["Historical base credit total (USD)", Number(currencySummary.historicalBaseCreditTotal)]);
       currencySheet.columns = [
-        { width: 14 }, { width: 18 }, { width: 42 }, { width: 18 }, { width: 18 },
-        { width: 18 }, { width: 24 }, { width: 24 }, { width: 18 }, { width: 22 },
+        { width: 14 },
+        { width: 18 },
+        { width: 42 },
+        { width: 18 },
+        { width: 18 },
+        { width: 18 },
+        { width: 24 },
+        { width: 24 },
+        { width: 18 },
+        { width: 22 },
       ];
       currencySheet.views = [{ state: "frozen", ySplit: 7 }];
 

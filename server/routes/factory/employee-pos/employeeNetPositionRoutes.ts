@@ -172,8 +172,8 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       );
 
       // Strip customer-linked accounts from the classifier output.
-      const ledgerForUs = classified.forUsAccounts.filter((a: any) => !customerLedgerIds.has(a.id));
-      const ledgerOnUsRaw = classified.onUsAccounts.filter((a: any) => !customerLedgerIds.has(a.id));
+      const ledgerForUs = classified.forUsAccounts.filter((a) => a.id === undefined || !customerLedgerIds.has(a.id));
+      const ledgerOnUsRaw = classified.onUsAccounts.filter((a) => a.id === undefined || !customerLedgerIds.has(a.id));
 
       // ── Strip any ledger-based "Payroll Payable" accounts ─────────────────────
       // The authoritative source for payroll payable is employees.currentBalance
@@ -303,7 +303,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
 
         const cVoucherMap = new Map(cVoucherRows.map((r) => [r.customerId, parseFloat(r.net || "0")]));
 
-        for (const c of allCustomersForNP as any[]) {
+        for (const c of allCustomersForNP) {
           const cbNet = cCbNetMap.get(c.id) ?? 0;
           const invCorr = cInvCorrMap.get(c.id) ?? 0;
           const ledgerVoucherNet = c.ledgerAccountId ? (cLedgerVoucherMap.get(c.ledgerAccountId) ?? 0) : 0;
@@ -314,7 +314,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           const totalBalance = (openingSide === "Dr" ? opening : -opening) + cbNet + invCorr + voucherNet;
           if (Math.abs(totalBalance) > 0.01) {
             customerItems.push({
-              name: c.legalName || c.name || `Customer #${c.id}`,
+              name: c.legalName || `Customer #${c.id}`,
               balanceUsd: round2(totalBalance),
               ledgerAccountId: c.ledgerAccountId || undefined,
             });
@@ -363,7 +363,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         )
         .orderBy(desc(customerOrders.orderDate));
 
-      const mapOrder = (r: any) => ({
+      const mapOrder = (r: (typeof pendingVerifiedRows)[number]) => ({
         id: r.id,
         customerName: r.customerName || `Customer #${r.customerId}`,
         orderDate: r.orderDate,

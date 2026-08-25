@@ -9,6 +9,7 @@ import ExcelJS from "exceljs";
 import path from "path";
 import fs from "fs";
 import { factoryDaybookEntries } from "@shared/schema";
+import type { DatabaseOrTransaction } from "../../db";
 
 /**
  * Daybook writing plus the PDF and Excel generators for the supplier-usage
@@ -18,7 +19,7 @@ import { factoryDaybookEntries } from "@shared/schema";
  * modules; they previously closed over the register function's body.
  */
 export async function writeDaybookEntry(
-  dbOrTx: any,
+  dbOrTx: DatabaseOrTransaction,
   opts: {
     companyId: number;
     txDate: string;
@@ -126,13 +127,60 @@ export async function generateEmptyExcel(
   res.end(xlsBuffer);
 }
 
+/** A factory_mix_batch_sources row as the supplier-usage report reads it. */
+export type MixSourceRow = {
+  mixBatchId: number | null;
+  containerId: number | null;
+  weightKg: string | null;
+  costPerKg: string | null;
+  totalCost: string | null;
+};
+
+/** One material line contributing to a bale in the supplier-usage report. */
+export type SupplierUsageBaleMaterial = {
+  containerId: number | null;
+  containerNumber: string;
+  weightKg: number;
+  costPerKg: number;
+  totalCost: number;
+};
+
+/** One bale row in the supplier-usage report. */
+export type SupplierUsageBaleRow = {
+  baleId: number;
+  baleCode: string | null;
+  referenceNumber: string;
+  productName: string;
+  supplierName: string;
+  weightKg: number;
+  costPerKg: number;
+  totalCost: number;
+  date: string;
+  materials: SupplierUsageBaleMaterial[];
+};
+
+/** One supplier row in the supplier-usage report. */
+export type SupplierUsageSummaryRow = {
+  supplierId: number;
+  supplierName: string;
+  openingBalance: number;
+  totalPurchasedKg: number;
+  totalUsedKg: number;
+  remaining: number;
+  avgCostPerKg: number;
+  costPerBale: number;
+  totalBales: number;
+  totalCost: number;
+  bales: unknown[];
+};
+
 export async function generatePdf(
   res: import("express").Response,
   companyName: string,
   startDate: string,
   endDate: string,
-  supplierSummaries: any[],
-  baleBreakdown: any[],
+  supplierSummaries: SupplierUsageSummaryRow[],
+  baleBreakdown: SupplierUsageBaleRow[],
   hideAllCosts: boolean
 ) {
   const doc = new PDFDocument({ margin: 40, size: "A4", layout: "landscape" });
@@ -239,8 +287,8 @@ export async function generatePdf(
         y = 40;
       }
 
-      const materialsStr = bale.materials.map((m: any) => m.containerNumber).join(", ") || "N/A";
-      const kgEachStr = bale.materials.map((m: any) => m.weightKg.toFixed(3)).join(", ") || "N/A";
+      const materialsStr = bale.materials.map((m) => m.containerNumber).join(", ") || "N/A";
+      const kgEachStr = bale.materials.map((m) => m.weightKg.toFixed(3)).join(", ") || "N/A";
 
       x = startX;
       const baleRow = [
@@ -252,7 +300,7 @@ export async function generatePdf(
         bale.date,
       ];
       for (let i = 0; i < baleRow.length; i++) {
-        doc.text(baleRow[i], x, y, { width: baleColWidths[i] });
+        doc.text(baleRow[i] ?? "", x, y, { width: baleColWidths[i] });
         x += baleColWidths[i];
       }
       y += 13;
@@ -267,11 +315,11 @@ export async function generateExcel(
   companyName: string,
   startDate: string,
   endDate: string,
-  supplierSummaries: any[],
-  baleBreakdown: any[],
-  allMixSources: any[],
-  containerMap: Map<number, any>,
-  supplierMap: Map<number, any>,
+  supplierSummaries: SupplierUsageSummaryRow[],
+  baleBreakdown: SupplierUsageBaleRow[],
+  allMixSources: MixSourceRow[],
+  containerMap: Map<number, { containerNumber: string; supplierId: number | null }>,
+  supplierMap: Map<number, { name: string }>,
   hideAllCosts: boolean
 ) {
   const workbook = new ExcelJS.Workbook();
@@ -438,8 +486,8 @@ export async function generateExcel(
   mixHeaderRow.font = boldFont;
 
   for (const ms of allMixSources) {
-    const container = containerMap.get(ms.containerId);
-    const supplier = container ? supplierMap.get(container.supplierId) : null;
+    const container = ms.containerId !== null ? containerMap.get(ms.containerId) : undefined;
+    const supplier = container?.supplierId != null ? supplierMap.get(container.supplierId) : null;
     if (hideAllCosts) {
       const row = sheet3.addRow([
         ms.mixBatchId,

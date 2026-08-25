@@ -275,7 +275,7 @@ export function validateCentralPostingRequest(request: CentralPostingRequest): V
  */
 export async function postBalancedVoucherTx(
   // Reached with a caller-generic TTransaction as well as a drizzle handle.
-  tx: any,
+  tx: DbTransaction,
   request: CentralPostingRequest,
   dependencies: CentralPostingDependencies
 ): Promise<CentralPostingResult> {

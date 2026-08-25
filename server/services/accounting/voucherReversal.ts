@@ -7,6 +7,7 @@ import {
   type PostingActor,
 } from "./centralPostingEngine";
 import { assertTransactionCompanyScope, type CompanyScopedTransaction } from "../security/transactionCompanyScope";
+import type { DbTransaction } from "../../db";
 
 /**
  * The immutable original voucher row, as locked inside the caller's
@@ -221,7 +222,10 @@ export async function reverseVoucherExactlyTx<TTransaction extends CompanyScoped
   });
 
   return postBalancedVoucherTx(
-    tx,
+    // The generic is intentionally structural (callers only owe company-scope
+    // assertions); every caller passes the drizzle transaction the central
+    // posting boundary writes through.
+    tx as unknown as DbTransaction,
     {
       ...reversal,
       source: {

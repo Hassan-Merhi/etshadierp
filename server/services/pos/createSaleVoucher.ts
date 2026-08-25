@@ -15,18 +15,18 @@ export async function insertSaleVoucher(
   tx: DbTransaction,
   params: {
     companyId: number;
-    locationId: any;
+    locationId: number;
     locationName: string;
     voucherNumber: string;
     voucherDate: string;
-    notes: any;
-    isCreditSale: any;
+    notes: string | null | undefined;
+    isCreditSale: boolean | null | undefined;
     customerAccountName: string | undefined;
     grandTotal: number;
     effectiveShiftId: number | null;
-    clientSaleId: any;
-    currency: any;
-    exchangeRate: any;
+    clientSaleId: string | undefined;
+    currency: string | null | undefined;
+    exchangeRate: string | number | null | undefined;
   }
 ) {
   const {
@@ -72,7 +72,7 @@ export async function insertSaleVoucher(
       shiftId: effectiveShiftId,
       clientSaleId: clientSaleId || null,
       currency: currency || "USD",
-      exchangeRate: exchangeRate || null,
+      exchangeRate: exchangeRate != null ? String(exchangeRate) : null,
       isCreditSale: !!isCreditSale,
     },
     postingIdentity,

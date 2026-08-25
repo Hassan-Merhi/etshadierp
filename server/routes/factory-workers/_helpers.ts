@@ -7,6 +7,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { factoryDaybookEntries } from "@shared/schema";
+import type { DatabaseOrTransaction } from "../../db";
 
 /** Prefer the factory-pinned company ID so cross-tab ERP company switches don't corrupt factory writes. */
 export function getFactoryCompanyId(req: import("express").Request): number | undefined {
@@ -80,7 +81,7 @@ export function computeMonthlyPayFromAttendance(
  * separate modules; it previously relied on closing over the register body.
  */
 export async function writeDaybookEntry(
-  dbOrTx: any,
+  dbOrTx: DatabaseOrTransaction,
   opts: {
     companyId: number;
     txDate: string;

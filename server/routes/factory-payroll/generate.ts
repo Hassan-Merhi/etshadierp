@@ -12,6 +12,7 @@ import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import { checkFactoryAdmin } from "../factory/_helpers";
 import { eq, and, gte, lte, inArray } from "drizzle-orm";
+
 import {
   factoryWorkers,
   factoryPayrolls,
@@ -62,7 +63,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
           )
         );
 
-      const balesByWorker = new Map();
+      const balesByWorker = new Map<number, (typeof balesInRange)[number][]>();
       for (const bale of balesInRange) {
         if (bale.finalizedBy) {
           const existing = balesByWorker.get(bale.finalizedBy) || [];
@@ -165,7 +166,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
             baleEarnings = balesCount * workerPerBaleRate;
             break;
           case "Per KG":
-            kgProcessed = workerBales.reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0);
+            kgProcessed = workerBales.reduce((sum: number, b) => sum + parseFloat(b.weightKg || "0"), 0);
             kgEarnings = kgProcessed * workerPerKgRate;
             break;
         }

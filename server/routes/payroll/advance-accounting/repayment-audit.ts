@@ -231,7 +231,7 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
         repaysByAdvId.set(r.advanceId, list);
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         // Resolve/create Factory Worker Advances ledger account once
         let [advancesAccount] = await tx
           .select({ id: ledgerAccounts.id })
@@ -239,10 +239,10 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
           .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Worker Advances")));
         if (!advancesAccount) {
           const maxCodeResult = await tx
-            .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+            .select({ maxCode: sql<number | null>`MAX(CAST(code AS INTEGER))` })
             .from(ledgerAccounts)
             .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
-          const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
+          const nextCode = String((maxCodeResult[0]?.maxCode ?? 0) + 1);
           [advancesAccount] = await tx
             .insert(ledgerAccounts)
             .values({

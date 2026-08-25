@@ -1,4 +1,4 @@
-import type { DbTransaction } from "../../db";
+import type { DatabaseOrTransaction, DatabasePool, DbTransaction } from "../../db";
 import { and, eq } from "drizzle-orm";
 import { userCompanyRoles, userSecurityPermissions } from "@shared/schema";
 
@@ -42,7 +42,11 @@ export function normalizePermissionList(value: unknown): string[] {
   return normalized.sort();
 }
 
-export async function loadNamedPermissions(db: any, userId: string, companyId: number): Promise<string[]> {
+export async function loadNamedPermissions(
+  db: DatabaseOrTransaction,
+  userId: string,
+  companyId: number
+): Promise<string[]> {
   try {
     const rows = await db
       .select({ permission: userSecurityPermissions.permission })
@@ -56,7 +60,11 @@ export async function loadNamedPermissions(db: any, userId: string, companyId: n
   }
 }
 
-export async function assertUserBelongsToCompany(db: any, userId: string, companyId: number): Promise<void> {
+export async function assertUserBelongsToCompany(
+  db: DatabaseOrTransaction,
+  userId: string,
+  companyId: number
+): Promise<void> {
   const [membership] = await db
     .select({ userId: userCompanyRoles.userId })
     .from(userCompanyRoles)
@@ -90,7 +98,7 @@ export async function replaceNamedPermissions(
   return permissions;
 }
 
-export async function hydrateSessionNamedPermissions(db: any, session: any): Promise<string[]> {
+export async function hydrateSessionNamedPermissions(db: DatabaseOrTransaction, session: any): Promise<string[]> {
   const userId = session?.userId;
   const companyId = session?.currentCompanyId;
   if (!userId || !Number.isSafeInteger(companyId) || companyId <= 0) {
@@ -111,7 +119,11 @@ export async function hydrateSessionNamedPermissions(db: any, session: any): Pro
   return permissions;
 }
 
-export async function invalidateUserCompanySessions(pool: any, userId: string, companyId: number): Promise<void> {
+export async function invalidateUserCompanySessions(
+  pool: DatabasePool,
+  userId: string,
+  companyId: number
+): Promise<void> {
   await pool.query(
     `DELETE FROM session WHERE sess->>'userId' = $1 AND COALESCE((sess->>'currentCompanyId')::int, 0) = $2`,
     [userId, companyId]

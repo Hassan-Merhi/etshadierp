@@ -85,7 +85,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
       const nextNum = (Number(seqRow?.count || 0) + 1).toString().padStart(4, "0");
       const saleNumber = `FPOS-${nextNum}`;
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         // 1. Create sale record
         const [sale] = await tx
           .insert(factoryPosSales)
@@ -171,7 +171,8 @@ export function registerPosSaleWriteRoutes(app: Express) {
           amountCurrency: totalAmount.toFixed(2),
           fxRateToUsd: "1",
           amountUsd: totalAmount.toFixed(2),
-          createdBy: userId,
+          // factory_daybook_entries.created_by is a varchar column.
+          createdBy: userId === null ? null : String(userId),
         });
 
         // 4b. Create daybook entries for each expense/deduction
@@ -187,7 +188,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
             amountCurrency: exp.amount.toFixed(2),
             fxRateToUsd: "1",
             amountUsd: exp.amount.toFixed(2),
-            createdBy: userId,
+            createdBy: userId === null ? null : String(userId),
           });
         }
 

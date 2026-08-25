@@ -1,13 +1,11 @@
 import { sql } from "drizzle-orm";
 import { sqlArray } from "../../lib/sqlArray";
+import { resultRows as rows } from "../../lib/queryResult";
+import type { DatabaseOrTransaction } from "../../db";
 import { rebuildPayrollGenVoucher } from "../../routes/payroll/_payrollAccountingHelper";
 import { calculateProductionBonusPreview, type ProductionBonusMemberSnapshot } from "../factory/productionBonusPreview";
 
 const ELIGIBLE_BALE_STATUSES = ["IN_STOCK", "SOLD", "RESERVED_FOR_ORDER", "DISPATCHED", "FINALIZED"] as const;
-
-function rows(result: any): any[] {
-  return Array.isArray(result) ? result : (result?.rows ?? []);
-}
 
 function parseMembers(value: unknown): ProductionBonusMemberSnapshot[] {
   let parsed: unknown = value;
@@ -79,7 +77,7 @@ const EMPTY_TOTALS: PayrollProductionBonusTotals = {
 };
 
 async function loadSavedPlanEntries(
-  executor: any,
+  executor: DatabaseOrTransaction,
   companyId: number,
   startDate: string,
   endDate: string
@@ -109,7 +107,7 @@ async function loadSavedPlanEntries(
 }
 
 async function loadActualMap(
-  executor: any,
+  executor: DatabaseOrTransaction,
   companyId: number,
   startDate: string,
   endDate: string
@@ -133,7 +131,7 @@ async function loadActualMap(
 }
 
 export async function syncProductionBonusProposalsForPeriod(
-  executor: any,
+  executor: DatabaseOrTransaction,
   companyId: number,
   startDate: string,
   endDate: string
@@ -220,7 +218,10 @@ export async function syncProductionBonusProposalsForPeriod(
  * transport and every other payroll component because net is adjusted by delta,
  * not reconstructed from a shortened formula.
  */
-export async function attachProductionBonusesToPayroll(executor: any, payrollId: number): Promise<void> {
+export async function attachProductionBonusesToPayroll(
+  executor: DatabaseOrTransaction,
+  payrollId: number
+): Promise<void> {
   const payrollResult = await executor.execute(sql`
     SELECT id, company_id AS "companyId", worker_id AS "workerId",
            period_start::text AS "periodStart", period_end::text AS "periodEnd", status,
@@ -263,7 +264,10 @@ export async function attachProductionBonusesToPayroll(executor: any, payrollId:
   }
 }
 
-export async function prepareProductionBonusesForPayroll(executor: any, payrollId: number): Promise<void> {
+export async function prepareProductionBonusesForPayroll(
+  executor: DatabaseOrTransaction,
+  payrollId: number
+): Promise<void> {
   const payrollResult = await executor.execute(sql`
     SELECT company_id AS "companyId", period_start::text AS "periodStart",
            period_end::text AS "periodEnd", status
@@ -283,7 +287,7 @@ export async function prepareProductionBonusesForPayroll(executor: any, payrollI
 }
 
 export async function getProductionBonusTotalsForPayrollIds(
-  executor: any,
+  executor: DatabaseOrTransaction,
   payrollIds: number[]
 ): Promise<Map<number, PayrollProductionBonusTotals>> {
   const map = new Map<number, PayrollProductionBonusTotals>();
@@ -316,7 +320,7 @@ export async function getProductionBonusTotalsForPayrollIds(
 }
 
 export async function getProductionBonusDetailsForPayroll(
-  executor: any,
+  executor: DatabaseOrTransaction,
   payrollId: number
 ): Promise<{ totals: PayrollProductionBonusTotals; allocations: PayrollProductionBonusAllocationDetail[] }> {
   await prepareProductionBonusesForPayroll(executor, payrollId);
@@ -359,7 +363,10 @@ export async function getProductionBonusDetailsForPayroll(
   return { totals, allocations };
 }
 
-export async function updateProductionBonusRunStatuses(executor: any, runIds: number[]): Promise<void> {
+export async function updateProductionBonusRunStatuses(
+  executor: DatabaseOrTransaction,
+  runIds: number[]
+): Promise<void> {
   for (const runId of [...new Set(runIds)]) {
     await executor.execute(sql`
       UPDATE factory_production_bonus_runs r

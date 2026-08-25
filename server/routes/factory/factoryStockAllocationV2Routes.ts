@@ -9,6 +9,29 @@ import { syncProformaReservations } from "./_stockReservationHelper";
 import { sqlArray } from "../../lib/sqlArray";
 import { resultRows } from "../../lib/queryResult";
 
+/** `article_code` plus a count, as the stock aggregation queries return it. */
+type ArticleCountRow = { articleCode: string; count: number };
+/** Reserved-but-not-yet-loaded totals per article. */
+type ArticleReservationRow = { articleCode: string; reservedNotYetLoaded: number };
+/** A resolved product display name for an article code. */
+type ProductNameRow = { articleCode: string; name: string | null };
+/** A proforma line as this route reads it. */
+type ProformaLineRow = {
+  id: number;
+  proformaId: number;
+  articleCode: string;
+  productName: string;
+  quantity: number;
+};
+/** An active loading order row. */
+type LoadingOrderRow = {
+  id: number;
+  customerId: number;
+  containerNumber: string | null;
+  status: string;
+  proformaIdUsed: number | null;
+};
+
 // ─── Backend stock-truth helper ───────────────────────────────────────────────
 // Phases 1–4: compute per-article inventory state entirely on the backend.
 // The frontend must NEVER recompute availability from visible columns.
@@ -38,7 +61,9 @@ async function computeStockTruth(companyId: number) {
         WHERE company_id = ${companyId} AND status = 'IN_STOCK'
         GROUP BY article_code`
   );
-  const inStockMap = new Map<string, number>(resultRows(inStockRaw).map((r: any) => [r.articleCode, Number(r.count)]));
+  const inStockMap = new Map<string, number>(
+    resultRows<ArticleCountRow>(inStockRaw).map((r) => [r.articleCode, Number(r.count)])
+  );
 
   // RESERVED_FOR_ORDER = bales physically picked into an active loading order
   const inLoadingRaw = await db.execute(
@@ -51,7 +76,7 @@ async function computeStockTruth(companyId: number) {
         GROUP BY fb.article_code`
   );
   const inLoadingMap = new Map<string, number>(
-    resultRows(inLoadingRaw).map((r: any) => [r.articleCode, Number(r.count)])
+    resultRows<ArticleCountRow>(inLoadingRaw).map((r) => [r.articleCode, Number(r.count)])
   );
 
   // ── proformaStockReservations is the backend SOT for reservedNotYetLoaded ──
@@ -65,7 +90,7 @@ async function computeStockTruth(companyId: number) {
         GROUP BY article_code`
   );
   const reservedNotYetLoadedMap = new Map<string, number>(
-    resultRows(reservedRaw).map((r: any) => [r.articleCode, Number(r.reservedNotYetLoaded)])
+    resultRows<ArticleReservationRow>(reservedRaw).map((r) => [r.articleCode, Number(r.reservedNotYetLoaded)])
   );
 
   // Union all known article codes from all three sources
@@ -142,7 +167,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
         .orderBy(customerProformas.createdAt);
 
       const proformaIds = allProformas.map((p) => p.id);
-      let allLines: any[] = [];
+      let allLines: ProformaLineRow[] = [];
       if (proformaIds.length > 0) {
         allLines = await db
           .select({
@@ -171,9 +196,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             GROUP BY co.proforma_id_used, fb.article_code`
       );
       type LoadedEntry = { proformaId: number; articleCode: string; loaded: number };
-      const loadedByProforma: LoadedEntry[] = (
-        loadedByProformaRaw.rows || ((loadedByProformaRaw as unknown))
-      ).map((r: any) => ({
+      const loadedByProforma: LoadedEntry[] = resultRows<LoadedEntry>(loadedByProformaRaw).map((r) => ({
         proformaId: Number(r.proformaId),
         articleCode: r.articleCode,
         loaded: Number(r.loaded),
@@ -210,7 +233,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`
         );
-        (prodRaw.rows || ((prodRaw as unknown))).forEach((r: any) => {
+        resultRows<ProductNameRow>(prodRaw).forEach((r) => {
           if (r.name) productNamesMap[r.articleCode] = r.name;
         });
       }
@@ -269,12 +292,12 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             WHERE company_id = ${companyId} AND status = 'IN_STOCK'
             GROUP BY article_code`
       );
-      const freeStockCounts: { articleCode: string; count: number }[] = (
-        freeStockRaw.rows || ((freeStockRaw as unknown))
-      ).map((r: any) => ({
-        articleCode: r.articleCode,
-        count: Number(r.count),
-      }));
+      const freeStockCounts: { articleCode: string; count: number }[] = resultRows<ArticleCountRow>(freeStockRaw).map(
+        (r) => ({
+          articleCode: r.articleCode,
+          count: Number(r.count),
+        })
+      );
       const freeStockMap = new Map(freeStockCounts.map((s) => [s.articleCode, s.count]));
 
       const loadingsRaw = await db.execute(
@@ -284,7 +307,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             WHERE company_id = ${companyId} AND status IN ('LOADING','PENDING_VERIFICATION')
             ORDER BY id`
       );
-      const loadings: any[] = (loadingsRaw.rows || ((loadingsRaw as unknown))).map((r) => ({
+      const loadings: LoadingOrderRow[] = resultRows<LoadingOrderRow>(loadingsRaw).map((r) => ({
         id: r.id,
         customerId: r.customerId,
         containerNumber: r.containerNumber || null,
@@ -302,7 +325,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
               WHERE cob.order_id = ANY(${sqlArray(ids)})
               GROUP BY cob.order_id, fb.article_code`
         );
-        loadingBales = (balesRaw.rows || ((balesRaw as unknown))).map((r: any) => ({
+        loadingBales = resultRows<{ orderId: number; articleCode: string; count: number }>(balesRaw).map((r) => ({
           orderId: r.orderId,
           articleCode: r.articleCode,
           count: Number(r.count),
@@ -377,7 +400,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`
         );
-        (prodRaw.rows || ((prodRaw as unknown))).forEach((r: any) => {
+        resultRows<ProductNameRow>(prodRaw).forEach((r) => {
           if (r.name) productNameByCode.set(r.articleCode, r.name);
         });
       }
