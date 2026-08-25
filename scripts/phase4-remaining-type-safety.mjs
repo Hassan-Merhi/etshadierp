@@ -123,7 +123,7 @@ function collectCandidates(sourceFile) {
   };
 
   function visit(node) {
-    if (ts.isAsExpression(node)) {
+    if (ts.isAsExpression(node) && !isExportedSurface(node)) {
       if (isAnyKeyword(node.type) && typeIsUseful(checker, node.expression)) {
         add(node.getStart(sourceFile), node.end, node.expression.getText(sourceFile), "remove-as-any");
         return;
@@ -166,7 +166,8 @@ function collectCandidates(sourceFile) {
       node.type &&
       (isDirectInferableAnyType(node.type) || isPromiseOfAny(node.type)) &&
       !hasExportModifier(node) &&
-      !isExportedClassMember(node)
+      !isExportedClassMember(node) &&
+      !isExportedSurface(node.type)
     ) {
       const start = returnTypeStart(node);
       if (start !== null) add(start, node.type.end, "", "infer-return-type");
@@ -175,6 +176,7 @@ function collectCandidates(sourceFile) {
 
     if (
       (ts.isCallExpression(node) || ts.isNewExpression(node)) &&
+      !isExportedSurface(node) &&
       node.typeArguments?.length &&
       node.typeArguments.every((argument) => isAnyKeyword(argument))
     ) {
@@ -275,9 +277,7 @@ while (editsByFile.size > 0) {
   if (round > 20) throw new Error("Phase 4 compiler-recovery loop exceeded 20 rounds");
 }
 
-if (editsByFile.size === 0) {
-  certified = true;
-}
+if (editsByFile.size === 0) certified = true;
 if (!certified) throw new Error("Phase 4 inference pass did not reach a compiler-clean state");
 
 const byKind = new Map();
