@@ -7,6 +7,7 @@
 import { randomUUID } from "node:crypto";
 import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
+import { inventoryQuantity } from "../../lib/inventoryMath";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -183,23 +184,37 @@ export function registerSilentTransferRoutes(app: Express) {
 
       const operationId = randomUUID();
       const occurredAt = new Date().toISOString();
+      let applied = 0;
 
       await db.transaction(async (tx) => {
         for (let index = 0; index < items.length; index++) {
           const item = items[index];
-          const qty = parseFloat(item.quantity);
-          const parsedRate = parseFloat(item.averageRate || "0");
-          const rate = Number.isFinite(parsedRate) && parsedRate >= 0 ? parsedRate : 0;
-          if (qty <= 0) continue;
-          await adjustInventory(tx, srcId, item.stockItemId, -qty, companyId);
-          await adjustInventory(tx, dstId, item.stockItemId, qty, companyId, rate);
+          const rawQty = parseFloat(item.quantity);
+          const qty = Number.parseFloat(inventoryQuantity(rawQty));
+          if (!Number.isFinite(qty) || qty <= 0) continue;
+
+          const stockItemId = parseInt(item.stockItemId);
+          if (!Number.isInteger(stockItemId) || stockItemId <= 0) continue;
+
+          const [sourceInventory] = await tx
+            .select({ averageRate: inventory.averageRate })
+            .from(inventory)
+            .where(and(eq(inventory.stockItemId, stockItemId), eq(inventory.locationId, srcId)))
+            .limit(1);
+          const sourceRate = Number.parseFloat(sourceInventory?.averageRate || "");
+          const parsedFallbackRate = parseFloat(item.averageRate || "0");
+          const fallbackRate = Number.isFinite(parsedFallbackRate) && parsedFallbackRate >= 0 ? parsedFallbackRate : 0;
+          const rate = Number.isFinite(sourceRate) ? Math.max(sourceRate, 0) : fallbackRate;
+
+          await adjustInventory(tx, srcId, stockItemId, -qty, companyId);
+          await adjustInventory(tx, dstId, stockItemId, qty, companyId, rate);
           await postStockMovementTx(
             tx,
             {
               companyId,
-              stockItemId: item.stockItemId,
+              stockItemId,
               kind: "transfer",
-              quantity: String(qty),
+              quantity: inventoryQuantity(qty),
               unitCost: String(rate),
               fromLocationId: srcId,
               toLocationId: dstId,
@@ -207,16 +222,17 @@ export function registerSilentTransferRoutes(app: Express) {
               source: {
                 sourceType: "silent_transfer_import",
                 sourceId: operationId,
-                idempotencyKey: `silent-transfer:${companyId}:${operationId}:${index}:${item.stockItemId}`,
+                idempotencyKey: `silent-transfer:${companyId}:${operationId}:${index}:${stockItemId}`,
               },
               allowNegativeStock: true,
             },
             canonicalStockMovementAdapter
           );
+          applied++;
         }
       });
 
-      res.json({ success: true, itemsTransferred: items.length });
+      res.json({ success: true, itemsTransferred: applied });
     } catch (err: unknown) {
       logger.error("Silent transfer apply error:", { error: err });
       res.status(500).json({ message: getErrorMessage(err) });
