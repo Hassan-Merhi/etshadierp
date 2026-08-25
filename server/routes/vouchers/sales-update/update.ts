@@ -72,7 +72,6 @@ export function registerVoucherUpdateRoutes(app: Express) {
 
         if (req.body.optional !== undefined && existingVoucher.optional !== req.body.optional) {
           await applyVoucherOptionalInventoryChange(tx, existingVoucher, req.body.optional, {
-            userId: req.session.userId,
             username: req.session.username,
             reason: `${req.body.optional ? "Suspend" : "Activate"} voucher ${existingVoucher.voucherNumber}`,
           });
