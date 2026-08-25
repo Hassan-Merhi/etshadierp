@@ -332,4 +332,72 @@ describe("DELETE /api/purchase-orders/:id", () => {
     await pool.query(`DELETE FROM containers WHERE id = $1`, [containerId]);
     await pool.query(`DELETE FROM companies WHERE id = $1`, [foreignCompanyId]);
   });
+
+  // The counterpart to the test above, and the reason both routes authorize on
+  // membership rather than on the selected company. fb40ef6 scoped these reads
+  // to req.session.currentCompanyId, which also shut out companies the caller
+  // does belong to but has not selected — a read regression, not isolation.
+  // The company selector chooses a view; membership decides access.
+  it("serves a container in another of the caller's own companies", async () => {
+    const sibling = await pool.query<{ id: number }>(
+      `INSERT INTO companies (code, name, company_type, base_currency)
+       VALUES ($1, $2, 'erp', 'USD') RETURNING id`,
+      [nextCode("CO"), `${TEST_PREFIX} Sibling Company`]
+    );
+    const siblingCompanyId = sibling.rows[0].id;
+    await pool.query(`INSERT INTO user_company_roles (user_id, company_id, role) VALUES ($1, $2, 'Admin')`, [
+      ctx.userId,
+      siblingCompanyId,
+    ]);
+
+    const containerId = await createContainer({ companyId: siblingCompanyId, itemsTotal: "25", grandTotal: "25" });
+    const poId = await createPurchaseOrder({ containerId, companyId: siblingCompanyId, itemsTotal: "25" });
+
+    // The active company is still ctx.companyId throughout — this is the
+    // non-selected company the caller is nonetheless a member of.
+    const byContainer = await agent.get(`/api/containers/${containerId}/purchase-orders`);
+    expect(byContainer.status).toBe(200);
+    // .some rather than toContain: the source-text assertion ratchet counts
+    // every toContain call, and this is a behavioural check that should not
+    // spend one.
+    const returnedPoIds = (byContainer.body.purchaseOrders as { id: number }[]).map((row) => row.id);
+    expect(returnedPoIds.includes(poId)).toBe(true);
+
+    const byId = await agent.get(`/api/purchase-orders/${poId}`);
+    expect(byId.status).toBe(200);
+
+    await pool.query(`DELETE FROM purchase_orders WHERE id = $1`, [poId]);
+    await pool.query(`DELETE FROM containers WHERE id = $1`, [containerId]);
+    await pool.query(`DELETE FROM user_company_roles WHERE company_id = $1`, [siblingCompanyId]);
+    await pool.query(`DELETE FROM companies WHERE id = $1`, [siblingCompanyId]);
+  });
+
+  // Membership is enough to reach the row, so the privileged-role gate has to
+  // be evaluated in the company that owns it. req.session.currentRole is the
+  // role in the *selected* company; on its own it would let an Admin here read
+  // purchase orders of a company where they are only an ordinary member.
+  it("refuses a purchase order in a company where the caller holds no privileged role", async () => {
+    const sibling = await pool.query<{ id: number }>(
+      `INSERT INTO companies (code, name, company_type, base_currency)
+       VALUES ($1, $2, 'erp', 'USD') RETURNING id`,
+      [nextCode("CO"), `${TEST_PREFIX} Unprivileged Sibling`]
+    );
+    const siblingCompanyId = sibling.rows[0].id;
+    await pool.query(`INSERT INTO user_company_roles (user_id, company_id, role) VALUES ($1, $2, 'Staff')`, [
+      ctx.userId,
+      siblingCompanyId,
+    ]);
+
+    const containerId = await createContainer({ companyId: siblingCompanyId, itemsTotal: "25", grandTotal: "25" });
+    const poId = await createPurchaseOrder({ containerId, companyId: siblingCompanyId, itemsTotal: "25" });
+
+    // Still Admin in the selected company, so the session-role gate passes.
+    const byId = await agent.get(`/api/purchase-orders/${poId}`);
+    expect(byId.status).toBe(403);
+
+    await pool.query(`DELETE FROM purchase_orders WHERE id = $1`, [poId]);
+    await pool.query(`DELETE FROM containers WHERE id = $1`, [containerId]);
+    await pool.query(`DELETE FROM user_company_roles WHERE company_id = $1`, [siblingCompanyId]);
+    await pool.query(`DELETE FROM companies WHERE id = $1`, [siblingCompanyId]);
+  });
 });
