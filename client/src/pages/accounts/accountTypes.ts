@@ -1,3 +1,7 @@
+import type { Dispatch, SetStateAction } from "react";
+import type { SubmitHandler, UseFormReturn } from "react-hook-form";
+import type { BankAccount, InsertBankAccount, LedgerAccount, UpdateLedgerAccount } from "@shared/schema";
+
 export interface Account {
   id: string;
   accountId: number;
@@ -67,36 +71,47 @@ export interface WaChat {
   type: string;
 }
 
+type BankFormValues = Omit<InsertBankAccount, "companyId">;
+type EditLedgerFormValues = Omit<UpdateLedgerAccount, "id" | "companyId">;
+
+interface PendingMutationState {
+  isPending?: boolean;
+}
+
+interface SaveWaRuleMutation extends PendingMutationState {
+  mutate: (rule: WaRule) => void;
+}
+
 export interface AccountDialogsProps {
-  bankToEdit: any | null;
-  setBankToEdit: (bank: null) => void;
-  bankForm: any;
-  onBankSubmit: (data: any) => void;
-  updateBankMutation: any;
-  deleteBankMutation: any;
+  bankToEdit: BankAccount | null;
+  setBankToEdit: Dispatch<SetStateAction<BankAccount | null>>;
+  bankForm: UseFormReturn<BankFormValues>;
+  onBankSubmit: SubmitHandler<BankFormValues>;
+  updateBankMutation: PendingMutationState;
+  deleteBankMutation: PendingMutationState;
   handleDeleteBankAccount: () => void;
-  accountToEdit: any | null;
-  setAccountToEdit: (acc: null) => void;
-  supplierToEdit: any | null;
-  setSupplierToEdit: (acc: null) => void;
-  customerToEdit: any | null;
-  setCustomerToEdit: (acc: null) => void;
-  employeeToEdit: any | null;
-  setEmployeeToEdit: (acc: null) => void;
-  editForm: any;
-  onEditSubmit: (data: any) => void;
-  updateLedgerMutation: any;
+  accountToEdit: LedgerAccount | null;
+  setAccountToEdit: Dispatch<SetStateAction<LedgerAccount | null>>;
+  supplierToEdit: Account | null;
+  setSupplierToEdit: Dispatch<SetStateAction<Account | null>>;
+  customerToEdit: Account | null;
+  setCustomerToEdit: Dispatch<SetStateAction<Account | null>>;
+  employeeToEdit: Account | null;
+  setEmployeeToEdit: Dispatch<SetStateAction<Account | null>>;
+  editForm: UseFormReturn<EditLedgerFormValues>;
+  onEditSubmit: SubmitHandler<EditLedgerFormValues>;
+  updateLedgerMutation: PendingMutationState;
   handleDeleteAccount: () => void;
   pendingDelete: (() => void) | null;
-  setPendingDelete: (fn: (() => void) | null) => void;
+  setPendingDelete: Dispatch<SetStateAction<(() => void) | null>>;
   waRuleDialogOpen: boolean;
-  setWaRuleDialogOpen: (open: boolean) => void;
+  setWaRuleDialogOpen: Dispatch<SetStateAction<boolean>>;
   waChatSearch: string;
-  setWaChatSearch: (search: string) => void;
+  setWaChatSearch: Dispatch<SetStateAction<string>>;
   waRuleDraft: WaRule;
-  setWaRuleDraft: (rule: WaRule) => void;
+  setWaRuleDraft: Dispatch<SetStateAction<WaRule>>;
   filteredWaChats: WaChat[];
-  saveWaRuleMutation: any;
+  saveWaRuleMutation: SaveWaRuleMutation;
   waChatsLoading: boolean;
 }
 
