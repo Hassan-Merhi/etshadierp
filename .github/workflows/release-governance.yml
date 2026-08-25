@@ -57,15 +57,15 @@ jobs:
           }
 
           const main = await github("/branches/main");
+          const rules = await github("/rules/branches/main?per_page=100");
+          if (!Array.isArray(rules)) {
+            throw new Error("GitHub did not return the active rules that apply to main.");
+          }
+
           if (main.protected !== true) {
             throw new Error(
               "main is not protected. Create an active ruleset targeting main before this repository can be release-governed.",
             );
-          }
-
-          const rules = await github("/rules/branches/main?per_page=100");
-          if (!Array.isArray(rules)) {
-            throw new Error("GitHub did not return the active rules that apply to main.");
           }
 
           const ruleTypes = new Set(rules.map((rule) => rule.type));
