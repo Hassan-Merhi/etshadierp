@@ -55,7 +55,11 @@ export async function getVoucherById(id: number): Promise<Voucher | undefined> {
   return voucher;
 }
 
-export async function getVouchersByDateRange(companyId: number, startDate: string, endDate: string): Promise<Voucher[]> {
+export async function getVouchersByDateRange(
+  companyId: number,
+  startDate: string,
+  endDate: string
+): Promise<Voucher[]> {
   const vouchers = await db
     .select()
     .from(schema.vouchers)

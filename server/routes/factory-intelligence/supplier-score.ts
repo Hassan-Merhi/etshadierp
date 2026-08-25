@@ -105,17 +105,13 @@ export function registerFactorySupplierScoreRoutes(app: Express, requireAuth: Au
       }
 
       for (const suppId of Object.keys(supplierStats).map(Number)) {
-        const supplierContainerIds = containers
-          .filter((c) => c.supplierId === suppId)
-          .map((c) => c.id);
+        const supplierContainerIds = containers.filter((c) => c.supplierId === suppId).map((c) => c.id);
 
         const supplierMixSources = mixSources.filter(
           (s) => s.containerId !== null && supplierContainerIds.includes(s.containerId)
         );
         const mixBatchIds = Array.from(new Set(supplierMixSources.map((s) => s.mixBatchId)));
-        const balesFromSupplier = allBales.filter(
-          (b) => b.mixBatchId !== null && mixBatchIds.includes(b.mixBatchId)
-        );
+        const balesFromSupplier = allBales.filter((b) => b.mixBatchId !== null && mixBatchIds.includes(b.mixBatchId));
         supplierStats[suppId].outputBales = balesFromSupplier.length;
       }
 

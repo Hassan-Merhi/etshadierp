@@ -110,7 +110,9 @@ export function registerDispatchBaleScanRoutes(app: Express) {
             .from(customerProformaLines)
             .where(eq(customerProformaLines.proformaId, batch.proformaId));
 
-          const matchingLine = proformaLines.find((l: { articleCode: null | string }) => l.articleCode === bale.articleCode);
+          const matchingLine = proformaLines.find(
+            (l: { articleCode: null | string }) => l.articleCode === bale.articleCode
+          );
           if (!matchingLine) {
             throw new Error(
               `Bale ${barcode} has article code "${bale.articleCode}" which is not in the linked proforma. Scan blocked.`

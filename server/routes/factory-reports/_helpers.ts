@@ -127,7 +127,6 @@ export async function generateEmptyExcel(
   res.end(xlsBuffer);
 }
 
-
 /** A factory_mix_batch_sources row as the supplier-usage report reads it. */
 export type MixSourceRow = {
   mixBatchId: number | null;

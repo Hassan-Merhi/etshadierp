@@ -11,11 +11,7 @@ import {
 import { getStableSupplierCost } from "./rawStockStableCost";
 import { db as sharedDb } from "../../db";
 import { FACTORY_HISTORICAL_REPLAY_V7_SCHEMA_SQL } from "./historicalReplayV7MigrationSql";
-import {
-  calculateCostLine,
-  calculateMovingAverageRate,
-  formatFactoryLockedRate,
-} from "./factoryCostingEngine";
+import { calculateCostLine, calculateMovingAverageRate, formatFactoryLockedRate } from "./factoryCostingEngine";
 import type { DatabaseOrTransaction } from "../../db";
 
 /**
@@ -175,9 +171,7 @@ export interface LockedRateDiagnosticRow {
 }
 
 /** Shared read-only locked-rate reconciliation used by diagnostics and UI. */
-export async function getLockedRateDiagnosticsForCompany(
-  companyId: number
-): Promise<LockedRateDiagnosticRow[]> {
+export async function getLockedRateDiagnosticsForCompany(companyId: number): Promise<LockedRateDiagnosticRow[]> {
   const db = sharedDb;
   const suppliers = await db
     .select({
@@ -216,9 +210,8 @@ export async function getLockedRateDiagnosticsForCompany(
     const rows: LockedRateDiagnosticRow[] = [];
     for (const supplier of suppliers) {
       const persistedRaw = supplier.currentRawMaterialCostPerKgUsd;
-      const persistedLockedRate = persistedRaw !== null && persistedRaw !== undefined
-        ? parseFloat(persistedRaw as string) || 0
-        : null;
+      const persistedLockedRate =
+        persistedRaw !== null && persistedRaw !== undefined ? parseFloat(persistedRaw as string) || 0 : null;
       const { rate } = await getLockedSupplierRateReadOnly(tx, companyId, supplier.id);
       const remainingKg = await getAuthoritativeSupplierRemainingKg(tx, companyId, supplier.id);
       const reservedKg = reservedBySupplierId.get(supplier.id) || 0;
@@ -262,10 +255,7 @@ export async function applyOffloadMovingAverage(
   const oldLockedRate = await getLockedSupplierRate(tx, companyId, supplierId, {
     forUpdate: true,
   });
-  const oldRemainingKg = Math.max(
-    0,
-    await getAuthoritativeSupplierRemainingKg(tx, companyId, supplierId)
-  );
+  const oldRemainingKg = Math.max(0, await getAuthoritativeSupplierRemainingKg(tx, companyId, supplierId));
   const newLockedRate = calculateMovingAverageRate({
     existingQuantityKg: oldRemainingKg,
     existingRatePerKg: oldLockedRate,

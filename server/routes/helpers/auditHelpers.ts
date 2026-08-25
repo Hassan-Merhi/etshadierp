@@ -13,14 +13,27 @@ import { inArray } from "drizzle-orm";
 
 // ─── Audit log ────────────────────────────────────────────────────────────────
 export type AuditAction =
-  | "create" | "update" | "delete"
-  | "restore" | "reverse" | "void" | "return"
-  | "recalculate" | "repair"
-  | "import" | "export"
-  | "send_whatsapp" | "send_email"
-  | "approve" | "cancel"
-  | "offload" | "transfer" | "adjust"
-  | "login" | "permission_change" | "settings_change";
+  | "create"
+  | "update"
+  | "delete"
+  | "restore"
+  | "reverse"
+  | "void"
+  | "return"
+  | "recalculate"
+  | "repair"
+  | "import"
+  | "export"
+  | "send_whatsapp"
+  | "send_email"
+  | "approve"
+  | "cancel"
+  | "offload"
+  | "transfer"
+  | "adjust"
+  | "login"
+  | "permission_change"
+  | "settings_change";
 
 function normalizeAuditAction(params: {
   action: AuditAction;
@@ -212,7 +225,10 @@ export async function snapshotVoucherEntries(
   });
 }
 
-export function buildVoucherChangesForCreate(v: VoucherSnap, entries: RecordedEntries): Record<string, { new: AuditChangeValue }> {
+export function buildVoucherChangesForCreate(
+  v: VoucherSnap,
+  entries: RecordedEntries
+): Record<string, { new: AuditChangeValue }> {
   const c: Record<string, { new: AuditChangeValue }> = {};
   if (v.voucherType) c.voucherType = { new: v.voucherType };
   if (v.voucherDate) c.date = { new: v.voucherDate };
@@ -223,7 +239,10 @@ export function buildVoucherChangesForCreate(v: VoucherSnap, entries: RecordedEn
   return c;
 }
 
-export function buildVoucherChangesForDelete(v: VoucherSnap, entries: RecordedEntries): Record<string, { old: AuditChangeValue }> {
+export function buildVoucherChangesForDelete(
+  v: VoucherSnap,
+  entries: RecordedEntries
+): Record<string, { old: AuditChangeValue }> {
   const c: Record<string, { old: AuditChangeValue }> = {};
   if (v.voucherType) c.voucherType = { old: v.voucherType };
   if (v.voucherDate) c.date = { old: v.voucherDate };

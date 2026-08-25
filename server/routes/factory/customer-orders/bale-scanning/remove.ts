@@ -24,83 +24,87 @@ import {
 import { eq, and } from "drizzle-orm";
 
 export function registerOrderBaleRemovalRoutes(app: Express) {
-  app.delete("/api/factory/customer-orders/:id/bales/:baleId", requireAuth, async (req: any, res: import("express").Response) => {
-    try {
-      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+  app.delete(
+    "/api/factory/customer-orders/:id/bales/:baleId",
+    requireAuth,
+    async (req: any, res: import("express").Response) => {
+      try {
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseId(req.params.id);
+        const orderId = parseId(req.params.id);
 
-      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
-      const baleId = parseId(req.params.baleId);
-      if (baleId === null) return res.status(400).json({ message: "Invalid id" });
+        if (orderId === null) return res.status(400).json({ message: "Invalid id" });
+        const baleId = parseId(req.params.baleId);
+        if (baleId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [order] = await db
-        .select()
-        .from(customerOrders)
-        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
-      if (!order) return res.status(404).json({ message: "Order not found" });
-      if (!["DRAFT", "LOADING", "PENDING_VERIFICATION", "VERIFIED", "FINALIZED"].includes(order.status))
-        return res.status(400).json({ message: "Can only remove bales from orders that are not yet cancelled" });
+        const [order] = await db
+          .select()
+          .from(customerOrders)
+          .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+        if (!order) return res.status(404).json({ message: "Order not found" });
+        if (!["DRAFT", "LOADING", "PENDING_VERIFICATION", "VERIFIED", "FINALIZED"].includes(order.status))
+          return res.status(400).json({ message: "Can only remove bales from orders that are not yet cancelled" });
 
-      const [orderBale] = await db
-        .select()
-        .from(customerOrderBales)
-        .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.id, baleId)));
+        const [orderBale] = await db
+          .select()
+          .from(customerOrderBales)
+          .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.id, baleId)));
 
-      // Fetch full bale details before deleting the join row, so we can log it
-      let baleDetails: typeof factoryBales.$inferSelect | undefined;
-      if (orderBale) {
-        const [found] = await db.select().from(factoryBales).where(eq(factoryBales.id, orderBale.baleId));
-        baleDetails = found;
-      }
+        // Fetch full bale details before deleting the join row, so we can log it
+        let baleDetails: typeof factoryBales.$inferSelect | undefined;
+        if (orderBale) {
+          const [found] = await db.select().from(factoryBales).where(eq(factoryBales.id, orderBale.baleId));
+          baleDetails = found;
+        }
 
-      await db
-        .delete(customerOrderBales)
-        .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.id, baleId)));
-
-      if (orderBale && baleDetails) {
         await db
-          .update(factoryBales)
-          .set({ status: "IN_STOCK", updatedAt: new Date() })
-          .where(eq(factoryBales.id, orderBale.baleId));
+          .delete(customerOrderBales)
+          .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.id, baleId)));
 
-        // Log the removal so it's visible on the loading page
-        const userId = req.user?.id ? String(req.user.id) : null;
-        const username = req.user?.username || req.user?.email || null;
-        await db.insert(customerOrderBaleRemovals).values({
-          orderId,
-          baleId: orderBale.baleId,
-          referenceNumber: baleDetails.referenceNumber,
-          articleCode: baleDetails.articleCode || null,
-          productName: baleDetails.productName || null,
-          weightKg: baleDetails.weightKg,
-          removedByUserId: userId,
-          removedByUsername: username,
-        });
-      } else if (orderBale) {
-        await db
-          .update(factoryBales)
-          .set({ status: "IN_STOCK", updatedAt: new Date() })
-          .where(eq(factoryBales.id, orderBale.baleId));
+        if (orderBale && baleDetails) {
+          await db
+            .update(factoryBales)
+            .set({ status: "IN_STOCK", updatedAt: new Date() })
+            .where(eq(factoryBales.id, orderBale.baleId));
+
+          // Log the removal so it's visible on the loading page
+          const userId = req.user?.id ? String(req.user.id) : null;
+          const username = req.user?.username || req.user?.email || null;
+          await db.insert(customerOrderBaleRemovals).values({
+            orderId,
+            baleId: orderBale.baleId,
+            referenceNumber: baleDetails.referenceNumber,
+            articleCode: baleDetails.articleCode || null,
+            productName: baleDetails.productName || null,
+            weightKg: baleDetails.weightKg,
+            removedByUserId: userId,
+            removedByUsername: username,
+          });
+        } else if (orderBale) {
+          await db
+            .update(factoryBales)
+            .set({ status: "IN_STOCK", updatedAt: new Date() })
+            .where(eq(factoryBales.id, orderBale.baleId));
+        }
+
+        await recalculateOrderTotals(db, orderId);
+
+        const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
+        const updatedBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+        const updatedLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
+        const updatedCharges = await db
+          .select()
+          .from(customerOrderCharges)
+          .where(eq(customerOrderCharges.orderId, orderId));
+
+        res.json({ ...updatedOrder, bales: updatedBales, lines: updatedLines, charges: updatedCharges });
+      } catch (error: unknown) {
+        logger.error("Error removing bale from order:", { error: error });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
-
-      await recalculateOrderTotals(db, orderId);
-
-      const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
-      const updatedBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
-      const updatedLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
-      const updatedCharges = await db
-        .select()
-        .from(customerOrderCharges)
-        .where(eq(customerOrderCharges.orderId, orderId));
-
-      res.json({ ...updatedOrder, bales: updatedBales, lines: updatedLines, charges: updatedCharges });
-    } catch (error: unknown) {
-      logger.error("Error removing bale from order:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
     }
-  });
+  );
 
   // POST /api/factory/bales/:id/return-to-stock — remove a bale from its order and return it to stock
   // Works for any order status. For FINALIZED orders: updates customer_balances + daybook. Admin-gated.

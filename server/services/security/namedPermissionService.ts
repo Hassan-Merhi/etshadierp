@@ -42,7 +42,11 @@ export function normalizePermissionList(value: unknown): string[] {
   return normalized.sort();
 }
 
-export async function loadNamedPermissions(db: DatabaseOrTransaction, userId: string, companyId: number): Promise<string[]> {
+export async function loadNamedPermissions(
+  db: DatabaseOrTransaction,
+  userId: string,
+  companyId: number
+): Promise<string[]> {
   try {
     const rows = await db
       .select({ permission: userSecurityPermissions.permission })
@@ -56,7 +60,11 @@ export async function loadNamedPermissions(db: DatabaseOrTransaction, userId: st
   }
 }
 
-export async function assertUserBelongsToCompany(db: DatabaseOrTransaction, userId: string, companyId: number): Promise<void> {
+export async function assertUserBelongsToCompany(
+  db: DatabaseOrTransaction,
+  userId: string,
+  companyId: number
+): Promise<void> {
   const [membership] = await db
     .select({ userId: userCompanyRoles.userId })
     .from(userCompanyRoles)
@@ -111,7 +119,11 @@ export async function hydrateSessionNamedPermissions(db: DatabaseOrTransaction, 
   return permissions;
 }
 
-export async function invalidateUserCompanySessions(pool: DatabasePool, userId: string, companyId: number): Promise<void> {
+export async function invalidateUserCompanySessions(
+  pool: DatabasePool,
+  userId: string,
+  companyId: number
+): Promise<void> {
   await pool.query(
     `DELETE FROM session WHERE sess->>'userId' = $1 AND COALESCE((sess->>'currentCompanyId')::int, 0) = $2`,
     [userId, companyId]

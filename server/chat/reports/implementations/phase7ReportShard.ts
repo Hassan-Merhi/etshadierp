@@ -21,7 +21,13 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
   switch (params.queryType) {
     case "audit_trail": {
       const tableFilter7 = params.entityName;
-      const rows = await db.execute<{ username: string | null; action: string; table_name: string | null; record_identifier: string | null; created_at: Date }>(sql`
+      const rows = await db.execute<{
+        username: string | null;
+        action: string;
+        table_name: string | null;
+        record_identifier: string | null;
+        created_at: Date;
+      }>(sql`
         SELECT al.username, al.action, al.table_name, al.record_identifier,
           al.created_at
         FROM audit_log al
@@ -55,7 +61,17 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "bank_account_list": {
-      const rows = await db.execute<{ code: string; name: string; bank_name: string | null; account_number: string | null; opening_balance: string; opening_balance_side: string | null; active: boolean; total_dr: string; total_cr: string }>(sql`
+      const rows = await db.execute<{
+        code: string;
+        name: string;
+        bank_name: string | null;
+        account_number: string | null;
+        opening_balance: string;
+        opening_balance_side: string | null;
+        active: boolean;
+        total_dr: string;
+        total_cr: string;
+      }>(sql`
         SELECT ba.code, ba.name, ba.bank_name, ba.account_number,
           CAST(ba.opening_balance AS numeric) AS opening_balance,
           ba.opening_balance_side, ba.active,
@@ -113,7 +129,18 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         : params.entityName?.toLowerCase().includes("prod")
           ? "Production"
           : null;
-      const rows = await db.execute<{ voucher_date: string; voucher_number: string; adjustment_type: string; location: string | null; item_name: string; code: string | null; uom: string | null; qty: string; rate: string; total_amount: string }>(sql`
+      const rows = await db.execute<{
+        voucher_date: string;
+        voucher_number: string;
+        adjustment_type: string;
+        location: string | null;
+        item_name: string;
+        code: string | null;
+        uom: string | null;
+        qty: string;
+        rate: string;
+        total_amount: string;
+      }>(sql`
         SELECT v.voucher_date, v.voucher_number, sav.adjustment_type,
           l.name AS location, si.name AS item_name, si.code, si.uom,
           CAST(sai.quantity AS numeric) AS qty,
@@ -176,7 +203,16 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const containerRow7 = await db.execute<{ id: number; container_number: string; status: string; eta: string | null; transporter: string | null; tracking_last_location: string | null; tracking_last_description: string | null; tracking_changed_at: Date | null }>(sql`
+      const containerRow7 = await db.execute<{
+        id: number;
+        container_number: string;
+        status: string;
+        eta: string | null;
+        transporter: string | null;
+        tracking_last_location: string | null;
+        tracking_last_description: string | null;
+        tracking_changed_at: Date | null;
+      }>(sql`
         SELECT c.id, c.container_number, c.status, c.eta, c.transporter,
           c.tracking_last_location, c.tracking_last_description, c.tracking_changed_at
         FROM containers c
@@ -193,7 +229,13 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         break;
       }
       const ctr7 = containerRow7.rows[0];
-      const evtRows = await db.execute<{ event_time: Date | null; event_status: string | null; event_location: string | null; event_description: string | null; provider: string | null }>(sql`
+      const evtRows = await db.execute<{
+        event_time: Date | null;
+        event_status: string | null;
+        event_location: string | null;
+        event_description: string | null;
+        provider: string | null;
+      }>(sql`
         SELECT cte.event_time, cte.event_status, cte.event_location, cte.event_description, cte.provider
         FROM container_tracking_events cte
         WHERE cte.container_id = ${ctr7.id}
@@ -228,7 +270,17 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "pending_container_sales": {
-      const rows = await db.execute<{ sale_date: string; invoice_number: string | null; container_number: string | null; customer: string | null; currency: string; total_amount: string; paid_amount: string; outstanding: string; payment_status: string | null }>(sql`
+      const rows = await db.execute<{
+        sale_date: string;
+        invoice_number: string | null;
+        container_number: string | null;
+        customer: string | null;
+        currency: string;
+        total_amount: string;
+        paid_amount: string;
+        outstanding: string;
+        payment_status: string | null;
+      }>(sql`
         SELECT cs.sale_date, cs.invoice_number, c.container_number,
           cu.legal_name AS customer, cs.currency,
           CAST(cs.total_amount AS numeric) AS total_amount,
@@ -297,7 +349,18 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const rows = await db.execute<{ container_number: string; status: string; import_date: string | null; eta: string | null; grand_total: string; currency: string; total_kg: string | null; rate_per_kg: string | null; item_name: string | null; supplier: string | null }>(sql`
+      const rows = await db.execute<{
+        container_number: string;
+        status: string;
+        import_date: string | null;
+        eta: string | null;
+        grand_total: string;
+        currency: string;
+        total_kg: string | null;
+        rate_per_kg: string | null;
+        item_name: string | null;
+        supplier: string | null;
+      }>(sql`
         SELECT c.container_number, c.status, c.import_date, c.eta,
           CAST(c.grand_total AS numeric) AS grand_total, c.currency,
           c.total_kg, c.rate_per_kg, c.item_name, s.legal_name AS supplier
@@ -394,7 +457,29 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const wRow = await db.execute<{ full_name: string; employee_code: string | null; position: string | null; department: string | null; gender: string | null; nationality: string | null; date_of_birth: string | null; date_joined: string | null; salary_type: string; base_salary: string | null; per_bale_rate: string | null; per_kg_rate: string | null; phone1: string | null; phone2: string | null; active: boolean; bank_name: string | null; payment_method: string | null; visa_expiry: string | null; work_permit_expiry: string | null; shift_type: string | null; transport_allowance: string | null }>(sql`
+      const wRow = await db.execute<{
+        full_name: string;
+        employee_code: string | null;
+        position: string | null;
+        department: string | null;
+        gender: string | null;
+        nationality: string | null;
+        date_of_birth: string | null;
+        date_joined: string | null;
+        salary_type: string;
+        base_salary: string | null;
+        per_bale_rate: string | null;
+        per_kg_rate: string | null;
+        phone1: string | null;
+        phone2: string | null;
+        active: boolean;
+        bank_name: string | null;
+        payment_method: string | null;
+        visa_expiry: string | null;
+        work_permit_expiry: string | null;
+        shift_type: string | null;
+        transport_allowance: string | null;
+      }>(sql`
         SELECT fw.full_name, fw.employee_code, fw.position, fw.department,
           fw.gender, fw.nationality, fw.date_of_birth, fw.date_joined,
           fw.salary_type, fw.base_salary, fw.per_bale_rate, fw.per_kg_rate,
@@ -462,7 +547,15 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "location_list": {
-      const rows = await db.execute<{ code: string; name: string; city: string | null; country: string | null; active: boolean; item_count: string; total_value: string }>(sql`
+      const rows = await db.execute<{
+        code: string;
+        name: string;
+        city: string | null;
+        country: string | null;
+        active: boolean;
+        item_count: string;
+        total_value: string;
+      }>(sql`
         SELECT l.code, l.name, l.city, l.country, l.active,
           COUNT(DISTINCT inv.stock_item_id) AS item_count,
           COALESCE(SUM(CAST(inv.total_value AS numeric)), 0) AS total_value
@@ -511,7 +604,13 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
 
     case "quarterly_comparison": {
       const yearStr = params.dateFrom ? params.dateFrom.slice(0, 4) : todayStr.slice(0, 4);
-      const rows = await db.execute<{ quarter: string; revenue: string | null; cost: string | null; profit: string | null; sales_count: string }>(sql`
+      const rows = await db.execute<{
+        quarter: string;
+        revenue: string | null;
+        cost: string | null;
+        profit: string | null;
+        sales_count: string;
+      }>(sql`
         SELECT EXTRACT(QUARTER FROM CAST(v.voucher_date AS date)) AS quarter,
           SUM(CAST(sal.total_sales AS numeric)) AS revenue,
           SUM(CAST(sal.total_cost AS numeric)) AS cost,

@@ -193,7 +193,12 @@ export function computeMonthlyPayFromAttendance(
  * Declared at module scope so the handlers that call it can live in separate
  * modules; it previously relied on hoisting inside the register function.
  */
-export async function settleAdvancesForPayroll(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], companyId: number, workerId: number, advanceAmount: number) {
+export async function settleAdvancesForPayroll(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  companyId: number,
+  workerId: number,
+  advanceAmount: number
+) {
   if (advanceAmount <= 0) return;
   const outstanding = await tx
     .select()

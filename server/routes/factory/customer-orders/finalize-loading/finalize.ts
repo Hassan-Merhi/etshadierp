@@ -88,13 +88,9 @@ export function registerOrderFinalizeRoutes(app: Express) {
         );
         // The raw row is snake_case; the insert fallback returns the camelCase column.
         let seqRow = firstRow<{ next_number: number }>(seqRows) as
-          | { next_number: number; nextNumber?: number }
-          | undefined;
+          { next_number: number; nextNumber?: number } | undefined;
         if (!seqRow) {
-          const [inserted] = await tx
-            .insert(customerInvoiceSequences)
-            .values({ companyId, nextNumber: 1 })
-            .returning();
+          const [inserted] = await tx.insert(customerInvoiceSequences).values({ companyId, nextNumber: 1 }).returning();
           seqRow = { next_number: inserted.nextNumber, nextNumber: inserted.nextNumber };
         }
         const invoiceNum = seqRow.nextNumber || seqRow.next_number;
@@ -348,7 +344,9 @@ export function registerOrderFinalizeRoutes(app: Express) {
           : [];
       const locationMap = new Map(locationRecords.map((l) => [l.id, l.name]));
 
-      const availableBales = baleRows.filter((b: { status: string }) => ["IN_STOCK", "RESERVED_FOR_ORDER"].includes(b.status));
+      const availableBales = baleRows.filter((b: { status: string }) =>
+        ["IN_STOCK", "RESERVED_FOR_ORDER"].includes(b.status)
+      );
 
       res.json({
         baleCount: availableBales.length,

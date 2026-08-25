@@ -241,11 +241,7 @@ type CutoverRow = Record<string, unknown> & {
 /** The `{ runId }` acknowledgement the delta-import handlers return. */
 type MigrationRunAck = { runId: string | number };
 
-async function invokeMigrationHandler(
-  handler: MigrationHandler,
-  req: Request,
-  body: unknown
-): Promise<unknown> {
+async function invokeMigrationHandler(handler: MigrationHandler, req: Request, body: unknown): Promise<unknown> {
   let statusCode = 200;
   let payload: unknown = null;
   const response: CapturedResponse = {

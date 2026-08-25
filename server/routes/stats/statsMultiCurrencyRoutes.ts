@@ -68,8 +68,12 @@ function applyCurrentCashTranslation(payload: NetPositionPayload, summaries: Cas
   const removedForUs = oldForUsAccounts.filter((row: NetPositionAccountRow) => row.id && resolvedLedgerIds.has(row.id));
   const removedOnUs = oldOnUsAccounts.filter((row: NetPositionAccountRow) => row.id && resolvedLedgerIds.has(row.id));
 
-  const forUsAccounts = oldForUsAccounts.filter((row: NetPositionAccountRow) => !row.id || !resolvedLedgerIds.has(row.id));
-  const onUsAccounts = oldOnUsAccounts.filter((row: NetPositionAccountRow) => !row.id || !resolvedLedgerIds.has(row.id));
+  const forUsAccounts = oldForUsAccounts.filter(
+    (row: NetPositionAccountRow) => !row.id || !resolvedLedgerIds.has(row.id)
+  );
+  const onUsAccounts = oldOnUsAccounts.filter(
+    (row: NetPositionAccountRow) => !row.id || !resolvedLedgerIds.has(row.id)
+  );
 
   let forUsTotal = new Decimal(payload.forUs.total ?? payload.forUsTotal ?? 0);
   let onUsTotal = new Decimal(payload.onUs.total ?? payload.onUsTotal ?? 0);

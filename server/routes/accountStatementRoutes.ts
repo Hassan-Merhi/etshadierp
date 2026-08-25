@@ -22,10 +22,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
 import { isParentCompanyContext } from "./helpers/supplierBalanceHelpers";
-import {
-  projectExportCurrencyRow,
-  summarizeExportCurrencyRows,
-} from "../services/accounting/exportCurrency";
+import { projectExportCurrencyRow, summarizeExportCurrencyRows } from "../services/accounting/exportCurrency";
 import {
   bankAccounts,
   companies,
@@ -429,8 +426,7 @@ export function registerAccountStatementRoutes(app: Express) {
           const rDate = statementDateKey(r.voucherDate);
           if (rDate && rDate < startDate) {
             const projected = projectExportCurrencyRow(r as Record<string, unknown>);
-            bfBalance +=
-              parseFloat(projected.historicalBaseDebit) - parseFloat(projected.historicalBaseCredit);
+            bfBalance += parseFloat(projected.historicalBaseDebit) - parseFloat(projected.historicalBaseCredit);
           }
         }
       }
@@ -665,10 +661,7 @@ export function registerAccountStatementRoutes(app: Express) {
       currencySheet.addRow(["Historical base currency", "USD"]);
       currencySheet.addRow(["Rate convention", "TRANSACTION_PER_BASE"]);
       const currencySummary = summarizeExportCurrencyRows(txRows as unknown[]);
-      currencySheet.addRow([
-        "Totals provisional",
-        currencySummary.totalsProvisional ? "YES" : "NO",
-      ]);
+      currencySheet.addRow(["Totals provisional", currencySummary.totalsProvisional ? "YES" : "NO"]);
       currencySheet.addRow(["Unresolved legacy entries", currencySummary.unresolvedEntryCount]);
       currencySheet.addRow([]);
       const nativeHeaders = currencySheet.addRow([
@@ -722,8 +715,16 @@ export function registerAccountStatementRoutes(app: Express) {
       currencySheet.addRow(["Historical base debit total (USD)", Number(currencySummary.historicalBaseDebitTotal)]);
       currencySheet.addRow(["Historical base credit total (USD)", Number(currencySummary.historicalBaseCreditTotal)]);
       currencySheet.columns = [
-        { width: 14 }, { width: 18 }, { width: 42 }, { width: 18 }, { width: 18 },
-        { width: 18 }, { width: 24 }, { width: 24 }, { width: 18 }, { width: 22 },
+        { width: 14 },
+        { width: 18 },
+        { width: 42 },
+        { width: 18 },
+        { width: 18 },
+        { width: 18 },
+        { width: 24 },
+        { width: 24 },
+        { width: 18 },
+        { width: 22 },
       ];
       currencySheet.views = [{ state: "frozen", ySplit: 7 }];
 

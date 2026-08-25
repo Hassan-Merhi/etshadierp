@@ -60,7 +60,14 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "cash_position": {
-      const rows = await db.execute<{ name: string; account_type: string; opening_balance: string | null; opening_balance_side: string | null; total_debit: string; total_credit: string }>(sql`
+      const rows = await db.execute<{
+        name: string;
+        account_type: string;
+        opening_balance: string | null;
+        opening_balance_side: string | null;
+        total_debit: string;
+        total_credit: string;
+      }>(sql`
         SELECT la.name, la.account_type, la.opening_balance, la.opening_balance_side,
           COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.debit_amount AS numeric) ELSE 0 END), 0) AS total_debit,
           COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.credit_amount AS numeric) ELSE 0 END), 0) AS total_credit
@@ -98,7 +105,14 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "overdue_payments": {
-      const rows = await db.execute<{ name: string; opening_balance: string | null; opening_balance_side: string | null; total_debit: string; total_credit: string; last_tx: string | null }>(sql`
+      const rows = await db.execute<{
+        name: string;
+        opening_balance: string | null;
+        opening_balance_side: string | null;
+        total_debit: string;
+        total_credit: string;
+        last_tx: string | null;
+      }>(sql`
         SELECT la.name, la.opening_balance, la.opening_balance_side,
           COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.debit_amount AS numeric) ELSE 0 END), 0) AS total_debit,
           COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.credit_amount AS numeric) ELSE 0 END), 0) AS total_credit,
@@ -305,7 +319,13 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "outstanding_suppliers": {
-      const rows = await db.execute<{ name: string; opening_balance: string | null; opening_balance_side: string | null; total_debit: string; total_credit: string }>(sql`
+      const rows = await db.execute<{
+        name: string;
+        opening_balance: string | null;
+        opening_balance_side: string | null;
+        total_debit: string;
+        total_credit: string;
+      }>(sql`
         SELECT la.name, la.opening_balance, la.opening_balance_side,
           COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.debit_amount AS numeric) ELSE 0 END), 0) AS total_debit,
           COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.credit_amount AS numeric) ELSE 0 END), 0) AS total_credit

@@ -292,12 +292,12 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             WHERE company_id = ${companyId} AND status = 'IN_STOCK'
             GROUP BY article_code`
       );
-      const freeStockCounts: { articleCode: string; count: number }[] = resultRows<ArticleCountRow>(
-        freeStockRaw
-      ).map((r) => ({
-        articleCode: r.articleCode,
-        count: Number(r.count),
-      }));
+      const freeStockCounts: { articleCode: string; count: number }[] = resultRows<ArticleCountRow>(freeStockRaw).map(
+        (r) => ({
+          articleCode: r.articleCode,
+          count: Number(r.count),
+        })
+      );
       const freeStockMap = new Map(freeStockCounts.map((s) => [s.articleCode, s.count]));
 
       const loadingsRaw = await db.execute(

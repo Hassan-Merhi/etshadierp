@@ -12,7 +12,6 @@ import ExcelJS from "exceljs";
 import { factoryWorkers, factoryPayrolls, companies } from "@shared/schema";
 import { getProductionBonusTotalsForPayrollIds } from "../../services/payroll/productionBonusPayrollService";
 
-
 function money(value: string | number | null | undefined): number {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;

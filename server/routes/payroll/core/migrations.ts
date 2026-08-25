@@ -56,7 +56,6 @@ type PaidBonusRow = {
   full_name: string;
 };
 
-
 const PAYROLL_MIGRATION_CONFIRMATION_REQUIRED = "Explicit confirmation is required to run this payroll migration";
 
 function migrationCompletePayload(vouchersUpdated: number, bonusEntriesCreated: number) {

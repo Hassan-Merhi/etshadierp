@@ -35,7 +35,15 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     case "inventory_check": {
       const itemName = params.entityName;
       const locName = params.locationName;
-      const rows = await db.execute<{ item_name: string; code: string; uom: string; location_name: string; qty: string; avg_rate: string; total_value: string }>(sql`
+      const rows = await db.execute<{
+        item_name: string;
+        code: string;
+        uom: string;
+        location_name: string;
+        qty: string;
+        avg_rate: string;
+        total_value: string;
+      }>(sql`
         SELECT si.name AS item_name, si.code, si.uom,
           l.name AS location_name,
           CAST(inv.quantity AS numeric) AS qty,
@@ -70,7 +78,13 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "low_stock_items": {
-      const rows = await db.execute<{ name: string; code: string; uom: string; reorder_level: string; total_qty: string }>(sql`
+      const rows = await db.execute<{
+        name: string;
+        code: string;
+        uom: string;
+        reorder_level: string;
+        total_qty: string;
+      }>(sql`
         SELECT si.name, si.code, si.uom,
           CAST(si.reorder_level AS numeric) AS reorder_level,
           COALESCE(SUM(CAST(inv.quantity AS numeric)), 0) AS total_qty
@@ -111,7 +125,15 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const rows = await db.execute<{ voucher_date: string; adjustment_type: string; location: string; item_name: string; uom: string; qty: string; rate: string }>(sql`
+      const rows = await db.execute<{
+        voucher_date: string;
+        adjustment_type: string;
+        location: string;
+        item_name: string;
+        uom: string;
+        qty: string;
+        rate: string;
+      }>(sql`
         SELECT v.voucher_date, sav.adjustment_type, l.name AS location,
           si.name AS item_name, si.uom,
           CAST(sai.quantity AS numeric) AS qty,
@@ -146,7 +168,15 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
 
     case "open_purchase_orders": {
       const supplierName = params.entityName;
-      const rows = await db.execute<{ po_number: string; supplier: string; container_number: string | null; currency: string; items_total: string; status: string; created_at: Date }>(sql`
+      const rows = await db.execute<{
+        po_number: string;
+        supplier: string;
+        container_number: string | null;
+        currency: string;
+        items_total: string;
+        status: string;
+        created_at: Date;
+      }>(sql`
         SELECT po.po_number, s.legal_name AS supplier,
           c.container_number, po.currency,
           CAST(po.items_total AS numeric) AS items_total,
@@ -182,7 +212,16 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "customer_aging": {
-      const rows = await db.execute<{ name: string; ob: string; total_debit: string; total_credit: string; bucket_0_30: string; bucket_31_60: string; bucket_61_90: string; bucket_over_90: string }>(sql`
+      const rows = await db.execute<{
+        name: string;
+        ob: string;
+        total_debit: string;
+        total_credit: string;
+        bucket_0_30: string;
+        bucket_31_60: string;
+        bucket_61_90: string;
+        bucket_over_90: string;
+      }>(sql`
         SELECT la.name,
           COALESCE(CASE WHEN la.opening_balance_side = 'Cr' THEN -CAST(la.opening_balance AS numeric) ELSE CAST(la.opening_balance AS numeric) END, 0) AS ob,
           COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.debit_amount AS numeric) ELSE 0 END), 0) AS total_debit,
@@ -260,7 +299,16 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "supplier_aging": {
-      const rows = await db.execute<{ name: string; ob: string; total_debit: string; total_credit: string; bucket_0_30: string; bucket_31_60: string; bucket_61_90: string; bucket_over_90: string }>(sql`
+      const rows = await db.execute<{
+        name: string;
+        ob: string;
+        total_debit: string;
+        total_credit: string;
+        bucket_0_30: string;
+        bucket_31_60: string;
+        bucket_61_90: string;
+        bucket_over_90: string;
+      }>(sql`
         SELECT la.name,
           COALESCE(CASE WHEN la.opening_balance_side = 'Dr' THEN -CAST(la.opening_balance AS numeric) ELSE CAST(la.opening_balance AS numeric) END, 0) AS ob,
           COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.credit_amount AS numeric) ELSE 0 END), 0) AS total_credit,
@@ -339,7 +387,16 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
 
     case "container_list": {
       const statusFilter = params.containerStatus;
-      const rows = await db.execute<{ container_number: string; status: string; import_date: string | null; eta: string | null; supplier: string; grand_total: string; currency: string; transporter: string | null }>(sql`
+      const rows = await db.execute<{
+        container_number: string;
+        status: string;
+        import_date: string | null;
+        eta: string | null;
+        supplier: string;
+        grand_total: string;
+        currency: string;
+        transporter: string | null;
+      }>(sql`
         SELECT c.container_number, c.status, c.import_date, c.eta,
           s.legal_name AS supplier,
           CAST(c.grand_total AS numeric) AS grand_total,
@@ -415,7 +472,16 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     case "rental_summary": {
       const currentYear = todayDate.getFullYear();
       const currentMonth = todayDate.getMonth() + 1;
-      const rows = await db.execute<{ unit_number: string; unit_type: string; location_group: string | null; tenant_name: string | null; rental_amount: string | null; contract_status: string | null; expected: string; paid: string }>(sql`
+      const rows = await db.execute<{
+        unit_number: string;
+        unit_type: string;
+        location_group: string | null;
+        tenant_name: string | null;
+        rental_amount: string | null;
+        contract_status: string | null;
+        expected: string;
+        paid: string;
+      }>(sql`
         SELECT pu.unit_number, pu.unit_type, pu.location_group,
           pc.tenant_name, CAST(pc.rental_amount AS numeric) AS rental_amount, pc.status AS contract_status,
           CAST(COALESCE(pml.expected_amount, 0) AS numeric) AS expected,
@@ -477,7 +543,18 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "payroll_summary": {
-      const rows = await db.execute<{ worker_name: string; period_start: string; period_end: string; status: string; net_salary: string; base_salary: string; bale_earnings: string; deductions: string; present_days: string | null; absent_days: string | null }>(sql`
+      const rows = await db.execute<{
+        worker_name: string;
+        period_start: string;
+        period_end: string;
+        status: string;
+        net_salary: string;
+        base_salary: string;
+        bale_earnings: string;
+        deductions: string;
+        present_days: string | null;
+        absent_days: string | null;
+      }>(sql`
         SELECT fw.name AS worker_name,
           fp.period_start, fp.period_end, fp.status,
           CAST(fp.net_salary AS numeric) AS net_salary,

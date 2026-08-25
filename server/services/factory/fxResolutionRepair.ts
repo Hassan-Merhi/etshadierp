@@ -79,7 +79,13 @@ export interface FxResolutionPlan {
   containerStatus: string | null;
 }
 
-async function loadRow(dbOrTx: DatabaseOrTransaction, source: FxResolutionSource, id: number, companyId: number, forUpdate = false) {
+async function loadRow(
+  dbOrTx: DatabaseOrTransaction,
+  source: FxResolutionSource,
+  id: number,
+  companyId: number,
+  forUpdate = false
+) {
   if (source === "container") {
     const q = dbOrTx
       .select()

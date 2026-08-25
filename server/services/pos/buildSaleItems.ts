@@ -12,7 +12,10 @@ import { eq, and } from "drizzle-orm";
 import type { HandlerErrorResult, PosSaleItemInput, ValidatedInventoryItem } from "./posSaleTypes";
 
 /** Input validation assertions for inventory safety. */
-export function validateItemsBasic(locationId: number | string | null | undefined, items: PosSaleItemInput[]): { error: HandlerErrorResult } | null {
+export function validateItemsBasic(
+  locationId: number | string | null | undefined,
+  items: PosSaleItemInput[]
+): { error: HandlerErrorResult } | null {
   const parsedLocationId = Number(locationId);
   if (!locationId || isNaN(parsedLocationId)) {
     return { error: { status: 400, body: { message: `Invalid locationId: ${locationId}` } } };

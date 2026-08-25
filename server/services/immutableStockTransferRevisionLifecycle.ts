@@ -184,7 +184,11 @@ async function assertCompanyScope(
   }
 }
 
-async function assertSubmittedBaseline(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], transferId: number, items: NormalizedImmutableRevisionItem[]) {
+async function assertSubmittedBaseline(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  transferId: number,
+  items: NormalizedImmutableRevisionItem[]
+) {
   const current = await tx.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, transferId));
   for (const item of items) {
     const row = current.find(

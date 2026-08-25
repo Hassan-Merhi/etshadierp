@@ -39,7 +39,7 @@ export async function getStableSupplierCost(
   tx: DatabaseOrTransaction,
   companyId: number,
   supplierId: number,
-  opts: { forUpdate?: boolean } = {},
+  opts: { forUpdate?: boolean } = {}
 ): Promise<StableSupplierCostResult> {
   const query = tx
     .select({
@@ -59,17 +59,15 @@ export async function getStableSupplierCost(
         eq(factoryContainers.supplierId, supplierId),
         sql`${factoryContainers.status} != 'DELETED'`,
         isNull(factoryRawStock.deletedAt),
-        isNull(factoryContainers.deletedAt),
-      ),
+        isNull(factoryContainers.deletedAt)
+      )
     )
     .orderBy(factoryRawStock.offloadedAt, factoryRawStock.id);
   const rawRows = await (opts.forUpdate ? query.for("update") : query);
   const rows: StableSupplierRawStockRow[] = rawRows.map((row: any) => {
     const receivedKg = new Decimal(row.receivedKg || 0).toNumber();
     const rawUsdRate = new Decimal(row.costPerKgUsd || 0);
-    const costPerKgUsd = rawUsdRate.gt(0)
-      ? rawUsdRate.toNumber()
-      : new Decimal(row.costPerKg || 0).toNumber();
+    const costPerKgUsd = rawUsdRate.gt(0) ? rawUsdRate.toNumber() : new Decimal(row.costPerKg || 0).toNumber();
 
     return {
       id: row.id,
@@ -85,7 +83,7 @@ export async function getStableSupplierCost(
     rows.map((row) => ({
       quantityKg: row.receivedKg,
       unitCostPerKg: row.costPerKgUsd,
-    })),
+    }))
   );
 
   return {

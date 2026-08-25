@@ -41,9 +41,7 @@ export async function checkIdempotentSale(
   const [existingVoucher] = await db
     .select()
     .from(vouchers)
-    .where(
-      and(eq(vouchers.companyId, companyId), eq(vouchers.clientSaleId, clientSaleId), isNull(vouchers.deletedAt))
-    )
+    .where(and(eq(vouchers.companyId, companyId), eq(vouchers.clientSaleId, clientSaleId), isNull(vouchers.deletedAt)))
     .limit(1);
   if (!existingVoucher) return null;
 

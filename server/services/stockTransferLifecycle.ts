@@ -239,7 +239,11 @@ async function validateAndApplyItems(
   }
 }
 
-async function replaceTransferItems(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], transferId: number, items: StockTransferLifecycleItem[]) {
+async function replaceTransferItems(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  transferId: number,
+  items: StockTransferLifecycleItem[]
+) {
   await tx.delete(stockTransferItems).where(eq(stockTransferItems.transferId, transferId));
   return tx
     .insert(stockTransferItems)

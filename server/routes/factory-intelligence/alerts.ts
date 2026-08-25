@@ -75,9 +75,7 @@ export function registerFactoryAlertRoutes(app: Express, requireAuth: AuthMiddle
         .where(and(eq(factoryAlerts.companyId, companyId), eq(factoryAlerts.isRead, false)));
 
       const alertExists = (type: string, entityType: string, entityId: number) => {
-        return existingAlerts.some(
-          (a) => a.type === type && a.entityType === entityType && a.entityId === entityId
-        );
+        return existingAlerts.some((a) => a.type === type && a.entityType === entityType && a.entityId === entityId);
       };
 
       const requiredDocTypes = await db

@@ -218,7 +218,10 @@ export async function syncProductionBonusProposalsForPeriod(
  * transport and every other payroll component because net is adjusted by delta,
  * not reconstructed from a shortened formula.
  */
-export async function attachProductionBonusesToPayroll(executor: DatabaseOrTransaction, payrollId: number): Promise<void> {
+export async function attachProductionBonusesToPayroll(
+  executor: DatabaseOrTransaction,
+  payrollId: number
+): Promise<void> {
   const payrollResult = await executor.execute(sql`
     SELECT id, company_id AS "companyId", worker_id AS "workerId",
            period_start::text AS "periodStart", period_end::text AS "periodEnd", status,
@@ -261,7 +264,10 @@ export async function attachProductionBonusesToPayroll(executor: DatabaseOrTrans
   }
 }
 
-export async function prepareProductionBonusesForPayroll(executor: DatabaseOrTransaction, payrollId: number): Promise<void> {
+export async function prepareProductionBonusesForPayroll(
+  executor: DatabaseOrTransaction,
+  payrollId: number
+): Promise<void> {
   const payrollResult = await executor.execute(sql`
     SELECT company_id AS "companyId", period_start::text AS "periodStart",
            period_end::text AS "periodEnd", status
@@ -357,7 +363,10 @@ export async function getProductionBonusDetailsForPayroll(
   return { totals, allocations };
 }
 
-export async function updateProductionBonusRunStatuses(executor: DatabaseOrTransaction, runIds: number[]): Promise<void> {
+export async function updateProductionBonusRunStatuses(
+  executor: DatabaseOrTransaction,
+  runIds: number[]
+): Promise<void> {
   for (const runId of [...new Set(runIds)]) {
     await executor.execute(sql`
       UPDATE factory_production_bonus_runs r

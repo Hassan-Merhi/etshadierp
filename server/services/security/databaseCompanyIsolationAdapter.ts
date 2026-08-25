@@ -38,7 +38,9 @@ export function createDatabaseCompanyIsolationAdapter(): CompanyIsolationLookupA
       // adapter is the drizzle implementation of it.
       const database = tx as DbTransaction;
 
-      const lookups: Partial<Record<CompanyScopedResourceType, { table: PgTable; idColumn: PgColumn; companyColumn: PgColumn }>> = {
+      const lookups: Partial<
+        Record<CompanyScopedResourceType, { table: PgTable; idColumn: PgColumn; companyColumn: PgColumn }>
+      > = {
         voucher: {
           table: vouchers,
           idColumn: vouchers.id,

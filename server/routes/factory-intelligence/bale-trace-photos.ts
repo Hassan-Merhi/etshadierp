@@ -59,9 +59,7 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: A
             .from(factoryMixBatchSources)
             .where(eq(factoryMixBatchSources.mixBatchId, mixBatch.id));
 
-          const containerIds = mixSources
-            .map((s) => s.containerId)
-            .filter((id): id is number => id !== null);
+          const containerIds = mixSources.map((s) => s.containerId).filter((id): id is number => id !== null);
           const containers =
             containerIds.length > 0
               ? await db

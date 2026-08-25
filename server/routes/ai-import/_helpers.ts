@@ -239,7 +239,10 @@ export async function validateStockItemRows(
   });
 }
 
-export async function validateCustomerRows(companyId: number, rows: { id: number; rowNumber: number; rawData: unknown }[]) {
+export async function validateCustomerRows(
+  companyId: number,
+  rows: { id: number; rowNumber: number; rawData: unknown }[]
+) {
   const existingCodes = await db
     .select({ code: customers.code })
     .from(customers)
@@ -275,7 +278,10 @@ export async function validateCustomerRows(companyId: number, rows: { id: number
   });
 }
 
-export async function validateSupplierRows(companyId: number, rows: { id: number; rowNumber: number; rawData: unknown }[]) {
+export async function validateSupplierRows(
+  companyId: number,
+  rows: { id: number; rowNumber: number; rawData: unknown }[]
+) {
   const existingCodes = await db.select({ code: suppliers.code }).from(suppliers).where(isNull(suppliers.deletedAt));
   const existingCodeSet = new Set(existingCodes.map((r) => (r.code || "").toLowerCase()));
   const batchCodes = new Set<string>();
@@ -308,7 +314,10 @@ export async function validateSupplierRows(companyId: number, rows: { id: number
   });
 }
 
-export async function validateVoucherRows(companyId: number, rows: { id: number; rowNumber: number; rawData: unknown }[]) {
+export async function validateVoucherRows(
+  companyId: number,
+  rows: { id: number; rowNumber: number; rawData: unknown }[]
+) {
   const [accounts, ledgerCorrections] = await Promise.all([
     db
       .select({ id: ledgerAccounts.id, name: ledgerAccounts.name, code: ledgerAccounts.code })
