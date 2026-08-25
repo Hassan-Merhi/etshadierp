@@ -78,26 +78,221 @@ function addFinding(findings, file, source, index, category, severity, message, 
   });
 }
 
-function detectAwaitInsideLoops(source, file, findings) {
-  const loopPattern = /\b(for\s*\([^)]*\)|for\s+await\s*\([^)]*\)|for\s*\([^)]*\)|while\s*\([^)]*\)|\.forEach\s*\([^)]*=>\s*\{)/g;
+/**
+ * Replace strings and comments with spaces while preserving source length and
+ * newlines. Delimiter matching can then ignore braces/parentheses that only
+ * appear in prose, SQL strings, templates, or comments.
+ */
+function maskNonCode(source) {
+  const chars = source.split("");
+  let state = "code";
+  let quote = "";
+
+  const mask = (index) => {
+    if (chars[index] !== "\n" && chars[index] !== "\r") chars[index] = " ";
+  };
+
+  for (let i = 0; i < source.length; i += 1) {
+    const char = source[i];
+    const next = source[i + 1];
+
+    if (state === "line-comment") {
+      if (char === "\n") state = "code";
+      else mask(i);
+      continue;
+    }
+
+    if (state === "block-comment") {
+      if (char === "*" && next === "/") {
+        mask(i);
+        mask(i + 1);
+        i += 1;
+        state = "code";
+      } else {
+        mask(i);
+      }
+      continue;
+    }
+
+    if (state === "string") {
+      if (char === "\\") {
+        mask(i);
+        if (i + 1 < source.length) {
+          mask(i + 1);
+          i += 1;
+        }
+        continue;
+      }
+      mask(i);
+      if (char === quote) {
+        state = "code";
+        quote = "";
+      }
+      continue;
+    }
+
+    if (char === "/" && next === "/") {
+      mask(i);
+      mask(i + 1);
+      i += 1;
+      state = "line-comment";
+      continue;
+    }
+    if (char === "/" && next === "*") {
+      mask(i);
+      mask(i + 1);
+      i += 1;
+      state = "block-comment";
+      continue;
+    }
+    if (char === '"' || char === "'" || char === "`") {
+      quote = char;
+      mask(i);
+      state = "string";
+    }
+  }
+
+  return chars.join("");
+}
+
+function findMatchingDelimiter(source, openIndex, openChar, closeChar) {
+  let depth = 0;
+  for (let i = openIndex; i < source.length; i += 1) {
+    if (source[i] === openChar) depth += 1;
+    else if (source[i] === closeChar) {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+function nextCodeIndex(source, start, limit = source.length) {
+  let index = start;
+  while (index < limit && /\s/.test(source[index])) index += 1;
+  return index;
+}
+
+function findSingleStatementEnd(source, start, limit = source.length) {
+  let parenDepth = 0;
+  let bracketDepth = 0;
+  let braceDepth = 0;
+
+  for (let i = start; i < limit; i += 1) {
+    const char = source[i];
+    if (char === "(") parenDepth += 1;
+    else if (char === ")" && parenDepth > 0) parenDepth -= 1;
+    else if (char === "[") bracketDepth += 1;
+    else if (char === "]" && bracketDepth > 0) bracketDepth -= 1;
+    else if (char === "{") braceDepth += 1;
+    else if (char === "}" && braceDepth > 0) braceDepth -= 1;
+
+    if (parenDepth === 0 && bracketDepth === 0 && braceDepth === 0) {
+      if (char === ";") return i + 1;
+      if (char === "\n") return i;
+    }
+  }
+
+  return limit;
+}
+
+function getBodyRange(maskedSource, bodyStart, limit = maskedSource.length) {
+  const start = nextCodeIndex(maskedSource, bodyStart, limit);
+  if (start >= limit) return null;
+
+  if (maskedSource[start] === "{") {
+    const close = findMatchingDelimiter(maskedSource, start, "{", "}");
+    if (close < 0 || close > limit) return null;
+    return { start: start + 1, end: close };
+  }
+
+  return { start, end: findSingleStatementEnd(maskedSource, start, limit) };
+}
+
+function collectLoopBodyRanges(source) {
+  const maskedSource = maskNonCode(source);
+  const ranges = [];
+
+  const controlLoopPattern = /\b(?:for\s+await|for|while)\s*\(/g;
   let match;
+  while ((match = controlLoopPattern.exec(maskedSource)) !== null) {
+    const openParen = maskedSource.indexOf("(", match.index);
+    const closeParen = findMatchingDelimiter(maskedSource, openParen, "(", ")");
+    if (closeParen < 0) continue;
+    const body = getBodyRange(maskedSource, closeParen + 1);
+    if (body) ranges.push(body);
+    controlLoopPattern.lastIndex = closeParen + 1;
+  }
 
-  while ((match = loopPattern.exec(source)) !== null) {
-    const windowEnd = Math.min(source.length, match.index + 2200);
-    const window = source.slice(match.index, windowEnd);
-    const awaitMatch = /\bawait\s+(?:db\.|tx\.|storage\.|pool\.|client\.|sql\.|[A-Za-z_$][\w$]*\.(?:select|insert|update|delete|execute|query|find|findMany|findFirst|get|list))/m.exec(window);
-    if (!awaitMatch) continue;
+  const forEachPattern = /\.forEach\s*\(/g;
+  while ((match = forEachPattern.exec(maskedSource)) !== null) {
+    const openParen = maskedSource.indexOf("(", match.index);
+    const closeParen = findMatchingDelimiter(maskedSource, openParen, "(", ")");
+    if (closeParen < 0) continue;
+    const arrowIndex = maskedSource.indexOf("=>", openParen + 1);
+    if (arrowIndex < 0 || arrowIndex > closeParen) continue;
+    const body = getBodyRange(maskedSource, arrowIndex + 2, closeParen);
+    if (body) ranges.push(body);
+    forEachPattern.lastIndex = closeParen + 1;
+  }
 
-    const absoluteIndex = match.index + awaitMatch.index;
-    addFinding(
-      findings,
-      file,
-      source,
-      absoluteIndex,
-      "possible-n-plus-one",
-      "high",
-      "Database-like await appears inside or immediately after a loop; inspect whether the reads can be batched or preloaded.",
-    );
+  return ranges;
+}
+
+function isReadLikeAwait(snippet) {
+  if (/\bawait\s+(?:db\.|tx\.)\s*select\b/.test(snippet)) return true;
+  if (/\bawait\s+[A-Za-z_$][\w$]*\.(?:find|findMany|findFirst|get|list|select)\b/.test(snippet)) return true;
+  if (/\bawait\s+(?:pool|client)\.query\b[\s\S]{0,220}\bSELECT\b/i.test(snippet)) return true;
+  if (/\bawait\s+(?:db|tx)\.execute\b[\s\S]{0,220}\bSELECT\b/i.test(snippet)) return true;
+  return false;
+}
+
+function bodyHasWriteLikeDatabaseOperation(body) {
+  return (
+    /\bawait\s+(?:db|tx)\.(?:insert|update|delete)\b/.test(body) ||
+    /\bawait\s+[A-Za-z_$][\w$]*\.(?:insert|update|delete|create|save|set|apply|sync|remove)[A-Za-z0-9_$]*\s*\(/.test(
+      body
+    ) ||
+    /\b(?:INSERT\s+INTO|UPDATE\s+[A-Za-z_]|DELETE\s+FROM|ALTER\s+TABLE|CREATE\s+(?:INDEX|TABLE)|DROP\s+(?:INDEX|TABLE))\b/i.test(
+      body
+    )
+  );
+}
+
+function detectAwaitInsideLoops(source, file, findings) {
+  const awaitPattern = /\bawait\s+(?:db\.|tx\.|storage\.|pool\.|client\.|sql\.|[A-Za-z_$][\w$]*\.(?:select|insert|update|delete|execute|query|find|findMany|findFirst|get|list))/gm;
+
+  for (const range of collectLoopBodyRanges(source)) {
+    const body = source.slice(range.start, range.end);
+    const orderedMutationContext = bodyHasWriteLikeDatabaseOperation(body);
+    let awaitMatch;
+    while ((awaitMatch = awaitPattern.exec(body)) !== null) {
+      const absoluteIndex = range.start + awaitMatch.index;
+      const operationSnippet = source.slice(absoluteIndex, Math.min(range.end, absoluteIndex + 520));
+      if (isReadLikeAwait(operationSnippet) && !orderedMutationContext) {
+        addFinding(
+          findings,
+          file,
+          source,
+          absoluteIndex,
+          "possible-n-plus-one",
+          "high",
+          "Read-like database await occurs inside a read-only loop/callback body; inspect whether the reads can be batched or preloaded.",
+        );
+      } else {
+        addFinding(
+          findings,
+          file,
+          source,
+          absoluteIndex,
+          "looped-database-operation",
+          "medium",
+          orderedMutationContext
+            ? "Database operation occurs in a read/write loop where iteration ordering may carry state; optimize only with semantic reconciliation evidence."
+            : "Database write, DDL, or indeterminate operation occurs inside a loop; preserve ordering when required and batch only with semantic evidence.",
+        );
+      }
+    }
   }
 }
 
@@ -112,8 +307,8 @@ function detectBroadSelects(source, file, findings) {
     {
       regex: /select\s+\*\s+from\s+/gi,
       category: "select-star",
-      severity: "high",
-      message: "Raw SQL SELECT * can inflate row payloads and memory use; prefer explicit fields where behavior permits.",
+      severity: "medium",
+      message: "Raw SQL SELECT * requests every column; verify the full row shape is required and the result is appropriately scoped.",
     },
   ];
 
@@ -223,6 +418,9 @@ const report = {
   findings: deduplicated,
   notes: [
     "Finding IDs are deterministic from file, category, and normalized snippet so classifications can survive unrelated line movement.",
+    "Loop findings are scoped to the actual balanced loop/callback body rather than a fixed source window.",
+    "High-severity N+1 candidates are read-like awaits in read-only loops; read/write loops remain visible at medium severity because ordering may carry state.",
+    "SELECT * is reported as a medium broad-payload smell; high severity is reserved for repeated read latency in read-only loops.",
     "This is a static heuristic audit; every finding requires manual review.",
     "Do not add indexes without query-plan evidence.",
     "Do not parallelize queries that depend on transaction ordering or shared mutable state.",
