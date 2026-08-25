@@ -35,7 +35,7 @@ import type {
 export async function checkIdempotentSale(
   companyId: number,
   clientSaleId: string | undefined
-): Promise<{ ok: true; status: number; body: PosSaleResponseBody } | null> {
+): Promise<{ status: number; body: PosSaleResponseBody } | null> {
   if (!clientSaleId) return null;
 
   const [existingVoucher] = await db
@@ -51,7 +51,6 @@ export async function checkIdempotentSale(
   const existingLocation =
     (existingVoucher.locationId ? await storage.getLocationById(existingVoucher.locationId) : null) ?? null;
   return {
-    ok: true,
     status: 200,
     body: {
       voucher: existingVoucher,

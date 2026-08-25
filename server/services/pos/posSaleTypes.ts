@@ -111,13 +111,20 @@ export interface PosSaleResponseBody {
   _idempotent?: boolean;
 }
 
+/** The created sale, exactly as the endpoint returns it. */
+export type CreatedPosSaleResult = { status: number; body: PosSaleResponseBody };
+
+/** Either the created sale or a mapped handler error. */
+export type CreatePosSaleResult = CreatedPosSaleResult | HandlerErrorResult;
+
 /**
- * Either the created sale or a mapped handler error. `ok` is the discriminant —
- * the error body is an open record, so only an explicit flag can separate them.
+ * Narrows a sale result to the created-sale branch. The error body is an open
+ * record, so the two branches only separate on the values the handler actually
+ * returns: a 200 carrying a voucher.
  */
-export type CreatePosSaleResult =
-  | { ok: true; status: number; body: PosSaleResponseBody }
-  | { ok: false; status: number; body: Record<string, unknown> };
+export function isCreatedPosSale(result: CreatePosSaleResult): result is CreatedPosSaleResult {
+  return result.status === 200 && "voucher" in result.body;
+}
 
 export interface CreatePosSaleParams {
   currentCompanyId: number;

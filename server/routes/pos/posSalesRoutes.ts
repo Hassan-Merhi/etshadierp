@@ -7,6 +7,7 @@ import { requireAuth, canModifyDate } from "../../auth";
 import { companies } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { createPosSale } from "../../services/pos/createSaleService";
+import { isCreatedPosSale } from "../../services/pos/posSaleTypes";
 import { logAudit } from "../helpers/auditHelpers";
 
 export function registerPosSalesRoutes(app: Express): void {
@@ -41,7 +42,7 @@ export function registerPosSalesRoutes(app: Express): void {
         { isSpCompany }
       );
 
-      if (result.ok) {
+      if (isCreatedPosSale(result)) {
         logger.info("POS sale create succeeded", {
           module: "pos",
           action: "createSale",

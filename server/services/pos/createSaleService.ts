@@ -43,7 +43,7 @@ import { lockAndDeductInventoryForSaleItem } from "./deductSaleInventory";
 import { lockAndFindExistingPosSaleTx } from "./posSaleIdempotency";
 
 function err(result: HandlerErrorResult): CreatePosSaleResult {
-  return { ok: false, status: result.status, body: result.body };
+  return { status: result.status, body: result.body };
 }
 
 export async function createPosSale(
@@ -107,7 +107,7 @@ export async function createPosSale(
   if (idempotentResult) return idempotentResult;
 
   if (!locationId) {
-    return { ok: false, status: 400, body: { message: "Location is required" } };
+    return { status: 400, body: { message: "Location is required" } };
   }
 
   let effectiveShiftId: number | null = shiftId || null;
@@ -125,13 +125,12 @@ export async function createPosSale(
   }
   if (!accountId) {
     return {
-      ok: false,
       status: 400,
       body: { message: isCreditSale ? "Customer is required" : "Payment account is required" },
     };
   }
   if (!items || !Array.isArray(items) || items.length === 0) {
-    return { ok: false, status: 400, body: { message: "At least one item is required" } };
+    return { status: 400, body: { message: "At least one item is required" } };
   }
 
   const parsedLocationId = Number(locationId);
@@ -304,7 +303,6 @@ export async function createPosSale(
     const existingLocation =
       (existingVoucher.locationId ? await storage.getLocationById(existingVoucher.locationId) : null) ?? null;
     return {
-      ok: true,
       status: 200,
       body: {
         voucher: existingVoucher,
@@ -354,7 +352,6 @@ export async function createPosSale(
   }
 
   return {
-    ok: true,
     status: 200,
     body: {
       voucher,
