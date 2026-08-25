@@ -30,9 +30,10 @@ secrets out of source control. `npm run verify:env-docs` must pass.
 
 ## Before merging
 
-`main` must satisfy `docs/release-governance.md`: PR-only changes, blocked force
-pushes/deletion, a current PR head, and required checks enforced by GitHub. The
-permanent Release Governance workflow must also be green on the exact PR head.
+`main` must satisfy `.github/RELEASE_GOVERNANCE.md`: PR-only changes, blocked
+force pushes/deletion, a current PR head, and required checks enforced by
+GitHub. The permanent Release Governance workflow must also be green on the
+exact PR head.
 
 Run the permanent local gates that apply to the change:
 
