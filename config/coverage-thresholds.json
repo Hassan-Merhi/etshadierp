@@ -126,7 +126,7 @@
   },
   "frontend": {
     "global": {
-      "lines": 18,
+      "lines": 20,
       "statements": 17,
       "functions": 11,
       "branches": 12
