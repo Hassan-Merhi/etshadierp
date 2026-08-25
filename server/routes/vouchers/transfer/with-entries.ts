@@ -76,7 +76,6 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
       if (existingVoucher.voucherType === "Sales" && locationChanged && oldLocationId && newLocationId) {
         await db.transaction(async (tx) => {
           await moveSalesVoucherInventoryLocation(tx, existingVoucher, oldLocationId, newLocationId, {
-            userId: req.session.userId,
             username: req.session.username,
             reason: `Move sales voucher ${existingVoucher.voucherNumber} from location ${oldLocationId} to ${newLocationId}`,
           });
