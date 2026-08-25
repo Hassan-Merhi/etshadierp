@@ -11,9 +11,15 @@ import {
   type SerializedRouteManifest,
 } from "./helpers/routeManifest";
 
+interface RouteManifestReplacement {
+  expected: string;
+  actual: string;
+}
+
 interface RatchetAllowances {
   routeManifestAdditions: string[];
   routeManifestMountAdditions: string[];
+  routeManifestReplacements?: RouteManifestReplacement[];
 }
 
 const MANIFEST_PATH = path.join(process.cwd(), "config/route-manifest.json");
@@ -103,6 +109,17 @@ function describeDiff(label: string, expectedEntries: string[], actualEntries: s
   return lines.join("\n");
 }
 
+function applyReviewedReplacements(entries: string[], replacements: RouteManifestReplacement[]): string[] {
+  const remaining = replacements.map((replacement) => ({ ...replacement, remaining: 1 }));
+  return entries.map((rawEntry) => {
+    const entry = normalizeReviewedMiddlewareWrappers(rawEntry);
+    const replacement = remaining.find((candidate) => candidate.remaining > 0 && candidate.actual === entry);
+    if (!replacement) return entry;
+    replacement.remaining -= 1;
+    return replacement.expected;
+  });
+}
+
 function removeReviewedOccurrences(
   entries: string[],
   expectedEntries: string[],
@@ -144,11 +161,13 @@ describe("route manifest", () => {
   it("exposes no route without an identifiable handler chain", () => {
     expect(actual.routes.filter((entry) => entry.endsWith("[]"))).toEqual([]);
   });
-  it("matches the committed snapshot plus exact reviewed additions", () => {
+  it("matches the committed snapshot plus exact reviewed deltas", () => {
     const expected = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as SerializedRouteManifest;
     const reviewedRoutes = new Set(allowances.routeManifestAdditions);
     const reviewedMounts = new Set([...allowances.routeManifestMountAdditions, ...reviewedSpMounts]);
-    const routes = removeReviewedOccurrences(actual.routes, expected.routes, reviewedRoutes);
+    const reviewedReplacements = allowances.routeManifestReplacements ?? [];
+    const replacedRoutes = applyReviewedReplacements(actual.routes, reviewedReplacements);
+    const routes = removeReviewedOccurrences(replacedRoutes, expected.routes, reviewedRoutes);
     const mounts = removeReviewedOccurrences(actual.middlewareMounts, expected.middlewareMounts, reviewedMounts);
     expect(expected.formatVersion).toBe(ROUTE_MANIFEST_FORMAT_VERSION);
     const routeDiff = describeDiff("Routes", expected.routes, routes);
@@ -159,6 +178,16 @@ describe("route manifest", () => {
         .map(normalizeReviewedMiddlewareWrappers)
         .filter((entry) => entry === addition).length;
       expect(actualCount).toBe(baselineCount + 1);
+    }
+    const normalizedActualRoutes = actual.routes.map(normalizeReviewedMiddlewareWrappers);
+    for (const replacement of reviewedReplacements) {
+      expect(replacement.actual).not.toBe(replacement.expected);
+      const baselineExpectedCount = expected.routes.filter((entry) => entry === replacement.expected).length;
+      const baselineActualCount = expected.routes.filter((entry) => entry === replacement.actual).length;
+      const currentExpectedCount = normalizedActualRoutes.filter((entry) => entry === replacement.expected).length;
+      const currentActualCount = normalizedActualRoutes.filter((entry) => entry === replacement.actual).length;
+      expect(currentExpectedCount).toBe(baselineExpectedCount - 1);
+      expect(currentActualCount).toBe(baselineActualCount + 1);
     }
     const mountDiff = describeDiff("Middleware mounts", expected.middlewareMounts, mounts);
     expect(mountDiff, mountDiff).toBe("");
