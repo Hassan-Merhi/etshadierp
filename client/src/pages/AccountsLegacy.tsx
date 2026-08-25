@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/PageHeader";
 import { ErrorState } from "@/components/ui/page-state";
-import { exportLabels } from "./accounts/accountTypes";
 import { AccountDialogs } from "./accounts/AccountDialogs";
 import { AccountTable } from "./accounts/AccountTable";
 import { AccountStatementView } from "./accounts/AccountStatementView";
@@ -181,11 +180,8 @@ export default function Accounts() {
               selectedVoucherIds={model.selectedVoucherIds}
               toggleSelectAll={model.toggleSelectAll}
               setShowBulkDeleteConfirm={model.setShowBulkDeleteConfirm}
-              filterCurrency={model.filterCurrency}
-              setFilterCurrency={model.setFilterCurrency}
               showDeletedVouchers={model.showDeletedVouchers}
               setShowDeletedVouchers={model.setShowDeletedVouchers}
-              currentUser={model.currentUser}
               formatAmount={(amt) => model.formatAmountForAccount(amt, selectedAccount?.type)}
               hideBalances={model.hideBalances}
               printRef={model.printRef}
@@ -196,16 +192,9 @@ export default function Accounts() {
               waRule={selectedAccountIsLedger ? (model.waRule ?? null) : null}
               openWaRuleDialog={selectedAccountIsLedger ? model.openWaRuleDialog : () => {}}
               sendWaStatementMutation={model.sendWaStatementMutation}
-              isMultiCurrency={model.isMultiCurrency}
               isBrokerSupplier={false}
-              brokerStatementData={null}
-              factorySupplierStatement={null}
               factoryStatementLoading={false}
               brokerStatementLoading={false}
-              handlePrint={model.handlePrint}
-              exportLang={model.exportLang}
-              setExportLang={model.setExportLang}
-              exportLabels={exportLabels}
             />
           )}
         </TabsContent>
