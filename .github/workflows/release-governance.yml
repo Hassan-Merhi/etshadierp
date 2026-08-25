@@ -26,7 +26,6 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       REPOSITORY: ${{ github.repository }}
       EVENT_NAME: ${{ github.event_name }}
-      EVENT_PATH: ${{ github.event_path }}
       HEAD_SHA: ${{ github.sha }}
     steps:
       - name: Verify live main governance
@@ -40,7 +39,7 @@ jobs:
           const repo = process.env.REPOSITORY;
           const token = process.env.GH_TOKEN;
           const eventName = process.env.EVENT_NAME;
-          const event = JSON.parse(fs.readFileSync(process.env.EVENT_PATH, "utf8"));
+          const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"));
           const headers = {
             Accept: "application/vnd.github+json",
             Authorization: `Bearer ${token}`,
