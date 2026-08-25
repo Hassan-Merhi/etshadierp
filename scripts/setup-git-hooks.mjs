@@ -8,36 +8,17 @@
  *  - Only sets core.hooksPath; never overwrites existing hook files.
  */
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, readFileSync } from "node:fs";
+import { chmodSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const hooksDir = "scripts/git-hooks";
 
-// Temporary Phase 2 diagnostic: npm's prepare hook runs after dev dependencies
-// are installed, so CI can ask the repository's exact Prettier version for the
-// canonical rendering of the one remaining formatting failure. This branch-only
-// probe is removed immediately after the output is captured.
+// CI checkouts are disposable and monitored for source writes. Hook wiring is
+// a local developer convenience, so do not mutate checkout metadata in CI.
 if (process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true") {
-  const prettier = await import("prettier");
-  const target = join(repoRoot, "tests/factory-container-lifecycle.test.ts");
-  const source = readFileSync(target, "utf8");
-  const formatted = await prettier.format(source, {
-    filepath: target,
-    semi: true,
-    singleQuote: false,
-    tabWidth: 2,
-    trailingComma: "es5",
-    printWidth: 120,
-    bracketSpacing: true,
-    arrowParens: "always",
-    endOfLine: "lf",
-  });
-  console.log("PHASE2_PRETTIER_BEGIN");
-  console.log(formatted);
-  console.log("PHASE2_PRETTIER_END");
-  process.exit(1);
+  process.exit(0);
 }
 
 function git(args) {
