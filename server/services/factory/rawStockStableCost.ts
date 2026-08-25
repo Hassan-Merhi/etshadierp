@@ -10,6 +10,7 @@ import { eq, and, isNull, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
 import { factoryRawStock, factoryContainers } from "@shared/schema";
 import { calculateWeightedAverageCost } from "./factoryCostingEngine";
+import type { DatabaseOrTransaction } from "../../db";
 
 export interface StableSupplierRawStockRow {
   id: number;
@@ -35,12 +36,12 @@ export interface StableSupplierCostResult {
  * so optional row locks remain inside the owning transaction.
  */
 export async function getStableSupplierCost(
-  tx: any,
+  tx: DatabaseOrTransaction,
   companyId: number,
   supplierId: number,
   opts: { forUpdate?: boolean } = {},
 ): Promise<StableSupplierCostResult> {
-  let query = tx
+  const query = tx
     .select({
       id: factoryRawStock.id,
       containerId: factoryRawStock.containerId,
@@ -62,10 +63,7 @@ export async function getStableSupplierCost(
       ),
     )
     .orderBy(factoryRawStock.offloadedAt, factoryRawStock.id);
-
-  if (opts.forUpdate) query = query.for("update");
-
-  const rawRows = await query;
+  const rawRows = await (opts.forUpdate ? query.for("update") : query);
   const rows: StableSupplierRawStockRow[] = rawRows.map((row: any) => {
     const receivedKg = new Decimal(row.receivedKg || 0).toNumber();
     const rawUsdRate = new Decimal(row.costPerKgUsd || 0);

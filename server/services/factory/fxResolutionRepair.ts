@@ -26,6 +26,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { factoryContainers, factoryOffloadAdditionalCharges, factoryContainerCommissions } from "@shared/schema";
+import type { DatabaseOrTransaction } from "../../db";
 
 export type FxResolutionSource = "container" | "offload_additional_charge" | "commission";
 
@@ -78,14 +79,13 @@ export interface FxResolutionPlan {
   containerStatus: string | null;
 }
 
-async function loadRow(dbOrTx: any, source: FxResolutionSource, id: number, companyId: number, forUpdate = false) {
+async function loadRow(dbOrTx: DatabaseOrTransaction, source: FxResolutionSource, id: number, companyId: number, forUpdate = false) {
   if (source === "container") {
-    let q = dbOrTx
+    const q = dbOrTx
       .select()
       .from(factoryContainers)
       .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId)));
-    if (forUpdate) q = q.for("update");
-    const [row] = await q;
+    const [row] = forUpdate ? await q.for("update") : await q;
     if (!row) return null;
     return {
       currencyCode: row.currencyCode,
@@ -97,12 +97,11 @@ async function loadRow(dbOrTx: any, source: FxResolutionSource, id: number, comp
     };
   }
   if (source === "offload_additional_charge") {
-    let q = dbOrTx
+    const q = dbOrTx
       .select()
       .from(factoryOffloadAdditionalCharges)
       .where(and(eq(factoryOffloadAdditionalCharges.id, id), eq(factoryOffloadAdditionalCharges.companyId, companyId)));
-    if (forUpdate) q = q.for("update");
-    const [row] = await q;
+    const [row] = forUpdate ? await q.for("update") : await q;
     if (!row) return null;
     const [container] = row.containerId
       ? await dbOrTx.select().from(factoryContainers).where(eq(factoryContainers.id, row.containerId))
@@ -120,12 +119,11 @@ async function loadRow(dbOrTx: any, source: FxResolutionSource, id: number, comp
     };
   }
   // commission
-  let q = dbOrTx
+  const q = dbOrTx
     .select()
     .from(factoryContainerCommissions)
     .where(and(eq(factoryContainerCommissions.id, id), eq(factoryContainerCommissions.companyId, companyId)));
-  if (forUpdate) q = q.for("update");
-  const [row] = await q;
+  const [row] = forUpdate ? await q.for("update") : await q;
   if (!row) return null;
   const [container] = row.containerId
     ? await dbOrTx.select().from(factoryContainers).where(eq(factoryContainers.id, row.containerId))

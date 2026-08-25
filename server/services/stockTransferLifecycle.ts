@@ -3,6 +3,19 @@ import { db } from "../db";
 import { adjustInventory } from "../inventoryHelper";
 import { locations, stockItems, stockTransferItems, stockTransferVouchers, vouchers } from "@shared/schema";
 import { journalStockTransferLeg, nextStockTransferRevision } from "./inventory/stockTransferJournal";
+import type { DbTransaction } from "../db";
+import { firstRow } from "../lib/queryResult";
+
+/** A stock-transfer voucher row locked FOR UPDATE, joined to its voucher header. */
+type LockedTransferRow = Record<string, unknown> & {
+  id: number;
+  voucher_id: number;
+  company_id: number;
+  optional: boolean;
+  voucher_type: string;
+  deleted_at: Date | null;
+  total_amount: string;
+};
 
 export interface StockTransferLifecycleItem {
   stockItemId: number;
@@ -93,7 +106,7 @@ export function aggregateSourceStockRequirements(
   );
 }
 
-async function lockTransfer(tx: any, transferId: number) {
+async function lockTransfer(tx: DbTransaction, transferId: number) {
   const result = await tx.execute(sql`
     SELECT stv.*, v.company_id, v.optional, v.voucher_type, v.deleted_at, v.total_amount
     FROM stock_transfer_vouchers stv
@@ -101,10 +114,10 @@ async function lockTransfer(tx: any, transferId: number) {
     WHERE stv.id = ${transferId}
     FOR UPDATE OF stv, v
   `);
-  return result.rows?.[0] ?? result[0];
+  return firstRow<LockedTransferRow>(result);
 }
 
-async function lockTransferByVoucher(tx: any, voucherId: number) {
+async function lockTransferByVoucher(tx: DbTransaction, voucherId: number) {
   const result = await tx.execute(sql`
     SELECT stv.*, v.company_id, v.optional, v.voucher_type, v.deleted_at, v.total_amount
     FROM stock_transfer_vouchers stv
@@ -112,7 +125,7 @@ async function lockTransferByVoucher(tx: any, voucherId: number) {
     WHERE stv.voucher_id = ${voucherId}
     FOR UPDATE OF stv, v
   `);
-  return result.rows?.[0] ?? result[0];
+  return firstRow<LockedTransferRow>(result);
 }
 
 async function loadTransferItems(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], transferId: number) {

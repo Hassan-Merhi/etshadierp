@@ -141,6 +141,15 @@ export type Database = typeof db;
  */
 export type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+/**
+ * Either handle, for helpers that run the same statements inside or outside a
+ * transaction. `db` and a transaction share the query surface these helpers use.
+ */
+export type DatabaseOrTransaction = Database | DbTransaction;
+
+/** The application's pg connection pool. */
+export type DatabasePool = typeof pool;
+
 // Lightweight pool snapshot exposed on globalThis so mjs lifecycle/health
 // modules can read it without creating a circular import dependency.
 (

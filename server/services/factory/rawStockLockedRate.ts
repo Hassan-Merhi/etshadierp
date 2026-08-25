@@ -16,13 +16,14 @@ import {
   calculateMovingAverageRate,
   formatFactoryLockedRate,
 } from "./factoryCostingEngine";
+import type { DatabaseOrTransaction } from "../../db";
 
 /**
  * Authoritative supplier raw-material quantity. This is the same quantity shown by
  * the Raw Materials API and used by the moving-average offload formula.
  */
 export async function getAuthoritativeSupplierRemainingKg(
-  tx: any,
+  tx: DatabaseOrTransaction,
   companyId: number,
   supplierId: number
 ): Promise<number> {
@@ -105,12 +106,12 @@ export async function getAuthoritativeSupplierRemainingKgWithExecutor(
  * the stable historical receipt cost and persisted; subsequent reads remain stable.
  */
 export async function getLockedSupplierRate(
-  tx: any,
+  tx: DatabaseOrTransaction,
   companyId: number,
   supplierId: number,
   opts: { forUpdate?: boolean } = {}
 ): Promise<number> {
-  let query = tx
+  const query = tx
     .select({
       id: factorySuppliers.id,
       currentRawMaterialCostPerKgUsd: factorySuppliers.currentRawMaterialCostPerKgUsd,
@@ -118,9 +119,7 @@ export async function getLockedSupplierRate(
     .from(factorySuppliers)
     .where(and(eq(factorySuppliers.id, supplierId), eq(factorySuppliers.companyId, companyId)));
 
-  if (opts.forUpdate) query = query.for("update");
-
-  const [supplier] = await query;
+  const [supplier] = await (opts.forUpdate ? query.for("update") : query);
   if (!supplier) return 0;
 
   const existing = supplier.currentRawMaterialCostPerKgUsd;
@@ -140,7 +139,7 @@ export async function getLockedSupplierRate(
 
 /** Pure read-only variant: never performs the legacy lazy-backfill write. */
 export async function getLockedSupplierRateReadOnly(
-  tx: any,
+  tx: DatabaseOrTransaction,
   companyId: number,
   supplierId: number
 ): Promise<{ rate: number; wasBackfilled: boolean }> {
@@ -251,7 +250,7 @@ export async function getLockedRateDiagnosticsForCompany(
  * supplier receipt. Fully consumed historical stock never re-enters the average.
  */
 export async function applyOffloadMovingAverage(
-  tx: any,
+  tx: DatabaseOrTransaction,
   params: {
     companyId: number;
     supplierId: number;
@@ -287,7 +286,7 @@ export async function applyOffloadMovingAverage(
 
 /** Quantity-only manual ADDs require an already-established locked rate. */
 export async function requireExistingLockedRate(
-  tx: any,
+  tx: DatabaseOrTransaction,
   companyId: number,
   supplierId: number
 ): Promise<number | null> {

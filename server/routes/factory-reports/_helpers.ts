@@ -9,6 +9,7 @@ import ExcelJS from "exceljs";
 import path from "path";
 import fs from "fs";
 import { factoryDaybookEntries } from "@shared/schema";
+import type { DatabaseOrTransaction } from "../../db";
 
 /**
  * Daybook writing plus the PDF and Excel generators for the supplier-usage
@@ -18,7 +19,7 @@ import { factoryDaybookEntries } from "@shared/schema";
  * modules; they previously closed over the register function's body.
  */
 export async function writeDaybookEntry(
-  dbOrTx: any,
+  dbOrTx: DatabaseOrTransaction,
   opts: {
     companyId: number;
     txDate: string;

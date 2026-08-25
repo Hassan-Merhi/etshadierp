@@ -21,6 +21,7 @@
 import { pool } from "../../db";
 import { factoryDaybookEntries } from "@shared/schema";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import type { DatabaseOrTransaction } from "../../db";
 
 // ── Source group definition ─────────────────────────────────────────────────
 
@@ -329,7 +330,7 @@ export function isRowIntegrityValid(
  * @param dbOrTx  Drizzle db or transaction object.
  */
 export async function removeDaybookEntriesForSource(
-  dbOrTx: any,
+  dbOrTx: DatabaseOrTransaction,
   opts: {
     companyId: number;
     referenceTable: string;

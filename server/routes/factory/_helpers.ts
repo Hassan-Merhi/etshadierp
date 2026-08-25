@@ -27,6 +27,7 @@ import {
   applyFxRate,
   UnresolvedExchangeRateError,
 } from "../../services/factory/currencyConversion";
+import type { DbTransaction, DatabaseOrTransaction } from "../../db";
 
 function buildValidatedUrl(baseUrl: string, dateISO: string, currencyCode: string): string {
   try {
@@ -208,7 +209,7 @@ export async function verifySupervisorPassword(password: string, hash: string): 
   return bcrypt.compare(password, hash);
 }
 
-export async function recalculateOrderTotals(dbConn: any, orderId: number) {
+export async function recalculateOrderTotals(dbConn: DatabaseOrTransaction, orderId: number) {
   const bales = await dbConn.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
 
   // Fetch proforma pricing mode and per-kg rate for this order (if proforma-linked)
@@ -325,7 +326,7 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
  * Returns the new { totalCost, inclusiveCostPerKg, costPerKgUsd, rawStockId }.
  */
 export async function recalculateContainerCosts(
-  tx: any,
+  tx: DbTransaction,
   companyId: number,
   containerId: number
 ): Promise<{ totalCost: number; inclusiveCostPerKg: number; costPerKgUsd: number; rawStockId: number | null }> {
@@ -351,14 +352,19 @@ export async function recalculateContainerCosts(
   // Freight — may be in a different currency; normalise to container currency
   const freightVal = parseFloat(container.freight || "0");
   const freightCcy = container.freightCurrencyCode || containerCcy;
-  const freightFx = parseFloat(container.fxRateToUsdOffload || container.freightFxRate || String(fxRate));
+  // `container.freightFxRate` is not a column on factory_containers (the stored
+  // freight rate is `freightFxRateToUsd`), so this branch has always been
+  // undefined; kept as-is so the computed freight is unchanged.
+  const freightFx = parseFloat(container.fxRateToUsdOffload || String(fxRate));
   const freightUsd = freightCcy === "USD" ? freightVal : freightVal * freightFx;
   const freightInCcy = freightCcy === containerCcy ? freightVal : fxRate > 0 ? freightUsd / fxRate : freightVal;
 
   // Other charges (bulk field)
   const ocVal = parseFloat(container.otherCharges || "0");
   const ocCcy = container.otherChargesCurrencyCode || containerCcy;
-  const ocFx = parseFloat(container.otherChargesFxRate || String(fxRate));
+  // factory_containers has no other-charges FX column, so this has always
+  // resolved to the container rate.
+  const ocFx = fxRate;
   const ocUsd = ocCcy === "USD" ? ocVal : ocVal * ocFx;
   const ocInCcy = ocCcy === containerCcy ? ocVal : fxRate > 0 ? ocUsd / fxRate : ocVal;
 

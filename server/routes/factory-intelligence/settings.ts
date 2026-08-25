@@ -4,14 +4,15 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response, RequestHandler } from "express";
+import type { Express, Request, Response } from "express";
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { cache } from "../../lib/simpleCache";
 import { eq } from "drizzle-orm";
 import { factorySettings } from "@shared/schema";
 
-export function registerFactorySettingsRoutes(app: Express, requireAuth: RequestHandler, db: any) {
+export function registerFactorySettingsRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   // ───────────────────────────────────────────────
   // 1. Settings CRUD
   // ───────────────────────────────────────────────
@@ -142,8 +143,8 @@ export function registerFactorySettingsRoutes(app: Express, requireAuth: Request
           .select({ extraSettings: factorySettings.extraSettings })
           .from(factorySettings)
           .where(eq(factorySettings.companyId, companyId));
-        const currentExtra = current?.extraSettings ?? {};
-        const newExtra = { ...currentExtra };
+        const currentExtra = (current?.extraSettings ?? {}) as Record<string, unknown>;
+        const newExtra: Record<string, unknown> = { ...currentExtra };
         for (const key of extraKeys) {
           if (req.body[key] !== undefined) newExtra[key] = req.body[key];
         }
