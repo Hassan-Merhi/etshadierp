@@ -1,0 +1,102 @@
+name: Phase 2 Red Diagnostic
+
+on:
+  push:
+    branches:
+      - chat-a/phase2-stock-movement-evidence
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.19.0"
+          cache: npm
+      - run: npm ci --no-audit --bin-links=true
+      - name: Exact CircleCI frontend regression command
+        run: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
+
+  postgres-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d heliumdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: phase2-diagnostic-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+      PORT: "5000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.19.0"
+          cache: npm
+      - run: npm ci --no-audit --bin-links=true
+      - name: Verify migration registry
+        run: node scripts/verify-migration-registry.mjs --json
+      - name: Prepare disposable database schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
+      - name: Verify disposable database schema
+        run: node scripts/verify-ci-disposable-schema.mjs
+      - name: Build application for startup migrations
+        run: npm run build
+      - name: Run application startup migrations
+        run: |
+          npm start > /tmp/phase2-startup-migrations.txt 2>&1 &
+          app_pid=$!
+          cleanup() {
+            kill "$app_pid" 2>/dev/null || true
+            wait "$app_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          for attempt in $(seq 1 180); do
+            if curl --fail --silent --show-error "http://127.0.0.1:${PORT}/api/health/db" > /tmp/phase2-health-db.json; then
+              cat /tmp/phase2-health-db.json
+              exit 0
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              cat /tmp/phase2-startup-migrations.txt
+              exit 1
+            fi
+            sleep 1
+          done
+          cat /tmp/phase2-startup-migrations.txt
+          exit 1
+      - name: Verify startup migration ratchet
+        run: HEALTH_REPORT=/tmp/phase2-health-db.json HEALTH_LABEL='Phase 2 diagnostic fresh schema' npm run verify:startup-migrations
+      - name: Exact CircleCI integration backend test command
+        run: |
+          mapfile -t integration_test_files < <(
+            find tests -type f -name '*.test.ts' \
+              ! -path 'tests/ui/*' \
+              ! -path 'tests/api-smoke-sweep.test.ts' \
+              | sort
+          )
+          test "${#integration_test_files[@]}" -gt 0
+          node node_modules/vitest/vitest.mjs run \
+            "${integration_test_files[@]}" \
+            --maxWorkers=1 \
+            --no-file-parallelism
