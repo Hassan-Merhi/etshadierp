@@ -14,6 +14,26 @@ It does not authorize a production restore, destructive migration, or manual dat
 6. Prefer additive, backward-compatible migrations so old and new application versions can both run during rollback.
 7. Never run an unreviewed SQL repair copied from logs or chat directly against production.
 
+## Repository rehearsal objectives
+
+The repository continuously proves the mechanics needed for recovery without touching production data:
+
+- every push to `main` runs a disposable backup/restore rehearsal as part of exact-main certification;
+- the dedicated resilience workflow also runs a weekly disposable restore rehearsal so recovery does not depend on recent application changes;
+- each rehearsal creates a PostgreSQL custom-format dump, verifies the catalog and backup signature, restores into a fresh database, and re-runs schema checks;
+- a critical-row fingerprint is captured before backup and after restore for `companies`, `vouchers`, `voucher_entries`, `inventory`, and `ledger_accounts`, and the rehearsal fails if the counts differ;
+- restore duration is measured against a five-minute rehearsal recovery-time budget (`DR_REHEARSAL_RTO_SECONDS=300` by default in CI);
+- structured evidence containing the commit, run identity, backup checksum, count fingerprints, and measured durations is retained by the dedicated resilience workflow for at least 30 days;
+- schedulers remain disabled throughout the rehearsal and scheduler overlap/failure isolation is re-tested afterward.
+
+The five-minute limit is a **CI rehearsal budget**, not a production recovery-time commitment. A disposable CI database is much smaller and simpler than the live production database.
+
+### Production RPO and RTO
+
+Production Recovery Point Objective (RPO) and Recovery Time Objective (RTO) depend on the hosting provider's actual backup cadence, retention, database size, restore throughput, operator availability, and the business owner's accepted data-loss window. Repository CI can prove that the recovery procedure remains executable, but it cannot certify the production backup frequency, retained restore points, or real production restore duration.
+
+Before claiming a production RPO or RTO, an authorized operator must record the provider's backup schedule/retention and complete a timed restore rehearsal using a production-sized, non-production copy. The approved objectives and evidence location belong in the private operations record, not in repository secrets or public logs.
+
 ## Migration risk classes
 
 | Class | Examples | Deployment expectation | Rollback expectation |
@@ -113,8 +133,9 @@ After restoration:
 4. Confirm `GET /api/health/ready` returns HTTP 200.
 5. Confirm login with a dedicated test account or approved restored account.
 6. Check representative record counts and financial totals.
-7. Record the restore duration and any warnings.
-8. Destroy the disposable database after evidence is retained.
+7. Record the backup and restore durations and any warnings.
+8. Compare the critical-row fingerprint from the source and restored databases before accepting the rehearsal.
+9. Destroy the disposable database after evidence is retained.
 
 Suggested read-only count checks:
 
@@ -219,6 +240,8 @@ A full recovery should normally restore into a new database and switch the appli
 - [ ] Backup age accepted
 - [ ] `pg_restore --list` completed for custom dump
 - [ ] Disposable restore completed
+- [ ] Source/restored critical-row fingerprint matches
+- [ ] Rehearsal restore duration recorded against the recovery-time budget
 - [ ] `/api/health/ready` returned 200 on restored database
 - [ ] Critical table counts compared
 - [ ] Financial reconciliation reviewed where applicable
