@@ -2,9 +2,19 @@ import { Fragment, useState, useMemo } from "react";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
-import { AccountTableProps } from "./accountTypes";
+import type { Account } from "./accountTypes";
 import { cn } from "@/lib/utils";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+
+interface AccountTableProps {
+  filteredAccounts: Account[];
+  expandedParents: Set<string>;
+  toggleParent: (id: string) => void;
+  handleAccountChange: (id: string) => void;
+  hideBalances: boolean;
+  formatAmount: (amt: number) => string;
+  onEdit?: (account: Account) => void;
+}
 
 export function AccountTable({
   filteredAccounts,
@@ -37,7 +47,7 @@ export function AccountTable({
   const accountIds = new Set(visibleAccounts.map((a) => a.accountId as number));
   const parents = visibleAccounts.filter((a) => !a.parentId || !accountIds.has(a.parentId));
   const childrenList = visibleAccounts.filter((a) => a.parentId && accountIds.has(a.parentId));
-  const childMap = new Map<number, any[]>();
+  const childMap = new Map<number, Account[]>();
   childrenList.forEach((c) => {
     if (!childMap.has(c.parentId)) childMap.set(c.parentId, []);
     childMap.get(c.parentId)!.push(c);
