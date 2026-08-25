@@ -5,6 +5,7 @@ import type { Express } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireNonPOS } from "../../auth";
+import { getAccessibleCompanyIds, isPrivilegedRole } from "../../security/companyAccessBoundary";
 import {
   stockItems,
   containers,
@@ -326,17 +327,29 @@ export function registerContainerFreightReadRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid container ID" });
       }
 
-      const container = await storage.getContainerByIdForCompany(containerId, req.session.currentCompanyId!);
+      // Authorized against every company this user belongs to, not just the
+      // active one. Scoping the lookup to req.session.currentCompanyId made a
+      // container owned by another of the caller's own companies answer 404,
+      // which is a read regression rather than isolation: membership, not the
+      // company selector, is what grants access here.
+      const container = await storage.getContainerById(containerId);
 
       if (!container) {
         return res.status(404).json({ message: "Container not found" });
       }
 
+      const accessibleCompanyIds = await getAccessibleCompanyIds(userId);
+      if (!accessibleCompanyIds.has(container.companyId)) {
+        // Same 404 as a missing container, so a non-member cannot use the
+        // status code to discover that this id exists.
+        return res.status(404).json({ message: "Container not found" });
+      }
+
       const supplier = await storage.getSupplierById(container.supplierId);
-      const purchaseOrders = await storage.getPurchaseOrdersByContainerForCompany(
-        containerId,
-        req.session.currentCompanyId!
-      );
+      // Scoped to the container's own company — the one just authorized —
+      // rather than the session's active company, so the rows cannot span
+      // tenants even if a container id were ever reused across them.
+      const purchaseOrders = await storage.getPurchaseOrdersByContainerForCompany(containerId, container.companyId);
 
       // Batch-fetch all line items and stock items in 2 queries instead of N*M
       const poIds = purchaseOrders.map((po) => po.id);
@@ -473,11 +486,34 @@ export function registerContainerFreightReadRoutes(app: Express) {
         return res.status(404).json({ message: "Purchase order not found" });
       }
 
-      // Verify purchase order belongs to current company
-      if (po.companyId !== req.session.currentCompanyId) {
+      // Verify the caller belongs to the owning company. Comparing against
+      // req.session.currentCompanyId alone refused purchase orders in the
+      // caller's other companies, which is a read regression: the company
+      // selector chooses a view, membership decides access.
+      const accessiblePoCompanyIds = await getAccessibleCompanyIds(req.session.userId!);
+      if (!accessiblePoCompanyIds.has(po.companyId)) {
         return res.status(403).json({
           message: "Access denied: Purchase order belongs to a different company",
         });
+      }
+
+      // The role gate above reads req.session.currentRole, which is the role
+      // held in the *selected* company. While this route only served the
+      // selected company that was the same thing. Now that membership in
+      // another company is enough to reach the row, it is not: a caller who is
+      // Admin here and an ordinary member elsewhere would otherwise read that
+      // other company's purchase orders on the strength of this company's
+      // role. So for a purchase order outside the selected company, the
+      // privileged role is required in the company that owns it.
+      if (po.companyId !== req.session.currentCompanyId) {
+        const companyRoles = await storage.getUserCompaniesWithRoles(req.session.userId!);
+        const isDeveloperAccount = companyRoles.some((entry) => entry.role === "Developer");
+        const owningRole = companyRoles.find((entry) => Number(entry.companyId) === po.companyId)?.role;
+        if (!isDeveloperAccount && !isPrivilegedRole(owningRole)) {
+          return res.status(403).json({
+            message: "Access denied: Purchase order belongs to a different company",
+          });
+        }
       }
 
       // Get line items for this PO

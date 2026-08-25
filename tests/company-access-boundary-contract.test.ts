@@ -79,6 +79,14 @@ describe("Phase 7 company access boundary", () => {
     expect(boundary).toContain("await assertCompanyAccess(context.userId, context.activeCompanyId)");
   });
 
+  // server/routes/containers/containerFreightReadRoutes.ts used to be in this
+  // list. fb40ef6 moved it off getAccessibleCompanyIds: its reads now either
+  // carry the session company into the WHERE clause via the ...ForCompany
+  // storage accessors, or fetch and then reject a foreign row explicitly. The
+  // file is mixed, so no single source-text claim describes it honestly, and
+  // pinning helper names here would only re-break the next time the mechanism
+  // improves. Its boundary is asserted by outcome instead — a cross-company
+  // read is refused — in tests/purchase-order-write-routes.test.ts.
   it("routes remaining cross-company page scopes through the central boundary", () => {
     const routeFiles = [
       "server/routes/erp-payroll/runs.ts",
@@ -86,7 +94,6 @@ describe("Phase 7 company access boundary", () => {
       "server/routes/helpers/supplierBalanceHelpers.ts",
       "server/routes/reportsContainerTrackingRoutes.ts",
       "server/routes/reportsClosingStockRoutes.ts",
-      "server/routes/containers/containerFreightReadRoutes.ts",
     ];
 
     for (const routeFile of routeFiles) {
