@@ -545,7 +545,7 @@
         0
       ],
       "client/src/pages/factory/FactoryContainers.tsx": [
-        5,
+        4,
         0,
         0
       ],
@@ -3187,6 +3187,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 1775
+    "typeEscapeCeiling": 1774
   }
 }

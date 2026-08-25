@@ -10,6 +10,16 @@ import { phase1PaginationPlugin } from "./build/vitePhase1PaginationGuardPlugin"
 import { lazyHeavyImportsPlugin } from "./build/viteLazyHeavyImportsPlugin";
 import { labelAssetExtractionPlugin } from "./build/viteLabelAssetExtractionPlugin";
 
+// `vite build` produces the production artifact, so it must be a production
+// build regardless of the NODE_ENV the surrounding job happens to export. CI
+// runs the whole job under NODE_ENV=test; without this, Vite kept that value,
+// built the client in development mode — unminified, dev React — and the build
+// exceeded the heap ceiling before it could finish. Set before defineConfig so
+// the value is in place when Vite resolves `isProduction`.
+if (process.env.NODE_ENV !== "production") {
+  process.env.NODE_ENV = "production";
+}
+
 export default defineConfig({
   plugins: [
     heavyListPaginationPlugin(),
