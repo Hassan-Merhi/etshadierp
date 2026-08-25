@@ -58,14 +58,31 @@ export function ensurePhase2Schema(): Promise<void> {
   return phase2SchemaPromise;
 }
 
-async function getCompany(companyId: number): Promise<any | null> {
+/** A company row as the migration pair validator reads it. */
+export type MigrationCompanyRow = {
+  id: number;
+  code: string;
+  name: string;
+  company_type: string | null;
+};
+
+/** A ledger account row loaded for target-account mapping. */
+export type MigrationLedgerAccountRow = {
+  id: number;
+  code: string;
+  name: string;
+  account_type: string;
+  sub_type: string | null;
+};
+
+async function getCompany(companyId: number): Promise<MigrationCompanyRow | null> {
   const result = await db.execute(sql`
     SELECT id, code, name, company_type
     FROM companies
     WHERE id = ${companyId}
     LIMIT 1
   `);
-  return firstRow(result) ?? null;
+  return firstRow<MigrationCompanyRow>(result) ?? null;
 }
 
 export async function validateMigrationPair(
@@ -75,8 +92,8 @@ export async function validateMigrationPair(
 ): Promise<{
   sourceId: number;
   targetId: number;
-  sourceCompany: any;
-  targetCompany: any;
+  sourceCompany: MigrationCompanyRow;
+  targetCompany: MigrationCompanyRow;
 } | null> {
   const sourceId = Number.parseInt(String(req.body?.sourceCompanyId ?? req.query?.sourceCompanyId ?? ""), 10);
   const targetId = Number.parseInt(String(req.body?.targetCompanyId ?? req.query?.targetCompanyId ?? ""), 10);
@@ -236,10 +253,10 @@ export async function loadStockItemMap(sourceId: number, targetId: number): Prom
 }
 
 export async function loadTargetAccounts(targetId: number): Promise<{
-  rows: any[];
-  bySubType: Map<string, any>;
-  byCode: Map<string, any>;
-  byType: Map<string, any[]>;
+  rows: Record<string, unknown>[];
+  bySubType: Map<string, Record<string, unknown>>;
+  byCode: Map<string, Record<string, unknown>>;
+  byType: Map<string, Record<string, unknown>[]>;
 }> {
   const result = await db.execute(sql`
     SELECT id, code, name, account_type, sub_type
@@ -280,14 +297,14 @@ export function mapTargetAccount(
 } {
   if (sourceAccount?.sub_type && targetAccounts.bySubType.has(String(sourceAccount.sub_type))) {
     return {
-      targetAccountId: pn(targetAccounts.bySubType.get(String(sourceAccount.sub_type)).id),
+      targetAccountId: pn(targetAccounts.bySubType.get(String(sourceAccount.sub_type))!.id),
       method: "exact_sub_type",
       reviewStatus: "mapped",
     };
   }
   if (sourceAccount?.code && targetAccounts.byCode.has(String(sourceAccount.code).trim().toLowerCase())) {
     return {
-      targetAccountId: pn(targetAccounts.byCode.get(String(sourceAccount.code).trim().toLowerCase()).id),
+      targetAccountId: pn(targetAccounts.byCode.get(String(sourceAccount.code).trim().toLowerCase())!.id),
       method: "exact_code",
       reviewStatus: "mapped",
     };
@@ -362,7 +379,21 @@ export async function resolveSupplier(
   };
 }
 
-export async function getSuspenseReview(sourceId: number, targetId: number): Promise<any> {
+/** One suspense-account entry flagged for manual review. */
+export type SuspenseReviewItem = Record<string, unknown> & {
+  debit_amount: string | null;
+  credit_amount: string | null;
+};
+
+/** The suspense review summary returned to the migration console. */
+export type SuspenseReview = {
+  count: number;
+  totalDebit: number;
+  totalCredit: number;
+  items: SuspenseReviewItem[];
+};
+
+export async function getSuspenseReview(sourceId: number, targetId: number): Promise<SuspenseReview> {
   const suspenseResult = await db.execute(sql`
     SELECT id FROM ledger_accounts
     WHERE company_id = ${targetId} AND sub_type = 'gc_mig_suspense' AND deleted_at IS NULL
@@ -440,7 +471,7 @@ export async function getSuspenseReview(sourceId: number, targetId: number): Pro
       )
   `);
 
-  const items = [...resultRows(linked), ...resultRows(unlinked)];
+  const items = [...resultRows<SuspenseReviewItem>(linked), ...resultRows<SuspenseReviewItem>(unlinked)];
   return {
     count: items.length,
     totalDebit: items.reduce((sum, item) => sum + pn(item.debit_amount), 0),
