@@ -13,7 +13,7 @@ incidents into this reference.
 | Build | `npm ci --registry=https://registry.npmjs.org/ && npm run build` |
 | Start | `npm start` |
 | Readiness health check | `/api/health/ready` |
-| Deployment source | Exact green commit on `main` |
+| Deployment source | Exact green commit on protected `main` |
 
 `render.yaml` is the source of truth for the Render service, database,
 commands, health check, Node version, and `autoDeployTrigger: checksPass`.
@@ -29,6 +29,11 @@ controls, historical-replay apply controls, signing material, and provider
 secrets out of source control. `npm run verify:env-docs` must pass.
 
 ## Before merging
+
+`main` must satisfy `.github/RELEASE_GOVERNANCE.md`: PR-only changes, blocked
+force pushes/deletion, a current PR head, and required checks enforced by
+GitHub. The permanent Release Governance workflow must also be green on the
+exact PR head.
 
 Run the permanent local gates that apply to the change:
 
@@ -58,17 +63,20 @@ resource limitation as a pass.
 The PR head must be green, and the exact merged `main` SHA must be checked
 again.
 
-- GitHub Actions: CI, Security, CodeQL, Semgrep, Dependency Review when
-  applicable, I18n Audit, RTL and Accessibility, Mobile Responsiveness,
-  GitHub Actions Quality, Release Verification, and resilience checks when
+- GitHub Actions: Release Governance, CI, Security, CodeQL, Semgrep, Dependency
+  Review when applicable, I18n Audit, RTL and Accessibility, Mobile
+  Responsiveness, GitHub Actions Quality, Browser E2E and Performance & Database
+  Safety when triggered, Release Verification, and resilience checks when
   triggered.
 - CircleCI: `static-build`, `postgres-regression`,
   `backend-core-regression`, `frontend-regression`, and
   `security-readiness`.
-- Commit status: `phase3/exact-main-certification`.
+- Post-merge commit status: `phase3/exact-main-certification`.
 
 Do not merge with a pending, cancelled, skipped-required, or failed gate. Do not
-rely on checks from an older SHA.
+rely on checks from an older SHA. The exact-main certification is a post-merge
+deployment authority and must succeed on the actual resulting `main` SHA before
+that commit is treated as release-ready.
 
 ## Database safety
 
@@ -84,17 +92,19 @@ rely on checks from an older SHA.
 
 ## Deploy and smoke test
 
-1. Confirm Render is deploying the certified `main` SHA.
-2. Confirm the build exits successfully and `npm start` remains healthy.
-3. Confirm `GET /api/health/ready` returns ready and
+1. Confirm the exact `main` SHA is protected-governance compliant and has a
+   successful `phase3/exact-main-certification` status.
+2. Confirm Render is deploying that certified `main` SHA.
+3. Confirm the build exits successfully and `npm start` remains healthy.
+4. Confirm `GET /api/health/ready` returns ready and
    `GET /api/health/db` reports the database ready.
-4. Review startup logs for migration, pool, scheduler, and bundle errors.
-5. Log in with a non-production test account and verify company selection.
-6. Smoke-test one read-only flow in Accounts, Inventory, POS, Factory,
+5. Review startup logs for migration, pool, scheduler, and bundle errors.
+6. Log in with a non-production test account and verify company selection.
+7. Smoke-test one read-only flow in Accounts, Inventory, POS, Factory,
    Containers, and Supplier Partner as applicable to the release.
-7. For a release that changes writes, exercise the affected flow with approved
+8. For a release that changes writes, exercise the affected flow with approved
    test data and verify its voucher, ledger, inventory, and audit evidence.
-8. Confirm no unexpected 5xx spike, repeated migration loop, or scheduler error
+9. Confirm no unexpected 5xx spike, repeated migration loop, or scheduler error
    appears after rollout.
 
 If any step fails, stop the rollout and follow the rollback/recovery runbook.

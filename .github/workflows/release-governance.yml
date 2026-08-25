@@ -1,0 +1,162 @@
+name: Release Governance
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: release-governance-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  governance:
+    name: Protect main and release path
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      EVENT_NAME: ${{ github.event_name }}
+      HEAD_SHA: ${{ github.sha }}
+    steps:
+      - name: Set up Node.js 24.19.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24.19.0"
+
+      - name: Verify live main governance
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+
+          const repo = process.env.REPOSITORY;
+          const token = process.env.GH_TOKEN;
+          const eventName = process.env.EVENT_NAME;
+          const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"));
+          const headers = {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${token}`,
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "etshadierp-release-governance",
+          };
+
+          async function github(path) {
+            const response = await fetch(`https://api.github.com/repos/${repo}${path}`, { headers });
+            if (!response.ok) {
+              const body = await response.text();
+              throw new Error(`GitHub API ${response.status} for ${path}: ${body}`);
+            }
+            return response.json();
+          }
+
+          const main = await github("/branches/main");
+          const rules = await github("/rules/branches/main?per_page=100");
+          if (!Array.isArray(rules)) {
+            throw new Error("GitHub did not return the active rules that apply to main.");
+          }
+
+          if (main.protected !== true) {
+            throw new Error(
+              "main is not protected. Create an active ruleset targeting main before this repository can be release-governed.",
+            );
+          }
+
+          const ruleTypes = new Set(rules.map((rule) => rule.type));
+          const mandatoryRuleTypes = ["pull_request", "required_status_checks", "non_fast_forward", "deletion"];
+          const missingRuleTypes = mandatoryRuleTypes.filter((type) => !ruleTypes.has(type));
+          if (missingRuleTypes.length > 0) {
+            throw new Error(`main ruleset is missing required rule(s): ${missingRuleTypes.join(", ")}`);
+          }
+
+          const statusRules = rules.filter((rule) => rule.type === "required_status_checks");
+          if (!statusRules.some((rule) => rule.parameters?.strict_required_status_checks_policy === true)) {
+            throw new Error(
+              "main required status checks are not strict. Enable 'Require branches to be up to date before merging'.",
+            );
+          }
+
+          const configuredContexts = new Set(
+            statusRules.flatMap((rule) =>
+              Array.isArray(rule.parameters?.required_status_checks)
+                ? rule.parameters.required_status_checks.map((check) => check.context)
+                : [],
+            ),
+          );
+          const requiredContexts = [
+            "Protect main and release path",
+            "Check / Build / Lint / Test",
+            "Secret scan",
+            "Dependency audit",
+            "Focused security readiness",
+            "Analyze JavaScript / TypeScript",
+            "Semgrep CE new-findings gate",
+            "Dependency Review",
+            "actionlint",
+            "zizmor",
+            "Classified untranslated-text audit",
+            "ci/circleci: static-build",
+            "ci/circleci: postgres-regression",
+            "ci/circleci: backend-core-regression",
+            "ci/circleci: frontend-regression",
+            "ci/circleci: security-readiness",
+          ];
+          const missingContexts = requiredContexts.filter((context) => !configuredContexts.has(context));
+          if (missingContexts.length > 0) {
+            throw new Error(`main ruleset is missing required status check(s): ${missingContexts.join(", ")}`);
+          }
+
+          if (eventName === "pull_request") {
+            const pr = event.pull_request;
+            if (!pr || pr.base?.ref !== "main") {
+              throw new Error("Release Governance expected a pull request targeting main.");
+            }
+
+            const latestMainSha = main.commit?.sha;
+            const headSha = pr.head?.sha;
+            if (!latestMainSha || !headSha) {
+              throw new Error("Unable to resolve the latest main SHA or pull-request head SHA.");
+            }
+
+            const compare = await github(`/compare/${latestMainSha}...${headSha}`);
+            if (compare.behind_by !== 0) {
+              throw new Error(
+                `Pull request head is ${compare.behind_by} commit(s) behind current main. Sync main before merge.`,
+              );
+            }
+          }
+
+          if (eventName === "push") {
+            if (event.forced === true) {
+              throw new Error("Force pushes to main are forbidden by the release-governance contract.");
+            }
+
+            const pushedSha = event.after || process.env.HEAD_SHA;
+            if (!pushedSha || /^0+$/.test(pushedSha)) {
+              throw new Error("main deletion or an empty main push is forbidden.");
+            }
+
+            const pulls = await github(`/commits/${pushedSha}/pulls`);
+            const associatedMergedMainPr = pulls.some((pr) => pr.merged_at && pr.base?.ref === "main");
+            if (!associatedMergedMainPr) {
+              throw new Error(
+                "The new main SHA is not associated with a merged pull request targeting main. Direct pushes are forbidden.",
+              );
+            }
+          }
+
+          console.log(
+            `Release governance passed for ${eventName}; main=${main.commit.sha}; requiredChecks=${requiredContexts.length}`,
+          );
+          NODE
