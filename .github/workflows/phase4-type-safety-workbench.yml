@@ -16,6 +16,8 @@ jobs:
     name: Compiler-safe type inference
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=5120
 
     steps:
       - name: Checkout Phase 4 branch
@@ -34,7 +36,7 @@ jobs:
         run: npm ci
 
       - name: Apply compiler-safe inference pass
-        run: node scripts/phase4-remaining-type-safety.mjs
+        run: node --expose-gc scripts/phase4-remaining-type-safety.mjs
 
       - name: Verify TypeScript after inference
         run: npm run check
@@ -99,4 +101,4 @@ jobs:
           git commit -m "refactor: apply Phase 4 compiler-safe type inference"
           git push origin HEAD:phase-4-remaining-type-safety
 
-# Workbench trigger revision 2
+# Workbench trigger revision 3
