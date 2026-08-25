@@ -131,6 +131,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
                       username: supervisorUsername,
                       reason: reason || "Factory bale stock removal",
                     },
+                    allowNegativeStock: true,
                   },
                   canonicalStockMovementAdapter,
                 );
@@ -264,6 +265,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
                   username: supervisorUsername,
                   reason: reason || "Factory bale stock removal",
                 },
+                allowNegativeStock: true,
               },
               canonicalStockMovementAdapter,
             );
