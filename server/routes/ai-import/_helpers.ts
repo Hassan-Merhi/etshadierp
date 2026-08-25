@@ -106,6 +106,49 @@ export async function validateRows(
   }
 }
 
+/**
+ * One spreadsheet row exactly as uploaded. Keys and value types come from the
+ * source file, so every read is coerced before use.
+ */
+type RawImportRow = Record<string, unknown>;
+
+/** A stock item resolved from an import row. */
+type MappedStockItem = {
+  name: string;
+  code: string | null;
+  sellingPrice: string;
+  reorderLevel: string;
+  stockGroupId: number | null;
+};
+
+/** A customer resolved from an import row. */
+type MappedCustomer = {
+  name: string;
+  legalName: string;
+  code: string | null;
+  phone: string | null;
+  email: string | null;
+};
+
+/** A supplier resolved from an import row. */
+type MappedSupplier = {
+  legalName: string;
+  code: string | null;
+  phone: string | null;
+  email: string | null;
+  openingBalance: string;
+};
+
+/** A voucher resolved from an import row. */
+type MappedVoucher = {
+  voucherDate: string;
+  voucherType: string;
+  description: string;
+  debitAccountId: number | null;
+  creditAccountId: number | null;
+  amount: string;
+};
+
 export async function validateStockItemRows(
   companyId: number,
   rows: { id: number; rowNumber: number; rawData: unknown }[]
@@ -142,10 +185,10 @@ export async function validateStockItemRows(
   const batchCodes = new Set<string>();
 
   return rows.map((row) => {
-    const raw = row.rawData as Record<string, any>;
+    const raw = row.rawData as RawImportRow;
     const errors: string[] = [];
     const warnings: string[] = [];
-    const mapped: Record<string, any> = {};
+    const mapped = {} as MappedStockItem;
 
     // name
     const name = String(raw.name ?? raw.Name ?? raw["Item Name"] ?? "").trim();
@@ -165,12 +208,12 @@ export async function validateStockItemRows(
     mapped.code = code || null;
 
     // sellingPrice
-    const sellingPrice = parseFloat(raw.sellingPrice ?? raw["Selling Price"] ?? raw.price ?? 0);
+    const sellingPrice = parseFloat(String(raw.sellingPrice ?? raw["Selling Price"] ?? raw.price ?? 0));
     if (isNaN(sellingPrice) || sellingPrice < 0) errors.push("sellingPrice must be a non-negative number");
     mapped.sellingPrice = isNaN(sellingPrice) ? "0" : sellingPrice.toFixed(2);
 
     // reorderLevel
-    const reorderLevel = parseFloat(raw.reorderLevel ?? raw["Reorder Level"] ?? raw.reorder ?? 0);
+    const reorderLevel = parseFloat(String(raw.reorderLevel ?? raw["Reorder Level"] ?? raw.reorder ?? 0));
     mapped.reorderLevel = isNaN(reorderLevel) ? "0" : reorderLevel.toFixed(2);
 
     // stockGroup — check correction memory first, then fall back to name/code match
@@ -205,10 +248,10 @@ export async function validateCustomerRows(companyId: number, rows: { id: number
   const batchCodes = new Set<string>();
 
   return rows.map((row) => {
-    const raw = row.rawData as Record<string, any>;
+    const raw = row.rawData as RawImportRow;
     const errors: string[] = [];
     const warnings: string[] = [];
-    const mapped: Record<string, any> = {};
+    const mapped = {} as MappedCustomer;
 
     const name = String(raw.name ?? raw.Name ?? raw["Customer Name"] ?? "").trim();
     if (!name) errors.push("name is required");
@@ -238,10 +281,10 @@ export async function validateSupplierRows(companyId: number, rows: { id: number
   const batchCodes = new Set<string>();
 
   return rows.map((row) => {
-    const raw = row.rawData as Record<string, any>;
+    const raw = row.rawData as RawImportRow;
     const errors: string[] = [];
     const warnings: string[] = [];
-    const mapped: Record<string, any> = {};
+    const mapped = {} as MappedSupplier;
 
     const legalName = String(raw.legalName ?? raw["Legal Name"] ?? raw.name ?? raw.Name ?? "").trim();
     if (!legalName) errors.push("legalName is required");
@@ -257,7 +300,7 @@ export async function validateSupplierRows(companyId: number, rows: { id: number
     mapped.code = code || null;
     mapped.phone = String(raw.phone ?? raw.Phone ?? "").trim() || null;
     mapped.email = String(raw.email ?? raw.Email ?? "").trim() || null;
-    mapped.openingBalance = String(parseFloat(raw.openingBalance ?? raw["Opening Balance"] ?? "0") || 0);
+    mapped.openingBalance = String(parseFloat(String(raw.openingBalance ?? raw["Opening Balance"] ?? "0")) || 0);
 
     const status: "valid" | "warning" | "error" =
       errors.length > 0 ? "error" : warnings.length > 0 ? "warning" : "valid";
@@ -291,10 +334,10 @@ export async function validateVoucherRows(companyId: number, rows: { id: number;
   const ledgerCorrMap = new Map(ledgerCorrections.map((c) => [c.rawValue.toLowerCase(), c]));
 
   return rows.map((row) => {
-    const raw = row.rawData as Record<string, any>;
+    const raw = row.rawData as RawImportRow;
     const errors: string[] = [];
     const warnings: string[] = [];
-    const mapped: Record<string, any> = {};
+    const mapped = {} as MappedVoucher;
 
     // date
     const rawDate = String(raw.date ?? raw.Date ?? raw["Voucher Date"] ?? "").trim();
@@ -337,7 +380,7 @@ export async function validateVoucherRows(companyId: number, rows: { id: number;
     mapped.debitAccountId = debitAcct?.id ?? null;
     mapped.creditAccountId = creditAcct?.id ?? null;
 
-    const amount = parseFloat(raw.amount ?? raw.Amount ?? 0);
+    const amount = parseFloat(String(raw.amount ?? raw.Amount ?? 0));
     if (isNaN(amount) || amount <= 0) errors.push("amount must be a positive number");
     mapped.amount = isNaN(amount) ? "0" : amount.toFixed(2);
 
@@ -388,18 +431,22 @@ export async function postStockItemRows(
 ) {
   const results: { rowId: number; recordType: string; recordId: number }[] = [];
   for (const row of rows) {
-    const d = row.mappedData as Record<string, any>;
+    const d = row.mappedData as MappedStockItem;
     const [created] = await tx
       .insert(stockItems)
       .values({
         companyId,
         name: d.name,
-        code: d.code ?? null,
+        // code is NOT NULL in the schema; a row that reaches here without one
+        // fails at the database, exactly as it does today.
+        code: d.code as string,
         sellingPrice: d.sellingPrice ?? "0",
         reorderLevel: d.reorderLevel ?? "0",
         stockGroupId: d.stockGroupId ?? null,
         active: true,
-      } as any)
+        // The import mapper does not resolve every NOT NULL column (uom); this
+        // asserts the row it produced rather than changing what is written.
+      } as typeof stockItems.$inferInsert)
       .returning({ id: stockItems.id });
 
     await logAudit({
@@ -427,18 +474,20 @@ export async function postCustomerRows(
 ) {
   const results: { rowId: number; recordType: string; recordId: number }[] = [];
   for (const row of rows) {
-    const d = row.mappedData as Record<string, any>;
+    const d = row.mappedData as MappedCustomer;
     const [created] = await tx
       .insert(customers)
       .values({
         companyId,
-        name: d.name,
+        // `customers` has no name column — legal_name is the stored name.
         legalName: d.legalName,
-        code: d.code ?? null,
+        // code is NOT NULL in the schema; a row that reaches here without one
+        // fails at the database, exactly as it does today.
+        code: d.code as string,
         phone: d.phone ?? null,
         email: d.email ?? null,
         active: true,
-      } as any)
+      } as typeof customers.$inferInsert)
       .returning({ id: customers.id });
 
     await logAudit({
@@ -466,18 +515,20 @@ export async function postSupplierRows(
 ) {
   const results: { rowId: number; recordType: string; recordId: number }[] = [];
   for (const row of rows) {
-    const d = row.mappedData as Record<string, any>;
+    const d = row.mappedData as MappedSupplier;
     const [created] = await tx
       .insert(suppliers)
       .values({
         companyId,
         legalName: d.legalName,
-        code: d.code ?? null,
+        // code is NOT NULL in the schema; a row that reaches here without one
+        // fails at the database, exactly as it does today.
+        code: d.code as string,
         phone: d.phone ?? null,
         email: d.email ?? null,
         openingBalance: d.openingBalance ?? "0",
         active: true,
-      } as any)
+      } as typeof suppliers.$inferInsert)
       .returning({ id: suppliers.id });
 
     await logAudit({
