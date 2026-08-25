@@ -14,7 +14,12 @@
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/v5/stock-allocation [<anonymous>]",
-    "USE / [helmetMiddleware]"
+    "USE / [helmetMiddleware]",
+    "USE /api/admin/repair-balances [balanceRepairRateLimit]",
+    "USE /api/admin/repair-balances [balanceRepairBudgetMiddleware]",
+    "USE /api/admin/repair-balances [balanceRepairConcurrencyMiddleware]",
+    "USE /api/sp/migration [spMigrationRateLimit]",
+    "USE /api/sp/migration [spMigrationRequestBudgetMiddleware]"
   ],
   "routeManifestReplacements": [
     {
