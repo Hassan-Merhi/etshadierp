@@ -92,6 +92,7 @@ export async function quickAdjustInventory(
             sourceId: operationId,
             idempotencyKey: `inventory-quick-adjust:${companyId}:${operationId}`,
           },
+          allowNegativeStock: true,
         },
         canonicalStockMovementAdapter,
       );
