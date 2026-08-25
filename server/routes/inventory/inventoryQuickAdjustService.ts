@@ -5,6 +5,7 @@ import { companies, inventory } from "@shared/schema";
 import { db } from "../../db";
 import { adjustInventory } from "../../inventoryHelper";
 import { getErrorMessage } from "../../lib/httpHandlers";
+import { inventoryQuantity } from "../../lib/inventoryMath";
 import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
 import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
 import { storage } from "../../storage";
@@ -58,16 +59,22 @@ export async function quickAdjustInventory(
         )
         .limit(1);
 
+      const normalizedQuantity = Number.parseFloat(inventoryQuantity(input.quantity));
+      if (!Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0) {
+        throw new InventoryRouteError(400, "Quantity must be at least 0.001 units.");
+      }
+
       const currentQuantity = existingInventory ? Number.parseFloat(existingInventory.quantity || "0") : 0;
-      const adjustedQuantity = input.type === "add" ? input.quantity : -input.quantity;
+      const adjustedQuantity = input.type === "add" ? normalizedQuantity : -normalizedQuantity;
       const newQuantity = currentQuantity + adjustedQuantity;
       if (newQuantity < 0) {
         throw new InventoryRouteError(
           400,
-          `Cannot subtract ${input.quantity} units. Only ${currentQuantity} units available at this location.`,
+          `Cannot subtract ${normalizedQuantity} units. Only ${currentQuantity} units available at this location.`,
         );
       }
 
+      const preAdjustmentRate = existingInventory ? Number.parseFloat(existingInventory.averageRate || "0") : 0;
       const adjustment = await adjustInventory(
         tx,
         input.locationId,
@@ -76,14 +83,18 @@ export async function quickAdjustInventory(
         companyId,
       );
       const operationId = randomUUID();
+      const movementUnitCost =
+        input.type === "subtract" && Number.isFinite(preAdjustmentRate)
+          ? Math.max(preAdjustmentRate, 0)
+          : adjustment.averageRate;
       await postStockMovementTx(
         tx,
         {
           companyId,
           stockItemId: input.stockItemId,
           kind: "adjustment",
-          quantity: String(input.quantity),
-          unitCost: String(adjustment.averageRate),
+          quantity: inventoryQuantity(normalizedQuantity),
+          unitCost: String(movementUnitCost),
           fromLocationId: input.type === "subtract" ? input.locationId : undefined,
           toLocationId: input.type === "add" ? input.locationId : undefined,
           occurredAt: new Date().toISOString(),
@@ -124,7 +135,9 @@ export async function quickAdjustInventory(
         location: { new: location.name },
         adjustmentType: { new: input.type === "add" ? "Add Stock" : "Subtract Stock" },
         quantity: { old: String(result.currentQuantity), new: String(result.newQuantity) },
-        adjustment: { new: `${input.type === "add" ? "+" : "-"}${input.quantity}` },
+        adjustment: {
+          new: `${input.type === "add" ? "+" : "-"}${Math.abs(result.adjustedQuantity)}`,
+        },
       },
     });
   } catch {
@@ -132,7 +145,7 @@ export async function quickAdjustInventory(
   }
 
   return {
-    message: `Successfully ${input.type === "add" ? "added" : "subtracted"} ${input.quantity} units. New quantity: ${result.newQuantity}`,
+    message: `Successfully ${input.type === "add" ? "added" : "subtracted"} ${Math.abs(result.adjustedQuantity)} units. New quantity: ${result.newQuantity}`,
     previousQuantity: result.currentQuantity,
     newQuantity: result.newQuantity,
     adjustment: result.adjustedQuantity,
