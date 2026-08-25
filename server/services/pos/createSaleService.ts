@@ -18,7 +18,13 @@ import { storage } from "../../storage";
 import { logAudit, runIntercompanyPosTransfer } from "../../routes/_helpers";
 import { stockItems, stockItemLocationPrices, salesItems } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
-import type { CreatePosSaleParams, HandlerErrorResult } from "./posSaleTypes";
+import type {
+  CreatePosSaleParams,
+  CreatePosSaleResult,
+  HandlerErrorResult,
+  PosSaleResponseItem,
+  PosSaleVoucher,
+} from "./posSaleTypes";
 import {
   checkIdempotentSale,
   resolvePosEnforcedCashAccount,
@@ -36,14 +42,14 @@ import { insertSaleVoucher } from "./createSaleVoucher";
 import { lockAndDeductInventoryForSaleItem } from "./deductSaleInventory";
 import { lockAndFindExistingPosSaleTx } from "./posSaleIdempotency";
 
-function err(result: HandlerErrorResult) {
-  return { status: result.status, body: result.body };
+function err(result: HandlerErrorResult): CreatePosSaleResult {
+  return { ok: false, status: result.status, body: result.body };
 }
 
 export async function createPosSale(
   params: CreatePosSaleParams,
   companyType: { isSpCompany: boolean }
-): Promise<{ status: number; body: any }> {
+): Promise<CreatePosSaleResult> {
   const {
     currentCompanyId,
     userId,
@@ -101,7 +107,7 @@ export async function createPosSale(
   if (idempotentResult) return idempotentResult;
 
   if (!locationId) {
-    return { status: 400, body: { message: "Location is required" } };
+    return { ok: false, status: 400, body: { message: "Location is required" } };
   }
 
   let effectiveShiftId: number | null = shiftId || null;
@@ -119,12 +125,13 @@ export async function createPosSale(
   }
   if (!accountId) {
     return {
+      ok: false,
       status: 400,
       body: { message: isCreditSale ? "Customer is required" : "Payment account is required" },
     };
   }
   if (!items || !Array.isArray(items) || items.length === 0) {
-    return { status: 400, body: { message: "At least one item is required" } };
+    return { ok: false, status: 400, body: { message: "At least one item is required" } };
   }
 
   const parsedLocationId = Number(locationId);
@@ -140,7 +147,7 @@ export async function createPosSale(
   const { salesAccount } = salesAccountResult;
 
   const locationResult = await validateLocationAccess({
-    locationId,
+    locationId: parsedLocationId,
     parsedLocationId,
     companyId: currentCompanyId,
     isPOSUser,
@@ -157,7 +164,7 @@ export async function createPosSale(
 
   let inventoryValidation: Awaited<ReturnType<typeof validateInventoryAvailability>>;
   try {
-    inventoryValidation = await validateInventoryAvailability(locationId, items, canSellNegativeStock);
+    inventoryValidation = await validateInventoryAvailability(parsedLocationId, items, canSellNegativeStock);
   } catch (error: unknown) {
     const committedRetry = await checkIdempotentSale(currentCompanyId, clientSaleId);
     if (committedRetry) return committedRetry;
@@ -173,9 +180,10 @@ export async function createPosSale(
   if ("error" in spCtxResult) return err(spCtxResult.error);
   const spCtx = spCtxResult;
 
-  let txResult: { voucher: any; saleItems: any[]; replayed: boolean };
+  type PosSaleTxResult = { voucher: PosSaleVoucher; saleItems: PosSaleResponseItem[]; replayed: boolean };
+  let txResult: PosSaleTxResult;
   try {
-    txResult = await db.transaction(async (tx) => {
+    txResult = await db.transaction(async (tx): Promise<PosSaleTxResult> => {
       const existing = await lockAndFindExistingPosSaleTx({
         tx,
         companyId: currentCompanyId,
@@ -187,7 +195,7 @@ export async function createPosSale(
 
       const txVoucher = await insertSaleVoucher(tx, {
         companyId: currentCompanyId,
-        locationId,
+        locationId: parsedLocationId,
         locationName: location.name,
         voucherNumber,
         voucherDate,
@@ -226,7 +234,7 @@ export async function createPosSale(
         const { costPrice } = await lockAndDeductInventoryForSaleItem(
           tx,
           parsedLocationId,
-          locationId,
+          parsedLocationId,
           validatedItem,
           canSellNegativeStock,
           currentCompanyId,
@@ -251,7 +259,7 @@ export async function createPosSale(
           .where(
             and(
               eq(stockItemLocationPrices.stockItemId, item.stockItemId),
-              eq(stockItemLocationPrices.locationId, locationId)
+              eq(stockItemLocationPrices.locationId, parsedLocationId)
             )
           )
           .limit(1);
@@ -293,10 +301,10 @@ export async function createPosSale(
 
   if (txResult.replayed) {
     const existingVoucher = txResult.voucher;
-    const existingLocation = existingVoucher.locationId
-      ? await storage.getLocationById(existingVoucher.locationId)
-      : null;
+    const existingLocation =
+      (existingVoucher.locationId ? await storage.getLocationById(existingVoucher.locationId) : null) ?? null;
     return {
+      ok: true,
       status: 200,
       body: {
         voucher: existingVoucher,
@@ -346,6 +354,7 @@ export async function createPosSale(
   }
 
   return {
+    ok: true,
     status: 200,
     body: {
       voucher,

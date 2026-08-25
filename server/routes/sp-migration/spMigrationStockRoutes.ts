@@ -147,10 +147,10 @@ export function registerSpMigrationStockRoutes(app: Express) {
         const { map: stockItemMap } = await ensureTargetStockItems(sourceId, targetId, runId);
 
         const sourceLocs = (
-          await db.execute(sql`
+          await db.execute<{ id: number; code: string; name: string }>(sql`
           SELECT id, code, name FROM locations WHERE company_id = ${sourceId} AND deleted_at IS NULL
         `)
-        ).rows as any[];
+        ).rows;
         const locMap = new Map<number, number>();
         for (const l of sourceLocs) await ensureTargetLocation(l, targetId, runId, locMap);
 

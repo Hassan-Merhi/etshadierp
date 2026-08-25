@@ -27,7 +27,7 @@ import { ledgerAccounts } from "@shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { firstRow } from "../../lib/queryResult";
 
-export const pn = (v: any) => {
+export const pn = (v: unknown) => {
   const n = parseFloat(String(v ?? "0"));
   return isNaN(n) ? 0 : n;
 };
@@ -87,14 +87,14 @@ export async function logRun(
   notes: string | null
 ): Promise<string> {
   const [row] = (
-    await db.execute(sql`
+    await db.execute<{ id: string }>(sql`
     INSERT INTO sp_migration_rehearsal_runs
       (source_company_id, target_company_id, action, status, rows_created, error_message, notes)
     VALUES
       (${sourceId}, ${targetId}, ${action}, ${status}, ${rowsCreated}, ${errorMessage}, ${notes})
     RETURNING id
   `)
-  ).rows as any[];
+  ).rows;
   return row.id;
 }
 

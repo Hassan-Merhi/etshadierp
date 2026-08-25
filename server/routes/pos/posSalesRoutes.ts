@@ -41,13 +41,13 @@ export function registerPosSalesRoutes(app: Express): void {
         { isSpCompany }
       );
 
-      if (result.status === 200) {
+      if (result.ok) {
         logger.info("POS sale create succeeded", {
           module: "pos",
           action: "createSale",
           userId: _uid,
           companyId: _cid,
-          voucherId: result.body?.voucher?.id,
+          voucherId: result.body.voucher.id,
           durationMs: Date.now() - _t,
         });
         try {
@@ -57,8 +57,8 @@ export function registerPosSalesRoutes(app: Express): void {
             companyId: req.session.currentCompanyId!,
             action: "create",
             tableName: "vouchers",
-            recordId: result.body?.voucher?.id ?? null,
-            recordIdentifier: result.body?.voucher?.voucherNumber ?? null,
+            recordId: result.body.voucher.id ?? null,
+            recordIdentifier: result.body.voucher.voucherNumber ?? null,
             changes: null,
           });
         } catch (auditErr) {
