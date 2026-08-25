@@ -145,7 +145,7 @@ export async function quickAdjustInventory(
   }
 
   return {
-    message: `Successfully ${input.type === "add" ? "added" : "subtracted"} ${Math.abs(result.adjustedQuantity)} units. New quantity: ${result.newQuantity}`,
+    message: `Successfully ${input.type === "add" ? "added" : "subtracted"} ${input.quantity} units. New quantity: ${result.newQuantity}`,
     previousQuantity: result.currentQuantity,
     newQuantity: result.newQuantity,
     adjustment: result.adjustedQuantity,
