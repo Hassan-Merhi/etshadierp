@@ -150,6 +150,9 @@ afterAll(async () => {
       [spCompanyId],
     );
     await pool.query(`DELETE FROM vouchers WHERE company_id = $1`, [spCompanyId]);
+    await pool.query(`DELETE FROM canonical_stock_movement_audit WHERE company_id = $1`, [spCompanyId]);
+    await pool.query(`DELETE FROM canonical_stock_movement_requests WHERE company_id = $1`, [spCompanyId]);
+    await pool.query(`DELETE FROM canonical_stock_movements WHERE company_id = $1`, [spCompanyId]);
     await pool.query(`DELETE FROM inventory WHERE company_id = $1`, [spCompanyId]);
     await pool.query(`DELETE FROM stock_items WHERE company_id = $1`, [spCompanyId]);
     await pool.query(`DELETE FROM ledger_accounts WHERE company_id = $1`, [spCompanyId]);
