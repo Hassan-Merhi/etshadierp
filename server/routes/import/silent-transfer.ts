@@ -4,8 +4,10 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
+import { randomUUID } from "node:crypto";
 import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
+import { inventoryQuantity } from "../../lib/inventoryMath";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -15,6 +17,10 @@ import { inventory } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, writeWorkbook } from "../../excelHelper";
 import { adjustInventory } from "../../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerSilentTransferRoutes(app: Express) {
   // Template download
@@ -176,17 +182,57 @@ export function registerSilentTransferRoutes(app: Express) {
       const dstId = parseInt(destinationLocationId);
       if (srcId === dstId) return res.status(400).json({ message: "Source and destination must be different" });
 
+      const operationId = randomUUID();
+      const occurredAt = new Date().toISOString();
+      let applied = 0;
+
       await db.transaction(async (tx) => {
-        for (const item of items) {
-          const qty = parseFloat(item.quantity);
-          const rate = parseFloat(item.averageRate || "0");
-          if (qty <= 0) continue;
-          await adjustInventory(tx, srcId, item.stockItemId, -qty, companyId);
-          await adjustInventory(tx, dstId, item.stockItemId, qty, companyId, rate);
+        for (let index = 0; index < items.length; index++) {
+          const item = items[index];
+          const rawQty = parseFloat(item.quantity);
+          const qty = Number.parseFloat(inventoryQuantity(rawQty));
+          if (!Number.isFinite(qty) || qty <= 0) continue;
+
+          const stockItemId = parseInt(item.stockItemId);
+          if (!Number.isInteger(stockItemId) || stockItemId <= 0) continue;
+
+          const [sourceInventory] = await tx
+            .select({ averageRate: inventory.averageRate })
+            .from(inventory)
+            .where(and(eq(inventory.stockItemId, stockItemId), eq(inventory.locationId, srcId)))
+            .limit(1);
+          const sourceRate = Number.parseFloat(sourceInventory?.averageRate || "");
+          const parsedFallbackRate = parseFloat(item.averageRate || "0");
+          const fallbackRate = Number.isFinite(parsedFallbackRate) && parsedFallbackRate >= 0 ? parsedFallbackRate : 0;
+          const rate = Number.isFinite(sourceRate) ? Math.max(sourceRate, 0) : fallbackRate;
+
+          await adjustInventory(tx, srcId, stockItemId, -qty, companyId);
+          await adjustInventory(tx, dstId, stockItemId, qty, companyId, rate);
+          await postStockMovementTx(
+            tx,
+            {
+              companyId,
+              stockItemId,
+              kind: "transfer",
+              quantity: inventoryQuantity(qty),
+              unitCost: String(rate),
+              fromLocationId: srcId,
+              toLocationId: dstId,
+              occurredAt,
+              source: {
+                sourceType: "silent_transfer_import",
+                sourceId: operationId,
+                idempotencyKey: `silent-transfer:${companyId}:${operationId}:${index}:${stockItemId}`,
+              },
+              allowNegativeStock: true,
+            },
+            canonicalStockMovementAdapter
+          );
+          applied++;
         }
       });
 
-      res.json({ success: true, itemsTransferred: items.length });
+      res.json({ success: true, itemsTransferred: applied });
     } catch (err: unknown) {
       logger.error("Silent transfer apply error:", { error: err });
       res.status(500).json({ message: getErrorMessage(err) });

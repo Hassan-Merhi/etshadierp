@@ -2,7 +2,11 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "../../db";
 import * as schema from "@shared/schema";
 import { adjustInventory } from "../../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
 import type { VoucherEntry, InsertVoucherEntry } from "@shared/schema";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export async function createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry> {
   const [created] = await db.insert(schema.voucherEntries).values(entry).returning();
@@ -29,6 +33,7 @@ export async function deleteVoucher(id: number): Promise<void> {
     if (!voucher) {
       throw new Error("Voucher not found");
     }
+    const occurredAt = new Date().toISOString();
 
     if (voucher.voucherType === "Sales" && voucher.locationId) {
       const salesItemsList = await tx.select().from(schema.salesItems).where(eq(schema.salesItems.voucherId, id));
@@ -45,6 +50,25 @@ export async function deleteVoucher(id: number): Promise<void> {
           costPrice,
           "Sales-Reversal",
           id
+        );
+        await postStockMovementTx(
+          tx,
+          {
+            companyId: voucher.companyId,
+            stockItemId: saleItem.stockItemId,
+            kind: "adjustment",
+            quantity: String(Math.abs(quantity)),
+            unitCost: String(Math.max(costPrice || 0, 0)),
+            toLocationId: voucher.locationId,
+            occurredAt,
+            source: {
+              sourceType: "storage-voucher-delete-sales",
+              sourceId: String(id),
+              idempotencyKey: `storage-voucher-delete:sales:${voucher.companyId}:${id}:${saleItem.id}`,
+            },
+            allowNegativeStock: true,
+          },
+          canonicalStockMovementAdapter
         );
       }
       await tx.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, id));
@@ -96,6 +120,26 @@ export async function deleteVoucher(id: number): Promise<void> {
             "StockTransfer-Reversal",
             id
           );
+          await postStockMovementTx(
+            tx,
+            {
+              companyId: voucher.companyId,
+              stockItemId: item.stockItemId,
+              kind: "transfer",
+              quantity: String(Math.abs(quantity)),
+              unitCost: String(Math.max(rate || 0, 0)),
+              fromLocationId: destinationLocationId,
+              toLocationId: sourceLocationId,
+              occurredAt,
+              source: {
+                sourceType: "storage-voucher-delete-transfer",
+                sourceId: String(id),
+                idempotencyKey: `storage-voucher-delete:transfer:${voucher.companyId}:${id}:${item.id}`,
+              },
+              allowNegativeStock: true,
+            },
+            canonicalStockMovementAdapter
+          );
         }
 
         await tx.delete(schema.stockTransferItems).where(eq(schema.stockTransferItems.transferId, transferVoucher.id));
@@ -139,6 +183,26 @@ export async function deleteVoucher(id: number): Promise<void> {
             rate,
             `${adjustmentType}-Reversal`,
             id
+          );
+          await postStockMovementTx(
+            tx,
+            {
+              companyId: voucher.companyId,
+              stockItemId: item.stockItemId,
+              kind: "adjustment",
+              quantity: String(quantity),
+              unitCost: String(Math.max(rate || 0, 0)),
+              fromLocationId: isConsumption ? undefined : adjustmentVoucher.locationId,
+              toLocationId: isConsumption ? adjustmentVoucher.locationId : undefined,
+              occurredAt,
+              source: {
+                sourceType: "storage-voucher-delete-adjustment",
+                sourceId: String(id),
+                idempotencyKey: `storage-voucher-delete:adjustment:${voucher.companyId}:${id}:${item.id}`,
+              },
+              allowNegativeStock: true,
+            },
+            canonicalStockMovementAdapter
           );
         }
 

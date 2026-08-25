@@ -37,6 +37,10 @@ import {
 import { eq, and, or, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { adjustInventory } from "../../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerVoucherBulkDeleteRoutes(app: Express) {
   // Bulk delete vouchers (Admin only) - uses same deletion logic as single delete
@@ -88,6 +92,8 @@ export function registerVoucherBulkDeleteRoutes(app: Express) {
             continue;
           }
 
+          const occurredAt = new Date().toISOString();
+
           // Use the same transaction-wrapped deletion logic as the single delete endpoint
           await db.transaction(async (tx) => {
             // IMPORTANT: Reverse inventory movements for Stock Transfer vouchers
@@ -127,6 +133,32 @@ export function registerVoucherBulkDeleteRoutes(app: Express) {
                     -qty,
                     currentCompanyId
                   );
+
+                  await postStockMovementTx(
+                    tx,
+                    {
+                      companyId: currentCompanyId,
+                      stockItemId: item.stockItemId,
+                      kind: "transfer",
+                      quantity: String(qty),
+                      unitCost: String(Math.max(transferRate || 0, 0)),
+                      fromLocationId: transferVoucher.destinationLocationId!,
+                      toLocationId: itemSourceId,
+                      occurredAt,
+                      source: {
+                        sourceType: "bulk_voucher_delete_stock_transfer",
+                        sourceId: String(id),
+                        idempotencyKey: `bulk-voucher-delete:transfer:${currentCompanyId}:${id}:${item.id}`,
+                      },
+                      actor: {
+                        userId: req.session.userId,
+                        username: req.session.username,
+                        reason: `Bulk delete voucher ${voucher.voucherNumber}`,
+                      },
+                      allowNegativeStock: true,
+                    },
+                    canonicalStockMovementAdapter
+                  );
                 }
               }
 
@@ -165,12 +197,36 @@ export function registerVoucherBulkDeleteRoutes(app: Express) {
 
                   if (isProduction) {
                     // Production added inventory, so reverse by subtracting
-                    await adjustInventory(
+                    const result = await adjustInventory(
                       tx,
                       adjustmentVoucher.locationId,
                       item.stockItemId,
                       -absoluteQty,
                       currentCompanyId
+                    );
+                    await postStockMovementTx(
+                      tx,
+                      {
+                        companyId: currentCompanyId,
+                        stockItemId: item.stockItemId,
+                        kind: "adjustment",
+                        quantity: String(absoluteQty),
+                        unitCost: String(Math.max(adjustmentRate || result.averageRate || 0, 0)),
+                        fromLocationId: adjustmentVoucher.locationId,
+                        occurredAt,
+                        source: {
+                          sourceType: "bulk_voucher_delete_stock_adjustment",
+                          sourceId: String(id),
+                          idempotencyKey: `bulk-voucher-delete:adjustment:${currentCompanyId}:${id}:${item.id}`,
+                        },
+                        actor: {
+                          userId: req.session.userId,
+                          username: req.session.username,
+                          reason: `Bulk delete voucher ${voucher.voucherNumber}`,
+                        },
+                        allowNegativeStock: true,
+                      },
+                      canonicalStockMovementAdapter
                     );
                   } else {
                     // Consumption subtracted inventory, so reverse by adding back
@@ -181,6 +237,29 @@ export function registerVoucherBulkDeleteRoutes(app: Express) {
                       absoluteQty,
                       currentCompanyId,
                       adjustmentRate
+                    );
+                    await postStockMovementTx(
+                      tx,
+                      {
+                        companyId: currentCompanyId,
+                        stockItemId: item.stockItemId,
+                        kind: "adjustment",
+                        quantity: String(absoluteQty),
+                        unitCost: String(Math.max(adjustmentRate || 0, 0)),
+                        toLocationId: adjustmentVoucher.locationId,
+                        occurredAt,
+                        source: {
+                          sourceType: "bulk_voucher_delete_stock_adjustment",
+                          sourceId: String(id),
+                          idempotencyKey: `bulk-voucher-delete:adjustment:${currentCompanyId}:${id}:${item.id}`,
+                        },
+                        actor: {
+                          userId: req.session.userId,
+                          username: req.session.username,
+                          reason: `Bulk delete voucher ${voucher.voucherNumber}`,
+                        },
+                      },
+                      canonicalStockMovementAdapter
                     );
                   }
                 }
@@ -204,7 +283,37 @@ export function registerVoucherBulkDeleteRoutes(app: Express) {
                     const costPrice = parseFloat(item.costPrice || "0");
 
                     // Add back sold items to inventory (reverse the sale deduction)
-                    await adjustInventory(tx, voucher.locationId, item.stockItemId, qty, currentCompanyId, costPrice);
+                    const result = await adjustInventory(
+                      tx,
+                      voucher.locationId,
+                      item.stockItemId,
+                      qty,
+                      currentCompanyId,
+                      costPrice
+                    );
+                    await postStockMovementTx(
+                      tx,
+                      {
+                        companyId: currentCompanyId,
+                        stockItemId: item.stockItemId,
+                        kind: "adjustment",
+                        quantity: String(qty),
+                        unitCost: String(Math.max(costPrice || result.averageRate || 0, 0)),
+                        toLocationId: voucher.locationId,
+                        occurredAt,
+                        source: {
+                          sourceType: "bulk_voucher_delete_pos_sale",
+                          sourceId: String(id),
+                          idempotencyKey: `bulk-voucher-delete:pos:${currentCompanyId}:${id}:${item.id}`,
+                        },
+                        actor: {
+                          userId: req.session.userId,
+                          username: req.session.username,
+                          reason: `Bulk delete voucher ${voucher.voucherNumber}`,
+                        },
+                      },
+                      canonicalStockMovementAdapter
+                    );
                   }
                 }
 
@@ -229,11 +338,65 @@ export function registerVoucherBulkDeleteRoutes(app: Express) {
                   if (voucher.voucherType === "Credit Note") {
                     // Credit Note forward: added qty to inventory
                     // Reversal: subtract qty from inventory
-                    await adjustInventory(tx, item.locationId, item.stockItemId, -qty, currentCompanyId);
+                    const result = await adjustInventory(tx, item.locationId, item.stockItemId, -qty, currentCompanyId);
+                    await postStockMovementTx(
+                      tx,
+                      {
+                        companyId: currentCompanyId,
+                        stockItemId: item.stockItemId,
+                        kind: "adjustment",
+                        quantity: String(qty),
+                        unitCost: String(Math.max(inventoryCost || result.averageRate || 0, 0)),
+                        fromLocationId: item.locationId,
+                        occurredAt,
+                        source: {
+                          sourceType: "bulk_voucher_delete_credit_note",
+                          sourceId: String(id),
+                          idempotencyKey: `bulk-voucher-delete:credit-note:${currentCompanyId}:${id}:${item.id}`,
+                        },
+                        actor: {
+                          userId: req.session.userId,
+                          username: req.session.username,
+                          reason: `Bulk delete voucher ${voucher.voucherNumber}`,
+                        },
+                        allowNegativeStock: true,
+                      },
+                      canonicalStockMovementAdapter
+                    );
                   } else {
                     // Debit Note forward: removed qty from inventory
                     // Reversal: add qty back to inventory
-                    await adjustInventory(tx, item.locationId, item.stockItemId, qty, currentCompanyId, inventoryCost);
+                    const result = await adjustInventory(
+                      tx,
+                      item.locationId,
+                      item.stockItemId,
+                      qty,
+                      currentCompanyId,
+                      inventoryCost
+                    );
+                    await postStockMovementTx(
+                      tx,
+                      {
+                        companyId: currentCompanyId,
+                        stockItemId: item.stockItemId,
+                        kind: "adjustment",
+                        quantity: String(qty),
+                        unitCost: String(Math.max(inventoryCost || result.averageRate || 0, 0)),
+                        toLocationId: item.locationId,
+                        occurredAt,
+                        source: {
+                          sourceType: "bulk_voucher_delete_debit_note",
+                          sourceId: String(id),
+                          idempotencyKey: `bulk-voucher-delete:debit-note:${currentCompanyId}:${id}:${item.id}`,
+                        },
+                        actor: {
+                          userId: req.session.userId,
+                          username: req.session.username,
+                          reason: `Bulk delete voucher ${voucher.voucherNumber}`,
+                        },
+                      },
+                      canonicalStockMovementAdapter
+                    );
                   }
                 }
 

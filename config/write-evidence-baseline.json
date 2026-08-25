@@ -1,26 +1,13 @@
 {
   "version": 1,
-  "description": "Ratchet on evidence, not on tests. audit-write-route-coverage.mjs asks whether a sensitive write route is tested and holds that at zero; this asks whether a write leaves the trail the rest of the system reconciles against, and both answers are currently backlogs rather than zeros. Neither list is a list of bugs: a company hard-delete that removes every inventory row, or a scheduler purging rows for a deleted stock item, has nothing to journal. The list is what a reviewer must look at when a file joins it. Both entries pin the set as well as the count, because a backlog that holds steady while a different file joins it is a new write path with no evidence wearing an old number. Re-pin downward with UPDATE_WRITE_EVIDENCE_BASELINE=1; the audit refuses upward.",
+  "description": "Ratchet on evidence, not on tests. audit-write-route-coverage.mjs asks whether a sensitive write route is tested and holds that at zero; this asks whether a write leaves the trail the rest of the system reconciles against. The stock movement backlog is now fully classified with zero confirmed active unjournalled writers. Neither list is a list of bugs: a company hard-delete that removes every inventory row, or a scheduler purging rows for a deleted stock item, has nothing to journal. The list is what a reviewer must look at when a file joins it. Both entries pin the set as well as the count, because a backlog that holds steady while a different file joins it is a new write path with no evidence wearing an old number. Re-pin downward with UPDATE_WRITE_EVIDENCE_BASELINE=1; the audit refuses upward.",
   "stockWritesWithoutJournalEvidence": {
-    "rationale": "Files that move stock without going through postStockMovementTx, the only writer of the canonical stock movement journal. Stock moves two ways: a statement naming the inventory table, or a call to adjustInventory()/reverseInventoryByExactValue() in server/inventoryHelper.ts, which owns the balance arithmetic. The helper module itself is exempt — it is the layer the journal sits above and cannot know which document is calling it — but its callers are not. Convergence reconciliation compares stock documents against the journal, so a mutation missing from it is not a discrepancy the report finds; it is one the report cannot see.",
-    "ceiling": 46,
+    "rationale": "Files that alter inventory without going through postStockMovementTx are measured because postStockMovementTx is the canonical stock movement journal writer. Phase 2 completed every reviewed active document movement: transfers, imports, voucher edits/deletes/toggles, factory bale movements, Supplier Partner postings, and container offload create/edit/reverse flows now leave canonical evidence in the same transaction as the quantity mutation. The remaining files are deliberately classified non-movements (teardown, revaluation, reconstruction, migration opening balances, identity merge) or unreachable shadowed code and therefore are retained for review rather than falsely journalled.",
+    "ceiling": 17,
     "files": [
       "server/routes/admin/deleted-items/permanent-delete.ts",
       "server/routes/admin/repair/inventory-values.ts",
-      "server/routes/admin/repair/misc.ts",
       "server/routes/admin/repair/rebuild-inventory.ts",
-      "server/routes/containers/offload/create.ts",
-      "server/routes/containers/offload/recalc.ts",
-      "server/routes/containers/offload/update.ts",
-      "server/routes/creditSalesImportRoutes.ts",
-      "server/routes/factory/bales/balesReimportRoutes.ts",
-      "server/routes/factory/employee-pos/employeeLedgerWasteRoutes.ts",
-      "server/routes/factory/stock/stockRemovalRoutes.ts",
-      "server/routes/import/silent-production.ts",
-      "server/routes/import/silent-transfer.ts",
-      "server/routes/inventory/inventoryQuickAdjustService.ts",
-      "server/routes/offloadRoutes.ts",
-      "server/routes/posImportRoutes.ts",
       "server/routes/reportsClosingStockRoutes.ts",
       "server/routes/sp-migration/spMigrationRunRoutes.ts",
       "server/routes/sp-migration/spMigrationStockRoutes.ts",
@@ -29,28 +16,12 @@
       "server/routes/stock/merge/bulk-merge.ts",
       "server/routes/stock/merge/merge-logs.ts",
       "server/routes/stock/merge/merge.ts",
-      "server/routes/stockTransferImportRoutes.ts",
-      "server/routes/voucher-entries/bulk-delete.ts",
-      "server/routes/voucher-entries/delete.ts",
-      "server/routes/vouchers/sales-update/optional.ts",
-      "server/routes/vouchers/sales-update/sales.ts",
-      "server/routes/vouchers/sales-update/update.ts",
       "server/routes/vouchers/transfer/fix-sales-inventory.ts",
-      "server/routes/vouchers/transfer/transfer.ts",
-      "server/routes/vouchers/transfer/with-entries.ts",
-      "server/routes/vouchers/voucherPurchaseUpdateRoutes.ts",
-      "server/services/containers/offload-lifecycle/reverse.ts",
       "server/services/scheduler/maintenance.ts",
-      "server/services/sp/spInventoryIntegrity.ts",
       "server/services/stockTransferRevisionLifecycle.ts",
       "server/services/syncSalesItemCosts.ts",
-      "server/storage/accounting/voucher-writes.ts",
       "server/storage/auth.ts",
-      "server/storage/containers-store/offload.ts",
-      "server/storage/inventory/locationInventoryStorage.ts",
-      "server/storage/inventory/stockMovementStorage.ts",
-      "server/storage/stock-ops/cost-prices.ts",
-      "server/storage/stock-ops/transfers-update.ts"
+      "server/storage/stock-ops/cost-prices.ts"
     ],
     "reviewed": {
       "teardown": {
@@ -95,48 +66,23 @@
         ]
       },
       "unjournalled": {
-        "reason": "Read and confirmed: each moves stock against a real document — a voucher, a transfer, a revision, an offload, an import — and leaves no journal row. These are the genuine backlog. The pattern across them is asymmetry: the paths that bring stock in were converted and the paths that take it back out were not. Stock transfer creation journals (server/storage/stock-ops/transfers-create.ts), and the lifecycle service that serves PUT /api/stock-transfers now journals its apply, unapply and posted-edit phases too; deletion journals the return, which is the only surviving account of it once the document is removed, and the immutable revision path journals its delta in the direction the stock travelled. Container offload execution journals (server/services/containers/offload-lifecycle/execute.ts) while create-correction, recalc and reverse do not. POS is the one symmetric family — deduct, edit-reverse and edit-rebuild all journal. So the journal records the issue and not the return, which is the shape most likely to make a convergence report look wrong when the data is right.",
-        "files": [
-          "server/routes/admin/repair/misc.ts",
-          "server/routes/containers/offload/create.ts",
-          "server/routes/containers/offload/recalc.ts",
-          "server/routes/containers/offload/update.ts",
-          "server/routes/creditSalesImportRoutes.ts",
-          "server/routes/factory/bales/balesReimportRoutes.ts",
-          "server/routes/factory/employee-pos/employeeLedgerWasteRoutes.ts",
-          "server/routes/factory/stock/stockRemovalRoutes.ts",
-          "server/routes/import/silent-production.ts",
-          "server/routes/import/silent-transfer.ts",
-          "server/routes/inventory/inventoryQuickAdjustService.ts",
-          "server/routes/offloadRoutes.ts",
-          "server/routes/posImportRoutes.ts",
-          "server/routes/stockTransferImportRoutes.ts",
-          "server/routes/voucher-entries/bulk-delete.ts",
-          "server/routes/voucher-entries/delete.ts",
-          "server/routes/vouchers/sales-update/optional.ts",
-          "server/routes/vouchers/sales-update/sales.ts",
-          "server/routes/vouchers/sales-update/update.ts",
-          "server/routes/vouchers/transfer/transfer.ts",
-          "server/routes/vouchers/transfer/with-entries.ts",
-          "server/routes/vouchers/voucherPurchaseUpdateRoutes.ts",
-          "server/services/containers/offload-lifecycle/reverse.ts",
-          "server/services/sp/spInventoryIntegrity.ts",
-          "server/storage/accounting/voucher-writes.ts",
-          "server/storage/containers-store/offload.ts",
-          "server/storage/inventory/locationInventoryStorage.ts",
-          "server/storage/inventory/stockMovementStorage.ts"
-        ]
+        "reason": "Phase 2 completed every previously confirmed active stock movement writer. This category intentionally remains present as an empty ratchet bucket: any future real document path that changes stock without canonical movement evidence must either be fixed before merge or explicitly re-reviewed rather than silently increasing the baseline.",
+        "files": []
       },
       "shadowed": {
-        "reason": "Write paths that cannot execute. Both register an Express route that an earlier registration already claims, and Express serves the first match: registerVoucherRoutes runs before registerFiscalTransferRoutes, and registerImmutableStockTransferRevisionRoutes before registerStockTransferRevisionLifecycleRoutes. Adding journal evidence here would be evidence written by code nothing calls; the real fix is deletion, which is a different change with a different risk. transfers-update.ts is only half dead — updateStockTransfer is unreachable, updateStockAdjustment is live and still owes evidence.",
+        "reason": "Write paths that cannot execute because an earlier route/registration owns the same operation. stockTransferRevisionLifecycle.ts remains wholly shadowed. Adding fabricated evidence to unreachable code is not useful; deleting the dead path is a separate cleanup change.",
         "files": [
-          "server/services/stockTransferRevisionLifecycle.ts",
-          "server/storage/stock-ops/transfers-update.ts"
+          "server/services/stockTransferRevisionLifecycle.ts"
         ]
       }
     },
     "unreviewed": [],
-    "reviewNote": "Every file in `files` is classified under `reviewed`; `unreviewed` is empty and must stay that way. A file entering the backlog has to be read and classified, or fixed. `unreviewed` never means 'fine' — it means nobody has opened it."
+    "reviewNote": "Every remaining file in `files` is classified under `reviewed`; `unreviewed` and `reviewed.unjournalled.files` are both empty. A new active stock writer must journal its movement or be explicitly reviewed before this ratchet can move.",
+    "phase2Completion": {
+      "confirmedActiveUnjournalledBefore": 28,
+      "confirmedActiveUnjournalledAfter": 0,
+      "retainedReviewedNonMovementOrShadowed": 17
+    }
   },
   "voucherWritesWithoutRequestIdentity": {
     "rationale": "Files that still create vouchers without a canonical stable posting identity. The retry need not be a user double-click: a proxy timeout, mobile network handover, or offline replay can submit the same operation again. A file is credited when it carries a stable request/source identity itself or reaches the central/infrastructure posting boundary that requires one. Phase 3 removed 11 infrastructure writers from the measured backlog by requiring deterministic source identity and serialized posting reuse. Phase 4 removes 22 high-risk operational writers by putting manual vouchers, payroll/advances, employee cash/POS and supplier payments behind a durable company-scoped request boundary whose stable identity survives browser retry/offline replay. The remaining active measured backlog is 48 creation paths: 15 explicit replay-guard paths, 11 migration/import/repair paths, and 22 Phase 5 operational paths. Only creation counts: updating, soft-deleting, restoring, or moving an existing voucher cannot produce a second voucher row.",

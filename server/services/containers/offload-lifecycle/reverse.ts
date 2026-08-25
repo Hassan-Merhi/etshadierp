@@ -2,8 +2,12 @@ import type { DbTransaction } from "../../../db";
 import { and, eq, sql } from "drizzle-orm";
 import { reverseInventoryByExactValue } from "../../../inventoryHelper";
 import * as schema from "@shared/schema";
+import { createDatabaseStockMovementAdapter } from "../../inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../inventory/stockMovementIntegrityService";
 
 import { amount, buildItemMap } from "./types";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 async function deleteVoucherWithEntries(tx: DbTransaction, voucherId: number): Promise<void> {
   await tx.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, voucherId));
@@ -20,15 +24,31 @@ export async function reverseExistingOffload(
     .select()
     .from(schema.containerOffloadItems)
     .where(eq(schema.containerOffloadItems.offloadId, existingOffload.id));
+  const occurredAt = new Date().toISOString();
 
   if (storedItems.length > 0) {
     for (const item of storedItems) {
-      await reverseInventoryByExactValue(
+      const quantity = amount(item.quantity);
+      const totalValue = amount(item.totalValue);
+      await reverseInventoryByExactValue(tx, existingOffload.locationId, item.stockItemId, quantity, totalValue);
+      await postStockMovementTx(
         tx,
-        existingOffload.locationId,
-        item.stockItemId,
-        amount(item.quantity),
-        amount(item.totalValue)
+        {
+          companyId: container.companyId,
+          stockItemId: item.stockItemId,
+          kind: "adjustment",
+          quantity: String(quantity),
+          unitCost: String(quantity > 0 ? Math.max(totalValue / quantity, 0) : 0),
+          fromLocationId: existingOffload.locationId,
+          occurredAt,
+          source: {
+            sourceType: "container_offload_reverse",
+            sourceId: String(existingOffload.id),
+            idempotencyKey: `container-offload-reverse:${container.companyId}:${existingOffload.id}:${item.id}`,
+          },
+          allowNegativeStock: true,
+        },
+        canonicalStockMovementAdapter
       );
     }
   } else {
@@ -42,6 +62,25 @@ export async function reverseExistingOffload(
         stockItemId,
         item.totalQuantity,
         estimatedValue
+      );
+      await postStockMovementTx(
+        tx,
+        {
+          companyId: container.companyId,
+          stockItemId,
+          kind: "adjustment",
+          quantity: String(item.totalQuantity),
+          unitCost: String(item.totalQuantity > 0 ? Math.max(estimatedValue / item.totalQuantity, 0) : 0),
+          fromLocationId: existingOffload.locationId,
+          occurredAt,
+          source: {
+            sourceType: "container_offload_reverse_legacy",
+            sourceId: String(existingOffload.id),
+            idempotencyKey: `container-offload-reverse:legacy:${container.companyId}:${existingOffload.id}:${stockItemId}`,
+          },
+          allowNegativeStock: true,
+        },
+        canonicalStockMovementAdapter
       );
     }
   }

@@ -1,29 +1,28 @@
+import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { companies, inventory } from "@shared/schema";
 
 import { db } from "../../db";
 import { adjustInventory } from "../../inventoryHelper";
 import { getErrorMessage } from "../../lib/httpHandlers";
+import { inventoryQuantity } from "../../lib/inventoryMath";
+import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
 import { storage } from "../../storage";
 import { logAudit } from "../_helpers";
 import { InventoryRouteError } from "./inventoryErrors";
 import type { InventoryAuditActor, QuickAdjustmentInput } from "./inventoryRequestContext";
 
-export async function quickAdjustInventory(
-  companyId: number,
-  input: QuickAdjustmentInput,
-  actor: InventoryAuditActor,
-) {
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
+
+export async function quickAdjustInventory(companyId: number, input: QuickAdjustmentInput, actor: InventoryAuditActor) {
   const [company] = await db
     .select({ companyType: companies.companyType })
     .from(companies)
     .where(eq(companies.id, companyId))
     .limit(1);
   if (company?.companyType === "supplier_partner") {
-    throw new InventoryRouteError(
-      403,
-      "Supplier Partner companies must use SP Sales / SP Containers for this action.",
-    );
+    throw new InventoryRouteError(403, "Supplier Partner companies must use SP Sales / SP Containers for this action.");
   }
 
   const [location, stockItem] = await Promise.all([
@@ -45,30 +44,50 @@ export async function quickAdjustInventory(
       const [existingInventory] = await tx
         .select()
         .from(inventory)
-        .where(
-          and(
-            eq(inventory.stockItemId, input.stockItemId),
-            eq(inventory.locationId, input.locationId),
-          ),
-        )
+        .where(and(eq(inventory.stockItemId, input.stockItemId), eq(inventory.locationId, input.locationId)))
         .limit(1);
 
+      const normalizedQuantity = Number.parseFloat(inventoryQuantity(input.quantity));
+      if (!Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0) {
+        throw new InventoryRouteError(400, "Quantity must be at least 0.001 units.");
+      }
+
       const currentQuantity = existingInventory ? Number.parseFloat(existingInventory.quantity || "0") : 0;
-      const adjustedQuantity = input.type === "add" ? input.quantity : -input.quantity;
+      const adjustedQuantity = input.type === "add" ? normalizedQuantity : -normalizedQuantity;
       const newQuantity = currentQuantity + adjustedQuantity;
       if (newQuantity < 0) {
         throw new InventoryRouteError(
           400,
-          `Cannot subtract ${input.quantity} units. Only ${currentQuantity} units available at this location.`,
+          `Cannot subtract ${normalizedQuantity} units. Only ${currentQuantity} units available at this location.`
         );
       }
 
-      const adjustment = await adjustInventory(
+      const preAdjustmentRate = existingInventory ? Number.parseFloat(existingInventory.averageRate || "0") : 0;
+      const adjustment = await adjustInventory(tx, input.locationId, input.stockItemId, adjustedQuantity, companyId);
+      const operationId = randomUUID();
+      const movementUnitCost =
+        input.type === "subtract" && Number.isFinite(preAdjustmentRate)
+          ? Math.max(preAdjustmentRate, 0)
+          : adjustment.averageRate;
+      await postStockMovementTx(
         tx,
-        input.locationId,
-        input.stockItemId,
-        adjustedQuantity,
-        companyId,
+        {
+          companyId,
+          stockItemId: input.stockItemId,
+          kind: "adjustment",
+          quantity: inventoryQuantity(normalizedQuantity),
+          unitCost: String(movementUnitCost),
+          fromLocationId: input.type === "subtract" ? input.locationId : undefined,
+          toLocationId: input.type === "add" ? input.locationId : undefined,
+          occurredAt: new Date().toISOString(),
+          source: {
+            sourceType: "inventory_quick_adjustment",
+            sourceId: operationId,
+            idempotencyKey: `inventory-quick-adjust:${companyId}:${operationId}`,
+          },
+          allowNegativeStock: true,
+        },
+        canonicalStockMovementAdapter
       );
       return {
         currentQuantity: adjustment.previousQuantity,
@@ -98,7 +117,9 @@ export async function quickAdjustInventory(
         location: { new: location.name },
         adjustmentType: { new: input.type === "add" ? "Add Stock" : "Subtract Stock" },
         quantity: { old: String(result.currentQuantity), new: String(result.newQuantity) },
-        adjustment: { new: `${input.type === "add" ? "+" : "-"}${input.quantity}` },
+        adjustment: {
+          new: `${input.type === "add" ? "+" : "-"}${Math.abs(result.adjustedQuantity)}`,
+        },
       },
     });
   } catch {

@@ -6,13 +6,17 @@
  * endpoints. Extracted from debugRoutes.ts as a sub-registrar; behaviour is
  * unchanged.
  */
+import { randomUUID } from "node:crypto";
 import type { Express } from "express";
 import { logger } from "../lib/logger";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { eq, and, or, desc, inArray, gte, lte, like, sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "../auth";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../services/inventory/stockMovementIntegrityService";
 import { getOrCreateLedgerAccount } from "./factory/_helpers";
 import { assertActiveCompanyAccess, sendCompanyAccessError } from "../security/companyAccessBoundary";
 import {
@@ -28,6 +32,8 @@ import {
   vouchers,
 } from "@shared/schema";
 import { resultRows } from "../lib/queryResult";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerOffloadRoutes(app: Express) {
   // List offloads for daybook view (filtered by date range and company)
@@ -262,6 +268,8 @@ export function registerOffloadRoutes(app: Express) {
 
         const makeOptional = !offload.optional; // toggle
         const cn = offload.containerNumber;
+        const operationId = randomUUID();
+        const occurredAt = new Date().toISOString();
 
         // Fetch the exact offload items (quantities + values as-offloaded)
         const offloadItems = await db
@@ -295,6 +303,32 @@ export function registerOffloadRoutes(app: Express) {
               // Unsuspending: add the stock back at the original rate
               await adjustInventory(tx, offload.locationId, item.stockItemId, qty, offload.companyId, rate);
             }
+
+            await postStockMovementTx(
+              tx,
+              {
+                companyId: offload.companyId,
+                stockItemId: item.stockItemId,
+                kind: "adjustment",
+                quantity: String(Math.abs(qty)),
+                unitCost: String(Math.max(rate || (qty !== 0 ? value / qty : 0), 0)),
+                fromLocationId: makeOptional ? offload.locationId : undefined,
+                toLocationId: makeOptional ? undefined : offload.locationId,
+                occurredAt,
+                source: {
+                  sourceType: makeOptional ? "offload_optional_suspend" : "offload_optional_restore",
+                  sourceId: String(offloadId),
+                  idempotencyKey: `offload-optional:${offload.companyId}:${offloadId}:${operationId}:${item.id}`,
+                },
+                actor: {
+                  userId: req.session.userId,
+                  username: req.session.username,
+                  reason: makeOptional ? "Suspend container offload" : "Restore container offload",
+                },
+                allowNegativeStock: true,
+              },
+              canonicalStockMovementAdapter
+            );
           }
 
           // 2. Toggle all offload-related vouchers (DUTY-, OFFICE-, TRANS-, XFER-, CHG-)

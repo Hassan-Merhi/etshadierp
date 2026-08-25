@@ -1,7 +1,11 @@
 import { eq, and, or, isNull, desc, sql, inArray } from "drizzle-orm";
 import { db } from "../../db";
 import * as schema from "@shared/schema";
+import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
 import { getLocationById } from "./locationInventoryStorage";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 // ---------------------------------------------------------------------------
 // Stock Group Location Archives
@@ -135,16 +139,42 @@ export async function archiveStockGroupAtLocation(
   });
   await db.insert(schema.stockGroupLocationArchiveItems).values(archiveItems);
 
-  await db
-    .update(schema.inventory)
-    .set({ quantity: "0", totalValue: "0", lastUpdated: sql`now()` })
-    .where(
-      and(
-        eq(schema.inventory.locationId, locationId),
-        eq(schema.inventory.companyId, companyId),
-        inArray(schema.inventory.stockItemId, stockItemIds)
-      )
-    );
+  const occurredAt = new Date().toISOString();
+  await db.transaction(async (tx) => {
+    for (const inv of inventoryRecords) {
+      await tx
+        .update(schema.inventory)
+        .set({ quantity: "0", totalValue: "0", lastUpdated: sql`now()` })
+        .where(
+          and(
+            eq(schema.inventory.locationId, locationId),
+            eq(schema.inventory.companyId, companyId),
+            eq(schema.inventory.stockItemId, inv.stockItemId)
+          )
+        );
+
+      await postStockMovementTx(
+        tx,
+        {
+          companyId,
+          stockItemId: inv.stockItemId,
+          kind: "adjustment",
+          quantity: inv.quantity,
+          unitCost: inv.averageRate,
+          fromLocationId: locationId,
+          occurredAt,
+          source: {
+            sourceType: "stock_group_location_archive",
+            sourceId: String(archive.id),
+            idempotencyKey: `stock-group-archive:${companyId}:${archive.id}:${inv.stockItemId}`,
+          },
+          actor: { username: archivedBy, reason: notes || "Stock group location archive" },
+          allowNegativeStock: true,
+        },
+        canonicalStockMovementAdapter
+      );
+    }
+  });
 
   return archive;
 }
@@ -195,55 +225,77 @@ export async function restoreStockGroupLocationArchive(
   if (archive.deletedAt) throw new Error("Archive has been deleted");
 
   const archiveItems = await getStockGroupLocationArchiveItems(archiveId);
+  const occurredAt = new Date().toISOString();
 
-  for (const item of archiveItems) {
-    const [existing] = await db
-      .select()
-      .from(schema.inventory)
-      .where(
-        and(
-          eq(schema.inventory.stockItemId, item.stockItemId),
-          eq(schema.inventory.locationId, archive.locationId),
-          eq(schema.inventory.companyId, companyId)
-        )
+  return db.transaction(async (tx) => {
+    for (const item of archiveItems) {
+      const [existing] = await tx
+        .select()
+        .from(schema.inventory)
+        .where(
+          and(
+            eq(schema.inventory.stockItemId, item.stockItemId),
+            eq(schema.inventory.locationId, archive.locationId),
+            eq(schema.inventory.companyId, companyId)
+          )
+        );
+
+      if (existing) {
+        const existingQty = parseFloat(existing.quantity);
+        const existingValue = parseFloat(existing.totalValue);
+        const archivedQty = parseFloat(item.quantity);
+        const archivedValue = parseFloat(item.totalValue);
+        const newQty = existingQty + archivedQty;
+        const newValue = existingValue + archivedValue;
+        const newRate = newQty > 0 ? newValue / newQty : 0;
+
+        await tx
+          .update(schema.inventory)
+          .set({
+            quantity: newQty.toString(),
+            averageRate: newRate.toFixed(2),
+            totalValue: newValue.toFixed(2),
+            lastUpdated: sql`now()`,
+          })
+          .where(eq(schema.inventory.id, existing.id));
+      } else {
+        await tx.insert(schema.inventory).values({
+          companyId,
+          locationId: archive.locationId,
+          stockItemId: item.stockItemId,
+          quantity: item.quantity,
+          averageRate: item.averageRate,
+          totalValue: item.totalValue,
+        });
+      }
+
+      await postStockMovementTx(
+        tx,
+        {
+          companyId,
+          stockItemId: item.stockItemId,
+          kind: "adjustment",
+          quantity: item.quantity,
+          unitCost: item.averageRate,
+          toLocationId: archive.locationId,
+          occurredAt,
+          source: {
+            sourceType: "stock_group_location_archive_restore",
+            sourceId: String(archiveId),
+            idempotencyKey: `stock-group-archive-restore:${companyId}:${archiveId}:${item.stockItemId}`,
+          },
+        },
+        canonicalStockMovementAdapter
       );
-
-    if (existing) {
-      const existingQty = parseFloat(existing.quantity);
-      const existingValue = parseFloat(existing.totalValue);
-      const archivedQty = parseFloat(item.quantity);
-      const archivedValue = parseFloat(item.totalValue);
-      const newQty = existingQty + archivedQty;
-      const newValue = existingValue + archivedValue;
-      const newRate = newQty > 0 ? newValue / newQty : 0;
-
-      await db
-        .update(schema.inventory)
-        .set({
-          quantity: newQty.toString(),
-          averageRate: newRate.toFixed(2),
-          totalValue: newValue.toFixed(2),
-          lastUpdated: sql`now()`,
-        })
-        .where(eq(schema.inventory.id, existing.id));
-    } else {
-      await db.insert(schema.inventory).values({
-        companyId,
-        locationId: archive.locationId,
-        stockItemId: item.stockItemId,
-        quantity: item.quantity,
-        averageRate: item.averageRate,
-        totalValue: item.totalValue,
-      });
     }
-  }
 
-  const [updated] = await db
-    .update(schema.stockGroupLocationArchives)
-    .set({ restoredAt: sql`now()` })
-    .where(eq(schema.stockGroupLocationArchives.id, archiveId))
-    .returning();
-  return updated;
+    const [updated] = await tx
+      .update(schema.stockGroupLocationArchives)
+      .set({ restoredAt: sql`now()` })
+      .where(eq(schema.stockGroupLocationArchives.id, archiveId))
+      .returning();
+    return updated;
+  });
 }
 
 export async function deleteStockGroupLocationArchive(archiveId: number, companyId: number): Promise<void> {

@@ -30,26 +30,24 @@ import {
 import { eq, and, sql } from "drizzle-orm";
 import { z } from "zod";
 import { adjustInventory } from "../../../inventoryHelper";
+import { nextCanonicalSourceRevision } from "../../../services/inventory/canonicalSourceRevision";
+import { createDatabaseStockMovementAdapter } from "../../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../../services/inventory/stockMovementIntegrityService";
 import { applyInventoryRateDeltaAndSync } from "../../../services/syncSalesItemCosts";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerContainerOffloadUpdateRoutes(app: Express) {
   app.patch("/api/containers/:id/offload", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       const containerId = parseId(req.params.id);
-      if (containerId === null) return res.status(400).json({ message: "Invalid id" });
-      if (isNaN(containerId)) {
-        return res.status(400).json({ message: "Invalid container ID" });
-      }
+      if (containerId === null || isNaN(containerId)) return res.status(400).json({ message: "Invalid container ID" });
 
-       const container = await storage.getContainerByIdForCompany(containerId, req.session.currentCompanyId!);
-      if (!container) {
-        return res.status(404).json({ message: "Container not found" });
-      }
-
+      const container = await storage.getContainerByIdForCompany(containerId, req.session.currentCompanyId!);
+      if (!container) return res.status(404).json({ message: "Container not found" });
       if (container.companyId !== req.session.currentCompanyId) {
         return res.status(403).json({ message: "Access denied: Container belongs to a different company" });
       }
-
       if (container.status !== "OFFLOADED") {
         return res.status(400).json({ message: "Container must be offloaded to edit" });
       }
@@ -65,10 +63,7 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
             .optional(),
         })
         .safeParse(req.body);
-
-      if (!validation.success) {
-        return res.status(400).json({ errors: validation.error.issues });
-      }
+      if (!validation.success) return res.status(400).json({ errors: validation.error.issues });
 
       const {
         locationId,
@@ -85,20 +80,26 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
         .from(containerOffloads)
         .where(eq(containerOffloads.containerId, containerId))
         .limit(1);
-
-      if (!currentOffload) {
-        return res.status(404).json({ message: "Offload record not found" });
-      }
+      if (!currentOffload) return res.status(404).json({ message: "Offload record not found" });
 
       let newAdditionalCostPerBale = toInventoryDecimal(0);
 
       await db.transaction(async (tx) => {
         if (locationId !== currentOffload.locationId) {
-           const pos = await storage.getPurchaseOrdersByContainerForCompany(containerId, req.session.currentCompanyId!);
+          const revision = await nextCanonicalSourceRevision(
+            tx,
+            container.companyId,
+            "container-offload-location-edit",
+            String(currentOffload.id)
+          );
+          const occurredAt = new Date().toISOString();
+          const pos = await storage.getPurchaseOrdersByContainerForCompany(containerId, req.session.currentCompanyId!);
           for (const po of pos) {
             const lineItems = await storage.getLineItemsByPO(po.id);
             for (const item of lineItems) {
+              if (!item.stockItemId) continue;
               const quantity = toInventoryDecimal(item.quantity);
+              if (quantity.isZero()) continue;
               const removeResult = await adjustInventory(
                 tx,
                 currentOffload.locationId,
@@ -106,6 +107,7 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
                 quantity.negated().toNumber(),
                 req.session.currentCompanyId!
               );
+              const unitCost = Math.max(removeResult.averageRate || 0, 0);
               if (removeResult.previousQuantity !== 0) {
                 await adjustInventory(
                   tx,
@@ -113,7 +115,57 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
                   item.stockItemId,
                   quantity.toNumber(),
                   req.session.currentCompanyId!,
-                  removeResult.averageRate
+                  unitCost
+                );
+                await postStockMovementTx(
+                  tx,
+                  {
+                    companyId: container.companyId,
+                    stockItemId: item.stockItemId,
+                    kind: "transfer",
+                    quantity: quantity.abs().toString(),
+                    unitCost: String(unitCost),
+                    fromLocationId: currentOffload.locationId,
+                    toLocationId: locationId,
+                    occurredAt,
+                    source: {
+                      sourceType: "container-offload-location-edit",
+                      sourceId: String(currentOffload.id),
+                      idempotencyKey: `container-offload-location:rev${revision}:${po.id}:${item.id}`,
+                    },
+                    actor: {
+                      userId: req.session.userId,
+                      username: req.session.username,
+                      reason: `Move offload ${container.containerNumber} to location ${locationId}`,
+                    },
+                    allowNegativeStock: true,
+                  },
+                  canonicalStockMovementAdapter
+                );
+              } else {
+                await postStockMovementTx(
+                  tx,
+                  {
+                    companyId: container.companyId,
+                    stockItemId: item.stockItemId,
+                    kind: "adjustment",
+                    quantity: quantity.abs().toString(),
+                    unitCost: String(unitCost),
+                    fromLocationId: currentOffload.locationId,
+                    occurredAt,
+                    source: {
+                      sourceType: "container-offload-location-edit-source-only",
+                      sourceId: String(currentOffload.id),
+                      idempotencyKey: `container-offload-location:rev${revision}:source-only:${po.id}:${item.id}`,
+                    },
+                    actor: {
+                      userId: req.session.userId,
+                      username: req.session.username,
+                      reason: `Move offload ${container.containerNumber} to location ${locationId}`,
+                    },
+                    allowNegativeStock: true,
+                  },
+                  canonicalStockMovementAdapter
                 );
               }
             }
@@ -159,7 +211,6 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
               sql`${vouchers.description} LIKE '%Container ${container.containerNumber}%'`
             )
           );
-
         for (const voucher of containerVouchers) {
           await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id));
           await tx.delete(vouchers).where(eq(vouchers.id, voucher.id));
@@ -172,7 +223,6 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
         try {
           const companyId = req.session.currentCompanyId!;
           const delta = subtractInventoryValues(newAdditionalCostPerBale, currentOffload.additionalCostPerBale);
-
           const offloadItems = await db
             .select({ stockItemId: containerOffloadItems.stockItemId })
             .from(containerOffloadItems)
@@ -180,7 +230,10 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
 
           let stockItemIds: number[] = [...new Set(offloadItems.map((i) => i.stockItemId))];
           if (stockItemIds.length === 0) {
-             const pos = await storage.getPurchaseOrdersByContainerForCompany(containerId, req.session.currentCompanyId!);
+            const pos = await storage.getPurchaseOrdersByContainerForCompany(
+              containerId,
+              req.session.currentCompanyId!
+            );
             const idSet = new Set<number>();
             for (const po of pos) {
               const lineItems = await storage.getLineItemsByPO(po.id);
@@ -190,7 +243,6 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
             }
             stockItemIds = [...idSet];
           }
-
           if (stockItemIds.length === 0) return;
 
           const result = await applyInventoryRateDeltaAndSync(
@@ -199,7 +251,6 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
             stockItemIds,
             delta.toNumber()
           );
-
           if (result.updatedCount > 0 || delta.abs().greaterThan("0.001")) {
             logger.info("Sales item costs synced after container charge edit", {
               module: "containers",

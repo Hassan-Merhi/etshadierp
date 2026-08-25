@@ -13,6 +13,10 @@ import { requireAuth, requireRole, requireNonPOS } from "../../../auth";
 import { stockTransferVouchers, stockTransferItems, vouchers } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { adjustInventory } from "../../../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../../services/inventory/stockMovementIntegrityService";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerAdminRepairMiscRoutes(app: Express) {
   app.post("/api/vouchers/:id/finalize", requireAuth, requireNonPOS, async (req, res) => {
@@ -48,6 +52,7 @@ export function registerAdminRepairMiscRoutes(app: Express) {
               .from(stockTransferItems)
               .where(eq(stockTransferItems.transferId, transferRecord.id));
 
+            const occurredAt = new Date().toISOString();
             for (const item of items) {
               const srcId = item.sourceLocationId || transferRecord.sourceLocationId;
               const qty = parseFloat(item.quantity);
@@ -55,6 +60,31 @@ export function registerAdminRepairMiscRoutes(app: Express) {
               if (srcId && qty > 0) {
                 await adjustInventory(tx, srcId, item.stockItemId, -qty, companyId);
                 await adjustInventory(tx, transferRecord.destinationLocationId, item.stockItemId, qty, companyId, rate);
+                await postStockMovementTx(
+                  tx,
+                  {
+                    companyId,
+                    stockItemId: item.stockItemId,
+                    kind: "transfer",
+                    quantity: String(qty),
+                    unitCost: String(Math.max(rate || 0, 0)),
+                    fromLocationId: srcId,
+                    toLocationId: transferRecord.destinationLocationId,
+                    occurredAt,
+                    source: {
+                      sourceType: "voucher_finalize_stock_transfer",
+                      sourceId: String(voucherId),
+                      idempotencyKey: `voucher-finalize-transfer:${companyId}:${voucherId}:${item.id}`,
+                    },
+                    actor: {
+                      userId: req.session.userId,
+                      username: req.session.username,
+                      reason: `Finalize ${voucher.voucherNumber}`,
+                    },
+                    allowNegativeStock: true,
+                  },
+                  canonicalStockMovementAdapter
+                );
               }
             }
 

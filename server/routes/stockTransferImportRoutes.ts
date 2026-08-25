@@ -14,10 +14,14 @@ import { storage } from "../storage";
 import { requireAuth, requireNonPOS } from "../auth";
 import { upload } from "./_helpers";
 import { adjustInventory } from "../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../services/inventory/stockMovementIntegrityService";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, writeWorkbook } from "../excelHelper";
 import { getClientDate } from "../lib/dateUtils";
 import { sendTransferWhatsApp } from "../helpers/sendTransferWhatsApp";
 import { inventory, stockTransferVouchers, stockTransferItems, vouchers } from "@shared/schema";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerStockTransferImportRoutes(app: Express) {
   // ============= Stock Transfer Import Endpoints =============
@@ -278,19 +282,22 @@ export function registerStockTransferImportRoutes(app: Express) {
           const itemTotal = parseFloat(item.quantity) * parseFloat(item.rate);
 
           // Create stock transfer item
-          await tx.insert(stockTransferItems).values({
-            transferId: transferRecord.id,
-            stockItemId: item.stockItemId,
-            quantity: item.quantity,
-            rate: item.rate,
-            totalAmount: itemTotal.toString(),
-          });
+          const [transferItem] = await tx
+            .insert(stockTransferItems)
+            .values({
+              transferId: transferRecord.id,
+              stockItemId: item.stockItemId,
+              sourceLocationId,
+              quantity: item.quantity,
+              rate: item.rate,
+              totalAmount: itemTotal.toString(),
+            })
+            .returning({ id: stockTransferItems.id });
 
           // Reduce source inventory
           await adjustInventory(
             tx,
-            (item as unknown as { stockItemId: number; quantity: string; rate: string } & { sourceLocationId: number })
-              .sourceLocationId || sourceLocationId,
+            sourceLocationId,
             item.stockItemId,
             -parseFloat(item.quantity),
             req.session.currentCompanyId!
@@ -304,6 +311,32 @@ export function registerStockTransferImportRoutes(app: Express) {
             parseFloat(item.quantity),
             req.session.currentCompanyId!,
             parseFloat(item.rate)
+          );
+
+          await postStockMovementTx(
+            tx,
+            {
+              companyId: req.session.currentCompanyId!,
+              stockItemId: item.stockItemId,
+              kind: "transfer",
+              quantity: item.quantity,
+              unitCost: String(Math.max(parseFloat(item.rate) || 0, 0)),
+              fromLocationId: sourceLocationId,
+              toLocationId: destinationLocationId,
+              occurredAt: new Date(`${transferDate}T00:00:00.000Z`).toISOString(),
+              source: {
+                sourceType: "stock-transfer-import",
+                sourceId: String(voucher.id),
+                idempotencyKey: `stock-transfer-import:${voucher.id}:${transferItem.id}`,
+              },
+              actor: {
+                userId: req.session.userId,
+                username: req.session.username,
+                reason: notes || `Excel stock transfer ${voucherNumber}`,
+              },
+              allowNegativeStock: true,
+            },
+            canonicalStockMovementAdapter
           );
         }
       });
@@ -757,26 +790,50 @@ export function registerStockTransferImportRoutes(app: Express) {
           const itemTotal = qty * rate;
 
           // Create stock transfer item with individual sourceLocationId
-          await tx.insert(stockTransferItems).values({
-            transferId: transferRecord.id,
-            stockItemId: item.stockItemId,
-            sourceLocationId: item.sourceLocationId || sourceLocationId,
-            quantity: qty.toString(),
-            rate: rate.toString(),
-            totalAmount: itemTotal.toString(),
-          });
+          const [transferItem] = await tx
+            .insert(stockTransferItems)
+            .values({
+              transferId: transferRecord.id,
+              stockItemId: item.stockItemId,
+              sourceLocationId,
+              quantity: qty.toString(),
+              rate: rate.toString(),
+              totalAmount: itemTotal.toString(),
+            })
+            .returning({ id: stockTransferItems.id });
 
           // Reduce source inventory
-          await adjustInventory(
-            tx,
-            item.sourceLocationId || sourceLocationId,
-            item.stockItemId,
-            -qty,
-            req.session.currentCompanyId!
-          );
+          await adjustInventory(tx, sourceLocationId, item.stockItemId, -qty, req.session.currentCompanyId!);
 
           // Add to destination inventory
           await adjustInventory(tx, destinationLocationId, item.stockItemId, qty, req.session.currentCompanyId!, rate);
+
+          const movementDate = transferDate || getClientDate(req);
+          await postStockMovementTx(
+            tx,
+            {
+              companyId: req.session.currentCompanyId!,
+              stockItemId: item.stockItemId,
+              kind: "transfer",
+              quantity: String(qty),
+              unitCost: String(Math.max(rate || 0, 0)),
+              fromLocationId: sourceLocationId,
+              toLocationId: destinationLocationId,
+              occurredAt: new Date(`${movementDate}T00:00:00.000Z`).toISOString(),
+              source: {
+                sourceType: "stock-transfer-import-multi-source",
+                sourceId: String(voucher.id),
+                idempotencyKey: `stock-transfer-import-multi:${voucher.id}:${transferItem.id}`,
+              },
+              actor: {
+                userId: req.session.userId,
+                username: req.session.username,
+                reason: notes || `Multi-source stock transfer ${voucherNumber}`,
+              },
+              allowNegativeStock: true,
+            },
+            canonicalStockMovementAdapter
+          );
         }
       });
 

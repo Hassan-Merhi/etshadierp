@@ -4,6 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
+import { randomUUID } from "node:crypto";
 import type { Express } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -15,6 +16,10 @@ import { logAudit, buildItemLevelChanges } from "../../_helpers";
 import { stockTransferVouchers, stockTransferItems, vouchers } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { adjustInventory } from "../../../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../../services/inventory/stockMovementIntegrityService";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerVoucherTransferOnlyRoutes(app: Express) {
   app.patch("/api/vouchers/:id/transfer", requireAuth, requireNonPOS, async (req, res) => {
@@ -92,6 +97,8 @@ export function registerVoucherTransferOnlyRoutes(app: Express) {
       const _oldXfrItems = _preTransfer
         ? await db.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, _preTransfer.id))
         : [];
+      const editOperationId = randomUUID();
+      const occurredAt = new Date().toISOString();
 
       // Wrap the entire operation in a transaction for atomicity
       const { updatedVoucher: updated, transferItemsData: updatedTransferItemsData } = await db.transaction(
@@ -172,6 +179,32 @@ export function registerVoucherTransferOnlyRoutes(app: Express) {
               -quantity,
               existingVoucher.companyId!
             );
+
+            await postStockMovementTx(
+              tx,
+              {
+                companyId: existingVoucher.companyId!,
+                stockItemId: oldItem.stockItemId,
+                kind: "transfer",
+                quantity: String(quantity),
+                unitCost: String(Math.max(rate || 0, 0)),
+                fromLocationId: oldDestinationLocationId,
+                toLocationId: oldSourceLocationId,
+                occurredAt,
+                source: {
+                  sourceType: "voucher_stock_transfer_edit_reverse",
+                  sourceId: String(id),
+                  idempotencyKey: `voucher-transfer-edit:reverse:${existingVoucher.companyId}:${id}:${oldItem.id}`,
+                },
+                actor: {
+                  userId: req.session.userId,
+                  username: req.session.username,
+                  reason: `Edit stock transfer ${existingVoucher.voucherNumber}`,
+                },
+                allowNegativeStock: true,
+              },
+              canonicalStockMovementAdapter
+            );
           }
 
           // STEP 2: Delete existing transfer items
@@ -181,7 +214,8 @@ export function registerVoucherTransferOnlyRoutes(app: Express) {
           const newSourceLocationId = parseInt(sourceLocationId);
           const newDestinationLocationId = parseInt(destinationLocationId);
 
-          for (const newItem of transferItemsData) {
+          for (let index = 0; index < transferItemsData.length; index++) {
+            const newItem = transferItemsData[index];
             const quantity = parseFloat(newItem.quantity);
             const rate = parseFloat(newItem.rate);
 
@@ -196,6 +230,32 @@ export function registerVoucherTransferOnlyRoutes(app: Express) {
               quantity,
               existingVoucher.companyId,
               rate
+            );
+
+            await postStockMovementTx(
+              tx,
+              {
+                companyId: existingVoucher.companyId!,
+                stockItemId: newItem.stockItemId,
+                kind: "transfer",
+                quantity: String(quantity),
+                unitCost: String(Math.max(rate || 0, 0)),
+                fromLocationId: newSourceLocationId,
+                toLocationId: newDestinationLocationId,
+                occurredAt,
+                source: {
+                  sourceType: "voucher_stock_transfer_edit_apply",
+                  sourceId: String(id),
+                  idempotencyKey: `voucher-transfer-edit:apply:${existingVoucher.companyId}:${id}:${editOperationId}:${index}`,
+                },
+                actor: {
+                  userId: req.session.userId,
+                  username: req.session.username,
+                  reason: `Edit stock transfer ${existingVoucher.voucherNumber}`,
+                },
+                allowNegativeStock: true,
+              },
+              canonicalStockMovementAdapter
             );
           }
 
