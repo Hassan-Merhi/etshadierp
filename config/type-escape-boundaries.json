@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "One-way ratchet on type escapes, counted from the TypeScript AST by scripts/audit-type-escapes.mjs. Every file carrying escapes is frozen at its current count in scan.baseline as [explicitAny, asAny, suppressions]: counts may fall freely, any increase fails, and a file with no entry must introduce none. totals.typeEscapeCeiling is the backlog as a single number and may only fall. Lower a baseline in the same change that removes the escapes \u2014 leaving headroom lets it refill silently. Phase 2.3 (API / service boundary typing) rebuilt the baseline at its earned value: the route, POS, report-shard, raw-SQL, migration and injected db/tx/pool boundaries now carry named contracts, and the ceiling falls from 2208 to 1775.",
+  "description": "One-way ratchet on type escapes, counted from the TypeScript AST by scripts/audit-type-escapes.mjs. Every file carrying escapes is frozen at its current count in scan.baseline as [explicitAny, asAny, suppressions]: counts may fall freely, any increase fails, and a file with no entry must introduce none. totals.typeEscapeCeiling is the backlog as a single number and may only fall. Lower a baseline in the same change that removes the escapes — leaving headroom lets it refill silently. Phase 2.3 (API / service boundary typing) rebuilt the baseline at its earned value: the route, POS, report-shard, raw-SQL, migration and injected db/tx/pool boundaries now carry named contracts, and the ceiling falls from 2208 to 1775.",
   "scan": {
     "roots": [
       "server",
@@ -290,7 +290,7 @@
         0
       ],
       "client/src/pages/SpreadsheetEditor.tsx": [
-        15,
+        13,
         0,
         0
       ],
@@ -1915,7 +1915,7 @@
         0
       ],
       "server/routes/chatbotPoImportRoutes.ts": [
-        3,
+        2,
         0,
         0
       ],
@@ -3187,6 +3187,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 1774
+    "typeEscapeCeiling": 1771
   }
 }
