@@ -14,14 +14,27 @@ import { labelAssetExtractionPlugin } from "./build/viteLabelAssetExtractionPlug
 // build regardless of the NODE_ENV the surrounding job happens to export. CI
 // runs the whole job under NODE_ENV=test; without this, Vite kept that value,
 // built the client in development mode — unminified, dev React — and the build
-// exceeded the heap ceiling before it could finish. Set before defineConfig so
-// the value is in place when Vite resolves `isProduction`.
-if (process.env.NODE_ENV !== "production") {
-  process.env.NODE_ENV = "production";
-}
+// exceeded the heap ceiling before it could finish.
+//
+// This has to be a build-only plugin rather than a module-level assignment.
+// server/index.ts imports server/vite.ts, which imports this file, so anything
+// this module does on evaluation also happens to the dev server: pinning
+// NODE_ENV there would make `app.get("env")` production, skip the Vite
+// middleware branch, and serve dist/public — a stale build, or none at all.
+// `apply: "build"` scopes it to the build, and the config hook runs before Vite
+// resolves `isProduction`, which is the value that decides dev versus
+// production React.
+const productionNodeEnvPlugin = {
+  name: "pin-production-node-env",
+  apply: "build" as const,
+  config() {
+    process.env.NODE_ENV = "production";
+  },
+};
 
 export default defineConfig({
   plugins: [
+    productionNodeEnvPlugin,
     heavyListPaginationPlugin(),
     // The Phase 3 Sales Report bandwidth transform rewrites the working legacy
     // report at build time. Keep the transform available for controlled testing,
