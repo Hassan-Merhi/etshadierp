@@ -1,19 +1,26 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { Account, Transaction } from "./accountTypes";
+
+export interface AccountStatementRow extends Transaction {
+  totalDebit: number;
+  totalCredit: number;
+  runningBalance: number;
+}
 
 export interface AccountTransactionRowsProps {
-  vouchersWithBalance: any[];
+  vouchersWithBalance: AccountStatementRow[];
   selectedVoucherIds: Set<number>;
   toggleSelectAll: () => void;
   toggleVoucherSelection: (id: number) => void;
-  handleOpenVoucher: (v: unknown) => void;
+  handleOpenVoucher: (v: AccountStatementRow) => void;
   formatAmount: (amt: number) => string;
   formatTransactionAmount?: (amt: number | string, currency: string) => string;
   hideBalances: boolean;
   appMode: string;
   openingBalance: number;
   closingBalance: number;
-  selectedAccount: any;
+  selectedAccount: Account;
   formatDisplayDate: (date: Date | string) => string;
 }
 
@@ -35,7 +42,7 @@ export function AccountTransactionRows({
   const colSpanMid = appMode === "factory" ? 3 : 2;
   const totalDebit = vouchersWithBalance.reduce((s, v) => s + (v.totalDebit || 0), 0);
   const totalCredit = vouchersWithBalance.reduce((s, v) => s + (v.totalCredit || 0), 0);
-  const isSupplier = selectedAccount?.type === "supplier";
+  const isSupplier = selectedAccount.type === "supplier";
 
   const balSide = (val: number) => (val >= 0 ? "Dr" : "Cr");
 
