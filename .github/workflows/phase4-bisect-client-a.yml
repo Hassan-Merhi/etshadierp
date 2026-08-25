@@ -28,6 +28,14 @@ jobs:
       - run: npm ci
       - name: Bisect compiler-safe client candidates
         run: node scripts/phase4-bisect-inference.mjs
+      - name: Restore cross-file-sensitive controllers
+        run: |
+          git checkout -- \
+            client/src/pages/bales/useBales.ts \
+            client/src/pages/factory/baleshistory/useBalesHistoryModel.tsx \
+            client/src/pages/factory/factorypos/useFactoryPosModel.ts \
+            client/src/pages/location-inventory/useLocationInventoryState.ts \
+            client/src/pages/settings/datatoolstab/useDataToolsModel.ts
       - name: Certify source tree
         run: |
           npm run check
