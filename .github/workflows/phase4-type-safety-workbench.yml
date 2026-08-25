@@ -9,7 +9,7 @@ permissions:
 
 concurrency:
   group: phase4-type-safety-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   infer:
@@ -99,4 +99,4 @@ jobs:
           git commit -m "refactor: apply Phase 4 compiler-safe type inference"
           git push origin HEAD:phase-4-remaining-type-safety
 
-# Workbench trigger revision 1
+# Workbench trigger revision 2
