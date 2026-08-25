@@ -112,17 +112,8 @@ function applyEdits(original, edits) {
   return text;
 }
 
-const initialProgram = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options });
-const initialDiagnostics = ts.getPreEmitDiagnostics(initialProgram);
-if (initialDiagnostics.length > 0) {
-  const first = initialDiagnostics[0];
-  const where = first.file ? `${normalize(first.file.fileName)}:${first.start ?? 0}` : "project";
-  throw new Error(
-    `Phase 4 workbench requires a clean TypeScript baseline; found ${initialDiagnostics.length} diagnostic(s), first at ${where}: ` +
-      ts.flattenDiagnosticMessageText(first.messageText, "\n"),
-  );
-}
-const checker = initialProgram.getTypeChecker();
+let inferenceProgram = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options });
+let checker = inferenceProgram.getTypeChecker();
 
 function collectCandidates(sourceFile) {
   const candidates = [];
@@ -218,7 +209,7 @@ for (const file of candidateFiles) {
   const original = fs.readFileSync(file, "utf8");
   if (!/\bany\b/.test(original)) continue;
   filesContainingAnyText += 1;
-  const sourceFile = initialProgram.getSourceFile(file);
+  const sourceFile = inferenceProgram.getSourceFile(file);
   if (!sourceFile) continue;
   const candidates = collectCandidates(sourceFile);
   if (candidates.length === 0) continue;
@@ -229,32 +220,47 @@ for (const file of candidateFiles) {
   fs.writeFileSync(file, edited);
 }
 
-function projectDiagnostics() {
+// Candidate collection is finished. Drop the original compiler graph before
+// constructing a second whole-project program for certification; retaining two
+// complete graphs is enough to exhaust the runner heap on this repository.
+checker = null;
+inferenceProgram = null;
+if (typeof global.gc === "function") global.gc();
+
+function projectDiagnosticSummaries() {
   const program = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options });
-  return ts.getPreEmitDiagnostics(program);
+  const diagnostics = ts.getPreEmitDiagnostics(program);
+  return diagnostics.map((diagnostic) => ({
+    fileName: diagnostic.file?.fileName ?? null,
+    start: diagnostic.start ?? null,
+    message: ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
+  }));
 }
 
 let round = 0;
+let certified = false;
 while (editsByFile.size > 0) {
   round += 1;
-  const diagnostics = projectDiagnostics();
-  if (diagnostics.length === 0) break;
+  const diagnostics = projectDiagnosticSummaries();
+  if (diagnostics.length === 0) {
+    certified = true;
+    break;
+  }
 
   const rejected = new Set();
   const unowned = [];
   for (const diagnostic of diagnostics) {
-    const file = diagnostic.file?.fileName;
-    if (file && editsByFile.has(file)) rejected.add(file);
+    if (diagnostic.fileName && editsByFile.has(diagnostic.fileName)) rejected.add(diagnostic.fileName);
     else unowned.push(diagnostic);
   }
 
   if (rejected.size === 0) {
     for (const [file, original] of originals) fs.writeFileSync(file, original);
     const first = unowned[0] ?? diagnostics[0];
-    const where = first.file ? `${normalize(first.file.fileName)}:${first.start ?? 0}` : "project";
+    const where = first.fileName ? `${normalize(first.fileName)}:${first.start ?? 0}` : "project";
     throw new Error(
       `Bulk Phase 4 edits caused ${diagnostics.length} diagnostic(s) outside edited files; restored the entire pass. ` +
-        `First diagnostic at ${where}: ${ts.flattenDiagnosticMessageText(first.messageText, "\n")}`,
+        `First diagnostic at ${where}: ${first.message}`,
     );
   }
 
@@ -265,14 +271,14 @@ while (editsByFile.size > 0) {
     fs.writeFileSync(file, originals.get(file));
     editsByFile.delete(file);
   }
-
+  if (typeof global.gc === "function") global.gc();
   if (round > 20) throw new Error("Phase 4 compiler-recovery loop exceeded 20 rounds");
 }
 
-const finalDiagnostics = projectDiagnostics();
-if (finalDiagnostics.length > 0) {
-  throw new Error(`Phase 4 inference pass ended with ${finalDiagnostics.length} TypeScript diagnostic(s)`);
+if (editsByFile.size === 0) {
+  certified = true;
 }
+if (!certified) throw new Error("Phase 4 inference pass did not reach a compiler-clean state");
 
 const byKind = new Map();
 let kept = 0;
