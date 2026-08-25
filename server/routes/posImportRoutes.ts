@@ -17,6 +17,8 @@ import { storage } from "../storage";
 import { requireAuth } from "../auth";
 import { upload } from "./_helpers";
 import { adjustInventory } from "../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../services/inventory/stockMovementIntegrityService";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, writeWorkbook } from "../excelHelper";
 import { getClientDate } from "../lib/dateUtils";
 import { generateInvoicePdf } from "../helpers/generateInvoicePdf";
@@ -24,6 +26,8 @@ import { generateStockPdf } from "../helpers/generateStockPdf";
 import { getErpExportVisibility } from "../helpers/exportVisibility";
 import { sendWhatsAppFileByUploadPos, sendWhatsAppFileToChatIdPos } from "../services/whatsappService";
 import { vouchers, voucherEntries, salesItems, companies, inventory, stockItemLocationPrices } from "@shared/schema";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerPosImportRoutes(app: Express) {
   app.post("/api/pos-import/parse", requireAuth, upload.single("file"), async (req, res) => {
@@ -226,17 +230,20 @@ export function registerPosImportRoutes(app: Express) {
             .limit(1);
           const configuredPrice = toInventoryDecimal(locationPrice?.sellingPrice || stockItem.sellingPrice);
 
-          await tx.insert(salesItems).values({
-            voucherId: voucher.id,
-            stockItemId: stockItem.id,
-            quantity: inventoryQuantity(quantity),
-            sellingPrice: inventoryMoney(sellingPrice),
-            costPrice: inventoryUnitCost(costPrice),
-            totalSales: inventoryMoney(itemSales),
-            totalCost: inventoryMoney(itemCost),
-            profit: inventoryMoney(profit),
-            configuredPrice: configuredPrice.isPositive() ? inventoryUnitCost(configuredPrice) : null,
-          });
+          const [saleItem] = await tx
+            .insert(salesItems)
+            .values({
+              voucherId: voucher.id,
+              stockItemId: stockItem.id,
+              quantity: inventoryQuantity(quantity),
+              sellingPrice: inventoryMoney(sellingPrice),
+              costPrice: inventoryUnitCost(costPrice),
+              totalSales: inventoryMoney(itemSales),
+              totalCost: inventoryMoney(itemCost),
+              profit: inventoryMoney(profit),
+              configuredPrice: configuredPrice.isPositive() ? inventoryUnitCost(configuredPrice) : null,
+            })
+            .returning({ id: salesItems.id });
 
           await adjustInventory(
             tx,
@@ -244,6 +251,30 @@ export function registerPosImportRoutes(app: Express) {
             stockItem.id,
             quantity.negated().toNumber(),
             req.session.currentCompanyId!
+          );
+          await postStockMovementTx(
+            tx,
+            {
+              companyId: req.session.currentCompanyId!,
+              stockItemId: stockItem.id,
+              kind: "issue",
+              quantity: inventoryQuantity(quantity.abs()),
+              unitCost: inventoryUnitCost(costPrice.abs()),
+              fromLocationId: locationId,
+              occurredAt: new Date(`${saleDate}T00:00:00.000Z`).toISOString(),
+              source: {
+                sourceType: "pos-import",
+                sourceId: String(voucher.id),
+                idempotencyKey: `pos-import:${voucher.id}:${saleItem.id}`,
+              },
+              actor: {
+                userId: req.session.userId,
+                username: req.session.username,
+                reason: `POS import ${voucherNumber}`,
+              },
+              allowNegativeStock: true,
+            },
+            canonicalStockMovementAdapter
           );
         }
 
