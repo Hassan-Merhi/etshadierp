@@ -1,13 +1,18 @@
+import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { companies, inventory } from "@shared/schema";
 
 import { db } from "../../db";
 import { adjustInventory } from "../../inventoryHelper";
 import { getErrorMessage } from "../../lib/httpHandlers";
+import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
 import { storage } from "../../storage";
 import { logAudit } from "../_helpers";
 import { InventoryRouteError } from "./inventoryErrors";
 import type { InventoryAuditActor, QuickAdjustmentInput } from "./inventoryRequestContext";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export async function quickAdjustInventory(
   companyId: number,
@@ -69,6 +74,26 @@ export async function quickAdjustInventory(
         input.stockItemId,
         adjustedQuantity,
         companyId,
+      );
+      const operationId = randomUUID();
+      await postStockMovementTx(
+        tx,
+        {
+          companyId,
+          stockItemId: input.stockItemId,
+          kind: "adjustment",
+          quantity: String(input.quantity),
+          unitCost: String(adjustment.averageRate),
+          fromLocationId: input.type === "subtract" ? input.locationId : undefined,
+          toLocationId: input.type === "add" ? input.locationId : undefined,
+          occurredAt: new Date().toISOString(),
+          source: {
+            sourceType: "inventory_quick_adjustment",
+            sourceId: operationId,
+            idempotencyKey: `inventory-quick-adjust:${companyId}:${operationId}`,
+          },
+        },
+        canonicalStockMovementAdapter,
       );
       return {
         currentQuantity: adjustment.previousQuantity,
