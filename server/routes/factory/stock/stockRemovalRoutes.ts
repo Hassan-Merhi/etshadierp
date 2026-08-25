@@ -14,7 +14,7 @@ import { adjustInventory } from "../../../inventoryHelper";
 import { createDatabaseStockMovementAdapter } from "../../../services/inventory/databaseStockMovementAdapter";
 import { postStockMovementTx } from "../../../services/inventory/stockMovementIntegrityService";
 import { writeDaybookEntry, verifySupervisorPassword } from "../_helpers";
-import { factoryBaleProducts, factoryBales, stockItems, users, userCompanyRoles } from "@shared/schema";
+import { factoryBaleProducts, factoryBales, inventory, stockItems, users, userCompanyRoles } from "@shared/schema";
 import { eq, and, inArray } from "drizzle-orm";
 
 const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
@@ -110,7 +110,21 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
               }
 
               if (erpStockItemId) {
-                const adjustment = await adjustInventory(tx, bale.erpLocationId!, erpStockItemId, -1, companyId);
+                const [inventoryBefore] = await tx
+                  .select({ averageRate: inventory.averageRate })
+                  .from(inventory)
+                  .where(
+                    and(
+                      eq(inventory.companyId, companyId),
+                      eq(inventory.locationId, bale.erpLocationId),
+                      eq(inventory.stockItemId, erpStockItemId)
+                    )
+                  )
+                  .limit(1);
+                const preAdjustmentRate = Number.parseFloat(inventoryBefore?.averageRate || "0");
+                const movementUnitCost = Number.isFinite(preAdjustmentRate) ? Math.max(preAdjustmentRate, 0) : 0;
+
+                await adjustInventory(tx, bale.erpLocationId!, erpStockItemId, -1, companyId);
                 await postStockMovementTx(
                   tx,
                   {
@@ -118,7 +132,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
                     stockItemId: erpStockItemId,
                     kind: "adjustment",
                     quantity: "1",
-                    unitCost: String(adjustment.averageRate),
+                    unitCost: String(movementUnitCost),
                     fromLocationId: bale.erpLocationId,
                     occurredAt: now.toISOString(),
                     source: {
@@ -244,7 +258,21 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
             productName: factoryProduct?.name || factoryProduct?.articleCode || "Unknown",
           });
           if (erpStockItemId) {
-            const adjustment = await adjustInventory(tx, bale.erpLocationId!, erpStockItemId, -1, companyId);
+            const [inventoryBefore] = await tx
+              .select({ averageRate: inventory.averageRate })
+              .from(inventory)
+              .where(
+                and(
+                  eq(inventory.companyId, companyId),
+                  eq(inventory.locationId, bale.erpLocationId!),
+                  eq(inventory.stockItemId, erpStockItemId)
+                )
+              )
+              .limit(1);
+            const preAdjustmentRate = Number.parseFloat(inventoryBefore?.averageRate || "0");
+            const movementUnitCost = Number.isFinite(preAdjustmentRate) ? Math.max(preAdjustmentRate, 0) : 0;
+
+            await adjustInventory(tx, bale.erpLocationId!, erpStockItemId, -1, companyId);
             await postStockMovementTx(
               tx,
               {
@@ -252,7 +280,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
                 stockItemId: erpStockItemId,
                 kind: "adjustment",
                 quantity: "1",
-                unitCost: String(adjustment.averageRate),
+                unitCost: String(movementUnitCost),
                 fromLocationId: bale.erpLocationId,
                 occurredAt: now.toISOString(),
                 source: {
