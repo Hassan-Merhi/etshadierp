@@ -11,43 +11,14 @@ if (rawConfig.error) {
   throw new Error(ts.flattenDiagnosticMessageText(rawConfig.error.messageText, "\n"));
 }
 const parsed = ts.parseJsonConfigFileContent(rawConfig.config, ts.sys, path.dirname(configFile));
-
+const normalize = (file) => path.relative(root, file).split(path.sep).join("/");
 const candidateFiles = parsed.fileNames.filter((file) => {
-  const rel = path.relative(root, file).split(path.sep).join("/");
+  const rel = normalize(file);
   return (
     !rel.endsWith(".d.ts") &&
     (rel.startsWith("server/") || rel.startsWith("client/src/") || rel.startsWith("shared/"))
   );
 });
-
-const versions = new Map(parsed.fileNames.map((file) => [file, 0]));
-const overrides = new Map();
-const host = {
-  getScriptFileNames: () => parsed.fileNames,
-  getScriptVersion: (file) => String(versions.get(file) ?? 0),
-  getScriptSnapshot: (file) => {
-    const text = overrides.has(file) ? overrides.get(file) : ts.sys.readFile(file);
-    return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text);
-  },
-  getCurrentDirectory: () => root,
-  getCompilationSettings: () => parsed.options,
-  getDefaultLibFileName: (options) => ts.getDefaultLibFilePath(options),
-  fileExists: ts.sys.fileExists,
-  readFile: ts.sys.readFile,
-  readDirectory: ts.sys.readDirectory,
-  directoryExists: ts.sys.directoryExists,
-  getDirectories: ts.sys.getDirectories,
-};
-const service = ts.createLanguageService(host, ts.createDocumentRegistry());
-
-function setText(file, text) {
-  overrides.set(file, text);
-  versions.set(file, (versions.get(file) ?? 0) + 1);
-}
-
-function diagnosticsClean(file) {
-  return service.getSyntacticDiagnostics(file).length === 0 && service.getSemanticDiagnostics(file).length === 0;
-}
 
 function hasExportModifier(node) {
   return Boolean(
@@ -88,26 +59,18 @@ function isExportedSurface(node) {
   return false;
 }
 
-function isAnyKeyword(node) {
-  return node?.kind === ts.SyntaxKind.AnyKeyword;
-}
-
-function isAnyArrayType(node) {
-  return Boolean(ts.isArrayTypeNode(node) && isAnyKeyword(node.elementType));
-}
-
-function isArrayOfAnyReference(node) {
-  return Boolean(
+const isAnyKeyword = (node) => node?.kind === ts.SyntaxKind.AnyKeyword;
+const isAnyArrayType = (node) => Boolean(ts.isArrayTypeNode(node) && isAnyKeyword(node.elementType));
+const isArrayOfAnyReference = (node) =>
+  Boolean(
     ts.isTypeReferenceNode(node) &&
       ts.isIdentifier(node.typeName) &&
       node.typeName.text === "Array" &&
       node.typeArguments?.length === 1 &&
       isAnyKeyword(node.typeArguments[0]),
   );
-}
-
-function isPromiseOfAny(node) {
-  return Boolean(
+const isPromiseOfAny = (node) =>
+  Boolean(
     ts.isTypeReferenceNode(node) &&
       ts.isIdentifier(node.typeName) &&
       node.typeName.text === "Promise" &&
@@ -116,17 +79,12 @@ function isPromiseOfAny(node) {
         isAnyArrayType(node.typeArguments[0]) ||
         isArrayOfAnyReference(node.typeArguments[0])),
   );
-}
-
-function isDirectInferableAnyType(node) {
-  return isAnyKeyword(node) || isAnyArrayType(node) || isArrayOfAnyReference(node);
-}
+const isDirectInferableAnyType = (node) =>
+  isAnyKeyword(node) || isAnyArrayType(node) || isArrayOfAnyReference(node);
 
 function typeIsUseful(checker, node) {
   const type = checker.getTypeAtLocation(node);
-  if (type.flags & ts.TypeFlags.Any) return false;
-  if (type.flags & ts.TypeFlags.Unknown) return false;
-  return true;
+  return !(type.flags & ts.TypeFlags.Any) && !(type.flags & ts.TypeFlags.Unknown);
 }
 
 function annotationStart(declaration) {
@@ -154,18 +112,24 @@ function applyEdits(original, edits) {
   return text;
 }
 
-function collectCandidates(file) {
-  const program = service.getProgram();
-  const sourceFile = program?.getSourceFile(file);
-  if (!program || !sourceFile) return [];
-  const checker = program.getTypeChecker();
+const initialProgram = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options });
+const initialDiagnostics = ts.getPreEmitDiagnostics(initialProgram);
+if (initialDiagnostics.length > 0) {
+  const first = initialDiagnostics[0];
+  const where = first.file ? `${normalize(first.file.fileName)}:${first.start ?? 0}` : "project";
+  throw new Error(
+    `Phase 4 workbench requires a clean TypeScript baseline; found ${initialDiagnostics.length} diagnostic(s), first at ${where}: ` +
+      ts.flattenDiagnosticMessageText(first.messageText, "\n"),
+  );
+}
+const checker = initialProgram.getTypeChecker();
+
+function collectCandidates(sourceFile) {
   const candidates = [];
   let id = 0;
-
-  function add(start, end, replacement, kind) {
-    if (start >= end) return;
-    candidates.push({ id: id++, start, end, replacement, kind });
-  }
+  const add = (start, end, replacement, kind) => {
+    if (start < end) candidates.push({ id: id++, start, end, replacement, kind });
+  };
 
   function visit(node) {
     if (ts.isAsExpression(node)) {
@@ -214,10 +178,8 @@ function collectCandidates(file) {
       !isExportedClassMember(node)
     ) {
       const start = returnTypeStart(node);
-      if (start !== null) {
-        add(start, node.type.end, "", "infer-return-type");
-        return;
-      }
+      if (start !== null) add(start, node.type.end, "", "infer-return-type");
+      return;
     }
 
     if (
@@ -240,7 +202,6 @@ function collectCandidates(file) {
 
   visit(sourceFile);
   candidates.sort((a, b) => a.start - b.start || b.end - a.end);
-
   const filtered = [];
   for (const candidate of candidates) {
     if (filtered.some((kept) => candidate.start < kept.end && candidate.end > kept.start)) continue;
@@ -249,70 +210,83 @@ function collectCandidates(file) {
   return filtered;
 }
 
-let kept = 0;
-let touchedFiles = 0;
-const byKind = new Map();
-const touched = [];
+const originals = new Map();
+const editsByFile = new Map();
 let filesContainingAnyText = 0;
 
 for (const file of candidateFiles) {
   const original = fs.readFileSync(file, "utf8");
-  // Avoid constructing semantic diagnostics for the thousands of files that
-  // cannot possibly contain an AnyKeyword. The full npm typecheck still runs
-  // after all accepted edits, so this is only a workbench speed optimization.
   if (!/\bany\b/.test(original)) continue;
   filesContainingAnyText += 1;
-
-  setText(file, original);
-  if (!diagnosticsClean(file)) continue;
-
-  const candidates = collectCandidates(file);
+  const sourceFile = initialProgram.getSourceFile(file);
+  if (!sourceFile) continue;
+  const candidates = collectCandidates(sourceFile);
   if (candidates.length === 0) continue;
+  const edited = applyEdits(original, candidates);
+  if (edited === original) continue;
+  originals.set(file, original);
+  editsByFile.set(file, candidates);
+  fs.writeFileSync(file, edited);
+}
 
-  const accepted = [];
-  const trySet = (extra) => {
-    const text = applyEdits(original, [...accepted, ...extra]);
-    setText(file, text);
-    return diagnosticsClean(file);
-  };
+function projectDiagnostics() {
+  const program = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options });
+  return ts.getPreEmitDiagnostics(program);
+}
 
-  const acceptChunk = (chunk) => {
-    if (chunk.length === 0) return;
-    if (trySet(chunk)) {
-      accepted.push(...chunk);
-      return;
-    }
-    setText(file, applyEdits(original, accepted));
-    if (chunk.length === 1) return;
-    const middle = Math.floor(chunk.length / 2);
-    acceptChunk(chunk.slice(0, middle));
-    acceptChunk(chunk.slice(middle));
-  };
+let round = 0;
+while (editsByFile.size > 0) {
+  round += 1;
+  const diagnostics = projectDiagnostics();
+  if (diagnostics.length === 0) break;
 
-  acceptChunk(candidates);
-  const finalText = applyEdits(original, accepted);
-  setText(file, finalText);
-
-  if (accepted.length > 0 && finalText !== original) {
-    fs.writeFileSync(file, finalText);
-    const relative = path.relative(root, file).split(path.sep).join("/");
-    touched.push(relative);
-    touchedFiles += 1;
-    kept += accepted.length;
-    for (const edit of accepted) {
-      byKind.set(edit.kind, (byKind.get(edit.kind) ?? 0) + 1);
-    }
+  const rejected = new Set();
+  const unowned = [];
+  for (const diagnostic of diagnostics) {
+    const file = diagnostic.file?.fileName;
+    if (file && editsByFile.has(file)) rejected.add(file);
+    else unowned.push(diagnostic);
   }
+
+  if (rejected.size === 0) {
+    for (const [file, original] of originals) fs.writeFileSync(file, original);
+    const first = unowned[0] ?? diagnostics[0];
+    const where = first.file ? `${normalize(first.file.fileName)}:${first.start ?? 0}` : "project";
+    throw new Error(
+      `Bulk Phase 4 edits caused ${diagnostics.length} diagnostic(s) outside edited files; restored the entire pass. ` +
+        `First diagnostic at ${where}: ${ts.flattenDiagnosticMessageText(first.messageText, "\n")}`,
+    );
+  }
+
+  console.log(
+    `Compiler rejection round ${round}: restoring ${rejected.size} edited file(s) responsible for ${diagnostics.length} diagnostic(s).`,
+  );
+  for (const file of rejected) {
+    fs.writeFileSync(file, originals.get(file));
+    editsByFile.delete(file);
+  }
+
+  if (round > 20) throw new Error("Phase 4 compiler-recovery loop exceeded 20 rounds");
+}
+
+const finalDiagnostics = projectDiagnostics();
+if (finalDiagnostics.length > 0) {
+  throw new Error(`Phase 4 inference pass ended with ${finalDiagnostics.length} TypeScript diagnostic(s)`);
+}
+
+const byKind = new Map();
+let kept = 0;
+for (const edits of editsByFile.values()) {
+  kept += edits.length;
+  for (const edit of edits) byKind.set(edit.kind, (byKind.get(edit.kind) ?? 0) + 1);
 }
 
 console.log(
-  `Phase 4 inference pass kept ${kept} edits across ${touchedFiles} files ` +
-    `(${filesContainingAnyText} files contained the token any).`,
+  `Phase 4 bulk inference kept ${kept} edits across ${editsByFile.size} files ` +
+    `(${filesContainingAnyText} files contained the token any; ${originals.size - editsByFile.size} edited files were restored by compiler proof).`,
 );
-for (const [kind, count] of [...byKind.entries()].sort()) {
-  console.log(`  ${kind}: ${count}`);
-}
-if (touched.length > 0) {
+for (const [kind, count] of [...byKind.entries()].sort()) console.log(`  ${kind}: ${count}`);
+if (editsByFile.size > 0) {
   console.log("Touched files:");
-  for (const file of touched) console.log(`  ${file}`);
+  for (const file of [...editsByFile.keys()].sort()) console.log(`  ${normalize(file)}`);
 }
