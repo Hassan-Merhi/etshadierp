@@ -120,12 +120,14 @@ describe("write evidence ratchet", () => {
 
   it("says why each stock category is not a defect, or that it is", () => {
     for (const [category, group] of Object.entries(baseline.stockWritesWithoutJournalEvidence.reviewed)) {
-      expect(group.files.length, `${category} classifies no files`).toBeGreaterThan(0);
+      if (category !== "unjournalled") {
+        expect(group.files.length, `${category} classifies no files`).toBeGreaterThan(0);
+      }
       expect(group.reason.length, `${category} has no stated reason`).toBeGreaterThan(120);
     }
 
     expect(Object.keys(baseline.stockWritesWithoutJournalEvidence.reviewed)).toContain("unjournalled");
-    expect(baseline.stockWritesWithoutJournalEvidence.reviewed.unjournalled.files.length).toBeGreaterThan(0);
+    expect(baseline.stockWritesWithoutJournalEvidence.reviewed.unjournalled.files).toEqual([]);
   });
 
   it("keeps only the exact 15 reviewed compatibility writers in the active voucher backlog", () => {
