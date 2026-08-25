@@ -30,12 +30,31 @@ import { buildAllocationsForPayment, findEarliestOutstandingMonth } from "./rent
 
 export { buildAllocationsForPayment, findEarliestOutstandingMonth } from "./rentalPaymentAllocationService";
 
+/** The rental contract fields this posting flow reads. */
+export type RentalContractRef = {
+  id: number;
+  companyId: number;
+  unitId: number;
+  rentalAmount: string;
+  startDate: string;
+};
+
+/** The rental unit fields this posting flow reads. */
+export type RentalUnitRef = {
+  unitNumber: string;
+  unitType: string | null;
+  locationGroup: string | null;
+};
+
+/** A posting failure that carries the HTTP status the route should return. */
+type RentalPostingError = Error & { status?: number };
+
 export interface RentalPaymentGroupOptions {
   companyId: number;
   contractCompanyId: number;
   module: RentalModule;
-  contract: any;
-  unit: any | null;
+  contract: RentalContractRef;
+  unit: RentalUnitRef | null;
   cashAccountId: number | null;
   amount: string;
   paymentDate: string;
@@ -71,8 +90,8 @@ async function postGroupCore(
   opts: {
     companyId: number;
     module: RentalModule;
-    contract: any;
-    unit: any | null;
+    contract: RentalContractRef;
+    unit: RentalUnitRef | null;
     cashAccountId: number | null;
     allocs: Array<{
       forYear: number;
@@ -460,7 +479,7 @@ export async function createRentalPaymentGroup(opts: RentalPaymentGroupOptions) 
   } = opts;
 
   if (paymentDate > clientDate && !scheduleFuturePayment) {
-    const err: any = new Error("Future payment dates require Schedule future payment.");
+    const err: RentalPostingError = new Error("Future payment dates require Schedule future payment.");
     err.status = 400;
     throw err;
   }
@@ -653,8 +672,8 @@ async function postScheduledGroup(
   companyId: number,
   contractCompanyId: number,
   module: RentalModule,
-  contract: any,
-  unit: any | null,
+  contract: RentalContractRef,
+  unit: RentalUnitRef | null,
   groupId: string,
   paymentDate: string,
   asOfDate: string,
