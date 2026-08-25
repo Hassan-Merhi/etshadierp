@@ -184,7 +184,7 @@ export async function getStockSummary(companyId: number): Promise<{
   const lowStockItems = inventory
     .filter((item) => parseFloat(item.quantity) < lowStockThreshold && parseFloat(item.quantity) > 0)
     .map((item) => ({
-      name: item.stockItemName,
+      name: item.stockItemName ?? "Unknown",
       stock: parseFloat(item.quantity),
       location: item.locationName || "Unknown",
     }))

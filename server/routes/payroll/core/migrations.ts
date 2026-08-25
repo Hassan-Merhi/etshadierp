@@ -13,6 +13,50 @@ import { sql, inArray } from "drizzle-orm";
 import { ledgerAccounts, vouchers, voucherEntries } from "@shared/schema";
 import { findOrCreateLedger, getFactoryCompanyId, normUsd } from "./_helpers";
 
+/** A PAYROLL-GEN voucher row this migration rewrites, joined to its DR entry. */
+type PayrollGenVoucherRow = {
+  id: number;
+  voucher_date: string;
+  description: string | null;
+  entry_id?: number;
+  debit_amount?: string;
+};
+
+/** Payroll amounts aggregated by worker city. */
+type PayrollCityAmountsRow = {
+  base_salary: string | null;
+  bonuses: string | null;
+  transport: string | null;
+  deductions: string | null;
+  city: string | null;
+};
+
+/** Per-worker payroll amounts read while rebuilding a period's expense entries. */
+type PayrollWorkerAmountsRow = {
+  worker_id: number;
+  base_salary: string | null;
+  transport: string | null;
+  bonuses: string | null;
+  deductions: string | null;
+  advances: string | null;
+  net_salary: string | null;
+  full_name: string | null;
+};
+
+/** A paid worker bonus awaiting an accounting voucher. */
+type PaidBonusRow = {
+  id: number;
+  worker_id: number;
+  bonus_date: string;
+  amount: string | null;
+  notes: string | null;
+  cash_account_id: number | null;
+  paid_date: string | null;
+  city: string | null;
+  full_name: string;
+};
+
+
 const PAYROLL_MIGRATION_CONFIRMATION_REQUIRED = "Explicit confirmation is required to run this payroll migration";
 
 function migrationCompletePayload(vouchersUpdated: number, bonusEntriesCreated: number) {
@@ -70,7 +114,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
       const legacyAcc = await findOrCreateLedger(companyId, "Factory Worker Payroll", "Expense");
 
       // --- Step 2: Migrate PAYROLL-GEN-* vouchers ---
-      const genVouchers = await db.execute(sql`
+      const genVouchers = await db.execute<PayrollGenVoucherRow>(sql`
         SELECT v.id, v.voucher_date, v.description, ve.id as entry_id, ve.debit_amount
         FROM vouchers v
         JOIN voucher_entries ve ON ve.voucher_id = v.id
@@ -81,7 +125,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
       `);
 
       let vouchersUpdated = 0;
-      for (const row of genVouchers.rows as any[]) {
+      for (const row of genVouchers.rows) {
         const _voucherDate = row.voucher_date as string;
         // Parse period end from description: "Payroll expense: N workers (YYYY-MM-DD – YYYY-MM-DD)"
         const periodMatch = (row.description as string).match(/\((\d{4}-\d{2}-\d{2})\s*[–-]\s*(\d{4}-\d{2}-\d{2})\)/);
@@ -90,7 +134,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
         const periodEnd = periodMatch[2];
 
         // Find factory_payrolls for this period
-        const payrollData = await db.execute(sql`
+        const payrollData = await db.execute<PayrollCityAmountsRow>(sql`
           SELECT fp.base_salary, fp.bonuses, fp.transport, fp.deductions,
                  fw.city
           FROM factory_payrolls fp
@@ -105,7 +149,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
         // Aggregate by city
         const salByCity = new Map<string, number>();
         const bonByCity = new Map<string, number>();
-        for (const pr of payrollData.rows as any[]) {
+        for (const pr of payrollData.rows) {
           const city = (pr.city as string | null)?.trim() || "";
           const sal =
             parseFloat(pr.base_salary || "0") + parseFloat(pr.transport || "0") - parseFloat(pr.deductions || "0");
@@ -162,7 +206,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
       }
 
       // --- Step 3: Create missing accounting for paid worker bonuses ---
-      const paidBonuses = await db.execute(sql`
+      const paidBonuses = await db.execute<PaidBonusRow>(sql`
         SELECT wb.id, wb.worker_id, wb.bonus_date, wb.amount, wb.notes,
                wb.cash_account_id, wb.paid_date,
                fw.city, fw.full_name
@@ -179,7 +223,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
       `);
 
       let bonusesRecorded = 0;
-      for (const wb of paidBonuses.rows as any[]) {
+      for (const wb of paidBonuses.rows) {
         const amt = parseFloat(wb.amount || "0");
         if (amt <= 0) continue;
         const city = (wb.city as string | null)?.trim() || "";
@@ -211,7 +255,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
           },
           {
             voucherId: bVoucher.id,
-            ledgerAccountId: parseInt(wb.cash_account_id),
+            ledgerAccountId: Number(wb.cash_account_id),
             ...normUsd("0", amt.toFixed(2)),
             narration,
           },
@@ -234,15 +278,15 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
       if (req.body?.confirm !== true) {
         return res.status(400).json({ message: PAYROLL_MIGRATION_CONFIRMATION_REQUIRED });
       }
-      const currentRole = (req.session as any).currentRole;
-      if (!["Admin", "Owner", "Developer"].includes(currentRole)) {
+      const currentRole = req.session.currentRole;
+      if (!["Admin", "Owner", "Developer"].includes(currentRole ?? "")) {
         return res.status(403).json({ message: "Only Admin, Owner, or Developer can run this migration" });
       }
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Find all PAYROLL-GEN vouchers for this company
-      const genVouchers = await db.execute(sql`
+      const genVouchers = await db.execute<PayrollGenVoucherRow>(sql`
         SELECT v.id, v.voucher_date, v.description
         FROM vouchers v
         WHERE v.company_id = ${companyId}
@@ -252,7 +296,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
 
       let vouchersUpdated = 0;
 
-      for (const row of genVouchers.rows as any[]) {
+      for (const row of genVouchers.rows) {
         // Parse period dates from description: "Payroll expense: N workers (YYYY-MM-DD – YYYY-MM-DD)"
         const periodMatch = (row.description as string | null)?.match(
           /\((\d{4}-\d{2}-\d{2})\s*[–-]\s*(\d{4}-\d{2}-\d{2})\)/
@@ -262,7 +306,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
         if (!periodEnd) continue;
 
         // Fetch payroll records + worker names for this period
-        const payrollData = await db.execute(sql`
+        const payrollData = await db.execute<PayrollWorkerAmountsRow>(sql`
           SELECT fp.worker_id, fp.base_salary, fp.transport, fp.bonuses,
                  fp.deductions, fp.advances, fp.net_salary, fw.full_name
           FROM factory_payrolls fp
@@ -283,7 +327,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
           sql`UPDATE ledger_accounts SET sub_type='Group' WHERE id IN (${salGrp.id}, ${bonGrp.id}) AND (sub_type IS NULL OR sub_type <> 'Group')`
         );
         const workerAccMap = new Map<number, { salaryId: number; bonusId: number }>();
-        for (const p of payrollData.rows as any[]) {
+        for (const p of payrollData.rows) {
           if (workerAccMap.has(p.worker_id)) continue;
           const workerName = (p.full_name as string) || `Worker #${p.worker_id}`;
           const sa = await findOrCreateLedger(companyId, `Salary Expense - ${workerName}`, "Expense", {
@@ -311,7 +355,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
 
         // Insert new per-worker DR entries
         const newEntries = [];
-        for (const p of payrollData.rows as any[]) {
+        for (const p of payrollData.rows) {
           const workerName = (p.full_name as string) || `Worker #${p.worker_id}`;
           const accs = workerAccMap.get(p.worker_id)!;
           const salAmt =
@@ -407,8 +451,8 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
       if (req.body?.confirm !== true) {
         return res.status(400).json({ message: PAYROLL_MIGRATION_CONFIRMATION_REQUIRED });
       }
-      const currentRole = (req.session as any).currentRole;
-      if (!["Admin", "Owner", "Developer"].includes(currentRole)) {
+      const currentRole = req.session.currentRole;
+      if (!["Admin", "Owner", "Developer"].includes(currentRole ?? "")) {
         return res.status(403).json({ message: "Only Admin, Owner, or Developer can run this migration" });
       }
       const companyId = req.body.companyId || getFactoryCompanyId(req);
