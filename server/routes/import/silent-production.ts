@@ -6,11 +6,13 @@
  */
 import { randomUUID } from "node:crypto";
 import type { Express } from "express";
+import { and, eq } from "drizzle-orm";
+import { inventory } from "@shared/schema";
 import { getErrorMessage } from "../../lib/httpHandlers";
+import { inventoryQuantity } from "../../lib/inventoryMath";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth, requireNonPOS } from "../../auth";
-import {} from "@shared/schema";
 import { adjustInventory } from "../../inventoryHelper";
 import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
 import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
@@ -43,13 +45,28 @@ export function registerSilentProductionRoutes(app: Express) {
       await db.transaction(async (tx) => {
         for (let index = 0; index < items.length; index++) {
           const item = items[index];
-          const qty = parseFloat(item.quantity);
+          const rawQty = Math.abs(parseFloat(item.quantity));
+          const normalizedQty = Number.parseFloat(inventoryQuantity(rawQty));
           const parsedRate = parseFloat(item.rate || "0");
           const rate = Number.isFinite(parsedRate) && parsedRate >= 0 ? parsedRate : 0;
-          if (!qty || !item.stockItemId) continue;
+          if (!Number.isFinite(normalizedQty) || normalizedQty <= 0 || !item.stockItemId) continue;
+
           const stockItemId = parseInt(item.stockItemId);
-          const delta = type === "Production" ? Math.abs(qty) : -Math.abs(qty);
-          const inventoryResult = await adjustInventory(
+          if (!Number.isInteger(stockItemId) || stockItemId <= 0) continue;
+
+          let movementUnitCost = rate;
+          if (type === "Consumption") {
+            const [existingInventory] = await tx
+              .select({ averageRate: inventory.averageRate })
+              .from(inventory)
+              .where(and(eq(inventory.stockItemId, stockItemId), eq(inventory.locationId, locId)))
+              .limit(1);
+            const preAdjustmentRate = Number.parseFloat(existingInventory?.averageRate || "0");
+            movementUnitCost = Number.isFinite(preAdjustmentRate) ? Math.max(preAdjustmentRate, 0) : 0;
+          }
+
+          const delta = type === "Production" ? normalizedQty : -normalizedQty;
+          await adjustInventory(
             tx,
             locId,
             stockItemId,
@@ -63,8 +80,8 @@ export function registerSilentProductionRoutes(app: Express) {
               companyId,
               stockItemId,
               kind: "adjustment",
-              quantity: String(Math.abs(qty)),
-              unitCost: String(type === "Production" ? rate : inventoryResult.averageRate),
+              quantity: inventoryQuantity(normalizedQty),
+              unitCost: String(movementUnitCost),
               fromLocationId: type === "Consumption" ? locId : undefined,
               toLocationId: type === "Production" ? locId : undefined,
               occurredAt,
