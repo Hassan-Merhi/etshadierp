@@ -22,6 +22,11 @@ import {
 } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { adjustInventory } from "../../../inventoryHelper";
+import { nextCanonicalSourceRevision } from "../../../services/inventory/canonicalSourceRevision";
+import { createDatabaseStockMovementAdapter } from "../../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../../services/inventory/stockMovementIntegrityService";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerVoucherOptionalUpdateRoutes(app: Express) {
   // Toggle optional status for a voucher
@@ -84,6 +89,19 @@ export function registerVoucherOptionalUpdateRoutes(app: Express) {
         // If changing from false→true: reverse inventory changes
         // If changing from true→false: apply inventory changes
         if (wasOptional !== willBeOptional) {
+          const evidenceRevision = await nextCanonicalSourceRevision(
+            tx,
+            existingVoucher.companyId,
+            "voucher-optional-toggle",
+            String(id)
+          );
+          const occurredAt = new Date().toISOString();
+          const evidenceActor = {
+            userId: req.session.userId,
+            username: req.session.username,
+            reason: `${willBeOptional ? "Suspend" : "Activate"} voucher ${existingVoucher.voucherNumber}`,
+          };
+
           if (hasStockTransfer.length > 0) {
             const transfer = hasStockTransfer[0];
             const items = await tx
@@ -107,6 +125,27 @@ export function registerVoucherOptionalUpdateRoutes(app: Express) {
                 // Reverse: inventory was applied, now marking optional → undo it
                 await adjustInventory(tx, sourceLocId, item.stockItemId, quantity, existingVoucher.companyId, rate);
                 await adjustInventory(tx, destinationLocId, item.stockItemId, -quantity, existingVoucher.companyId);
+                await postStockMovementTx(
+                  tx,
+                  {
+                    companyId: existingVoucher.companyId,
+                    stockItemId: item.stockItemId,
+                    kind: "transfer",
+                    quantity: String(quantity),
+                    unitCost: String(Math.max(rate || 0, 0)),
+                    fromLocationId: destinationLocId,
+                    toLocationId: sourceLocId,
+                    occurredAt,
+                    source: {
+                      sourceType: "voucher-optional-toggle-transfer-reverse",
+                      sourceId: String(id),
+                      idempotencyKey: `voucher-optional:rev${evidenceRevision}:transfer-reverse:${item.id}`,
+                    },
+                    actor: evidenceActor,
+                    allowNegativeStock: true,
+                  },
+                  canonicalStockMovementAdapter
+                );
               } else if (!willBeOptional && !transfer.inventoryApplied) {
                 // Apply: inventory was not applied, now marking non-optional → apply it
                 await adjustInventory(tx, sourceLocId, item.stockItemId, -quantity, existingVoucher.companyId);
@@ -117,6 +156,27 @@ export function registerVoucherOptionalUpdateRoutes(app: Express) {
                   quantity,
                   existingVoucher.companyId,
                   rate
+                );
+                await postStockMovementTx(
+                  tx,
+                  {
+                    companyId: existingVoucher.companyId,
+                    stockItemId: item.stockItemId,
+                    kind: "transfer",
+                    quantity: String(quantity),
+                    unitCost: String(Math.max(rate || 0, 0)),
+                    fromLocationId: sourceLocId,
+                    toLocationId: destinationLocId,
+                    occurredAt,
+                    source: {
+                      sourceType: "voucher-optional-toggle-transfer-apply",
+                      sourceId: String(id),
+                      idempotencyKey: `voucher-optional:rev${evidenceRevision}:transfer-apply:${item.id}`,
+                    },
+                    actor: evidenceActor,
+                    allowNegativeStock: true,
+                  },
+                  canonicalStockMovementAdapter
                 );
               }
               // else: already in the correct applied/unapplied state — no-op
@@ -149,6 +209,7 @@ export function registerVoucherOptionalUpdateRoutes(app: Express) {
               const adjustmentType = adjustment.adjustmentType;
               const isProduction = adjustmentType === "Production" || (adjustmentType === "Mixed" && rawQuantity > 0);
 
+              let outgoing = false;
               if (willBeOptional) {
                 // Reversing the adjustment
                 if (isProduction) {
@@ -160,6 +221,7 @@ export function registerVoucherOptionalUpdateRoutes(app: Express) {
                     -quantity,
                     existingVoucher.companyId
                   );
+                  outgoing = true;
                 } else {
                   // Reverse consumption: add back what was subtracted
                   await adjustInventory(
@@ -192,8 +254,30 @@ export function registerVoucherOptionalUpdateRoutes(app: Express) {
                     -quantity,
                     existingVoucher.companyId
                   );
+                  outgoing = true;
                 }
               }
+              await postStockMovementTx(
+                tx,
+                {
+                  companyId: existingVoucher.companyId,
+                  stockItemId: item.stockItemId,
+                  kind: "adjustment",
+                  quantity: String(quantity),
+                  unitCost: String(Math.max(rate || 0, 0)),
+                  fromLocationId: outgoing ? adjustment.locationId : undefined,
+                  toLocationId: outgoing ? undefined : adjustment.locationId,
+                  occurredAt,
+                  source: {
+                    sourceType: "voucher-optional-toggle-adjustment",
+                    sourceId: String(id),
+                    idempotencyKey: `voucher-optional:rev${evidenceRevision}:adjustment:${item.id}`,
+                  },
+                  actor: evidenceActor,
+                  allowNegativeStock: true,
+                },
+                canonicalStockMovementAdapter
+              );
             }
           }
 
@@ -224,6 +308,27 @@ export function registerVoucherOptionalUpdateRoutes(app: Express) {
                   existingVoucher.companyId
                 );
               }
+              await postStockMovementTx(
+                tx,
+                {
+                  companyId: existingVoucher.companyId,
+                  stockItemId: item.stockItemId,
+                  kind: "adjustment",
+                  quantity: String(quantity),
+                  unitCost: String(Math.max(costPrice || 0, 0)),
+                  fromLocationId: willBeOptional ? undefined : existingVoucher.locationId,
+                  toLocationId: willBeOptional ? existingVoucher.locationId : undefined,
+                  occurredAt,
+                  source: {
+                    sourceType: "voucher-optional-toggle-sale",
+                    sourceId: String(id),
+                    idempotencyKey: `voucher-optional:rev${evidenceRevision}:sale:${item.id}`,
+                  },
+                  actor: evidenceActor,
+                  allowNegativeStock: true,
+                },
+                canonicalStockMovementAdapter
+              );
             }
           }
 
@@ -241,6 +346,27 @@ export function registerVoucherOptionalUpdateRoutes(app: Express) {
                 // Apply: add stock back for the credit note (customer return)
                 await adjustInventory(tx, item.locationId, item.stockItemId, quantity, existingVoucher.companyId, rate);
               }
+              await postStockMovementTx(
+                tx,
+                {
+                  companyId: existingVoucher.companyId,
+                  stockItemId: item.stockItemId,
+                  kind: "adjustment",
+                  quantity: String(quantity),
+                  unitCost: String(Math.max(rate || 0, 0)),
+                  fromLocationId: willBeOptional ? item.locationId : undefined,
+                  toLocationId: willBeOptional ? undefined : item.locationId,
+                  occurredAt,
+                  source: {
+                    sourceType: "voucher-optional-toggle-credit-note",
+                    sourceId: String(id),
+                    idempotencyKey: `voucher-optional:rev${evidenceRevision}:credit-note:${item.id}`,
+                  },
+                  actor: evidenceActor,
+                  allowNegativeStock: true,
+                },
+                canonicalStockMovementAdapter
+              );
             }
           }
         }
