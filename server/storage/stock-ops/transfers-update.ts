@@ -1,6 +1,8 @@
 import { eq, and, isNull, sql, inArray } from "drizzle-orm";
 import { db } from "../../db";
 import { firstRow } from "../../lib/queryResult";
+import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
 
 /** An inventory row locked FOR UPDATE while a transfer is rewritten. */
 type InventoryLockRow = { id: number; quantity: string; average_rate: string; total_value: string };
@@ -16,6 +18,8 @@ import {
 } from "../../lib/inventoryMath";
 import * as schema from "@shared/schema";
 import type { StockTransferItem, StockAdjustmentItem } from "@shared/schema";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export async function updateStockTransfer(
   id: number,
@@ -260,6 +264,7 @@ export async function updateStockAdjustment(
           sql`SELECT * FROM inventory WHERE location_id = ${existingAdjustment.locationId} AND stock_item_id = ${oldItem.stockItemId} FOR UPDATE`
         );
         const currentInventory = firstRow<InventoryLockRow>(currentInventoryRows);
+        let evidenceRate = rate;
 
         if (currentInventory) {
           const currentQty = toInventoryDecimal(currentInventory.quantity);
@@ -272,6 +277,7 @@ export async function updateStockAdjustment(
             newQty = subtractInventoryValues(currentQty, absoluteQuantity);
             newValue = newQty.isPositive() ? multiplyInventoryValues(newQty, currentRate) : toInventoryDecimal(0);
             newRate = currentRate;
+            evidenceRate = currentRate;
           } else {
             newQty = addInventoryValues(currentQty, absoluteQuantity);
             newRate = weightedAverageInventoryCost(currentQty, currentRate, absoluteQuantity, rate);
@@ -298,6 +304,27 @@ export async function updateStockAdjustment(
             lastUpdated: new Date(),
           });
         }
+
+        await postStockMovementTx(
+          tx,
+          {
+            companyId: location.companyId,
+            stockItemId: oldItem.stockItemId,
+            kind: "adjustment",
+            quantity: inventoryQuantity(absoluteQuantity),
+            unitCost: inventoryUnitCost(evidenceRate),
+            fromLocationId: wasProduction ? existingAdjustment.locationId : undefined,
+            toLocationId: wasProduction ? undefined : existingAdjustment.locationId,
+            occurredAt: new Date().toISOString(),
+            source: {
+              sourceType: "stock_adjustment_edit_reverse",
+              sourceId: String(existingAdjustment.voucherId),
+              idempotencyKey: `stock-adjustment-edit:reverse:${location.companyId}:${id}:${oldItem.id}`,
+            },
+            allowNegativeStock: true,
+          },
+          canonicalStockMovementAdapter
+        );
       }
     }
 
@@ -473,6 +500,29 @@ export async function updateStockAdjustment(
         })
         .returning();
       adjustmentItems.push(adjustmentItem);
+
+      if (!isOptional) {
+        await postStockMovementTx(
+          tx,
+          {
+            companyId: newLocation.companyId,
+            stockItemId: item.stockItemId,
+            kind: "adjustment",
+            quantity: inventoryQuantity(absoluteQuantity),
+            unitCost: inventoryUnitCost(actualRate),
+            fromLocationId: isProduction ? undefined : locationId,
+            toLocationId: isProduction ? locationId : undefined,
+            occurredAt: new Date().toISOString(),
+            source: {
+              sourceType: "stock_adjustment_edit_apply",
+              sourceId: String(existingAdjustment.voucherId),
+              idempotencyKey: `stock-adjustment-edit:apply:${newLocation.companyId}:${id}:${adjustmentItem.id}`,
+            },
+            allowNegativeStock: true,
+          },
+          canonicalStockMovementAdapter
+        );
+      }
     }
 
     if (!isOptional) {
