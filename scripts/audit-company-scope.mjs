@@ -40,6 +40,7 @@ const COMPANY_AUTH_MARKERS = [
   "authorizeCompanyIdParam",
   "getFactoryCompanyId",
   "getActiveSupplierCompanyId",
+  "getActiveCustomerCompanyId",
   "enforceSupplierCompanyQuery",
   "req.session.currentCompanyId",
   "req.session.factoryCompanyId",
