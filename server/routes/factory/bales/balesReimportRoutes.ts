@@ -13,6 +13,8 @@ import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 
 import { adjustInventory } from "../../../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../../services/inventory/stockMovementIntegrityService";
 import { writeDaybookEntry } from "../_helpers";
 import {
   factoryCategories,
@@ -23,6 +25,8 @@ import {
   locations,
 } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerBalesReimportRoutes(app: Express) {
   app.post("/api/factory/bales/reimport", requireAuth, async (req: any, res: import("express").Response) => {
@@ -321,7 +325,32 @@ export function registerBalesReimportRoutes(app: Express) {
 
             const costPerKg = parseFloat(bale.costPerKg || "0");
             const weight = parseFloat(bale.weightKg || "0");
-            await adjustInventory(tx, locId, erpStockItemId!, 1, companyId, weight * costPerKg);
+            const baleCost = weight * costPerKg;
+            await adjustInventory(tx, locId, erpStockItemId!, 1, companyId, baleCost);
+            await postStockMovementTx(
+              tx,
+              {
+                companyId,
+                stockItemId: erpStockItemId!,
+                kind: "receipt",
+                quantity: "1",
+                unitCost: String(Math.max(baleCost, 0)),
+                toLocationId: locId,
+                occurredAt: (bale.finalizedAt instanceof Date ? bale.finalizedAt : new Date()).toISOString(),
+                source: {
+                  sourceType: "factory_bale_reimport",
+                  sourceId: String(bale.id),
+                  idempotencyKey: `factory-bale-reimport:${companyId}:${bale.id}`,
+                },
+                actor: {
+                  userId: req.session.userId,
+                  username: req.session.username,
+                  reason: `Bale reimport ${bale.referenceNumber}`,
+                },
+                allowNegativeStock: true,
+              },
+              canonicalStockMovementAdapter
+            );
           }
 
           return { count: createdBales.length, totalWeight };
