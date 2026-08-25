@@ -5,6 +5,35 @@ import { db, pool } from "../../db";
 import * as schema from "@shared/schema";
 import type { Voucher, InsertVoucher } from "@shared/schema";
 
+/**
+ * One statement line: a voucher's postings against a single account, already
+ * summed and cast to text by the query. Amount columns are numeric-as-text; the
+ * base columns are null when the voucher predates dual-currency capture.
+ */
+export type AccountStatementEntryRow = {
+  voucherId: number;
+  entryId: number;
+  debitAmount: string;
+  creditAmount: string;
+  transactionDebitAmount: string;
+  transactionCreditAmount: string;
+  baseDebitAmount: string | null;
+  baseCreditAmount: string | null;
+  transactionCurrency: string | null;
+  historicalExchangeRate: string | null;
+  rateConvention: string | null;
+  narration: string | null;
+  voucherNumber: string;
+  voucherType: string;
+  voucherDate: string;
+  voucherDescription: string | null;
+  currency: string | null;
+  companyId: number;
+};
+
+/** Positional parameters bound into the statement queries below. */
+type StatementQueryParams = (string | number)[];
+
 export async function getAllVouchers(companyId: number): Promise<Voucher[]> {
   return await db
     .select()
@@ -26,7 +55,7 @@ export async function getVoucherById(id: number): Promise<Voucher | undefined> {
   return voucher;
 }
 
-export async function getVouchersByDateRange(companyId: number, startDate: string, endDate: string): Promise<any[]> {
+export async function getVouchersByDateRange(companyId: number, startDate: string, endDate: string): Promise<Voucher[]> {
   const vouchers = await db
     .select()
     .from(schema.vouchers)
@@ -49,8 +78,8 @@ export async function getVoucherEntriesByLedger(
   startDate?: string,
   endDate?: string,
   companyId?: number
-): Promise<any[]> {
-  const params: any[] = [ledgerAccountId];
+): Promise<AccountStatementEntryRow[]> {
+  const params: StatementQueryParams = [ledgerAccountId];
   let dateFilters = "";
   if (startDate) {
     params.push(startDate);
@@ -73,7 +102,7 @@ export async function getVoucherEntriesByLedger(
   // GROUP BY voucher so that a single voucher with multiple lines all posting
   // to the same ledger account appears as ONE row (with summed debit/credit),
   // not as one row per entry line.
-  const result = await pool.query(
+  const result = await pool.query<AccountStatementEntryRow>(
     `SELECT
        v.id                                                        AS "voucherId",
        MIN(ve.id)                                                  AS "entryId",
@@ -115,8 +144,8 @@ export async function getVoucherEntriesByCustomer(
   startDate?: string,
   endDate?: string,
   companyId?: number
-): Promise<any[]> {
-  const params: any[] = [customerId];
+): Promise<AccountStatementEntryRow[]> {
+  const params: StatementQueryParams = [customerId];
   let dateFilters = "";
   let companyFilter = "";
   if (startDate) {
@@ -131,7 +160,7 @@ export async function getVoucherEntriesByCustomer(
     params.push(companyId);
     companyFilter = " AND v.company_id = $" + params.length;
   }
-  const result = await pool.query(
+  const result = await pool.query<AccountStatementEntryRow>(
     `SELECT
        ve.id                                                        AS "entryId",
        ve.voucher_id                                                AS "voucherId",
@@ -169,8 +198,8 @@ export async function getVoucherEntriesByBankAccount(
   startDate?: string,
   endDate?: string,
   companyId?: number
-): Promise<any[]> {
-  const params: any[] = [bankAccountId];
+): Promise<AccountStatementEntryRow[]> {
+  const params: StatementQueryParams = [bankAccountId];
   let dateFilters = "";
   let companyFilter = "";
   if (startDate) {
@@ -185,7 +214,7 @@ export async function getVoucherEntriesByBankAccount(
     params.push(companyId);
     companyFilter = " AND v.company_id = $" + params.length;
   }
-  const result = await pool.query(
+  const result = await pool.query<AccountStatementEntryRow>(
     `SELECT
        ve.id                                                        AS "entryId",
        ve.voucher_id                                                AS "voucherId",
@@ -223,8 +252,8 @@ export async function getVoucherEntriesByFixedAsset(
   startDate?: string,
   endDate?: string,
   companyId?: number
-): Promise<any[]> {
-  const params: any[] = [fixedAssetId];
+): Promise<AccountStatementEntryRow[]> {
+  const params: StatementQueryParams = [fixedAssetId];
   let dateFilters = "";
   let companyFilter = "";
   if (startDate) {
@@ -239,7 +268,7 @@ export async function getVoucherEntriesByFixedAsset(
     params.push(companyId);
     companyFilter = " AND v.company_id = $" + params.length;
   }
-  const result = await pool.query(
+  const result = await pool.query<AccountStatementEntryRow>(
     `SELECT
        ve.id                                                        AS "entryId",
        ve.voucher_id                                                AS "voucherId",
@@ -277,8 +306,8 @@ export async function getVoucherEntriesBySupplier(
   companyId?: number,
   startDate?: string,
   endDate?: string
-): Promise<any[]> {
-  const params: any[] = [supplierId];
+): Promise<AccountStatementEntryRow[]> {
+  const params: StatementQueryParams = [supplierId];
   let dateFilters = "";
   let companyFilter = "";
   if (companyId) {
@@ -293,7 +322,7 @@ export async function getVoucherEntriesBySupplier(
     params.push(endDate);
     dateFilters += " AND COALESCE(v.effective_date::date, v.voucher_date::date) <= $" + params.length + "::date";
   }
-  const result = await pool.query(
+  const result = await pool.query<AccountStatementEntryRow>(
     `SELECT
        ve.id                                                        AS "entryId",
        ve.voucher_id                                                AS "voucherId",
@@ -331,8 +360,8 @@ export async function getVoucherEntriesByEmployee(
   companyId?: number,
   startDate?: string,
   endDate?: string
-): Promise<any[]> {
-  const params: any[] = [employeeId];
+): Promise<AccountStatementEntryRow[]> {
+  const params: StatementQueryParams = [employeeId];
   let dateFilters = "";
   let companyFilter = "";
   if (companyId) {
@@ -347,7 +376,7 @@ export async function getVoucherEntriesByEmployee(
     params.push(endDate);
     dateFilters += " AND COALESCE(v.effective_date::date, v.voucher_date::date) <= $" + params.length + "::date";
   }
-  const result = await pool.query(
+  const result = await pool.query<AccountStatementEntryRow>(
     `SELECT
        ve.id                                                        AS "entryId",
        ve.voucher_id                                                AS "voucherId",
@@ -393,7 +422,7 @@ export async function updateVoucher(id: number, updates: Partial<InsertVoucher>)
   return updated;
 }
 
-export async function getVoucherEntriesByVoucher(voucherId: number): Promise<any[]> {
+export async function getVoucherEntriesByVoucher(voucherId: number) {
   const entries = await db
     .select({
       id: schema.voucherEntries.id,

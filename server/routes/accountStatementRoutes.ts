@@ -39,6 +39,7 @@ import {
   voucherEntries,
   vouchers,
 } from "@shared/schema";
+import type { AccountStatementEntryRow } from "../storage/accounting/vouchers";
 
 export function registerAccountStatementRoutes(app: Express) {
   app.get("/api/accounts/:type/:id/deleted-vouchers", requireAuth, async (req, res) => {
@@ -407,7 +408,7 @@ export function registerAccountStatementRoutes(app: Express) {
         accountName = `${acct.firstName} ${acct.lastName}`.trim();
       }
 
-      let txRows = [];
+      let txRows: AccountStatementEntryRow[] = [];
       if (accountType === "ledger") {
         txRows = await storage.getVoucherEntriesByLedger(accountId, startDate, endDate, companyId);
       } else if (accountType === "bank") {
@@ -418,7 +419,7 @@ export function registerAccountStatementRoutes(app: Express) {
         txRows = await storage.getVoucherEntriesByEmployee(accountId, companyId, startDate, endDate);
       }
 
-      let allTxForBF = [];
+      let allTxForBF: AccountStatementEntryRow[] = [];
       if (startDate && accountType === "ledger") {
         allTxForBF = await storage.getVoucherEntriesByLedger(accountId, undefined, undefined, companyId);
       }
