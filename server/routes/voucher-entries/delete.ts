@@ -32,6 +32,10 @@ import {
 } from "@shared/schema";
 import { eq, and, or, sql } from "drizzle-orm";
 import { adjustInventory } from "../../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerVoucherDeleteRoutes(app: Express) {
   // Delete a voucher (Admin only)
@@ -55,6 +59,9 @@ export function registerVoucherDeleteRoutes(app: Express) {
       if (isReadonlyMigratedVoucher(voucher)) {
         return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
       }
+
+      const companyId = req.session.currentCompanyId;
+      const occurredAt = new Date().toISOString();
 
       // Wrap balance sync and deletion in a transaction
       await db.transaction(async (tx) => {
@@ -98,14 +105,7 @@ export function registerVoucherDeleteRoutes(app: Express) {
               const itemSourceId = item.sourceLocationId || transferVoucher.sourceLocationId!;
 
               // Add back to source location (reverse the deduction)
-              await adjustInventory(
-                tx,
-                itemSourceId,
-                item.stockItemId,
-                qty,
-                req.session.currentCompanyId!,
-                transferRate
-              );
+              await adjustInventory(tx, itemSourceId, item.stockItemId, qty, companyId, transferRate);
 
               // Remove from destination location (reverse the addition)
               await adjustInventory(
@@ -113,7 +113,33 @@ export function registerVoucherDeleteRoutes(app: Express) {
                 transferVoucher.destinationLocationId!,
                 item.stockItemId,
                 -qty,
-                req.session.currentCompanyId!
+                companyId
+              );
+
+              await postStockMovementTx(
+                tx,
+                {
+                  companyId,
+                  stockItemId: item.stockItemId,
+                  kind: "transfer",
+                  quantity: String(qty),
+                  unitCost: String(Math.max(transferRate || 0, 0)),
+                  fromLocationId: transferVoucher.destinationLocationId!,
+                  toLocationId: itemSourceId,
+                  occurredAt,
+                  source: {
+                    sourceType: "voucher_delete_stock_transfer",
+                    sourceId: String(id),
+                    idempotencyKey: `voucher-delete:transfer:${companyId}:${id}:${item.id}`,
+                  },
+                  actor: {
+                    userId: req.session.userId,
+                    username: req.session.username,
+                    reason: `Delete voucher ${voucher.voucherNumber}`,
+                  },
+                  allowNegativeStock: true,
+                },
+                canonicalStockMovementAdapter
               );
             }
           }
@@ -163,12 +189,36 @@ export function registerVoucherDeleteRoutes(app: Express) {
 
               if (isProduction) {
                 // Production added inventory, so reverse by subtracting
-                await adjustInventory(
+                const result = await adjustInventory(
                   tx,
                   adjustmentVoucher.locationId,
                   item.stockItemId,
                   -absoluteQty,
-                  req.session.currentCompanyId!
+                  companyId
+                );
+                await postStockMovementTx(
+                  tx,
+                  {
+                    companyId,
+                    stockItemId: item.stockItemId,
+                    kind: "adjustment",
+                    quantity: String(absoluteQty),
+                    unitCost: String(Math.max(adjustmentRate || result.averageRate || 0, 0)),
+                    fromLocationId: adjustmentVoucher.locationId,
+                    occurredAt,
+                    source: {
+                      sourceType: "voucher_delete_stock_adjustment",
+                      sourceId: String(id),
+                      idempotencyKey: `voucher-delete:adjustment:${companyId}:${id}:${item.id}`,
+                    },
+                    actor: {
+                      userId: req.session.userId,
+                      username: req.session.username,
+                      reason: `Delete voucher ${voucher.voucherNumber}`,
+                    },
+                    allowNegativeStock: true,
+                  },
+                  canonicalStockMovementAdapter
                 );
               } else {
                 // Consumption subtracted inventory, so reverse by adding back
@@ -177,8 +227,31 @@ export function registerVoucherDeleteRoutes(app: Express) {
                   adjustmentVoucher.locationId,
                   item.stockItemId,
                   absoluteQty,
-                  req.session.currentCompanyId!,
+                  companyId,
                   adjustmentRate
+                );
+                await postStockMovementTx(
+                  tx,
+                  {
+                    companyId,
+                    stockItemId: item.stockItemId,
+                    kind: "adjustment",
+                    quantity: String(absoluteQty),
+                    unitCost: String(Math.max(adjustmentRate || 0, 0)),
+                    toLocationId: adjustmentVoucher.locationId,
+                    occurredAt,
+                    source: {
+                      sourceType: "voucher_delete_stock_adjustment",
+                      sourceId: String(id),
+                      idempotencyKey: `voucher-delete:adjustment:${companyId}:${id}:${item.id}`,
+                    },
+                    actor: {
+                      userId: req.session.userId,
+                      username: req.session.username,
+                      reason: `Delete voucher ${voucher.voucherNumber}`,
+                    },
+                  },
+                  canonicalStockMovementAdapter
                 );
               }
             }
@@ -213,13 +286,29 @@ export function registerVoucherDeleteRoutes(app: Express) {
 
                 logger.info(`[POS Delete] Restoring item ${item.stockItemId}: qty=${qty}, costPrice=${costPrice}`);
 
-                const result = await adjustInventory(
+                const result = await adjustInventory(tx, targetLocationId, item.stockItemId, qty, companyId, costPrice);
+                await postStockMovementTx(
                   tx,
-                  targetLocationId,
-                  item.stockItemId,
-                  qty,
-                  req.session.currentCompanyId!,
-                  costPrice
+                  {
+                    companyId,
+                    stockItemId: item.stockItemId,
+                    kind: "adjustment",
+                    quantity: String(qty),
+                    unitCost: String(Math.max(costPrice || result.averageRate || 0, 0)),
+                    toLocationId: targetLocationId,
+                    occurredAt,
+                    source: {
+                      sourceType: "voucher_delete_pos_sale",
+                      sourceId: String(id),
+                      idempotencyKey: `voucher-delete:pos:${companyId}:${id}:${item.id}`,
+                    },
+                    actor: {
+                      userId: req.session.userId,
+                      username: req.session.username,
+                      reason: `Delete voucher ${voucher.voucherNumber}`,
+                    },
+                  },
+                  canonicalStockMovementAdapter
                 );
                 logger.info(
                   `[POS Delete] Item ${item.stockItemId}: qty ${result.previousQuantity} + ${qty} = ${result.newQuantity}, rate: ${result.averageRate.toFixed(2)}`
@@ -251,12 +340,30 @@ export function registerVoucherDeleteRoutes(app: Express) {
               if (voucher.voucherType === "Credit Note") {
                 // Credit Note forward: added qty to inventory
                 // Reversal: subtract qty from inventory
-                const result = await adjustInventory(
+                const result = await adjustInventory(tx, item.locationId, item.stockItemId, -qty, companyId);
+                await postStockMovementTx(
                   tx,
-                  item.locationId,
-                  item.stockItemId,
-                  -qty,
-                  req.session.currentCompanyId!
+                  {
+                    companyId,
+                    stockItemId: item.stockItemId,
+                    kind: "adjustment",
+                    quantity: String(qty),
+                    unitCost: String(Math.max(inventoryCost || result.averageRate || 0, 0)),
+                    fromLocationId: item.locationId,
+                    occurredAt,
+                    source: {
+                      sourceType: "voucher_delete_credit_note",
+                      sourceId: String(id),
+                      idempotencyKey: `voucher-delete:credit-note:${companyId}:${id}:${item.id}`,
+                    },
+                    actor: {
+                      userId: req.session.userId,
+                      username: req.session.username,
+                      reason: `Delete voucher ${voucher.voucherNumber}`,
+                    },
+                    allowNegativeStock: true,
+                  },
+                  canonicalStockMovementAdapter
                 );
                 logger.info(
                   `[Credit Note Delete] Item ${item.stockItemId} at location ${item.locationId}: qty ${result.previousQuantity} - ${qty} = ${result.newQuantity}`
@@ -264,13 +371,29 @@ export function registerVoucherDeleteRoutes(app: Express) {
               } else {
                 // Debit Note forward: removed qty from inventory
                 // Reversal: add qty back to inventory
-                const result = await adjustInventory(
+                const result = await adjustInventory(tx, item.locationId, item.stockItemId, qty, companyId, inventoryCost);
+                await postStockMovementTx(
                   tx,
-                  item.locationId,
-                  item.stockItemId,
-                  qty,
-                  req.session.currentCompanyId!,
-                  inventoryCost
+                  {
+                    companyId,
+                    stockItemId: item.stockItemId,
+                    kind: "adjustment",
+                    quantity: String(qty),
+                    unitCost: String(Math.max(inventoryCost || result.averageRate || 0, 0)),
+                    toLocationId: item.locationId,
+                    occurredAt,
+                    source: {
+                      sourceType: "voucher_delete_debit_note",
+                      sourceId: String(id),
+                      idempotencyKey: `voucher-delete:debit-note:${companyId}:${id}:${item.id}`,
+                    },
+                    actor: {
+                      userId: req.session.userId,
+                      username: req.session.username,
+                      reason: `Delete voucher ${voucher.voucherNumber}`,
+                    },
+                  },
+                  canonicalStockMovementAdapter
                 );
                 logger.info(
                   `[Debit Note Delete] Item ${item.stockItemId} at location ${item.locationId}: qty ${result.previousQuantity} + ${qty} = ${result.newQuantity}`
@@ -295,7 +418,7 @@ export function registerVoucherDeleteRoutes(app: Express) {
               debitAmount: e.debitAmount,
               creditAmount: e.creditAmount,
             })),
-            req.session.currentCompanyId!,
+            companyId,
             true // reverse
           );
         }
@@ -352,7 +475,7 @@ export function registerVoucherDeleteRoutes(app: Express) {
       await logAudit({
         userId: req.session.userId!,
         username: req.session.username || "unknown",
-        companyId: req.session.currentCompanyId!,
+        companyId,
         action: "delete",
         tableName: "vouchers",
         recordId: id,
