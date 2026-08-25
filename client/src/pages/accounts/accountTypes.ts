@@ -100,47 +100,6 @@ export interface AccountDialogsProps {
   waChatsLoading: boolean;
 }
 
-export interface AccountStatementViewProps {
-  selectedAccount: Account;
-  onClose: () => void;
-  periodFilter: any;
-  setPeriodFilter: (filter: any) => void;
-  vouchersWithBalance: any[];
-  closingBalance: number;
-  openingBalance: number;
-  transactionsLoading: boolean;
-  transactionError?: string | null;
-  selectedVoucherIds: Set<number>;
-  toggleSelectAll: () => void;
-  setShowBulkDeleteConfirm: (show: boolean) => void;
-  filterCurrency: string;
-  setFilterCurrency: (updater: any) => void;
-  showDeletedVouchers: boolean;
-  setShowDeletedVouchers: (updater: (p: boolean) => boolean) => void;
-  currentUser: any;
-  formatAmount: (amt: number) => string;
-  hideBalances: boolean;
-  printRef: React.RefObject<HTMLDivElement | null>;
-  appMode: string;
-  formatDisplayDate: (date: Date | string) => string;
-  toggleVoucherSelection: (id: number) => void;
-  handleOpenVoucher: (v: any) => void;
-  waRule: WaRule | null;
-  openWaRuleDialog: () => void;
-  sendWaStatementMutation: any;
-  isMultiCurrency: boolean;
-  ledgerCurrencyBalances?: any[];
-  isBrokerSupplier: boolean;
-  brokerStatementData: any;
-  factorySupplierStatement: any;
-  factoryStatementLoading: boolean;
-  brokerStatementLoading: boolean;
-  handlePrint: () => void;
-  exportLang: "en" | "fr" | "ar";
-  setExportLang: (lang: "en" | "fr" | "ar") => void;
-  exportLabels: any;
-}
-
 export const exportLabels: Record<
   string,
   {
