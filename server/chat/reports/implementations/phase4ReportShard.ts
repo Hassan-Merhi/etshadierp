@@ -21,7 +21,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
   switch (params.queryType) {
     case "pos_sales_summary": {
       const itemFilter = params.entityName;
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ product_name: string; article_code: string | null; total_qty: string | null; total_revenue: string | null; num_sales: string; currency_code: string | null }>(sql`
         SELECT fpsi.product_name, fpsi.article_code,
           SUM(fpsi.quantity) AS total_qty,
           SUM(CAST(fpsi.total_amount AS numeric)) AS total_revenue,
@@ -36,18 +36,16 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY total_revenue DESC
         LIMIT ${rowLimit}
       `);
-      const totalsRow = await db.execute(sql`
+      const totalsRow = await db.execute<{ num_transactions: string; grand_total: string | null }>(sql`
         SELECT COUNT(id) AS num_transactions,
           SUM(CAST(total_amount AS numeric)) AS grand_total
         FROM factory_pos_sales
         WHERE company_id = ${companyId} AND status = 'COMPLETED'
           AND CAST(tx_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
       `);
-      const t4 = totalsRow.rows[0] as unknown as { num_transactions: Parameters<typeof String>[0] } & {
-        grand_total: string;
-      };
+      const t4 = totalsRow.rows[0];
       let _grandRev = 0;
-      const tableRows4 = (rows.rows as any[]).map((r) => {
+      const tableRows4 = rows.rows.map((r) => {
         const rev = parseFloat(r.total_revenue || "0");
         _grandRev += rev;
         return [
@@ -82,7 +80,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "intercompany_transfers": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ transfer_date: string; transfer_type: string; from_company: string | null; to_company: string | null; amount: string; description: string | null }>(sql`
         SELECT ict.transfer_date, ict.transfer_type,
           fc.name AS from_company, tc.name AS to_company,
           CAST(ict.amount AS numeric) AS amount,
@@ -97,7 +95,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       // No in/out totals are computed here: the shard renders rows and a count,
       // and the accumulators that used to sit here were written but never read.
-      const tableRows4 = (rows.rows as any[]).map((r) => {
+      const tableRows4 = rows.rows.map((r) => {
         const amt = parseFloat(r.amount || "0");
         return [
           String(r.transfer_date).slice(0, 10),
@@ -128,7 +126,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ container_number: string; location: string; item_name: string; code: string; uom: string; qty: string; rate: string; total_value: string; offloaded_at: Date | null }>(sql`
         SELECT c.container_number, l.name AS location,
           si.name AS item_name, si.code, si.uom,
           CAST(coi.quantity AS numeric) AS qty,
@@ -146,7 +144,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let totalVal = 0;
-      const tableRows4 = (rows.rows as any[]).map((r) => {
+      const tableRows4 = rows.rows.map((r) => {
         const val = parseFloat(r.total_value || "0");
         totalVal += val;
         return [
@@ -170,7 +168,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "worker_productivity": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ full_name: string; total_bales: string; total_kg: string; avg_kg_per_bale: string }>(sql`
         SELECT fw.full_name,
           COUNT(fb.id) AS total_bales,
           COALESCE(SUM(CAST(fb.weight_kg AS numeric)), 0) AS total_kg,
@@ -184,7 +182,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY total_bales DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows4 = (rows.rows as any[]).map((r, i) => [
+      const tableRows4 = rows.rows.map((r, i) => [
         String(i + 1),
         r.full_name,
         String(r.total_bales),
@@ -203,7 +201,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
 
     case "supplier_spend": {
       const supplierFilter = params.entityName;
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ supplier: string; po_count: string; total_items: string | null; total_charges: string | null; currency: string }>(sql`
         SELECT s.legal_name AS supplier,
           COUNT(po.id) AS po_count,
           SUM(CAST(po.items_total AS numeric)) AS total_items,
@@ -221,7 +219,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let _grandItems = 0;
-      const tableRows4 = (rows.rows as any[]).map((r) => {
+      const tableRows4 = rows.rows.map((r) => {
         const items = parseFloat(r.total_items || "0");
         const charges = parseFloat(r.total_charges || "0");
         _grandItems += items;
@@ -243,7 +241,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     case "upcoming_arrivals": {
       const daysAhead = 30;
       const futureDate = new Date(todayDate.getTime() + daysAhead * 86400000).toISOString().slice(0, 10);
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ container_number: string; status: string; eta: string | null; supplier: string | null; transporter: string | null; tracking_location: string | null; import_date: string | null; grand_total: string; currency: string; days_until_eta: number | null }>(sql`
         SELECT c.container_number, c.status, c.eta,
           s.legal_name AS supplier,
           c.transporter, c.tracking_location,
@@ -260,8 +258,8 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY c.eta ASC
         LIMIT ${rowLimit}
       `);
-      const tableRows4 = (rows.rows as any[]).map((r) => {
-        const days = parseInt(r.days_until_eta || "0");
+      const tableRows4 = rows.rows.map((r) => {
+        const days = r.days_until_eta ?? 0;
         const daysLabel = days <= 0 ? "TODAY/OVERDUE" : `${days}d`;
         return [
           r.container_number,
@@ -287,7 +285,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "factory_waste_analysis": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ date: string; waste_type: string; kg_waste: string; reason: string | null }>(sql`
         SELECT fwe.date, fwe.waste_type,
           CAST(fwe.kg_waste AS numeric) AS kg_waste,
           fwe.reason
@@ -299,7 +297,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let totalWaste = 0;
       const typeMap: Record<string, number> = {};
-      const tableRows4 = (rows.rows as any[]).map((r) => {
+      const tableRows4 = rows.rows.map((r) => {
         const kg = parseFloat(r.kg_waste || "0");
         totalWaste += kg;
         const wt = r.waste_type || "Unknown";
@@ -328,7 +326,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
 
     case "customer_payment_history": {
       const custName = params.entityName;
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ voucher_date: string; voucher_type: string; description: string | null; voucher_number: string; amount: string; currency: string }>(sql`
         SELECT v.voucher_date, v.voucher_type, v.description, v.voucher_number,
           CAST(v.total_amount AS numeric) AS amount, v.currency
         FROM vouchers v
@@ -342,7 +340,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let totalReceipts = 0,
         totalPayments = 0;
-      const tableRows4 = (rows.rows as any[]).map((r) => {
+      const tableRows4 = rows.rows.map((r) => {
         const amt = parseFloat(r.amount || "0");
         if (r.voucher_type === "Receipt") totalReceipts += amt;
         else totalPayments += amt;
@@ -374,7 +372,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "voucher_type_summary": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ voucher_type: string; count: string; total_amount: string | null; first_date: string | null; last_date: string | null }>(sql`
         SELECT v.voucher_type,
           COUNT(v.id) AS count,
           SUM(CAST(v.total_amount AS numeric)) AS total_amount,
@@ -390,7 +388,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let grandCount = 0,
         grandTotal = 0;
-      const tableRows4 = (rows.rows as any[]).map((r) => {
+      const tableRows4 = rows.rows.map((r) => {
         const cnt = parseInt(r.count || "0");
         const amt = parseFloat(r.total_amount || "0");
         grandCount += cnt;
@@ -416,7 +414,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
 
     case "location_stock_summary": {
       const locFilter = params.entityName || params.locationName;
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ location: string; item_count: string; total_qty: string | null; total_value: string | null }>(sql`
         SELECT l.name AS location,
           COUNT(DISTINCT inv.stock_item_id) AS item_count,
           SUM(CAST(inv.quantity AS numeric)) AS total_qty,
@@ -432,7 +430,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let grandItems = 0,
         grandValue = 0;
-      const tableRows4 = (rows.rows as any[]).map((r) => {
+      const tableRows4 = rows.rows.map((r) => {
         const items = parseInt(r.item_count || "0");
         const val = parseFloat(r.total_value || "0");
         grandItems += items;

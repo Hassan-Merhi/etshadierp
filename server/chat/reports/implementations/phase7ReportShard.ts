@@ -21,7 +21,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
   switch (params.queryType) {
     case "audit_trail": {
       const tableFilter7 = params.entityName;
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ username: string | null; action: string; table_name: string | null; record_identifier: string | null; created_at: Date }>(sql`
         SELECT al.username, al.action, al.table_name, al.record_identifier,
           al.created_at
         FROM audit_log al
@@ -32,7 +32,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       const actionMap: Record<string, number> = {};
-      const tableRows7 = (rows.rows as any[]).map((r) => {
+      const tableRows7 = rows.rows.map((r) => {
         actionMap[r.action] = (actionMap[r.action] || 0) + 1;
         return [String(r.created_at).slice(0, 16), r.username, r.action, r.table_name, r.record_identifier || "—"];
       });
@@ -55,7 +55,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "bank_account_list": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ code: string; name: string; bank_name: string | null; account_number: string | null; opening_balance: string; opening_balance_side: string | null; active: boolean; total_dr: string; total_cr: string }>(sql`
         SELECT ba.code, ba.name, ba.bank_name, ba.account_number,
           CAST(ba.opening_balance AS numeric) AS opening_balance,
           ba.opening_balance_side, ba.active,
@@ -72,7 +72,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY ba.name
       `);
       let grandBalance = 0;
-      const tableRows7 = (rows.rows as any[]).map((r) => {
+      const tableRows7 = rows.rows.map((r) => {
         const ob = parseFloat(r.opening_balance || "0") * (r.opening_balance_side === "Cr" ? -1 : 1);
         const dr = parseFloat(r.total_dr || "0");
         const cr = parseFloat(r.total_cr || "0");
@@ -113,7 +113,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         : params.entityName?.toLowerCase().includes("prod")
           ? "Production"
           : null;
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ voucher_date: string; voucher_number: string; adjustment_type: string; location: string | null; item_name: string; code: string | null; uom: string | null; qty: string; rate: string; total_amount: string }>(sql`
         SELECT v.voucher_date, v.voucher_number, sav.adjustment_type,
           l.name AS location, si.name AS item_name, si.code, si.uom,
           CAST(sai.quantity AS numeric) AS qty,
@@ -132,7 +132,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let totalProd = 0,
         totalCons = 0;
-      const tableRows7 = (rows.rows as any[]).map((r) => {
+      const tableRows7 = rows.rows.map((r) => {
         const qty = parseFloat(r.qty || "0");
         const amt = parseFloat(r.total_amount || "0");
         if (r.adjustment_type === "Production") totalProd += amt;
@@ -176,7 +176,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const containerRow7 = await db.execute(sql`
+      const containerRow7 = await db.execute<{ id: number; container_number: string; status: string; eta: string | null; transporter: string | null; tracking_last_location: string | null; tracking_last_description: string | null; tracking_changed_at: Date | null }>(sql`
         SELECT c.id, c.container_number, c.status, c.eta, c.transporter,
           c.tracking_last_location, c.tracking_last_description, c.tracking_changed_at
         FROM containers c
@@ -192,19 +192,15 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const ctr7 = containerRow7.rows[0] as unknown as { id: unknown } & { container_number: unknown } & {
-        status: unknown;
-      } & { eta: unknown } & { eta: Parameters<typeof String>[0] } & { transporter: unknown } & {
-        tracking_last_location: unknown;
-      } & { tracking_last_description: unknown } & { tracking_last_description: string };
-      const evtRows = await db.execute(sql`
+      const ctr7 = containerRow7.rows[0];
+      const evtRows = await db.execute<{ event_time: Date | null; event_status: string | null; event_location: string | null; event_description: string | null; provider: string | null }>(sql`
         SELECT cte.event_time, cte.event_status, cte.event_location, cte.event_description, cte.provider
         FROM container_tracking_events cte
         WHERE cte.container_id = ${ctr7.id}
         ORDER BY cte.event_time DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows7 = (evtRows.rows as any[]).map((r) => [
+      const tableRows7 = evtRows.rows.map((r) => [
         r.event_time ? String(r.event_time).slice(0, 16) : "—",
         r.event_status || "—",
         r.event_location || "—",
@@ -232,7 +228,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "pending_container_sales": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ sale_date: string; invoice_number: string | null; container_number: string | null; customer: string | null; currency: string; total_amount: string; paid_amount: string; outstanding: string; payment_status: string | null }>(sql`
         SELECT cs.sale_date, cs.invoice_number, c.container_number,
           cu.legal_name AS customer, cs.currency,
           CAST(cs.total_amount AS numeric) AS total_amount,
@@ -248,7 +244,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let totalOutstanding = 0;
-      const tableRows7 = (rows.rows as any[]).map((r) => {
+      const tableRows7 = rows.rows.map((r) => {
         const outstanding = parseFloat(r.outstanding || "0");
         totalOutstanding += outstanding;
         return [
@@ -301,7 +297,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ container_number: string; status: string; import_date: string | null; eta: string | null; grand_total: string; currency: string; total_kg: string | null; rate_per_kg: string | null; item_name: string | null; supplier: string | null }>(sql`
         SELECT c.container_number, c.status, c.import_date, c.eta,
           CAST(c.grand_total AS numeric) AS grand_total, c.currency,
           c.total_kg, c.rate_per_kg, c.item_name, s.legal_name AS supplier
@@ -315,7 +311,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       let totalValue = 0,
         totalKg = 0;
       const statusCounts: Record<string, number> = {};
-      const tableRows7 = (rows.rows as any[]).map((r) => {
+      const tableRows7 = rows.rows.map((r) => {
         const val = parseFloat(r.grand_total || "0");
         const kg = parseFloat(r.total_kg || "0");
         totalValue += val;
@@ -355,7 +351,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "income_breakdown": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ name: string; account_type: string; net_income: string }>(sql`
         SELECT la.name, la.account_type,
           COALESCE(SUM(CAST(ve.credit_amount AS numeric) - CAST(ve.debit_amount AS numeric)), 0) AS net_income
         FROM ledger_accounts la
@@ -372,7 +368,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let grandIncome = 0;
-      const tableRows7 = (rows.rows as any[]).map((r) => {
+      const tableRows7 = rows.rows.map((r) => {
         const income = parseFloat(r.net_income || "0");
         grandIncome += income;
         return [r.name, r.account_type, fmt(income)];
@@ -398,7 +394,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const wRow = await db.execute(sql`
+      const wRow = await db.execute<{ full_name: string; employee_code: string | null; position: string | null; department: string | null; gender: string | null; nationality: string | null; date_of_birth: string | null; date_joined: string | null; salary_type: string; base_salary: string | null; per_bale_rate: string | null; per_kg_rate: string | null; phone1: string | null; phone2: string | null; active: boolean; bank_name: string | null; payment_method: string | null; visa_expiry: string | null; work_permit_expiry: string | null; shift_type: string | null; transport_allowance: string | null }>(sql`
         SELECT fw.full_name, fw.employee_code, fw.position, fw.department,
           fw.gender, fw.nationality, fw.date_of_birth, fw.date_joined,
           fw.salary_type, fw.base_salary, fw.per_bale_rate, fw.per_kg_rate,
@@ -418,18 +414,8 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const w7 = wRow.rows[0] as unknown as { full_name: unknown } & { employee_code: unknown } & {
-        position: unknown;
-      } & { department: unknown } & { active: unknown } & { salary_type: unknown } & { base_salary: string } & {
-        per_bale_rate: string;
-      } & { phone1: unknown } & { nationality: unknown } & { gender: unknown } & { date_of_birth: unknown } & {
-        date_of_birth: Parameters<typeof String>[0];
-      } & { date_joined: unknown } & { date_joined: Parameters<typeof String>[0] } & { shift_type: unknown } & {
-        bank_name: unknown;
-      } & { payment_method: unknown } & { visa_expiry: unknown } & { visa_expiry: Parameters<typeof String>[0] } & {
-        work_permit_expiry: unknown;
-      } & { work_permit_expiry: Parameters<typeof String>[0] } & { transport_allowance: string };
-      const baleStats7 = await db.execute(sql`
+      const w7 = wRow.rows[0];
+      const baleStats7 = await db.execute<{ total_bales: string; total_kg: string }>(sql`
         SELECT COUNT(id) AS total_bales,
           COALESCE(SUM(CAST(weight_kg AS numeric)), 0) AS total_kg
         FROM factory_bales
@@ -438,7 +424,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
           AND CAST(pressed_at AS text) BETWEEN ${dateFrom} AND ${dateTo}
           AND worker_name ILIKE ${"%" + workerName7 + "%"}
       `);
-      const bs7 = baleStats7.rows[0] as unknown as { total_bales: Parameters<typeof String>[0] } & { total_kg: string };
+      const bs7 = baleStats7.rows[0];
       const stats7 = [
         { label: "Name", value: w7.full_name },
         { label: "Code", value: w7.employee_code || "—" },
@@ -476,7 +462,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "location_list": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ code: string; name: string; city: string | null; country: string | null; active: boolean; item_count: string; total_value: string }>(sql`
         SELECT l.code, l.name, l.city, l.country, l.active,
           COUNT(DISTINCT inv.stock_item_id) AS item_count,
           COALESCE(SUM(CAST(inv.total_value AS numeric)), 0) AS total_value
@@ -489,7 +475,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let grandValue = 0,
         grandItems = 0;
-      const tableRows7 = (rows.rows as any[]).map((r) => {
+      const tableRows7 = rows.rows.map((r) => {
         const val = parseFloat(r.total_value || "0");
         const items = parseInt(r.item_count || "0");
         grandValue += val;
@@ -525,7 +511,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
 
     case "quarterly_comparison": {
       const yearStr = params.dateFrom ? params.dateFrom.slice(0, 4) : todayStr.slice(0, 4);
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ quarter: string; revenue: string | null; cost: string | null; profit: string | null; sales_count: string }>(sql`
         SELECT EXTRACT(QUARTER FROM CAST(v.voucher_date AS date)) AS quarter,
           SUM(CAST(sal.total_sales AS numeric)) AS revenue,
           SUM(CAST(sal.total_cost AS numeric)) AS cost,
@@ -542,7 +528,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         totCost = 0,
         totProfit = 0;
       const qLabels = ["Q1 (Jan-Mar)", "Q2 (Apr-Jun)", "Q3 (Jul-Sep)", "Q4 (Oct-Dec)"];
-      const tableRows7 = (rows.rows as any[]).map((r) => {
+      const tableRows7 = rows.rows.map((r) => {
         const q = parseInt(r.quarter || "1");
         const rev = parseFloat(r.revenue || "0");
         const cost = parseFloat(r.cost || "0");

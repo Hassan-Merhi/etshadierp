@@ -35,7 +35,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     case "inventory_check": {
       const itemName = params.entityName;
       const locName = params.locationName;
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ item_name: string; code: string; uom: string; location_name: string; qty: string; avg_rate: string; total_value: string }>(sql`
         SELECT si.name AS item_name, si.code, si.uom,
           l.name AS location_name,
           CAST(inv.quantity AS numeric) AS qty,
@@ -51,7 +51,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY total_value DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows2 = (rows.rows as any[]).map((r) => [
+      const tableRows2 = rows.rows.map((r) => [
         r.item_name,
         r.code,
         r.location_name,
@@ -70,7 +70,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "low_stock_items": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ name: string; code: string; uom: string; reorder_level: string; total_qty: string }>(sql`
         SELECT si.name, si.code, si.uom,
           CAST(si.reorder_level AS numeric) AS reorder_level,
           COALESCE(SUM(CAST(inv.quantity AS numeric)), 0) AS total_qty
@@ -84,7 +84,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY (COALESCE(SUM(CAST(inv.quantity AS numeric)), 0) / NULLIF(CAST(si.reorder_level AS numeric), 0)) ASC
         LIMIT ${rowLimit}
       `);
-      const tableRows2 = (rows.rows as any[]).map((r) => [
+      const tableRows2 = rows.rows.map((r) => [
         r.name,
         r.code,
         `${fmtDec(parseFloat(r.total_qty))} ${r.uom}`,
@@ -111,7 +111,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ voucher_date: string; adjustment_type: string; location: string; item_name: string; uom: string; qty: string; rate: string }>(sql`
         SELECT v.voucher_date, sav.adjustment_type, l.name AS location,
           si.name AS item_name, si.uom,
           CAST(sai.quantity AS numeric) AS qty,
@@ -127,7 +127,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY v.voucher_date DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows2 = (rows.rows as any[]).map((r) => [
+      const tableRows2 = rows.rows.map((r) => [
         String(r.voucher_date).slice(0, 10),
         r.adjustment_type,
         r.location,
@@ -146,7 +146,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
 
     case "open_purchase_orders": {
       const supplierName = params.entityName;
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ po_number: string; supplier: string; container_number: string | null; currency: string; items_total: string; status: string; created_at: Date }>(sql`
         SELECT po.po_number, s.legal_name AS supplier,
           c.container_number, po.currency,
           CAST(po.items_total AS numeric) AS items_total,
@@ -160,7 +160,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY po.created_at DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows2 = (rows.rows as any[]).map((r) => [
+      const tableRows2 = rows.rows.map((r) => [
         r.po_number,
         r.supplier,
         r.container_number,
@@ -182,7 +182,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "customer_aging": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ name: string; ob: string; total_debit: string; total_credit: string; bucket_0_30: string; bucket_31_60: string; bucket_61_90: string; bucket_over_90: string }>(sql`
         SELECT la.name,
           COALESCE(CASE WHEN la.opening_balance_side = 'Cr' THEN -CAST(la.opening_balance AS numeric) ELSE CAST(la.opening_balance AS numeric) END, 0) AS ob,
           COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.debit_amount AS numeric) ELSE 0 END), 0) AS total_debit,
@@ -218,7 +218,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         grandTotal61_90 = 0,
         grandTotalOver90 = 0,
         grandTotalAll = 0;
-      const tableRows2 = (rows.rows as any[]).map((r) => {
+      const tableRows2 = rows.rows.map((r) => {
         const balance = parseFloat(r.ob) + parseFloat(r.total_debit) - parseFloat(r.total_credit);
         const b0 = parseFloat(r.bucket_0_30);
         const b1 = parseFloat(r.bucket_31_60);
@@ -260,7 +260,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "supplier_aging": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ name: string; ob: string; total_debit: string; total_credit: string; bucket_0_30: string; bucket_31_60: string; bucket_61_90: string; bucket_over_90: string }>(sql`
         SELECT la.name,
           COALESCE(CASE WHEN la.opening_balance_side = 'Dr' THEN -CAST(la.opening_balance AS numeric) ELSE CAST(la.opening_balance AS numeric) END, 0) AS ob,
           COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.credit_amount AS numeric) ELSE 0 END), 0) AS total_credit,
@@ -296,7 +296,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         sgTotal61_90 = 0,
         sgTotalOver90 = 0,
         sgTotalAll = 0;
-      const tableRows2 = (rows.rows as any[]).map((r) => {
+      const tableRows2 = rows.rows.map((r) => {
         const balance = parseFloat(r.ob) + parseFloat(r.total_credit) - parseFloat(r.total_debit);
         const b0 = parseFloat(r.bucket_0_30);
         const b1 = parseFloat(r.bucket_31_60);
@@ -339,7 +339,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
 
     case "container_list": {
       const statusFilter = params.containerStatus;
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ container_number: string; status: string; import_date: string | null; eta: string | null; supplier: string; grand_total: string; currency: string; transporter: string | null }>(sql`
         SELECT c.container_number, c.status, c.import_date, c.eta,
           s.legal_name AS supplier,
           CAST(c.grand_total AS numeric) AS grand_total,
@@ -352,7 +352,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY c.import_date DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows2 = (rows.rows as any[]).map((r) => [
+      const tableRows2 = rows.rows.map((r) => [
         r.container_number,
         r.status,
         String(r.import_date).slice(0, 10),
@@ -376,7 +376,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
 
     case "monthly_comparison": {
       const runPL = async (from: string, to: string) => {
-        const r = await db.execute(sql`
+        const r = await db.execute<{ revenue: string; expenses: string }>(sql`
           SELECT
             COALESCE(SUM(CASE WHEN la.account_type IN ('Income') THEN CAST(ve.credit_amount AS numeric) - CAST(ve.debit_amount AS numeric) ELSE 0 END), 0) AS revenue,
             COALESCE(SUM(CASE WHEN la.account_type IN ('Expense','Direct Expense','Indirect Expense') THEN CAST(ve.debit_amount AS numeric) - CAST(ve.credit_amount AS numeric) ELSE 0 END), 0) AS expenses
@@ -386,7 +386,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
           WHERE la.company_id = ${companyId}
             AND CAST(v.voucher_date AS text) BETWEEN ${from} AND ${to}
         `);
-        const row = r.rows[0] as unknown as { revenue: string } & { expenses: string };
+        const row = r.rows[0];
         const rev = parseFloat(row?.revenue || "0");
         const exp = parseFloat(row?.expenses || "0");
         return { revenue: rev, expenses: exp, net: rev - exp };
@@ -415,7 +415,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     case "rental_summary": {
       const currentYear = todayDate.getFullYear();
       const currentMonth = todayDate.getMonth() + 1;
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ unit_number: string; unit_type: string; location_group: string | null; tenant_name: string | null; rental_amount: string | null; contract_status: string | null; expected: string; paid: string }>(sql`
         SELECT pu.unit_number, pu.unit_type, pu.location_group,
           pc.tenant_name, CAST(pc.rental_amount AS numeric) AS rental_amount, pc.status AS contract_status,
           CAST(COALESCE(pml.expected_amount, 0) AS numeric) AS expected,
@@ -432,7 +432,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         totalPaid = 0,
         occupied = 0,
         vacant = 0;
-      const tableRows2 = (rows.rows as any[]).map((r) => {
+      const tableRows2 = rows.rows.map((r) => {
         const exp = parseFloat(r.expected || "0");
         const paid = parseFloat(r.paid || "0");
         totalExpected += exp;
@@ -477,7 +477,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
     }
 
     case "payroll_summary": {
-      const rows = await db.execute(sql`
+      const rows = await db.execute<{ worker_name: string; period_start: string; period_end: string; status: string; net_salary: string; base_salary: string; bale_earnings: string; deductions: string; present_days: string | null; absent_days: string | null }>(sql`
         SELECT fw.name AS worker_name,
           fp.period_start, fp.period_end, fp.status,
           CAST(fp.net_salary AS numeric) AS net_salary,
@@ -497,7 +497,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         totalBase = 0,
         totalBale = 0,
         totalDed = 0;
-      const tableRows2 = (rows.rows as any[]).map((r) => {
+      const tableRows2 = rows.rows.map((r) => {
         const net = parseFloat(r.net_salary || "0");
         totalNet += net;
         totalBase += parseFloat(r.base_salary || "0");
