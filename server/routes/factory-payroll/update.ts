@@ -303,10 +303,10 @@ export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: Re
           await tx
             .update(factoryPayrolls)
             .set({
+              // paymentSource/paymentReference are not columns on factory_payrolls;
+              // they live in the daybook entry metaJson written when the run is paid.
               status: "DRAFT",
               paidAt: null,
-              paymentSource: null,
-              paymentReference: null,
               approvedAt: null,
             })
             .where(eq(factoryPayrolls.id, id));

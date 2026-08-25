@@ -4,19 +4,43 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response, RequestHandler } from "express";
+import type { Express, Request, Response } from "express";
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { eq, and, sql } from "drizzle-orm";
 import { factorySettings, factoryBales, factoryMixBatches, factoryMixBatchSources } from "@shared/schema";
 
-export function registerFactoryMixOptimizeRoutes(app: Express, requireAuth: RequestHandler, db: any) {
+/** A caller-supplied material offered to the optimizer when no history exists. */
+type MixOptimizeMaterialInput = {
+  supplierId: number;
+  costPerKg: string | null;
+};
+
+/** Request body accepted by POST /api/factory/mix/optimize. */
+type MixOptimizeRequest = {
+  companyId?: number;
+  targetProductId: number;
+  desiredMarginPct?: number;
+  availableMaterials?: MixOptimizeMaterialInput[];
+};
+
+/** One proposed mix returned by the optimizer. */
+type MixOptimizeSuggestion = {
+  sources: Array<{ containerId?: number | null; supplierId?: number; kgRatio: number }>;
+  expectedCostPerBale: number;
+  expectedProfit: number;
+  historicalWastePct: number | null;
+};
+
+export function registerFactoryMixOptimizeRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   app.post("/api/factory/mix/optimize", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = req.body.companyId || req.session.factoryCompanyId || req.session.currentCompanyId;
+      const body = req.body as MixOptimizeRequest;
+      const companyId = body.companyId || req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { targetProductId, desiredMarginPct, availableMaterials } = req.body;
+      const { targetProductId, desiredMarginPct, availableMaterials } = body;
 
       const [settings] = await db.select().from(factorySettings).where(eq(factorySettings.companyId, companyId));
 
@@ -28,9 +52,11 @@ export function registerFactoryMixOptimizeRoutes(app: Express, requireAuth: Requ
         .from(factoryBales)
         .where(and(eq(factoryBales.companyId, companyId), eq(factoryBales.productId, targetProductId)));
 
-      const mixBatchIds = Array.from(new Set(balesForProduct.map((b) => b.mixBatchId).filter(Boolean))) as number[];
+      const mixBatchIds = Array.from(
+        new Set(balesForProduct.map((b) => b.mixBatchId).filter((id): id is number => id !== null))
+      );
 
-      let suggestions = [];
+      let suggestions: MixOptimizeSuggestion[] = [];
 
       if (mixBatchIds.length > 0) {
         const mixes = await db
@@ -38,7 +64,7 @@ export function registerFactoryMixOptimizeRoutes(app: Express, requireAuth: Requ
           .from(factoryMixBatches)
           .where(
             sql`${factoryMixBatches.id} IN (${sql.join(
-              mixBatchIds.map((id: number) => sql`${id}`),
+              mixBatchIds.map((id) => sql`${id}`),
               sql`, `
             )})`
           );
@@ -48,7 +74,7 @@ export function registerFactoryMixOptimizeRoutes(app: Express, requireAuth: Requ
           .from(factoryMixBatchSources)
           .where(
             sql`${factoryMixBatchSources.mixBatchId} IN (${sql.join(
-              mixBatchIds.map((id: number) => sql`${id}`),
+              mixBatchIds.map((id) => sql`${id}`),
               sql`, `
             )})`
           );

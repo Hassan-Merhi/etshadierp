@@ -4,7 +4,8 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response, RequestHandler } from "express";
+import type { Express, Request, Response } from "express";
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -23,7 +24,14 @@ import {
 
 import { balePhotoUpload } from "./_helpers";
 
-export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: RequestHandler, db: any) {
+/** One raw-material source line on a bale trace response. */
+type BaleTraceSource = {
+  supplier: { id: number; name: string } | null;
+  container: { id: number; containerNumber: string | null } | null;
+  kgUsed: number;
+};
+
+export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   app.get("/api/factory/bales/:id/trace", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -39,7 +47,7 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: R
       if (!bale) return res.status(404).json({ message: "Bale not found" });
 
       let mixBatch = null;
-      let sourcesData = [];
+      let sourcesData: BaleTraceSource[] = [];
 
       if (bale.mixBatchId) {
         const [mb] = await db.select().from(factoryMixBatches).where(eq(factoryMixBatches.id, bale.mixBatchId));
@@ -51,7 +59,9 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: R
             .from(factoryMixBatchSources)
             .where(eq(factoryMixBatchSources.mixBatchId, mixBatch.id));
 
-          const containerIds = mixSources.map((s) => s.containerId).filter(Boolean);
+          const containerIds = mixSources
+            .map((s) => s.containerId)
+            .filter((id): id is number => id !== null);
           const containers =
             containerIds.length > 0
               ? await db
@@ -59,15 +69,17 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: R
                   .from(factoryContainers)
                   .where(
                     sql`${factoryContainers.id} IN (${sql.join(
-                      containerIds.map((id: number) => sql`${id}`),
+                      containerIds.map((id) => sql`${id}`),
                       sql`, `
                     )})`
                   )
               : [];
 
-          const containerMap = new Map<number, any>(containers.map((c) => [c.id, c]));
+          const containerMap = new Map(containers.map((c) => [c.id, c]));
 
-          const supplierIds = Array.from(new Set(containers.map((c) => c.supplierId).filter(Boolean))) as number[];
+          const supplierIds = Array.from(
+            new Set(containers.map((c) => c.supplierId).filter((id): id is number => id !== null))
+          );
           const suppliers =
             supplierIds.length > 0
               ? await db
@@ -75,12 +87,12 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: R
                   .from(factorySuppliers)
                   .where(
                     sql`${factorySuppliers.id} IN (${sql.join(
-                      supplierIds.map((id: number) => sql`${id}`),
+                      supplierIds.map((id) => sql`${id}`),
                       sql`, `
                     )})`
                   )
               : [];
-          const supplierMap = new Map<number, any>(suppliers.map((s) => [s.id, s]));
+          const supplierMap = new Map(suppliers.map((s) => [s.id, s]));
 
           sourcesData = mixSources.map((s) => {
             const container = s.containerId ? containerMap.get(s.containerId) : null;

@@ -6,7 +6,6 @@ import { eq, and, inArray, gte, lte } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import { factoryAttendance, factoryWorkers } from "@shared/schema";
 
-import type { AppDb, AuthMiddleware } from "./routeBoundaryTypes";
 
 function getFactoryCompanyId(req: import("express").Request): number | undefined {
   return req.session.factoryCompanyId || req.session.currentCompanyId;

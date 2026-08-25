@@ -4,7 +4,8 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response, RequestHandler } from "express";
+import type { Express, Request, Response } from "express";
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
@@ -16,7 +17,7 @@ import { factoryWorkers } from "@shared/schema";
 
 import { getFactoryCompanyId, workerUpload, writeDaybookEntry } from "./_helpers";
 
-export function registerFactoryWorkerImportExportRoutes(app: Express, requireAuth: RequestHandler, db: any) {
+export function registerFactoryWorkerImportExportRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   // GET /api/factory/workers/template.xlsx - Download Excel import template
   app.get("/api/factory/workers/template.xlsx", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -247,20 +248,24 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
 
         // Determine next HMD code number for auto-assignment during import
         const importPrefix = "HMD";
-        let nextHmdNum = existingWorkers.reduce((max: number, w: { employeeCode: string }) => {
+        let nextHmdNum = existingWorkers.reduce((max: number, w) => {
           if (!w.employeeCode) return max;
           const m = w.employeeCode.match(new RegExp(`^${importPrefix}(\\d+)$`));
           return m ? Math.max(max, parseInt(m[1], 10)) : max;
         }, 0);
-        const byCode = new Map<string, any>(
-          existingWorkers.filter((w) => w.employeeCode).map((w) => [w.employeeCode, w])
-        );
-        const byPassport = new Map<string, any>(
-          existingWorkers.filter((w) => w.passportNumber).map((w) => [w.passportNumber, w])
-        );
-        const byNationalId = new Map<string, any>(
-          existingWorkers.filter((w) => w.nationalId).map((w) => [w.nationalId, w])
-        );
+
+        type ExistingWorker = (typeof existingWorkers)[number];
+        const indexBy = (key: keyof ExistingWorker): Map<string, ExistingWorker> => {
+          const index = new Map<string, ExistingWorker>();
+          for (const worker of existingWorkers) {
+            const value = worker[key];
+            if (typeof value === "string" && value) index.set(value, worker);
+          }
+          return index;
+        };
+        const byCode = indexBy("employeeCode");
+        const byPassport = indexBy("passportNumber");
+        const byNationalId = indexBy("nationalId");
 
         const parseDate = (v: number): string | null => {
           if (!v) return null;

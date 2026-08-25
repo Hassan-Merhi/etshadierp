@@ -12,7 +12,6 @@ import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import { checkFactoryAdmin } from "../factory/_helpers";
 import { eq, and, gte, lte, inArray } from "drizzle-orm";
-import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
 
 import {
   factoryWorkers,
@@ -64,7 +63,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
           )
         );
 
-      const balesByWorker = new Map();
+      const balesByWorker = new Map<number, (typeof balesInRange)[number][]>();
       for (const bale of balesInRange) {
         if (bale.finalizedBy) {
           const existing = balesByWorker.get(bale.finalizedBy) || [];

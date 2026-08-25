@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
-import type { db } from "../db";
+import type { Database } from "../db";
 
 /** Shared dependency contracts for split route-registration modules. */
 export type AuthMiddleware = RequestHandler;
-export type AppDb = typeof db;
+/** The Drizzle handle injected into route registrars; alias of the canonical `Database`. */
+export type AppDb = Database;

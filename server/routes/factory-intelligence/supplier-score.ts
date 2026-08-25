@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response, RequestHandler } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { eq, and, sql, gte, lte } from "drizzle-orm";
@@ -19,7 +19,7 @@ import {
   factorySuppliers,
 } from "@shared/schema";
 
-export function registerFactorySupplierScoreRoutes(app: Express, requireAuth: RequestHandler, db: any) {
+export function registerFactorySupplierScoreRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   app.get("/api/factory/suppliers/score", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -106,12 +106,16 @@ export function registerFactorySupplierScoreRoutes(app: Express, requireAuth: Re
 
       for (const suppId of Object.keys(supplierStats).map(Number)) {
         const supplierContainerIds = containers
-          .filter((c: { supplierId: number }) => c.supplierId === suppId)
-          .map((c: any) => c.id);
+          .filter((c) => c.supplierId === suppId)
+          .map((c) => c.id);
 
-        const supplierMixSources = mixSources.filter((s) => supplierContainerIds.includes(s.containerId));
-        const mixBatchIds = Array.from(new Set(supplierMixSources.map((s) => s.mixBatchId))) as number[];
-        const balesFromSupplier = allBales.filter((b: { mixBatchId: number }) => mixBatchIds.includes(b.mixBatchId));
+        const supplierMixSources = mixSources.filter(
+          (s) => s.containerId !== null && supplierContainerIds.includes(s.containerId)
+        );
+        const mixBatchIds = Array.from(new Set(supplierMixSources.map((s) => s.mixBatchId)));
+        const balesFromSupplier = allBales.filter(
+          (b) => b.mixBatchId !== null && mixBatchIds.includes(b.mixBatchId)
+        );
         supplierStats[suppId].outputBales = balesFromSupplier.length;
       }
 

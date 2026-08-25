@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response, RequestHandler } from "express";
+import type { Express, Request, Response } from "express";
 import { getClientDate } from "../../lib/dateUtils";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -21,7 +21,7 @@ import {
   containerDocumentTypes,
 } from "@shared/schema";
 
-export function registerFactoryAlertRoutes(app: Express, requireAuth: RequestHandler, db: any) {
+export function registerFactoryAlertRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   app.get("/api/factory/alerts", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -76,8 +76,7 @@ export function registerFactoryAlertRoutes(app: Express, requireAuth: RequestHan
 
       const alertExists = (type: string, entityType: string, entityId: number) => {
         return existingAlerts.some(
-          (a: { entityId: number; entityType: string; type: string }) =>
-            a.type === type && a.entityType === entityType && a.entityId === entityId
+          (a) => a.type === type && a.entityType === entityType && a.entityId === entityId
         );
       };
 
