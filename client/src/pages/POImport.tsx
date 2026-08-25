@@ -1,7 +1,6 @@
 import type { ClientErrorLike } from "@/lib/clientError";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 
 const formatCurrency = (num: number) => {
@@ -18,15 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { companyQueryKey } from "@/lib/companyQueryScope";
 import { useCompany } from "@/contexts/CompanyContext";
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download, Check, ChevronsUpDown, Printer } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Supplier } from "@shared/schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -104,7 +95,6 @@ function SupplierCombobox({
 }
 
 export default function POImport() {
-  const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [file, setFile] = useState<File | null>(null);
@@ -113,8 +103,6 @@ export default function POImport() {
   const [selectedSupplier, setSelectedSupplier] = useState<string>("");
   const [containerNumber, setContainerNumber] = useState<string>("");
   const [importDate, setImportDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
-  const [showPrintDialog, setShowPrintDialog] = useState(false);
-  const [importResult, setImportResult] = useState<any>(null);
   const [freightPaidBy, setFreightPaidBy] = useState<"supplier" | "parent">("supplier");
   const [freightParentAccountId, setFreightParentAccountId] = useState<string>("");
 
@@ -202,8 +190,6 @@ export default function POImport() {
         description: `Container ${data.containerNumber} imported with ${data.itemsCount} items`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
-      setImportResult(data);
-      setShowPrintDialog(true);
     },
     onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
@@ -653,39 +639,6 @@ export default function POImport() {
         </Card>
       )}
 
-      <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Import Successful</DialogTitle>
-            <DialogDescription>
-              Container {importResult?.containerNumber} was imported with {importResult?.itemsCount} items. Would you
-              like to print or view the container?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowPrintDialog(false);
-                if (importResult?.containerId) navigate(`/containers/${importResult.containerId}`);
-              }}
-              data-testid="button-skip-print"
-            >
-              Skip Print
-            </Button>
-            <Button
-              onClick={() => {
-                setShowPrintDialog(false);
-                if (importResult?.containerId) navigate(`/containers/${importResult.containerId}?print=true`);
-              }}
-              data-testid="button-print-container"
-            >
-              <Printer className="w-4 h-4 mr-2" />
-              Print
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
