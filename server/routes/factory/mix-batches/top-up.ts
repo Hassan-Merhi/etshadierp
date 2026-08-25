@@ -46,7 +46,7 @@ export function registerFactoryMixBatchTopUpRoutes(app: Express) {
         .from(factoryMixBatches)
         .where(and(eq(factoryMixBatches.id, id), eq(factoryMixBatches.companyId, companyId)));
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const [batch] = await tx
           .select()
           .from(factoryMixBatches)
@@ -169,7 +169,7 @@ export function registerFactoryMixBatchTopUpRoutes(app: Express) {
           if (ctnSupplierId2) {
             costUsd = await getLockedSupplierRate(tx, companyId, ctnSupplierId2, { forUpdate: true });
           } else {
-            costUsd = parseFloat(rawStockRow.costPerKgUsd) || parseFloat(rawStockRow.costPerKg) || 0;
+            costUsd = parseFloat(rawStockRow.costPerKgUsd || "0") || parseFloat(rawStockRow.costPerKg || "0") || 0;
           }
 
           // Allow over-use: usedKg may exceed receivedKg, driving stock negative

@@ -95,7 +95,7 @@ export function registerPayrollVoucherBackfillRoutes(app: Express) {
 
       const backfilledIds: number[] = [];
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         const payrollAccountCache = new Map<number, number>();
 
         for (const cid of companyIds) {
@@ -106,10 +106,10 @@ export function registerPayrollVoucherBackfillRoutes(app: Express) {
 
           if (!found) {
             const [maxCode] = await tx
-              .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+              .select({ maxCode: sql<number | null>`MAX(CAST(code AS INTEGER))` })
               .from(ledgerAccounts)
               .where(and(eq(ledgerAccounts.companyId, cid), sql`code ~ '^\d+$'`));
-            const nextCode = String((parseInt(maxCode?.maxCode || "0") || 0) + 1);
+            const nextCode = String((maxCode?.maxCode ?? 0) + 1);
             [found] = await tx
               .insert(ledgerAccounts)
               .values({

@@ -132,7 +132,7 @@ export function registerOrderBaleSwapRoutes(app: Express) {
         .where(and(eq(customerOrders.id, orderBale.orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Associated order not found" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // 5. Update customerOrderBales to point to the replacement bale (keep priceUsed unchanged)
         await tx
           .update(customerOrderBales)
@@ -212,7 +212,7 @@ export function registerOrderBaleSwapRoutes(app: Express) {
           if (daybookEntry) {
             await tx
               .update(factoryDaybookEntries)
-              .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
+              .set({ amountCurrency: String(newGrandTotal), amountUsd: String(newGrandTotal) })
               .where(eq(factoryDaybookEntries.id, daybookEntry.id));
           }
         }
@@ -238,7 +238,7 @@ export function registerOrderBaleSwapRoutes(app: Express) {
           if (verifiedEntry) {
             await tx
               .update(factoryDaybookEntries)
-              .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
+              .set({ amountCurrency: String(newGrandTotal), amountUsd: String(newGrandTotal) })
               .where(eq(factoryDaybookEntries.id, verifiedEntry.id));
           }
         }

@@ -72,10 +72,10 @@ export async function findOrCreateLedger(
 
   for (let attempt = 0; attempt < 5; attempt++) {
     const [maxCodeRow] = await db
-      .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+      .select({ maxCode: sql<number | null>`MAX(CAST(code AS INTEGER))` })
       .from(ledgerAccounts)
       .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
-    const nextCode = String((parseInt((maxCodeRow as { maxCode: string })?.maxCode || "0") || 0) + 1 + attempt);
+    const nextCode = String((maxCodeRow?.maxCode ?? 0) + 1 + attempt);
     try {
       const [created] = await db
         .insert(ledgerAccounts)

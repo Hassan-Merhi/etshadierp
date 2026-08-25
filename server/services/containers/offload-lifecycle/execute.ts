@@ -16,13 +16,17 @@ import {
   buildItemMap,
   positiveIds,
 } from "./types";
+import { firstRow } from "../../../lib/queryResult";
+
+/** The inventory row an offload locks FOR UPDATE before rewriting its cost. */
+type InventoryLockRow = { id: number; quantity: string; total_value: string };
 
 const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export async function executeContainerOffloadLifecycle(
   input: ContainerOffloadLifecycleInput
 ): Promise<ContainerOffloadLifecycleResult> {
-  return db.transaction(async (tx: any) => {
+  return db.transaction(async (tx) => {
     const [container] = await tx
       .select()
       .from(schema.containers)
@@ -163,7 +167,7 @@ export async function executeContainerOffloadLifecycle(
       const correctionRows = await tx.execute(
         sql`SELECT * FROM inventory WHERE location_id = ${input.locationId} AND stock_item_id = ${correction.stockItemId} FOR UPDATE`
       );
-      const row = correctionRows.rows?.[0] ?? correctionRows[0];
+      const row = firstRow<InventoryLockRow>(correctionRows);
       if (!row) continue;
       const existingQuantity = amount(row.quantity);
       if (existingQuantity <= 0) continue;
@@ -206,7 +210,7 @@ export async function executeContainerOffloadLifecycle(
       const inventoryRows = await tx.execute(
         sql`SELECT * FROM inventory WHERE location_id = ${input.locationId} AND stock_item_id = ${stockItemId} FOR UPDATE`
       );
-      const current = inventoryRows.rows?.[0] ?? inventoryRows[0];
+      const current = firstRow<InventoryLockRow>(inventoryRows);
       if (current) {
         const currentQuantity = amount(current.quantity);
         const currentValue = amount(current.total_value);

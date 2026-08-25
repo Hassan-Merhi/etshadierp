@@ -33,7 +33,7 @@ export function registerDispatchBaleScanRoutes(app: Express) {
       const { barcode } = req.body;
       if (!barcode) return res.status(400).json({ message: "barcode is required" });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         // 1. Validate ride
         const [ride] = await tx
           .select()
@@ -64,7 +64,7 @@ export function registerDispatchBaleScanRoutes(app: Express) {
         `);
         const bale = firstRow<{
           id: number;
-          referenceNumber: string | null;
+          referenceNumber: string;
           articleCode: string | null;
           productName: string | null;
           weightKg: string | null;

@@ -157,7 +157,7 @@ export function registerOrderBaleRemovalRoutes(app: Express) {
         });
       }
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // 5. Remove from customer_order_bales
         await tx.delete(customerOrderBales).where(eq(customerOrderBales.id, orderBale.id));
 
@@ -220,7 +220,7 @@ export function registerOrderBaleRemovalRoutes(app: Express) {
           if (daybookEntry) {
             await tx
               .update(factoryDaybookEntries)
-              .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
+              .set({ amountCurrency: String(newGrandTotal), amountUsd: String(newGrandTotal) })
               .where(eq(factoryDaybookEntries.id, daybookEntry.id));
           }
         }
@@ -246,7 +246,7 @@ export function registerOrderBaleRemovalRoutes(app: Express) {
           if (verifiedEntry) {
             await tx
               .update(factoryDaybookEntries)
-              .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
+              .set({ amountCurrency: String(newGrandTotal), amountUsd: String(newGrandTotal) })
               .where(eq(factoryDaybookEntries.id, verifiedEntry.id));
           }
         }
