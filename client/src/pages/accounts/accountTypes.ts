@@ -141,16 +141,6 @@ export interface AccountStatementViewProps {
   exportLabels: any;
 }
 
-export interface AccountTableProps {
-  filteredAccounts: any[];
-  expandedParents: Set<string>;
-  toggleParent: (id: string) => void;
-  handleAccountChange: (id: string) => void;
-  hideBalances: boolean;
-  formatAmount: (amt: number) => string;
-  onEdit?: (account: any) => void;
-}
-
 export const exportLabels: Record<
   string,
   {
