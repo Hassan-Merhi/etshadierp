@@ -108,7 +108,7 @@ export function registerAdvanceCashRoutes(app: Express) {
         .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
       if (!cashAcct) return res.status(400).json({ message: "Cash account not found" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // Resolve or auto-create the contra "Factory Advance Adjustments" account
         let [adjAccount] = await tx
           .select({ id: ledgerAccounts.id })
@@ -116,10 +116,10 @@ export function registerAdvanceCashRoutes(app: Express) {
           .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Advance Adjustments")));
         if (!adjAccount) {
           const maxCodeResult = await tx
-            .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+            .select({ maxCode: sql<number | null>`MAX(CAST(code AS INTEGER))` })
             .from(ledgerAccounts)
             .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
-          const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
+          const nextCode = String((maxCodeResult[0]?.maxCode ?? 0) + 1);
           [adjAccount] = await tx
             .insert(ledgerAccounts)
             .values({

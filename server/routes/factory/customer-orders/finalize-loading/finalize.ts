@@ -28,6 +28,7 @@ import {
   vouchers,
 } from "@shared/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
+import { firstRow } from "../../../../lib/queryResult";
 
 export function registerOrderFinalizeRoutes(app: Express) {
   app.post("/api/factory/customer-orders/:id/finalize", requireAuth, async (req: Request, res: Response) => {
@@ -39,7 +40,7 @@ export function registerOrderFinalizeRoutes(app: Express) {
 
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const [order] = await tx
           .select()
           .from(customerOrders)
@@ -85,9 +86,12 @@ export function registerOrderFinalizeRoutes(app: Express) {
         const seqRows = await tx.execute(
           sql`SELECT * FROM customer_invoice_sequences WHERE company_id = ${companyId} FOR UPDATE`
         );
-        let seqRow = seqRows.rows?.[0] || seqRows[0];
+        // The raw row is snake_case; the insert fallback returns the camelCase column.
+        let seqRow = firstRow<{ next_number: number }>(seqRows) as
+          { next_number: number; nextNumber?: number } | undefined;
         if (!seqRow) {
-          [seqRow] = await tx.insert(customerInvoiceSequences).values({ companyId, nextNumber: 1 }).returning();
+          const [inserted] = await tx.insert(customerInvoiceSequences).values({ companyId, nextNumber: 1 }).returning();
+          seqRow = { next_number: inserted.nextNumber, nextNumber: inserted.nextNumber };
         }
         const invoiceNum = seqRow.nextNumber || seqRow.next_number;
         await tx
@@ -259,7 +263,9 @@ export function registerOrderFinalizeRoutes(app: Express) {
       });
 
       const today = req.body.txDate || req.body.invoiceDate || getClientDate(req);
-      const invoiceRefId = result.orderId || orderId;
+      // The transaction result spreads a customer_orders row, which keys the order
+      // by `id`; the old `result.orderId` lookup was always undefined.
+      const invoiceRefId = orderId;
       // Remove any previous INVOICE and INVOICE_REVERTED rows so only this approval shows
       await db
         .delete(factoryDaybookEntries)
@@ -338,7 +344,9 @@ export function registerOrderFinalizeRoutes(app: Express) {
           : [];
       const locationMap = new Map(locationRecords.map((l) => [l.id, l.name]));
 
-      const availableBales = baleRows.filter((b: { status: string }) => ["IN_STOCK", "RESERVED_FOR_ORDER"].includes(b.status));
+      const availableBales = baleRows.filter((b: { status: string }) =>
+        ["IN_STOCK", "RESERVED_FOR_ORDER"].includes(b.status)
+      );
 
       res.json({
         baleCount: availableBales.length,

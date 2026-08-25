@@ -192,7 +192,8 @@ export function registerPosSaleWriteRoutes(app: Express) {
           amountCurrency: totalAmount.toFixed(2),
           fxRateToUsd: "1",
           amountUsd: totalAmount.toFixed(2),
-          createdBy: userId,
+          // factory_daybook_entries.created_by is a varchar column.
+          createdBy: userId === null ? null : String(userId),
         });
 
         // 4b. Create daybook entries for each expense/deduction
@@ -208,7 +209,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
             amountCurrency: exp.amount.toFixed(2),
             fxRateToUsd: "1",
             amountUsd: exp.amount.toFixed(2),
-            createdBy: userId,
+            createdBy: userId === null ? null : String(userId),
           });
         }
 

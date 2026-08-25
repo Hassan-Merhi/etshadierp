@@ -11,11 +11,24 @@
  * columns always store the historical base (USD) value so legacy queries keep working.
  */
 import { db } from "../../db";
+import type { DbTransaction } from "../../db";
 import { logger } from "../../lib/logger";
 import { storage } from "../../storage";
 import { ledgerAccounts, voucherEntries } from "@shared/schema";
+
+/**
+ * The voucher-entry row a POS sale inserts. The account key is filled in after
+ * construction (ledger, bank, or customer), so it starts out partial.
+ */
+type PosVoucherEntryValues = typeof voucherEntries.$inferInsert;
 import { eq, and, isNull } from "drizzle-orm";
-import type { HandlerErrorResult, SupplierPartnerAccountingContext, ValidatedInventoryItem } from "./posSaleTypes";
+import type {
+  HandlerErrorResult,
+  PosLedgerAccount,
+  PosLocation,
+  SupplierPartnerAccountingContext,
+  ValidatedInventoryItem,
+} from "./posSaleTypes";
 import { findLinkedCustomerId } from "./updateCustomerBalance";
 import { normalizeVoucherEntryAmounts } from "../../services/accounting/currencyAmounts";
 
@@ -27,7 +40,7 @@ import { normalizeVoucherEntryAmounts } from "../../services/accounting/currency
  */
 export async function getOrCreateSalesRevenueAccount(
   companyId: number
-): Promise<{ salesAccount: any } | { error: HandlerErrorResult }> {
+): Promise<{ salesAccount: PosLedgerAccount } | { error: HandlerErrorResult }> {
   const salesAccount = await storage.getOrCreateLedgerAccount({
     companyId,
     code: "SALES",
@@ -59,7 +72,7 @@ export async function getOrCreateSalesRevenueAccount(
 export async function fetchSupplierPartnerAccountingContext(
   isSpCompany: boolean,
   companyId: number,
-  location: any,
+  location: PosLocation,
   inventoryValidation: ValidatedInventoryItem[]
 ): Promise<SupplierPartnerAccountingContext | { error: HandlerErrorResult }> {
   // Per-qty deduction that silently reduces Supplier Cash Payable (not income/expense)
@@ -204,19 +217,19 @@ function normalizePosEntry(
 
 /** Insert the Dr (payment) + Cr (Sales revenue, or SP-split) voucher entries for a POS sale. */
 export async function insertSaleAccountingEntries(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  tx: DbTransaction,
   params: {
     txVoucherId: number;
     voucherNumber: string;
     grandTotal: number;
-    isCreditSale: any;
+    isCreditSale: boolean | null | undefined;
     accountType: "cash" | "bank" | "credit";
     accountId: number;
-    location: any;
-    customerAccount: any;
+    location: PosLocation;
+    customerAccount: PosLedgerAccount | null;
     companyId: number;
     isSpCompany: boolean;
-    salesAccount: any;
+    salesAccount: PosLedgerAccount;
     spCtx: SupplierPartnerAccountingContext;
     /** Voucher transaction currency (e.g. "CFA", "USD"). Defaults to "USD". */
     currency?: string | null;
@@ -261,12 +274,12 @@ export async function insertSaleAccountingEntries(
   }
 
   const creditSaleNarration = isCreditSale
-    ? `Credit Invoice Sale at ${location.name} - ${customerAccount.name}`
+    ? `Credit Invoice Sale at ${location.name} - ${customerAccount?.name ?? ""}`
     : `POS Sale - ${voucherNumber}`;
 
   // Debit entry (cash / bank / receivable account)
   const normDR = normalizePosEntry(toTxAmt(Math.abs(grandTotal)), 0, currency || "USD", exchangeRate);
-  const debitEntry: any = {
+  const debitEntry: PosVoucherEntryValues = {
     voucherId: txVoucherId,
     debitAmount: grandTotal >= 0 ? normDR.debitAmount : "0",
     creditAmount: grandTotal < 0 ? normDR.debitAmount : "0", // reversals have opposite sign

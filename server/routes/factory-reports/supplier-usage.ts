@@ -4,7 +4,8 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request, Response, RequestHandler } from "express";
+import type { Express, Request, Response } from "express";
+import type { AppDb, AuthMiddleware } from "../routeBoundaryTypes";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
@@ -22,7 +23,7 @@ import {
 import { getUserHideAllCosts } from "../factory/_helpers";
 import { generateEmptyExcel, generateEmptyPdf, generateExcel, generatePdf, writeDaybookEntry } from "./_helpers";
 
-export function registerFactorySupplierUsageReportRoutes(app: Express, requireAuth: RequestHandler, db: any) {
+export function registerFactorySupplierUsageReportRoutes(app: Express, requireAuth: AuthMiddleware, db: AppDb) {
   app.post("/api/factory/reports/supplier-usage", requireAuth, async (req: Request, res: Response) => {
     try {
       const hideAllCosts = await getUserHideAllCosts(req);
@@ -51,7 +52,7 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
         .from(factoryContainers)
         .where(and(...containerConditions));
 
-      const containerIds = allContainers.map((c: any) => c.id);
+      const containerIds = allContainers.map((c) => c.id);
 
       if (containerIds.length === 0) {
         if (format === "pdf") {
@@ -76,7 +77,7 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
         .from(factoryRawStock)
         .where(eq(factoryRawStock.companyId, companyId));
 
-      const relevantRawStock = allRawStock.filter((rs: any) => containerIds.includes(rs.containerId));
+      const relevantRawStock = allRawStock.filter((rs) => containerIds.includes(rs.containerId));
 
       const allMixSources = await db
         .select({
@@ -127,7 +128,7 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
       }
 
       const supplierSummaries = [];
-      const supplierGroups = new Map<number, unknown[]>();
+      const supplierGroups = new Map<number, (typeof allContainers)[number][]>();
 
       for (const container of allContainers) {
         const sid = container.supplierId || 0;
@@ -140,9 +141,9 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
       for (const [sid, sContainers] of Array.from(supplierGroups.entries())) {
         const supplier = supplierMap.get(sid);
         const supplierName = supplier ? supplier.name : `Unknown (ID: ${sid})`;
-        const sContainerIds = sContainers.map((c: any) => c.id);
+        const sContainerIds = sContainers.map((c) => c.id);
 
-        const sRawStock = relevantRawStock.filter((rs: any) => sContainerIds.includes(rs.containerId));
+        const sRawStock = relevantRawStock.filter((rs) => sContainerIds.includes(rs.containerId));
 
         let openingReceivedKg = 0;
         let openingUsedKg = 0;
@@ -159,7 +160,7 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
 
           const receivedKg = parseFloat(rs.receivedKg || "0");
           const usedKg = parseFloat(rs.usedKg || "0");
-          const cpk = parseFloat(rs.costPerKgUsd) || parseFloat(rs.costPerKg) || 0;
+          const cpk = parseFloat(rs.costPerKgUsd || "0") || parseFloat(rs.costPerKg || "0") || 0;
 
           if (rsDate < startDate) {
             openingReceivedKg += receivedKg;
@@ -174,7 +175,9 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
           }
         }
 
-        const sMixSources = allMixSources.filter((ms: any) => sContainerIds.includes(ms.containerId));
+        const sMixSources = allMixSources.filter(
+          (ms) => ms.containerId !== null && sContainerIds.includes(ms.containerId)
+        );
 
         let periodUsedKg = 0;
         for (const ms of sMixSources) {
@@ -195,9 +198,9 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
           }
         }
 
-        const sBales = allBales.filter((b: any) => b.mixBatchId && sMixBatchIds.has(b.mixBatchId));
+        const sBales = allBales.filter((b) => b.mixBatchId && sMixBatchIds.has(b.mixBatchId));
 
-        const periodBales = sBales.filter((b: any) => {
+        const periodBales = sBales.filter((b) => {
           const bDate = b.finalizedAt
             ? new Date(b.finalizedAt).toISOString().split("T")[0]
             : b.createdAt
@@ -231,8 +234,8 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
       const baleBreakdown = [];
       for (const summary of supplierSummaries) {
         for (const bale of summary.bales) {
-          const mixSources = allMixSources.filter((ms: any) => ms.mixBatchId === bale.mixBatchId);
-          const materials = mixSources.map((ms: any) => {
+          const mixSources = allMixSources.filter((ms) => ms.mixBatchId === bale.mixBatchId);
+          const materials = mixSources.map((ms) => {
             const container = containerMap.get(ms.containerId);
             return {
               containerId: ms.containerId,

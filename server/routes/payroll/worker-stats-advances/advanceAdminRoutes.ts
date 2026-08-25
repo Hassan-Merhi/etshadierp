@@ -40,7 +40,7 @@ export function registerWorkerAdvanceAdminRoutes(app: Express) {
         if (!acct) return res.status(400).json({ message: "Cash account not found for this company" });
       }
 
-      const results = await db.transaction(async (tx: any) => {
+      const results = await db.transaction(async (tx) => {
         // Resolve or create the "Factory Worker Advances" ledger account once
         let advancesAccountId: number | null = null;
         if (cashAccountId) {
@@ -50,10 +50,10 @@ export function registerWorkerAdvanceAdminRoutes(app: Express) {
             .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Worker Advances")));
           if (!advancesAccount) {
             const maxCodeResult = await tx
-              .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+              .select({ maxCode: sql<number | null>`MAX(CAST(code AS INTEGER))` })
               .from(ledgerAccounts)
               .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\d+$'`));
-            const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
+            const nextCode = String((maxCodeResult[0]?.maxCode ?? 0) + 1);
             [advancesAccount] = await tx
               .insert(ledgerAccounts)
               .values({

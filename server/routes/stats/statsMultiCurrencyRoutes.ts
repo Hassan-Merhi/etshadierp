@@ -13,7 +13,39 @@ function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
-function rebuildBreakdown(accounts: any[]): Array<{ name: string; value: number }> {
+/** One account line in a net-position side. */
+type NetPositionAccountRow = {
+  id?: number;
+  name: string;
+  code?: string | null;
+  value: number;
+  category?: string;
+  currencyRevalued?: boolean;
+  nativeBalancesByCurrency?: unknown;
+  historicalBaseBalance?: unknown;
+  currentTranslatedBaseBalance?: unknown;
+  translationDifference?: unknown;
+};
+
+/** One side (for-us / on-us) of the net-position payload. */
+type NetPositionSide = {
+  accounts: NetPositionAccountRow[];
+  total: number;
+  breakdown?: Array<{ name: string; value: number }>;
+};
+
+/** The net-position payload this route re-translates in place. */
+type NetPositionPayload = {
+  forUs?: NetPositionSide;
+  onUs?: NetPositionSide;
+  forUsTotal?: number;
+  onUsTotal?: number;
+  netPosition?: number;
+  currency?: Record<string, unknown> & { currentCashBankTranslationApplied?: boolean };
+  currencyRevaluation?: Record<string, unknown>;
+} & Record<string, unknown>;
+
+function rebuildBreakdown(accounts: NetPositionAccountRow[]): Array<{ name: string; value: number }> {
   const totals = new Map<string, number>();
   for (const account of accounts) {
     const category = account.category || "Other";
@@ -25,7 +57,7 @@ function rebuildBreakdown(accounts: any[]): Array<{ name: string; value: number 
     .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
 }
 
-function applyCurrentCashTranslation(payload: any, summaries: CashBankCurrencySummary[]) {
+function applyCurrentCashTranslation(payload: NetPositionPayload, summaries: CashBankCurrencySummary[]) {
   if (!payload?.forUs || !payload?.onUs) return payload;
 
   const resolved = summaries.filter((row) => row.currentTranslatedBaseBalance !== null);
@@ -33,11 +65,15 @@ function applyCurrentCashTranslation(payload: any, summaries: CashBankCurrencySu
 
   const oldForUsAccounts = Array.isArray(payload.forUs.accounts) ? payload.forUs.accounts : [];
   const oldOnUsAccounts = Array.isArray(payload.onUs.accounts) ? payload.onUs.accounts : [];
-  const removedForUs = oldForUsAccounts.filter((row: any) => row.id && resolvedLedgerIds.has(row.id));
-  const removedOnUs = oldOnUsAccounts.filter((row: any) => row.id && resolvedLedgerIds.has(row.id));
+  const removedForUs = oldForUsAccounts.filter((row: NetPositionAccountRow) => row.id && resolvedLedgerIds.has(row.id));
+  const removedOnUs = oldOnUsAccounts.filter((row: NetPositionAccountRow) => row.id && resolvedLedgerIds.has(row.id));
 
-  const forUsAccounts = oldForUsAccounts.filter((row: any) => !row.id || !resolvedLedgerIds.has(row.id));
-  const onUsAccounts = oldOnUsAccounts.filter((row: any) => !row.id || !resolvedLedgerIds.has(row.id));
+  const forUsAccounts = oldForUsAccounts.filter(
+    (row: NetPositionAccountRow) => !row.id || !resolvedLedgerIds.has(row.id)
+  );
+  const onUsAccounts = oldOnUsAccounts.filter(
+    (row: NetPositionAccountRow) => !row.id || !resolvedLedgerIds.has(row.id)
+  );
 
   let forUsTotal = new Decimal(payload.forUs.total ?? payload.forUsTotal ?? 0);
   let onUsTotal = new Decimal(payload.onUs.total ?? payload.onUsTotal ?? 0);
@@ -71,8 +107,8 @@ function applyCurrentCashTranslation(payload: any, summaries: CashBankCurrencySu
   const onUsRounded = round2(onUsTotal.toNumber());
   const netPosition = round2(forUsRounded - onUsRounded);
 
-  payload.forUs.accounts = forUsAccounts.sort((a: any, b: any) => Number(b.value || 0) - Number(a.value || 0));
-  payload.onUs.accounts = onUsAccounts.sort((a: any, b: any) => Number(b.value || 0) - Number(a.value || 0));
+  payload.forUs.accounts = forUsAccounts.sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+  payload.onUs.accounts = onUsAccounts.sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
   payload.forUs.total = forUsRounded;
   payload.onUs.total = onUsRounded;
   payload.forUs.breakdown = rebuildBreakdown(payload.forUs.accounts);

@@ -5,6 +5,8 @@ declare module "express-session" {
     csrfToken?: string;
     role?: string;
     factoryRole?: string;
+    /** Epoch ms until which a factory admin override grants elevated access. */
+    factoryAdminOverrideUntil?: number;
     currentCompanyName?: string | null;
     ip?: string | null;
     userAgent?: string | null;

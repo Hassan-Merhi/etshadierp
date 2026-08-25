@@ -77,10 +77,10 @@ async function _findOrCreateLedger(companyId: number, name: string, accountType:
 
   for (let attempt = 0; attempt < 5; attempt++) {
     const [maxCodeRow] = await db
-      .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+      .select({ maxCode: sql<number | null>`MAX(CAST(code AS INTEGER))` })
       .from(ledgerAccounts)
       .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
-    const nextCode = String((parseInt((maxCodeRow as { maxCode: string })?.maxCode || "0") || 0) + 1 + attempt);
+    const nextCode = String((maxCodeRow?.maxCode ?? 0) + 1 + attempt);
     try {
       const [created] = await db
         .insert(ledgerAccounts)
@@ -488,7 +488,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
         .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
       if (!acct) return res.status(400).json({ message: "Cash account not found for this company" });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const allAdvances = await tx
           .select({
             id: factoryWorkerAdvances.id,
@@ -512,8 +512,8 @@ export function registerAdvanceManagementRoutes(app: Express) {
           if (match) alreadyPostedIds.add(parseInt(match[1]));
         }
 
-        const eligible = allAdvances.filter((a: { cashAccountId: null; id: number }) => !alreadyPostedIds.has(a.id) || a.cashAccountId === null);
-        const eligibleIds = new Set(eligible.map((a: any) => a.id));
+        const eligible = allAdvances.filter((a) => !alreadyPostedIds.has(a.id) || a.cashAccountId === null);
+        const eligibleIds = new Set(eligible.map((a) => a.id));
 
         if (eligibleIds.size === 0) {
           return { posted: 0, skipped: 0 };
@@ -526,10 +526,10 @@ export function registerAdvanceManagementRoutes(app: Express) {
 
         if (!advancesAccount) {
           const maxCodeResult = await tx
-            .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+            .select({ maxCode: sql<number | null>`MAX(CAST(code AS INTEGER))` })
             .from(ledgerAccounts)
             .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\d+$'`));
-          const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
+          const nextCode = String((maxCodeResult[0]?.maxCode ?? 0) + 1);
 
           [advancesAccount] = await tx
             .insert(ledgerAccounts)
@@ -643,7 +643,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
       const ids = advanceIds.map((x) => parseInt(x)).filter((x: number) => !isNaN(x));
       const today = getClientDate(req);
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         // Load the advance records we're updating (need amount, date, workerId)
         const advanceRows = await tx
           .select()
@@ -668,10 +668,10 @@ export function registerAdvanceManagementRoutes(app: Express) {
           .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Worker Advances")));
         if (!advancesAccount) {
           const maxCodeResult = await tx
-            .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+            .select({ maxCode: sql<number | null>`MAX(CAST(code AS INTEGER))` })
             .from(ledgerAccounts)
             .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
-          const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
+          const nextCode = String((maxCodeResult[0]?.maxCode ?? 0) + 1);
           [advancesAccount] = await tx
             .insert(ledgerAccounts)
             .values({
@@ -726,8 +726,8 @@ export function registerAdvanceManagementRoutes(app: Express) {
               .where(eq(voucherEntries.voucherId, voucherId));
 
             const creditEntry = entries
-              .filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
-              .sort((a: { creditAmount: string }, b: { creditAmount: string }) => parseFloat(b.creditAmount) - parseFloat(a.creditAmount))[0];
+              .filter((e) => parseFloat(e.creditAmount || "0") > 0)
+              .sort((a, b) => parseFloat(b.creditAmount || "0") - parseFloat(a.creditAmount || "0"))[0];
 
             if (creditEntry) {
               await tx

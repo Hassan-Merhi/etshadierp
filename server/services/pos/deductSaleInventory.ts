@@ -9,7 +9,12 @@ import { adjustInventory } from "../../inventoryHelper";
 import { inventoryQuantity, inventoryUnitCost, toInventoryDecimal } from "../../lib/inventoryMath";
 import { createDatabaseStockMovementAdapter } from "../inventory/databaseStockMovementAdapter";
 import { postStockMovementTx } from "../inventory/stockMovementIntegrityService";
+import type { DbTransaction } from "../../db";
+import { firstRow } from "../../lib/queryResult";
 import type { ValidatedInventoryItem } from "./posSaleTypes";
+
+/** The inventory row a sale locks FOR UPDATE before deducting from it. */
+type LockedStockRow = { quantity: string; average_rate: string; item_name: string | null };
 
 const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
@@ -19,9 +24,9 @@ export interface LockedInventoryResult {
 }
 
 export async function lockAndDeductInventoryForSaleItem(
-  tx: any,
+  tx: DbTransaction,
   parsedLocationId: number,
-  locationId: any,
+  locationId: number,
   validatedItem: ValidatedInventoryItem,
   canSellNegativeStock: boolean,
   companyId: number,
@@ -36,7 +41,7 @@ export async function lockAndDeductInventoryForSaleItem(
     WHERE i.location_id = ${parsedLocationId} AND i.stock_item_id = ${item.stockItemId}
     FOR UPDATE OF i
   `);
-  const lockedRow = stockLockResult.rows?.[0] ?? stockLockResult[0];
+  const lockedRow = firstRow<LockedStockRow>(stockLockResult);
   const lockedQuantity = toInventoryDecimal(lockedRow?.quantity);
   const requestedQuantity = toInventoryDecimal(saleQty);
 

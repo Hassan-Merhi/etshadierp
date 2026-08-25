@@ -98,7 +98,7 @@ export function registerAdvanceRepaymentRoutes(app: Express) {
         .from(factoryWorkers)
         .where(eq(factoryWorkers.id, advance.workerId));
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const [repayment] = await tx
           .insert(factoryAdvanceRepayments)
           .values({
@@ -131,10 +131,10 @@ export function registerAdvanceRepaymentRoutes(app: Express) {
 
           if (!advancesAccount) {
             const maxCodeResult = await tx
-              .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+              .select({ maxCode: sql<number | null>`MAX(CAST(code AS INTEGER))` })
               .from(ledgerAccounts)
               .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
-            const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
+            const nextCode = String((maxCodeResult[0]?.maxCode ?? 0) + 1);
             [advancesAccount] = await tx
               .insert(ledgerAccounts)
               .values({

@@ -246,7 +246,7 @@ export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: Re
         .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Payroll record not found" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         const advDeducted = parseFloat(existing.advances || "0");
         if (advDeducted > 0) {
           const repayments = await tx
@@ -292,7 +292,7 @@ export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: Re
             and(eq(vouchers.companyId, companyId), sql`${vouchers.voucherNumber} LIKE ${"PAYMENT-PAY-" + id + "-%"}`)
           );
         if (paymentVouchers.length > 0) {
-          const voucherIds = paymentVouchers.map((voucher: any) => voucher.id);
+          const voucherIds = paymentVouchers.map((voucher) => voucher.id);
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, voucherIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, voucherIds));
         }
@@ -303,10 +303,10 @@ export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: Re
           await tx
             .update(factoryPayrolls)
             .set({
+              // paymentSource/paymentReference are not columns on factory_payrolls;
+              // they live in the daybook entry metaJson written when the run is paid.
               status: "DRAFT",
               paidAt: null,
-              paymentSource: null,
-              paymentReference: null,
               approvedAt: null,
             })
             .where(eq(factoryPayrolls.id, id));

@@ -4,6 +4,7 @@
  * Extracted verbatim from the former single-file factoryPayrollRoutes.ts.
  */
 import { factoryDaybookEntries } from "@shared/schema";
+import type { DatabaseOrTransaction } from "../../db";
 
 /**
  * Daybook writing and the pro-rata pay calculations shared by the payroll
@@ -12,7 +13,7 @@ import { factoryDaybookEntries } from "@shared/schema";
  * Declared at module scope so those handlers can live in separate modules.
  */
 export async function writeDaybookEntry(
-  dbOrTx: any,
+  dbOrTx: DatabaseOrTransaction,
   opts: {
     companyId: number;
     txDate: string;

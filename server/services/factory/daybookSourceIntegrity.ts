@@ -21,6 +21,7 @@
 import { pool } from "../../db";
 import { factoryDaybookEntries } from "@shared/schema";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import type { DatabaseOrTransaction } from "../../db";
 
 // ── Source group definition ─────────────────────────────────────────────────
 
@@ -89,14 +90,7 @@ export const SOURCE_GROUPS: SourceGroup[] = [
   {
     // FREIGHT / DUTY / FREIGHT_PAYMENT / OTHER_CHARGE all store the container id
     // as referenceId.  CONTAINER_IMPORT and PURCHASE store the container id too.
-    txTypes: [
-      "CONTAINER_IMPORT",
-      "PURCHASE",
-      "FREIGHT",
-      "DUTY",
-      "FREIGHT_PAYMENT",
-      "OTHER_CHARGE",
-    ],
+    txTypes: ["CONTAINER_IMPORT", "PURCHASE", "FREIGHT", "DUTY", "FREIGHT_PAYMENT", "OTHER_CHARGE"],
     sourceTable: "factory_containers",
     companyCol: "company_id",
     deletedAtCol: "deleted_at",
@@ -239,10 +233,7 @@ export function buildPaginationIntegrityConditions(companyParam: string): string
  * Does NOT handle voucher-backed rows — those use their own live-data fetch with
  * description/amount enrichment in the legacy daybook route.
  */
-export async function buildLegacyValidSourceIds(
-  rows: any[],
-  companyId: number
-): Promise<Map<string, Set<number>>> {
+export async function buildLegacyValidSourceIds(rows: any[], companyId: number): Promise<Map<string, Set<number>>> {
   // Collect referenceIds grouped by source table
   const tableIds = new Map<string, Set<number>>();
   for (const row of rows) {
@@ -329,7 +320,7 @@ export function isRowIntegrityValid(
  * @param dbOrTx  Drizzle db or transaction object.
  */
 export async function removeDaybookEntriesForSource(
-  dbOrTx: any,
+  dbOrTx: DatabaseOrTransaction,
   opts: {
     companyId: number;
     referenceTable: string;
@@ -342,17 +333,16 @@ export async function removeDaybookEntriesForSource(
 
   const tableCondition = or(
     eq(factoryDaybookEntries.referenceTable, referenceTable),
-    and(
-      isNull(factoryDaybookEntries.referenceTable),
-      inArray(factoryDaybookEntries.txType, txTypes)
-    )
+    and(isNull(factoryDaybookEntries.referenceTable), inArray(factoryDaybookEntries.txType, txTypes))
   );
 
-  await dbOrTx.delete(factoryDaybookEntries).where(
-    and(
-      eq(factoryDaybookEntries.companyId, companyId),
-      eq(factoryDaybookEntries.referenceId, referenceId),
-      tableCondition
-    )
-  );
+  await dbOrTx
+    .delete(factoryDaybookEntries)
+    .where(
+      and(
+        eq(factoryDaybookEntries.companyId, companyId),
+        eq(factoryDaybookEntries.referenceId, referenceId),
+        tableCondition
+      )
+    );
 }

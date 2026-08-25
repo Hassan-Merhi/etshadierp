@@ -16,8 +16,11 @@ import {
   immutableRevisionPayloadHash,
   normalizeImmutableRevisionItems,
   type ImmutableRevisionItemInput,
+  type LifecycleError,
+  type LockedTransferRow,
   type NormalizedImmutableRevisionItem,
 } from "./immutableStockTransferRevisionInput";
+import { resultRows } from "../lib/queryResult";
 
 export { normalizeImmutableRevisionItems } from "./immutableStockTransferRevisionInput";
 export type { ImmutableRevisionItemInput } from "./immutableStockTransferRevisionInput";
@@ -63,11 +66,11 @@ export interface ReviewImmutableRevisionResult {
   totalAmount: string;
 }
 
-function rows<T = Record<string, unknown>>(result: any): T[] {
-  return (result?.rows ?? result ?? []) as T[];
+function rows<T extends Record<string, unknown> = Record<string, unknown>>(result: unknown): T[] {
+  return resultRows<T>(result);
 }
 
-function firstRow<T = Record<string, unknown>>(result: any): T | undefined {
+function firstRow<T extends Record<string, unknown> = Record<string, unknown>>(result: unknown): T | undefined {
   return rows<T>(result)[0];
 }
 
@@ -77,14 +80,14 @@ function positiveInteger(value: unknown, label: string): number {
   return parsed;
 }
 
-function lifecycleError(message: string, code: string): Error {
-  const error: any = new Error(message);
+function lifecycleError(message: string, code: string): LifecycleError {
+  const error: LifecycleError = new Error(message);
   error.code = code;
   return error;
 }
 
 async function lockTransfer(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], transferId: number) {
-  return firstRow(
+  return firstRow<LockedTransferRow>(
     await tx.execute(sql`
       SELECT
         stv.id,
@@ -109,7 +112,7 @@ async function lockTransfer(tx: Parameters<Parameters<typeof db.transaction>[0]>
   );
 }
 
-function assertTransfer(transfer: any, companyId: number): asserts transfer {
+function assertTransfer(transfer: LockedTransferRow | undefined, companyId: number): asserts transfer {
   if (!transfer) throw new Error("Stock transfer not found");
   if (Number(transfer.company_id) !== companyId) {
     throw lifecycleError("Stock transfer belongs to a different company", "STOCK_TRANSFER_REVISION_SCOPE");
@@ -158,7 +161,11 @@ async function assertCompanyScope(
   }
 }
 
-async function assertSubmittedBaseline(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], transferId: number, items: NormalizedImmutableRevisionItem[]) {
+async function assertSubmittedBaseline(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  transferId: number,
+  items: NormalizedImmutableRevisionItem[]
+) {
   const current = await tx.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, transferId));
   for (const item of items) {
     const row = current.find(
@@ -167,7 +174,7 @@ async function assertSubmittedBaseline(tx: Parameters<Parameters<typeof db.trans
     );
     const currentQuantity = Number(row?.quantity ?? 0);
     if (Math.abs(currentQuantity - item.originalQuantity) > 0.001) {
-      const error: any = lifecycleError(
+      const error: LifecycleError = lifecycleError(
         `Revision is stale for item ${item.stockItemId} at source ${item.sourceLocationId}. Expected ${item.originalQuantity}, current transfer quantity is ${currentQuantity}.`,
         "STOCK_TRANSFER_REVISION_STALE"
       );
@@ -495,7 +502,7 @@ export async function approveImmutableStockTransferRevision(
       const oldQuantity = Number(existing?.quantity ?? 0);
       const expectedQuantity = Number(item.originalQuantity);
       if (Math.abs(oldQuantity - expectedQuantity) > 0.001) {
-        const error: any = lifecycleError(
+        const error: LifecycleError = lifecycleError(
           `Revision #${revisionNumbersById.get(item.revisionId) ?? revisionNumber} is stale for ${item.stockItemName}. Expected ${expectedQuantity}, current transfer quantity is ${oldQuantity}.`,
           "STOCK_TRANSFER_REVISION_STALE"
         );
@@ -555,7 +562,7 @@ export async function approveImmutableStockTransferRevision(
           );
           const available = Number(sourceInventory?.quantity ?? 0);
           if (available + 1e-9 < change.delta) {
-            const error: any = lifecycleError(
+            const error: LifecycleError = lifecycleError(
               `Insufficient stock for revision item ${change.stockItemId}: required ${change.delta}, available ${available}`,
               "STOCK_TRANSFER_INSUFFICIENT_STOCK"
             );
@@ -579,7 +586,7 @@ export async function approveImmutableStockTransferRevision(
           const required = Math.abs(change.delta);
           const available = Number(destinationInventory?.quantity ?? 0);
           if (available + 1e-9 < required) {
-            const error: any = lifecycleError(
+            const error: LifecycleError = lifecycleError(
               `Destination stock is too low to reduce transfer item ${change.stockItemId}: required ${required}, available ${available}`,
               "STOCK_TRANSFER_DESTINATION_STOCK_CONFLICT"
             );

@@ -96,10 +96,10 @@ export async function findOrCreateLedger(
 
   for (let attempt = 0; attempt < 5; attempt++) {
     const [maxCodeRow] = await db
-      .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+      .select({ maxCode: sql<number | null>`MAX(CAST(code AS INTEGER))` })
       .from(ledgerAccounts)
       .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
-    const nextCode = String((parseInt((maxCodeRow as { maxCode: string })?.maxCode || "0") || 0) + 1 + attempt);
+    const nextCode = String((maxCodeRow?.maxCode ?? 0) + 1 + attempt);
     try {
       const insertVals: any = { companyId, code: nextCode, name, accountType, active: true, isHidden: false };
       if (opts?.parentId) insertVals.parentId = opts.parentId;
@@ -193,7 +193,12 @@ export function computeMonthlyPayFromAttendance(
  * Declared at module scope so the handlers that call it can live in separate
  * modules; it previously relied on hoisting inside the register function.
  */
-export async function settleAdvancesForPayroll(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], companyId: number, workerId: number, advanceAmount: number) {
+export async function settleAdvancesForPayroll(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  companyId: number,
+  workerId: number,
+  advanceAmount: number
+) {
   if (advanceAmount <= 0) return;
   const outstanding = await tx
     .select()

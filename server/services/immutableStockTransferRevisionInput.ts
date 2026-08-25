@@ -13,6 +13,31 @@ export interface NormalizedImmutableRevisionItem extends ImmutableRevisionItemIn
   delta: number;
 }
 
+/** The stock-transfer voucher row the revision lifecycle locks FOR UPDATE. */
+export type LockedTransferRow = Record<string, unknown> & {
+  id: number;
+  voucher_id: number;
+  company_id: number;
+  voucher_type: string;
+  voucher_number: string;
+  voucher_date: string;
+  deleted_at: Date | null;
+  inventory_applied: boolean;
+  source_location_id: number | null;
+  destination_location_id: number;
+  source_location_name: string | null;
+  destination_location_name: string;
+};
+
+/** A lifecycle failure that carries a stable code (and sometimes the offending item). */
+export type LifecycleError = Error & {
+  code?: string;
+  stockItemId?: number;
+  sourceLocationId?: number | null;
+  requiredQuantity?: number;
+  availableQuantity?: number;
+};
+
 function positiveInteger(value: unknown, label: string): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) throw new Error(`${label} must be a positive integer`);

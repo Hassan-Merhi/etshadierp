@@ -38,7 +38,11 @@ async function ensureCutoverColumns(): Promise<void> {
   );
 }
 
-function exactConfirmation(req: { body: { companyNameConfirm: string; confirmation?: string | undefined } }, expected: string, sourceName: string): string | null {
+function exactConfirmation(
+  req: { body: { companyNameConfirm: string; confirmation?: string | undefined } },
+  expected: string,
+  sourceName: string
+): string | null {
   if (req.body?.confirmation !== expected) return `Requires confirmation = "${expected}"`;
   if (!req.body?.companyNameConfirm || req.body.companyNameConfirm.trim() !== sourceName) {
     return `Company name confirmation must match exactly: "${sourceName}"`;
@@ -46,35 +50,66 @@ function exactConfirmation(req: { body: { companyNameConfirm: string; confirmati
   return null;
 }
 
-async function invokeMigrationHandler(
-  handler: (req: Request, res: Response) => Promise<any>,
-  req: any,
-  body: any
-): Promise<any> {
+/** A cutover endpoint handler, reused both as a route and programmatically. */
+type MigrationHandler = (req: Request, res: Response) => Promise<Response | void>;
+
+/** The slice of the Express response API the cutover handlers reach for. */
+type CapturedResponse = {
+  status(code: number): CapturedResponse;
+  json(value: unknown): CapturedResponse;
+  send(value: unknown): CapturedResponse;
+};
+
+/** Counts of live (non-migration) activity already present in the target company. */
+type HarmfulTargetActivity = {
+  vouchers: number;
+  sales: number;
+  offloads: number;
+  prepaid: number;
+  containers: number;
+  total: number;
+};
+
+/** A row of sp_migration_cutovers. */
+type CutoverRow = Record<string, unknown> & {
+  id: number;
+  source_company_id: number;
+  target_company_id: number;
+  source_company_name: string;
+  status: string;
+  activated_at: string | null;
+  rollback_deadline: string | null;
+};
+
+async function invokeMigrationHandler(handler: MigrationHandler, req: Request, body: unknown): Promise<unknown> {
   let statusCode = 200;
-  let payload: any = null;
-  const captureResponse: any = {
+  let payload: unknown = null;
+  const captureResponse: CapturedResponse = {
     status(code: number) {
       statusCode = code;
       return this;
     },
-    json(value: any) {
+    json(value: unknown) {
       payload = value;
       return this;
     },
-    send(value: any) {
+    send(value: unknown) {
       payload = value;
       return this;
     },
   };
-  await handler({ ...req, body }, captureResponse);
+  // The handlers only read `body` off the request and only call the three
+  // response methods captured above, so a shallow clone and this recorder
+  // stand in for the real Express pair.
+  await handler({ ...req, body } as Request, captureResponse as unknown as Response);
   if (statusCode >= 400) {
-    throw new Error(payload?.message ?? `Migration handler failed with status ${statusCode}`);
+    const message = (payload as { message?: string } | null)?.message;
+    throw new Error(message ?? `Migration handler failed with status ${statusCode}`);
   }
   return payload;
 }
 
-async function harmfulTargetActivity(targetId: number, activatedAt?: string | null): Promise<any> {
+async function harmfulTargetActivity(targetId: number, activatedAt?: string | null): Promise<HarmfulTargetActivity> {
   const after = activatedAt ? sql`AND created_at > ${activatedAt}` : sql``;
   const vouchers = await db.execute(sql`
     SELECT COUNT(*)::int AS count
@@ -113,10 +148,12 @@ async function harmfulTargetActivity(targetId: number, activatedAt?: string | nu
   return { ...counts, total: Object.values(counts).reduce((sum, value) => sum + value, 0) };
 }
 
-async function normalizedReadiness(sourceId: number, targetId: number): Promise<any> {
+async function normalizedReadiness(sourceId: number, targetId: number) {
   const readiness = await buildCutoverReadiness(sourceId, targetId);
   const activity = await harmfulTargetActivity(targetId);
-  readiness.blockers = (readiness.blockers ?? []).filter((blocker: { code: string }) => blocker.code !== "TARGET_ALREADY_LIVE");
+  readiness.blockers = (readiness.blockers ?? []).filter(
+    (blocker: { code: string }) => blocker.code !== "TARGET_ALREADY_LIVE"
+  );
   readiness.counts.targetLiveActivity = activity.total;
   if (activity.total > 0) {
     readiness.blockers.push({
@@ -131,14 +168,14 @@ async function normalizedReadiness(sourceId: number, targetId: number): Promise<
   return readiness;
 }
 
-async function loadCutoverById(cutoverId: number): Promise<any | null> {
+async function loadCutoverById(cutoverId: number): Promise<CutoverRow | null> {
   const result = await db.execute(sql`
     SELECT * FROM sp_migration_cutovers WHERE id = ${cutoverId} LIMIT 1
   `);
-  return firstRow(result) ?? null;
+  return firstRow<CutoverRow>(result) ?? null;
 }
 
-async function prepareCutover(req: Request, res: Response): Promise<any> {
+async function prepareCutover(req: Request, res: Response): Promise<Response | void> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const confirmationError = exactConfirmation(req, "PREPARE CUTOVER", pair.sourceCompany.name);
@@ -181,7 +218,7 @@ async function prepareCutover(req: Request, res: Response): Promise<any> {
   });
 }
 
-async function finalizeCutover(req: Request, res: Response): Promise<any> {
+async function finalizeCutover(req: Request, res: Response): Promise<Response | void> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const confirmationError = exactConfirmation(req, "FINALIZE CUTOVER", pair.sourceCompany.name);
@@ -279,7 +316,7 @@ async function finalizeCutover(req: Request, res: Response): Promise<any> {
   }
 }
 
-async function rollbackCutover(req: Request, res: Response): Promise<any> {
+async function rollbackCutover(req: Request, res: Response): Promise<Response | void> {
   const cutoverId = pn(req.body?.cutoverId);
   if (!cutoverId) return res.status(400).json({ message: "cutoverId is required" });
   await ensureCutoverColumns();
@@ -325,7 +362,7 @@ async function rollbackCutover(req: Request, res: Response): Promise<any> {
   });
 }
 
-async function cancelPreparedCutover(req: Request, res: Response): Promise<any> {
+async function cancelPreparedCutover(req: Request, res: Response): Promise<Response | void> {
   const cutoverId = pn(req.body?.cutoverId);
   if (!cutoverId) return res.status(400).json({ message: "cutoverId is required" });
   await ensureCutoverColumns();
@@ -352,7 +389,7 @@ async function cancelPreparedCutover(req: Request, res: Response): Promise<any> 
   });
 }
 
-async function statusCutover(req: Request, res: Response): Promise<any> {
+async function statusCutover(req: Request, res: Response): Promise<Response | void> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   await ensureCutoverColumns();
@@ -369,7 +406,7 @@ async function statusCutover(req: Request, res: Response): Promise<any> {
   });
 }
 
-async function mapSuspenseEntry(req: Request, res: Response): Promise<any> {
+async function mapSuspenseEntry(req: Request, res: Response): Promise<Response | void> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const targetEntryId = pn(req.params.targetEntryId);
@@ -402,7 +439,7 @@ async function mapSuspenseEntry(req: Request, res: Response): Promise<any> {
   return res.json({ success: true, targetEntryId, targetLedgerAccountId });
 }
 
-async function mapContainerCharge(req: Request, res: Response): Promise<any> {
+async function mapContainerCharge(req: Request, res: Response): Promise<Response | void> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const chargeId = pn(req.params.chargeId);

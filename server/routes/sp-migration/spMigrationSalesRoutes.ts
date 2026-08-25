@@ -19,6 +19,9 @@ import {
   ensureTargetStockItems,
 } from "./_helpers";
 
+/** Account-mapping columns read from ledger_accounts during an SP migration run. */
+type SpLedgerAccountRow = { id: number; account_type: string; sub_type: string | null };
+
 export function registerSpMigrationSalesRoutes(app: Express) {
   // ── Historical sales — TRUE read-only copy ──────────────────────────────
   // POST /api/sp/migration/gc-sales-readonly
@@ -71,15 +74,15 @@ export function registerSpMigrationSalesRoutes(app: Express) {
           hadi_sp_intercompany: "sp_hadi_intercompany",
         };
         const sourceAccts = (
-          await db.execute(
+          await db.execute<SpLedgerAccountRow>(
             sql`SELECT id, account_type, sub_type FROM ledger_accounts WHERE company_id = ${sourceId} AND deleted_at IS NULL`
           )
-        ).rows as any[];
+        ).rows;
         const targetAccts = (
-          await db.execute(
+          await db.execute<SpLedgerAccountRow>(
             sql`SELECT id, account_type, sub_type FROM ledger_accounts WHERE company_id = ${targetId} AND deleted_at IS NULL`
           )
-        ).rows as any[];
+        ).rows;
         const targetBySubType = new Map<string, number>();
         for (const ta of targetAccts) if (ta.sub_type) targetBySubType.set(ta.sub_type, pn(ta.id));
 

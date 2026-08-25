@@ -35,10 +35,14 @@ export function registerSpMigrationRunRoutes(app: Express) {
   });
 
   // ── GET /api/sp/migration/runs ──────────────────────────────────────────
-  app.get("/api/sp/migration/runs", requireAuth, requireRole("Developer"), async (_req: unknown, res: import("express").Response) => {
-    try {
-      const runs = (
-        await db.execute(sql`
+  app.get(
+    "/api/sp/migration/runs",
+    requireAuth,
+    requireRole("Developer"),
+    async (_req: unknown, res: import("express").Response) => {
+      try {
+        const runs = (
+          await db.execute(sql`
         SELECT
           r.id, r.source_company_id, r.target_company_id,
           r.action, r.status, r.rows_created,
@@ -50,24 +54,30 @@ export function registerSpMigrationRunRoutes(app: Express) {
         ORDER BY r.created_at DESC
         LIMIT 50
       `)
-      ).rows;
-      return res.json({ runs });
-    } catch (_err: unknown) {
-      return res.status(500).json({ message: "Internal server error" });
+        ).rows;
+        return res.json({ runs });
+      } catch (_err: unknown) {
+        return res.status(500).json({ message: "Internal server error" });
+      }
     }
-  });
+  );
 
   // ── POST /api/sp/migration/rehearsal ────────────────────────────────────
   // DISABLED: the old all-in-one rehearsal flow (default-warehouse + raw stock_item_id reuse +
   // source_type='opening_stock' + "recreate containers manually") is permanently retired.
   // Use the staged endpoints instead: gc-account-plan, gc-stock-master, gc-stock-opening,
   // gc-sales-readonly, gc-containers, gc-profit-opening, gc-reconciliation.
-  app.post("/api/sp/migration/rehearsal", requireAuth, requireRole("Developer"), async (_req: unknown, res: import("express").Response) => {
-    return res.status(410).json({
-      message: "The old all-in-one GC migration flow is disabled. Use the staged migration steps instead.",
-      code: "OLD_GC_REHEARSAL_DISABLED",
-    });
-  });
+  app.post(
+    "/api/sp/migration/rehearsal",
+    requireAuth,
+    requireRole("Developer"),
+    async (_req: unknown, res: import("express").Response) => {
+      return res.status(410).json({
+        message: "The old all-in-one GC migration flow is disabled. Use the staged migration steps instead.",
+        code: "OLD_GC_REHEARSAL_DISABLED",
+      });
+    }
+  );
 
   // ── POST /api/sp/migration/rollback ─────────────────────────────────────
   // Removes ONLY rows created by a specific rehearsal run.
@@ -103,11 +113,11 @@ export function registerSpMigrationRunRoutes(app: Express) {
 
       // Fetch tracked rows
       const trackedRows = (
-        await db.execute(sql`
+        await db.execute<{ table_name: string; row_id: number }>(sql`
         SELECT table_name, row_id FROM sp_migration_run_rows WHERE run_id = ${runId}
         ORDER BY id DESC
       `)
-      ).rows as any[];
+      ).rows;
 
       let deleted = 0;
       const byTable: Record<string, number[]> = {};
@@ -139,63 +149,90 @@ export function registerSpMigrationRunRoutes(app: Express) {
           // Extra safety: verify the row belongs to target company before deleting
           let verified = false;
           if (tbl === "sp_stock_movements") {
-            const [chk] = (await db.execute(sql`SELECT company_id FROM sp_stock_movements WHERE id = ${id} LIMIT 1`))
-              .rows as any[];
+            const [chk] = (
+              await db.execute<{ company_id: number }>(
+                sql`SELECT company_id FROM sp_stock_movements WHERE id = ${id} LIMIT 1`
+              )
+            ).rows;
             verified = !!chk && pn(chk.company_id) === targetId;
           } else if (tbl === "stock_item_code_aliases") {
             const [chk] = (
-              await db.execute(sql`SELECT company_id FROM stock_item_code_aliases WHERE id = ${id} LIMIT 1`)
-            ).rows as any[];
+              await db.execute<{ company_id: number }>(
+                sql`SELECT company_id FROM stock_item_code_aliases WHERE id = ${id} LIMIT 1`
+              )
+            ).rows;
             verified = !!chk && pn(chk.company_id) === targetId;
           } else if (tbl === "locations") {
-            const [chk] = (await db.execute(sql`SELECT company_id FROM locations WHERE id = ${id} LIMIT 1`))
-              .rows as any[];
+            const [chk] = (
+              await db.execute<{ company_id: number }>(sql`SELECT company_id FROM locations WHERE id = ${id} LIMIT 1`)
+            ).rows;
             verified = !!chk && pn(chk.company_id) === targetId;
           } else if (tbl === "vouchers") {
-            const [chk] = (await db.execute(sql`SELECT company_id FROM vouchers WHERE id = ${id} LIMIT 1`))
-              .rows as any[];
+            const [chk] = (
+              await db.execute<{ company_id: number }>(sql`SELECT company_id FROM vouchers WHERE id = ${id} LIMIT 1`)
+            ).rows;
             verified = !!chk && pn(chk.company_id) === targetId;
           } else if (tbl === "voucher_entries") {
             // voucher_entries has no company_id — verify via parent voucher
             const [chk] = (
-              await db.execute(sql`
+              await db.execute<{ company_id: number }>(sql`
               SELECT v.company_id FROM voucher_entries ve
               JOIN vouchers v ON v.id = ve.voucher_id
               WHERE ve.id = ${id} LIMIT 1
             `)
-            ).rows as any[];
+            ).rows;
             verified = !!chk && pn(chk.company_id) === targetId;
           } else if (tbl === "ledger_accounts") {
-            const [chk] = (await db.execute(sql`SELECT company_id FROM ledger_accounts WHERE id = ${id} LIMIT 1`))
-              .rows as any[];
+            const [chk] = (
+              await db.execute<{ company_id: number }>(
+                sql`SELECT company_id FROM ledger_accounts WHERE id = ${id} LIMIT 1`
+              )
+            ).rows;
             verified = !!chk && pn(chk.company_id) === targetId;
           } else if (tbl === "inventory") {
-            const [chk] = (await db.execute(sql`SELECT company_id FROM inventory WHERE id = ${id} LIMIT 1`))
-              .rows as any[];
+            const [chk] = (
+              await db.execute<{ company_id: number }>(sql`SELECT company_id FROM inventory WHERE id = ${id} LIMIT 1`)
+            ).rows;
             verified = !!chk && pn(chk.company_id) === targetId;
           } else if (tbl === "stock_items") {
-            const [chk] = (await db.execute(sql`SELECT company_id FROM stock_items WHERE id = ${id} LIMIT 1`))
-              .rows as any[];
+            const [chk] = (
+              await db.execute<{ company_id: number }>(sql`SELECT company_id FROM stock_items WHERE id = ${id} LIMIT 1`)
+            ).rows;
             verified = !!chk && pn(chk.company_id) === targetId;
           } else if (tbl === "stock_groups") {
-            const [chk] = (await db.execute(sql`SELECT company_id FROM stock_groups WHERE id = ${id} LIMIT 1`))
-              .rows as any[];
+            const [chk] = (
+              await db.execute<{ company_id: number }>(
+                sql`SELECT company_id FROM stock_groups WHERE id = ${id} LIMIT 1`
+              )
+            ).rows;
             verified = !!chk && pn(chk.company_id) === targetId;
           } else if (tbl === "stock_grades") {
-            const [chk] = (await db.execute(sql`SELECT company_id FROM stock_grades WHERE id = ${id} LIMIT 1`))
-              .rows as any[];
+            const [chk] = (
+              await db.execute<{ company_id: number }>(
+                sql`SELECT company_id FROM stock_grades WHERE id = ${id} LIMIT 1`
+              )
+            ).rows;
             verified = !!chk && pn(chk.company_id) === targetId;
           } else if (tbl === "stock_categories") {
-            const [chk] = (await db.execute(sql`SELECT company_id FROM stock_categories WHERE id = ${id} LIMIT 1`))
-              .rows as any[];
+            const [chk] = (
+              await db.execute<{ company_id: number }>(
+                sql`SELECT company_id FROM stock_categories WHERE id = ${id} LIMIT 1`
+              )
+            ).rows;
             verified = !!chk && pn(chk.company_id) === targetId;
           } else if (tbl === "sp_containers") {
-            const [chk] = (await db.execute(sql`SELECT company_id FROM sp_containers WHERE id = ${id} LIMIT 1`))
-              .rows as any[];
+            const [chk] = (
+              await db.execute<{ company_id: number }>(
+                sql`SELECT company_id FROM sp_containers WHERE id = ${id} LIMIT 1`
+              )
+            ).rows;
             verified = !!chk && pn(chk.company_id) === targetId;
           } else if (tbl === "sp_container_lines") {
-            const [chk] = (await db.execute(sql`SELECT company_id FROM sp_container_lines WHERE id = ${id} LIMIT 1`))
-              .rows as any[];
+            const [chk] = (
+              await db.execute<{ company_id: number }>(
+                sql`SELECT company_id FROM sp_container_lines WHERE id = ${id} LIMIT 1`
+              )
+            ).rows;
             verified = !!chk && pn(chk.company_id) === targetId;
           }
 
