@@ -272,7 +272,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
             AND fp.period_end = ${periodEnd}
         `);
 
-        if ((payrollData.rows as any[]).length === 0) continue;
+        if (payrollData.rows.length === 0) continue;
 
         // Resolve per-worker ledger accounts (sequential to avoid nextCode collisions)
         // Ensure group headers exist so worker accounts nest under them in the chart of accounts
@@ -355,7 +355,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
           )
       `);
       let accountsDeleted = 0;
-      const orphanRows = orphanedAccounts.rows as any[];
+      const orphanRows = orphanedAccounts.rows;
       if (orphanRows.length > 0) {
         // Use inArray (drizzle) instead of raw ANY() to avoid parameterization issues
         const orphanIds = orphanRows.map((r) => r.id as number);

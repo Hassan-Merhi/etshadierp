@@ -98,7 +98,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
             VALUES (${targetId}, 'GC-SUSP', 'Migration Suspense', 'Equity', 'gc_mig_suspense', true, true)
             RETURNING id
           `)
-          ).rows as any[];
+          ).rows;
           suspenseAccountId = pn(suspRow.id);
           await trackRow(runId, "ledger_accounts", suspenseAccountId);
           rowsCreated++;
@@ -124,7 +124,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
           WHERE company_id = ${sourceId} AND voucher_type IN ('Sales', 'Sale') AND deleted_at IS NULL
           ORDER BY voucher_date ASC, id ASC
         `)
-        ).rows as any[];
+        ).rows;
 
         // Stock item mapping produced by Step 4 (Stock Master) — required to translate
         // source sale-item stock_item_id references into the target company's stock items.
@@ -136,7 +136,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
           WHERE r.target_company_id = ${targetId} AND r.source_company_id = ${sourceId}
             AND sml.source_table = 'stock_items' AND sml.target_table = 'stock_items'
         `)
-        ).rows as any[];
+        ).rows;
         const stockItemMap = new Map<number, number>();
         for (const l of stockItemLinkRows) stockItemMap.set(pn(l.source_id), pn(l.target_id));
 
@@ -167,7 +167,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
                ${v.total_amount}, ${v.currency ?? "USD"}, ${v.exchange_rate ?? null}, 'SP_MIGRATION_READONLY')
             RETURNING id
           `)
-          ).rows as any[];
+          ).rows;
           const newVoucherId = pn(vRow.id);
           await trackRow(runId, "vouchers", newVoucherId);
           rowsCreated++;
@@ -185,7 +185,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
             SELECT stock_item_id, quantity, selling_price, cost_price, total_sales, total_cost, profit, configured_price
             FROM sales_items WHERE voucher_id = ${v.id}
           `)
-          ).rows as any[];
+          ).rows;
           if (!sourceSaleItems.length) {
             vouchersMissingItems++;
             summary.push(`Voucher ${v.voucher_number} has no source sale item rows; accounting-only voucher migrated.`);
@@ -207,7 +207,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
                    ${si.total_sales}, ${si.total_cost}, ${si.profit ?? "0"}, ${si.configured_price ?? null})
                 RETURNING id
               `)
-              ).rows as any[];
+              ).rows;
               await trackRow(runId, "sales_items", pn(siRow.id));
               itemRowsCreated++;
               rowsCreated++;
@@ -218,7 +218,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
             await db.execute(
               sql`SELECT ledger_account_id, debit_amount, credit_amount, narration FROM voucher_entries WHERE voucher_id = ${v.id}`
             )
-          ).rows as any[];
+          ).rows;
           for (const e of entries) {
             const srcAcctId = e.ledger_account_id ? pn(e.ledger_account_id) : null;
             const mappedAcctId = srcAcctId !== null ? (accountMap.get(srcAcctId) ?? suspenseAccountId) : null;
@@ -228,7 +228,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
               VALUES (${newVoucherId}, ${mappedAcctId}, ${e.debit_amount ?? "0"}, ${e.credit_amount ?? "0"}, ${e.narration ?? null})
               RETURNING id
             `)
-            ).rows as any[];
+            ).rows;
             await trackRow(runId, "voucher_entries", pn(eRow.id));
             entriesCreated++;
             rowsCreated++;

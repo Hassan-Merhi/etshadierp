@@ -205,7 +205,7 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
     .select()
     .from(factoryContainers)
     .where(and(eq(factoryContainers.companyId, companyId), ne(factoryContainers.currencyCode, "USD")));
-  for (const c of nonUsdContainers as any[]) {
+  for (const c of nonUsdContainers) {
     const { looksSet } = resolveStoredFxRate(c.currencyCode, c.fxRateToUsd, c.fxRateConfirmed);
     const amt = (parseFloat(c.ratePerKg || "0") || 0) * (parseFloat(c.actualReceivedKg || c.totalKg || "0") || 0);
     bumpExposure(c.supplierId, c.currencyCode, amt, looksSet);
@@ -237,7 +237,7 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
     .where(
       and(eq(factoryContainerCommissions.companyId, companyId), ne(factoryContainerCommissions.currencyCode, "USD"))
     );
-  for (const cm of nonUsdCommissions as any[]) {
+  for (const cm of nonUsdCommissions) {
     const { looksSet } = resolveStoredFxRate(cm.currencyCode, cm.fxRateToUsd, cm.fxRateConfirmed);
     const container = allContainersById.get(cm.containerId);
     bumpExposure(container?.supplierId ?? null, cm.currencyCode, parseFloat(cm.commissionTotal || "0") || 0, looksSet);
@@ -352,7 +352,7 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
     .select()
     .from(factoryOffloadAdditionalCharges)
     .where(eq(factoryOffloadAdditionalCharges.companyId, companyId));
-  for (const oc of allOffloadCharges as any[]) {
+  for (const oc of allOffloadCharges) {
     const supplierId = oc.supplierId ?? allContainersById.get(oc.containerId)?.supplierId ?? null;
     if (!supplierId) continue;
     const cc = oc.currencyCode || "USD";
@@ -378,7 +378,7 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
     .select()
     .from(factoryContainerOtherCharges)
     .where(eq(factoryContainerOtherCharges.companyId, companyId));
-  for (const oc of allContainerOtherCharges as any[]) {
+  for (const oc of allContainerOtherCharges) {
     const container = allContainersById.get(oc.containerId);
     const supplierId = container?.supplierId ?? null;
     if (!supplierId) continue;
@@ -453,7 +453,7 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
     .select()
     .from(factorySupplierPayments)
     .where(eq(factorySupplierPayments.companyId, companyId));
-  for (const p of allSupplierPayments as any[]) {
+  for (const p of allSupplierPayments) {
     const cc = p.currencyCode || "USD";
     const amt = parseFloat(p.amount || "0") || 0;
     const amtUsd = parseFloat(p.amountUsd || "0") || 0;
@@ -487,7 +487,7 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
             )
           )
       : [];
-  for (const p of allVoucherPayments as any[]) {
+  for (const p of allVoucherPayments) {
     if (p.optional || !p.supplierId) continue;
     const cc = p.currency || "USD";
     const amt = parseFloat(p.debitAmount || "0") || 0;
@@ -516,7 +516,7 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
     .select()
     .from(factorySupplierFxTransfers)
     .where(eq(factorySupplierFxTransfers.companyId, companyId));
-  for (const t of allFxTransfers as any[]) {
+  for (const t of allFxTransfers) {
     const fromCc = t.fromCurrencyCode || "USD";
     const fromAmt = parseFloat(t.fromAmount || "0") || 0;
     const toAmountUsd = parseFloat(t.toAmountUsd || "0") || 0;

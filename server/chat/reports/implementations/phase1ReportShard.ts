@@ -352,7 +352,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         GROUP BY fa.status ORDER BY fa.status
       `);
       const totalRecords = (rows.rows as any[]).reduce((s: number, r) => s + parseInt(r.count || "0"), 0);
-      const stats = (rows.rows as any[]).map((r) => ({
+      const stats = rows.rows.map((r) => ({
         label: r.status,
         value: `${r.count} records · ${r.workers} worker(s)`,
         highlight: r.status === "Present" ? "positive" : r.status === "Absent" ? "negative" : "muted",

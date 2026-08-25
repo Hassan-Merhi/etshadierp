@@ -711,7 +711,7 @@ export async function applyPostOffloadChargeMutation(
       .where(eq(factoryOffloadAdditionalCharges.id, chargeId));
 
     // Compute NEW canonical cost (without this charge)
-    const remainingActiveCharges = activeCharges.filter((c: any) => c.id !== chargeId);
+    const remainingActiveCharges = activeCharges.filter((c) => c.id !== chargeId);
     const newCost = computeCorrectContainerCost(container, remainingActiveCharges, commissionRecord, otherChargeRows);
     if (newCost.fxUnresolved) throw new Error(`FX rate unresolved for container ${container.containerNumber}`);
 

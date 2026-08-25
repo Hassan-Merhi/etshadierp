@@ -195,9 +195,11 @@ export function registerFactoryProfitabilityRoutes(app: Express, requireAuth: Re
           .reduce((s: number, f) => s + parseFloat(f.freightAmount || "0"), 0);
 
         const containerMixSources = mixSources.filter((s) => s.containerId === container.id);
-        const mixBatchIds = Array.from(new Set(containerMixSources.map((s) => s.mixBatchId))) as number[];
+        const mixBatchIds = Array.from(new Set(containerMixSources.map((s) => s.mixBatchId)));
 
-        const containerBales = allBales.filter((b) => mixBatchIds.includes(b.mixBatchId));
+        const containerBales = allBales.filter(
+          (b) => b.mixBatchId !== null && mixBatchIds.includes(b.mixBatchId)
+        );
         const baleTotalKg = containerBales.reduce((s: number, b) => s + parseFloat(b.weightKg || "0"), 0);
         const baleLaborCost = baleTotalKg * laborCostPerKg;
         const baleOverheadCost = baleTotalKg * overheadPerKg;

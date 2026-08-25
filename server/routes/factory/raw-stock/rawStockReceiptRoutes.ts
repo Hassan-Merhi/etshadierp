@@ -418,7 +418,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
           rows[0].freeKg = totalRemaining.toFixed(3);
         } else {
           // Proportional distribution across multiple rows
-          for (const row of rows as any[]) {
+          for (const row of rows) {
             const rem = parseFloat(row.remainingKg);
             const proportion = totalRemaining > 0 ? rem / totalRemaining : 0;
             row.reservedKg = (reserved * proportion).toFixed(3);

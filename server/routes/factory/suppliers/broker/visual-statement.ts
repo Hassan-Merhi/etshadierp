@@ -154,7 +154,7 @@ export function registerSupplierBrokerVisualStatementRoutes(app: Express) {
 
       const paymentRows: PayRow[] = [];
 
-      for (const p of payments as any[]) {
+      for (const p of payments) {
         const amt = parseFloat(p.amount || "0");
         const cc = p.currencyCode || "USD";
         // factory_supplier_payments has no fxRateConfirmed column yet — legacy heuristic stopgap.
@@ -175,7 +175,7 @@ export function registerSupplierBrokerVisualStatementRoutes(app: Express) {
         });
       }
 
-      for (const v of vpayRows as any[]) {
+      for (const v of vpayRows) {
         const amt = parseFloat(v.debitAmount || "0");
         paymentRows.push({
           id: `vpay-${v.id}`,
@@ -191,7 +191,7 @@ export function registerSupplierBrokerVisualStatementRoutes(app: Express) {
       }
 
       const seenFx = new Set<number>();
-      for (const t of fxTransfers as any[]) {
+      for (const t of fxTransfers) {
         if (seenFx.has(t.id)) continue;
         seenFx.add(t.id);
         const fromCc = t.fromCurrencyCode || "USD";

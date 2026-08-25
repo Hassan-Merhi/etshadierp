@@ -414,7 +414,7 @@ export function writeSummarySheet(
   ws.getRow(1).height = 36;
 
   // Header row: [blank] | Month1 | Month2 | ... | TOTAL
-  const hdrRowData: any[] = [""];
+  const hdrRowData = [""];
   for (const ml of monthLabels) hdrRowData.push(ml);
   hdrRowData.push("TOTAL");
   const hdrRow = ws.addRow(hdrRowData);
