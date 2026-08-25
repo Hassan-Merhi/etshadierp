@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
+import type { DbTransaction } from "../../db";
 import { adjustInventory, type AdjustInventoryResult } from "../../inventoryHelper";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { createDatabaseStockMovementAdapter } from "../inventory/databaseStockMovementAdapter";
 import { postStockMovementTx } from "../inventory/stockMovementIntegrityService";
 
-type SpInventoryExecutor = Parameters<typeof adjustInventory>[0];
+type SpInventoryExecutor = DbTransaction;
 
 const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
