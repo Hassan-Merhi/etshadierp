@@ -14,6 +14,8 @@ import { storage } from "../storage";
 import { requireAuth } from "../auth";
 import { upload } from "./_helpers";
 import { adjustInventory } from "../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../services/inventory/stockMovementIntegrityService";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, writeWorkbook } from "../excelHelper";
 import { getClientDate } from "../lib/dateUtils";
 import { generateInvoicePdf } from "../helpers/generateInvoicePdf";
@@ -38,6 +40,8 @@ import {
   financialOperationRequestPayload,
   resolveFinancialOperationKey,
 } from "../services/accounting/financialOperationRequest";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerCreditSalesImportRoutes(app: Express) {
   // ============= Credit Sales Import Endpoints =============
@@ -336,19 +340,46 @@ export function registerCreditSalesImportRoutes(app: Express) {
             importCreditLocPrice?.sellingPrice || stockItem.sellingPrice || "0"
           );
 
-          await tx.insert(salesItems).values({
-            voucherId: voucher.id,
-            stockItemId: stockItem.id,
-            quantity: item.quantity.toString(),
-            sellingPrice: item.rate.toString(),
-            costPrice: costPrice.toString(),
-            totalSales: itemSales.toString(),
-            totalCost: itemCost.toString(),
-            profit: profit.toString(),
-            configuredPrice: importCreditConfiguredPrice > 0 ? importCreditConfiguredPrice.toFixed(6) : null,
-          });
+          const [saleItem] = await tx
+            .insert(salesItems)
+            .values({
+              voucherId: voucher.id,
+              stockItemId: stockItem.id,
+              quantity: item.quantity.toString(),
+              sellingPrice: item.rate.toString(),
+              costPrice: costPrice.toString(),
+              totalSales: itemSales.toString(),
+              totalCost: itemCost.toString(),
+              profit: profit.toString(),
+              configuredPrice: importCreditConfiguredPrice > 0 ? importCreditConfiguredPrice.toFixed(6) : null,
+            })
+            .returning({ id: salesItems.id });
 
           await adjustInventory(tx, locationId, stockItem.id, -item.quantity, req.session.currentCompanyId!);
+          await postStockMovementTx(
+            tx,
+            {
+              companyId: req.session.currentCompanyId!,
+              stockItemId: stockItem.id,
+              kind: "issue",
+              quantity: String(Math.abs(item.quantity)),
+              unitCost: String(Math.max(costPrice, 0)),
+              fromLocationId: locationId,
+              occurredAt: new Date(`${saleDate}T00:00:00.000Z`).toISOString(),
+              source: {
+                sourceType: "credit-sales-import",
+                sourceId: String(voucher.id),
+                idempotencyKey: `credit-sales-import:${voucher.id}:${saleItem.id}`,
+              },
+              actor: {
+                userId: req.session.userId,
+                username: req.session.username,
+                reason: `Credit sales import ${voucher.voucherNumber}`,
+              },
+              allowNegativeStock: true,
+            },
+            canonicalStockMovementAdapter
+          );
         }
 
         // Create voucher entries for credit sale
