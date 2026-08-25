@@ -2,6 +2,8 @@ import {
   infrastructurePostingIdentity,
   insertInfrastructureVoucherTx,
 } from "../../services/accounting/infrastructureVoucherIdentity";
+import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import type Decimal from "decimal.js";
 import { logger } from "../../lib/logger";
@@ -21,6 +23,8 @@ import type { POLineItem, ContainerOffload } from "@shared/schema";
 import { getLocationById } from "../inventory";
 import { getContainerById, getPurchaseOrdersByContainer } from "./containers";
 import { getLineItemsByPO } from "./line-items-charges";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export async function offloadContainer(
   containerId: number,
@@ -584,6 +588,28 @@ export async function offloadContainer(
         rate: inventoryUnitCost(item.rate),
         totalValue: inventoryMoney(item.totalValue),
       });
+
+      if (!item.quantity.isZero()) {
+        await postStockMovementTx(
+          tx,
+          {
+            companyId: location.companyId,
+            stockItemId: item.stockItemId,
+            kind: "receipt",
+            quantity: inventoryQuantity(item.quantity.abs()),
+            unitCost: inventoryUnitCost(item.rate.abs()),
+            toLocationId: locationId,
+            occurredAt: offloadRecord.offloadedAt.toISOString(),
+            source: {
+              sourceType: "legacy-container-offload",
+              sourceId: String(offloadRecord.id),
+              idempotencyKey: `legacy-container-offload:${offloadRecord.id}:${item.stockItemId}`,
+            },
+            allowNegativeStock: true,
+          },
+          canonicalStockMovementAdapter
+        );
+      }
     }
 
     return offloadRecord;
