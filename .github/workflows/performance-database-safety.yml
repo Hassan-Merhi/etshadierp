@@ -1,0 +1,94 @@
+name: Performance & Database Safety
+
+on:
+  pull_request:
+    paths:
+      - "server/**"
+      - "scripts/**"
+      - "docs/program-6d-query-classifications.json"
+      - "docs/program-6d-phase10-current-review.json"
+      - "docs/archive/program-6d-database-query-optimization.md"
+      - ".github/workflows/performance-database-safety.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "server/**"
+      - "scripts/**"
+      - "docs/program-6d-query-classifications.json"
+      - "docs/program-6d-phase10-current-review.json"
+      - "docs/archive/program-6d-database-query-optimization.md"
+      - ".github/workflows/performance-database-safety.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  query-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden Runner (audit mode)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Download repository source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" |
+            tar --extract --gzip --strip-components=1
+
+      - name: Set up Node.js 24.19.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24.19.0"
+
+      - name: Materialize reviewed Phase 10 evidence
+        run: |
+          node scripts/materialize-program6d-phase10-review.mjs \
+            --manifest=docs/program-6d-phase10-current-review.json \
+            --output=tmp/phase10-current-query-classifications.json
+
+      - name: Strict query-risk classification gate
+        id: query_review
+        continue-on-error: true
+        run: |
+          node scripts/run-program6d-query-review.mjs \
+            --report=tmp/performance-database-query-report.json \
+            --classifications=tmp/phase10-current-query-classifications.json \
+            --strict
+
+      - name: Query-safety invariants
+        id: query_safety
+        if: always()
+        continue-on-error: true
+        run: node scripts/verify-program6d-query-safety.mjs
+
+      - name: Upload query-audit evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: performance-database-audit-${{ github.sha }}
+          path: |
+            tmp/performance-database-query-report.json
+            tmp/phase10-current-query-classifications.json
+            docs/program-6d-phase10-current-review.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce performance/database gate
+        if: always()
+        env:
+          QUERY_REVIEW_OUTCOME: ${{ steps.query_review.outcome }}
+          QUERY_SAFETY_OUTCOME: ${{ steps.query_safety.outcome }}
+        run: |
+          if [ "$QUERY_REVIEW_OUTCOME" != "success" ] || [ "$QUERY_SAFETY_OUTCOME" != "success" ]; then
+            echo "Performance/database safety gate failed."
+            exit 1
+          fi
