@@ -4,6 +4,8 @@ import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { adjustInventory } from "../../../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../../services/inventory/stockMovementIntegrityService";
 import { writeDaybookEntry } from "../_helpers";
 import {
   factoryCategories,
@@ -16,6 +18,8 @@ import {
 } from "@shared/schema";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { resultRows } from "../../../lib/queryResult";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerEmployeeLedgerWasteRoutes(app: Express) {
   app.get("/api/factory/bale-ledger", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
@@ -600,7 +604,30 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
               .from(stockItems)
               .where(and(eq(stockItems.companyId, companyId), eq(stockItems.code, bale.articleCode)));
             if (existing) {
-              await adjustInventory(tx, bale.erpLocationId, existing.id, 1, companyId);
+              const adjustment = await adjustInventory(tx, bale.erpLocationId, existing.id, 1, companyId);
+              await postStockMovementTx(
+                tx,
+                {
+                  companyId,
+                  stockItemId: existing.id,
+                  kind: "adjustment",
+                  quantity: "1",
+                  unitCost: String(Math.max(adjustment.averageRate || 0, 0)),
+                  toLocationId: bale.erpLocationId,
+                  occurredAt: now.toISOString(),
+                  source: {
+                    sourceType: "factory_waste_dispatch_restore",
+                    sourceId: String(dispatchId),
+                    idempotencyKey: `factory-waste-dispatch:restore:${companyId}:${dispatchId}:${bale.id}`,
+                  },
+                  actor: {
+                    userId: req.session.userId,
+                    username: req.session.username,
+                    reason: `Delete waste dispatch ${dispatch.dispatchNumber}`,
+                  },
+                },
+                canonicalStockMovementAdapter
+              );
             }
           }
         }
@@ -721,7 +748,31 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
               }
             }
             if (erpStockItemId) {
-              await adjustInventory(tx, bale.erpLocationId, erpStockItemId, -1, companyId);
+              const adjustment = await adjustInventory(tx, bale.erpLocationId, erpStockItemId, -1, companyId);
+              await postStockMovementTx(
+                tx,
+                {
+                  companyId,
+                  stockItemId: erpStockItemId,
+                  kind: "adjustment",
+                  quantity: "1",
+                  unitCost: String(Math.max(adjustment.averageRate || 0, 0)),
+                  fromLocationId: bale.erpLocationId,
+                  occurredAt: now.toISOString(),
+                  source: {
+                    sourceType: "factory_waste_dispatch",
+                    sourceId: String(dispatch.id),
+                    idempotencyKey: `factory-waste-dispatch:${companyId}:${dispatch.id}:${bale.id}`,
+                  },
+                  actor: {
+                    userId: userId ?? undefined,
+                    username: req.session.username,
+                    reason: notes || `Waste dispatch ${dispatchNumber}`,
+                  },
+                  allowNegativeStock: true,
+                },
+                canonicalStockMovementAdapter
+              );
             }
           }
         }
