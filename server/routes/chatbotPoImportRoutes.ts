@@ -145,10 +145,14 @@ export function registerChatbotPoImportRoutes(app: Express) {
       if (fileExt === "pdf") {
         let pdfText = "";
         try {
-          const pdfParseModule: any = await import("pdf-parse");
-          const pdfParse = (pdfParseModule.default ?? pdfParseModule) as (buf: Buffer) => Promise<{ text: string }>;
-          const parsed = await pdfParse(req.file.buffer);
-          pdfText = parsed.text;
+          const { PDFParse } = await import("pdf-parse");
+          const parser = new PDFParse({ data: new Uint8Array(req.file.buffer) });
+          try {
+            const parsed = await parser.getText();
+            pdfText = parsed.text;
+          } finally {
+            await parser.destroy();
+          }
         } catch (pdfErr: unknown) {
           return res.status(400).json({ message: `Could not read PDF: ${getErrorMessage(pdfErr)}` });
         }
@@ -406,7 +410,10 @@ export function registerChatbotPoImportRoutes(app: Express) {
         }
       }
 
-      const itemsTotal = lines.reduce((s: number, l: { qty: string; rate: string }) => s + parseFloat(l.qty) * parseFloat(l.rate), 0);
+      const itemsTotal = lines.reduce(
+        (s: number, l: { qty: string; rate: string }) => s + parseFloat(l.qty) * parseFloat(l.rate),
+        0
+      );
       const freightAmt = parseFloat(charges?.freight || "0") || 0;
       const surchargeAmt = parseFloat(charges?.surcharge || "0") || 0;
       const fumigationAmt = parseFloat(charges?.fumigation || "0") || 0;
