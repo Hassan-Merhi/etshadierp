@@ -1,0 +1,46 @@
+name: Phase 4 Bisect Client B
+
+on:
+  push:
+    branches: [phase4-bisect-client-b]
+
+permissions:
+  contents: write
+
+jobs:
+  bisect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      PHASE4_SCOPE: client
+      PHASE4_BUCKET: "1"
+      PHASE4_BUCKET_COUNT: "2"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: phase4-bisect-client-b
+          fetch-depth: 1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24.19.0"
+          cache: npm
+      - run: npm ci
+      - name: Bisect compiler-safe client candidates
+        run: node scripts/phase4-bisect-inference.mjs
+      - name: Certify source tree
+        run: |
+          npm run check
+          npm run audit:type-escapes
+          npm run lint
+          git diff --check
+      - name: Commit source-only result and retire lane
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/phase4-bisect-client-b.yml
+          git add client/src
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "refactor: harvest Phase 4 client inference lane B"
+          git push origin HEAD:phase4-bisect-client-b
