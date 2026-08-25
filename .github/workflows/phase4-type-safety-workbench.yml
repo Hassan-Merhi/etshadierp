@@ -98,3 +98,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "refactor: apply Phase 4 compiler-safe type inference"
           git push origin HEAD:phase-4-remaining-type-safety
+
+# Workbench trigger revision 1
