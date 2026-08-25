@@ -71,8 +71,7 @@ function isExportedClassMember(node) {
 }
 
 function isExportedSurface(node) {
-  let child = node;
-  for (let current = node.parent; current; child = current, current = current.parent) {
+  for (let current = node.parent; current; current = current.parent) {
     if (
       (ts.isInterfaceDeclaration(current) ||
         ts.isTypeAliasDeclaration(current) ||
@@ -254,9 +253,16 @@ let kept = 0;
 let touchedFiles = 0;
 const byKind = new Map();
 const touched = [];
+let filesContainingAnyText = 0;
 
 for (const file of candidateFiles) {
   const original = fs.readFileSync(file, "utf8");
+  // Avoid constructing semantic diagnostics for the thousands of files that
+  // cannot possibly contain an AnyKeyword. The full npm typecheck still runs
+  // after all accepted edits, so this is only a workbench speed optimization.
+  if (!/\bany\b/.test(original)) continue;
+  filesContainingAnyText += 1;
+
   setText(file, original);
   if (!diagnosticsClean(file)) continue;
 
@@ -299,7 +305,10 @@ for (const file of candidateFiles) {
   }
 }
 
-console.log(`Phase 4 inference pass kept ${kept} edits across ${touchedFiles} files.`);
+console.log(
+  `Phase 4 inference pass kept ${kept} edits across ${touchedFiles} files ` +
+    `(${filesContainingAnyText} files contained the token any).`,
+);
 for (const [kind, count] of [...byKind.entries()].sort()) {
   console.log(`  ${kind}: ${count}`);
 }
