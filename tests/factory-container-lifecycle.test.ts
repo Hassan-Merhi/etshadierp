@@ -249,8 +249,8 @@ describe("SP container offload", () => {
     expect(Number(offload.totalQty)).toBeCloseTo(CONTAINER_QTY, 1);
     expect(Number(offload.totalBaseCostUsd)).toBeCloseTo(CONTAINER_QTY * UNIT_RATE, 0);
 
-    offloadVoucherIds = [offload.voucherIdReversal, offload.voucherIdStock].filter(
-      (id): id is number => Number.isInteger(id)
+    offloadVoucherIds = [offload.voucherIdReversal, offload.voucherIdStock].filter((id): id is number =>
+      Number.isInteger(id)
     );
     expect(offloadVoucherIds.length).toBeGreaterThan(0);
     for (const voucherId of offloadVoucherIds) {
