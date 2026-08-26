@@ -1,25 +1,9 @@
 /**
  * Migration 0016 actually isolates tenants — proven by running it.
  *
- * `0016_company_scope_rls_readiness.sql` installs row-level security on the
- * eight tables that carry company_id plus voucher_entries, and it is
- * deliberately not applied automatically: the file says so, the runner refuses
- * to run without an explicit confirmation, and the production start command
- * does not invoke it. That is the right call for a policy change of this size.
- *
- * It also meant nobody had ever executed it. The only tests it had read the SQL
- * as text and asserted that certain words appeared in it, which proves the file
- * says "CREATE POLICY" and nothing about whether the policy isolates anything.
- * The day it is applied is the worst possible day to discover that a predicate
- * is inverted, that the compatibility fallback swallows a malformed tenant
- * assertion, or that voucher_entries — which has no company_id of its own — is
- * reachable across companies through its parent.
- *
- * So this runs it. Against a throwaway database, as an ordinary non-superuser
- * role (a superuser bypasses RLS entirely, so a test that used one would pass
- * no matter what the policies said), with rows belonging to two companies. The
- * scratch database is created and dropped here and shares nothing with the
- * suite database.
+ * The migration is executed against a scratch database as an ordinary
+ * non-superuser role. A superuser bypasses RLS entirely, so using one for the
+ * assertions below would make the most important tests pass vacuously.
  */
 import { Client } from "pg";
 import { readFileSync } from "node:fs";
@@ -72,7 +56,7 @@ async function connect(connectionString: string): Promise<Client> {
  * The subset of the real schema the migration names: enough columns for the
  * policies to compile and for a row to belong to a company. Building this by
  * hand rather than importing the production schema keeps the test about the
- * policy predicates rather than about 200 unrelated columns.
+ * policy predicates rather than about unrelated columns.
  */
 const SCRATCH_SCHEMA = `
   CREATE TABLE vouchers (id serial PRIMARY KEY, company_id integer NOT NULL, voucher_number text);
@@ -90,7 +74,7 @@ let admin: Client | null = null;
 let probe: Client | null = null;
 let available = false;
 
-/** Every table the migration puts a company_scope policy on. */
+/** Every direct-company table the migration protects. */
 const SCOPED_TABLES = [
   "vouchers",
   "customers",
@@ -102,15 +86,23 @@ const SCOPED_TABLES = [
   "inventory",
 ];
 
-async function scopeTo(value: string | null): Promise<void> {
-  // Session-level, not transaction-local, so each test states its own scope and
-  // no test inherits one. Production uses SET LOCAL inside a transaction; the
-  // policy reads the same setting either way.
-  if (value === null) {
-    await probe!.query("SELECT set_config('app.current_company_id', '', false)");
-    return;
-  }
-  await probe!.query("SELECT set_config('app.current_company_id', $1, false)", [value]);
+async function scopeTo(value: string | null, authorizedCompanyIds = ""): Promise<void> {
+  await probe!.query(
+    `SELECT
+       set_config('app.company_scope_maintenance', 'off', false),
+       set_config('app.current_company_id', $1, false),
+       set_config('app.authorized_company_ids', $2, false)`,
+    [value ?? "", authorizedCompanyIds]
+  );
+}
+
+async function enableMaintenanceScope(): Promise<void> {
+  await probe!.query(
+    `SELECT
+       set_config('app.company_scope_maintenance', 'on', false),
+       set_config('app.current_company_id', '', false),
+       set_config('app.authorized_company_ids', '', false)`
+  );
 }
 
 beforeAll(async () => {
@@ -144,15 +136,12 @@ beforeAll(async () => {
     );
   }
 
-  // The probe deliberately does not own these tables: RLS is skipped for the
-  // owner unless FORCE is set, and the migration explicitly does not FORCE.
   await admin.query(`GRANT USAGE ON SCHEMA public TO ${PROBE_ROLE}`);
   await admin.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${PROBE_ROLE}`);
   await admin.query(`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${PROBE_ROLE}`);
 
   probe = await connect(scratchConnectionString(SCRATCH_DATABASE, { user: PROBE_ROLE, password: PROBE_PASSWORD }));
   const who = await probe.query("SELECT usesuper FROM pg_user WHERE usename = current_user");
-  // If this role were a superuser every assertion below would pass vacuously.
   expect(who.rows[0]?.usesuper, "the probe role must not bypass RLS").toBe(false);
 
   available = true;
@@ -174,20 +163,26 @@ afterAll(async () => {
 }, 60_000);
 
 describe("company scope RLS migration 0016", () => {
-  it("leaves every row readable while no transaction states a company", async () => {
+  it("fails closed when no tenant or maintenance scope is present", async () => {
     expect(available).toBe(true);
     await scopeTo(null);
 
     for (const table of SCOPED_TABLES) {
-      const { rows } = await probe!.query(`SELECT count(*)::int AS total FROM ${table}`);
-      // This is the compatibility promise that makes the migration safe to apply
-      // before every write path adopts SET LOCAL. If it broke, applying 0016
-      // would blank the application rather than isolate it.
-      expect(rows[0].total, `${table} must stay fully visible without a company setting`).toBe(2);
+      await expect(probe!.query(`SELECT count(*)::int AS total FROM ${table}`)).rejects.toMatchObject({ code: "22023" });
     }
   });
 
-  it("hides another company's rows the moment a company is stated", async () => {
+  it("allows all-company access only after explicit maintenance assertion", async () => {
+    expect(available).toBe(true);
+    await enableMaintenanceScope();
+
+    for (const table of SCOPED_TABLES) {
+      const { rows } = await probe!.query(`SELECT count(*)::int AS total FROM ${table}`);
+      expect(rows[0].total, `${table} must be visible to explicit maintenance scope`).toBe(2);
+    }
+  });
+
+  it("hides another company's rows when a company is stated", async () => {
     expect(available).toBe(true);
     await scopeTo(String(HOME_COMPANY));
 
@@ -204,8 +199,6 @@ describe("company scope RLS migration 0016", () => {
     expect(available).toBe(true);
     await scopeTo(String(HOME_COMPANY));
 
-    // A read-only policy would let a mis-scoped write plant a row that its own
-    // company can then never see — the worst of both failures.
     await expect(
       probe!.query(`INSERT INTO customers (company_id, name) VALUES (${OTHER_COMPANY}, 'smuggled')`)
     ).rejects.toThrow(/row-level security/i);
@@ -226,33 +219,31 @@ describe("company scope RLS migration 0016", () => {
     await probe!.query(`DELETE FROM customers WHERE name = 'legitimate'`);
   });
 
-  it("fails closed on a malformed company setting instead of reading everything", async () => {
+  it("supports an explicit secondary company list for intentional intercompany work", async () => {
     expect(available).toBe(true);
-    await scopeTo("not-a-number");
-
-    // The dangerous alternative is treating an unparseable assertion as "no
-    // assertion", which turns a corrupted tenant context into full visibility.
-    await expect(probe!.query("SELECT count(*) FROM vouchers")).rejects.toThrow(/invalid input syntax/i);
+    await scopeTo(String(HOME_COMPANY), String(OTHER_COMPANY));
+    const { rows } = await probe!.query("SELECT company_id FROM vouchers ORDER BY company_id");
+    expect(rows.map((row) => row.company_id)).toEqual([HOME_COMPANY, OTHER_COMPANY]);
   });
 
-  it("rejects a non-positive company id rather than scoping to nothing", async () => {
+  it("fails closed on malformed tenant assertions", async () => {
     expect(available).toBe(true);
+    await scopeTo("not-a-number");
+    await expect(probe!.query("SELECT count(*) FROM vouchers")).rejects.toThrow(/invalid input syntax/i);
 
     for (const value of ["0", "-1"]) {
       await scopeTo(value);
-      await expect(probe!.query("SELECT count(*) FROM vouchers")).rejects.toMatchObject({
-        code: "22023",
-      });
+      await expect(probe!.query("SELECT count(*) FROM vouchers")).rejects.toMatchObject({ code: "22023" });
     }
+
+    await scopeTo(String(HOME_COMPANY), "8,bad");
+    await expect(probe!.query("SELECT erp_authorized_company_ids()")) .rejects.toMatchObject({ code: "22023" });
   });
 
   it("scopes voucher entries through their parent voucher", async () => {
     expect(available).toBe(true);
     await scopeTo(String(HOME_COMPANY));
 
-    // voucher_entries carries no company_id, so it is only isolated if the
-    // policy walks the parent. This is the ledger detail rows — the table where
-    // a leak is both most valuable to an attacker and least visible.
     const { rows } = await probe!.query("SELECT voucher_id FROM voucher_entries");
     expect(rows.map((row) => row.voucher_id)).toEqual([1]);
 
@@ -271,8 +262,6 @@ describe("company scope RLS migration 0016", () => {
        GROUP BY tablename ORDER BY tablename`
     );
 
-    // Two policies on one table are OR-ed, so a re-run that stacked a stale
-    // permissive copy would quietly restore cross-company visibility.
     expect(rows).toHaveLength(SCOPED_TABLES.length + 1);
     for (const row of rows) {
       expect(row.policies, `${row.tablename} has ${row.policies} scope policies`).toBe(1);
