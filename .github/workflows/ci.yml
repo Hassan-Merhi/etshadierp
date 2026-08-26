@@ -62,9 +62,6 @@ jobs:
             frontend=true
           }
 
-          # Keep main maximally conservative. Selective execution is a PR
-          # feedback optimization; every commit that actually lands on main
-          # still receives the complete application validation suite.
           if [[ "${GITHUB_EVENT_NAME}" != "pull_request" ]]; then
             enable_all
             echo "Non-PR event: running the full CI suite."
@@ -85,33 +82,23 @@ jobs:
 
             for file in "${changed_files[@]}"; do
               case "$file" in
-                # A CI topology change must exercise every lane before merge.
                 .github/workflows/ci.yml)
                   enable_all
                   ;;
-
-                # Documentation-only changes still run repository audits because
-                # env/doc-index ratchets intentionally validate documentation.
                 *.md|docs/*|.github/*.md)
                   ;;
-
-                # Frontend-only application changes.
                 client/*|public/*)
                   typecheck=true
                   lint_format=true
                   build=true
                   frontend=true
                   ;;
-
-                # Backend-only application changes.
                 server/*)
                   typecheck=true
                   lint_format=true
                   build=true
                   backend=true
                   ;;
-
-                # Shared code can affect either runtime.
                 shared/*)
                   typecheck=true
                   lint_format=true
@@ -119,40 +106,25 @@ jobs:
                   backend=true
                   frontend=true
                   ;;
-
-                # Tests may exercise either side; stay conservative.
                 tests/*)
                   typecheck=true
                   lint_format=true
                   backend=true
                   frontend=true
                   ;;
-
-                # Repository scripts are covered by audits, lint and type/static
-                # checks but do not by themselves require application suites.
                 scripts/*)
                   typecheck=true
                   lint_format=true
                   ;;
-
-                # Database/schema/migration changes require backend + DB coverage.
                 migrations/*|migration/*|drizzle/*|db/*|database/*)
                   build=true
                   backend=true
                   ;;
-
-                # Dependency/toolchain/test-runner changes can affect everything.
                 package.json|package-lock.json|npm-shrinkwrap.json|.node-version|.nvmrc|tsconfig*.json|vite.config.*|vitest.config.*|eslint.config.*|drizzle.config.*)
                   enable_all
                   ;;
-
-                # Other workflow-only changes are validated by repository audits
-                # and the dedicated GitHub Actions Quality workflow.
                 .github/*)
                   ;;
-
-                # Unknown files fail safe. We only skip expensive lanes when a
-                # path is explicitly understood.
                 *)
                   echo "Unclassified path '${file}': running all application lanes."
                   enable_all
@@ -183,7 +155,6 @@ jobs:
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
-
       - name: Download repository source
         env:
           GH_TOKEN: ${{ github.token }}
@@ -194,17 +165,14 @@ jobs:
             --header "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" |
             tar --extract --gzip --strip-components=1
-
       - name: Set up Node.js 24.19.0
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "24.19.0"
           cache: npm
-
       - name: Install dependencies
         id: install
         run: npm ci --no-audit --bin-links=true
-
       - name: Dependency diagnostics
         if: always() && steps.install.outcome == 'success'
         run: |
@@ -214,41 +182,29 @@ jobs:
           node -p "'TypeScript ' + require('typescript/package.json').version"
           node -p "'jsdom ' + require('jsdom/package.json').version"
           for binary in tsc vite eslint vitest; do
-            if [ -x "node_modules/.bin/$binary" ]; then
-              echo "$binary: available"
-            else
-              echo "::warning::$binary is missing from node_modules/.bin"
-            fi
+            if [ -x "node_modules/.bin/$binary" ]; then echo "$binary: available"; else echo "::warning::$binary is missing from node_modules/.bin"; fi
           done
-
       - name: Verify environment documentation
         if: always() && steps.install.outcome == 'success'
         run: npm run verify:env-docs
-
       - name: Type-escape ratchet
         if: always() && steps.install.outcome == 'success'
         run: npm run audit:type-escapes
-
       - name: Documentation state index
         if: always() && steps.install.outcome == 'success'
         run: npm run audit:doc-index
-
       - name: Write-route coverage ratchet
         if: always() && steps.install.outcome == 'success'
         run: npm run audit:write-routes
-
       - name: Write-evidence ratchet
         if: always() && steps.install.outcome == 'success'
         run: npm run audit:write-evidence
-
       - name: Toolchain coherence
         if: always() && steps.install.outcome == 'success'
         run: npm run audit:toolchain
-
       - name: Script inventory
         if: always() && steps.install.outcome == 'success'
         run: npm run audit:scripts
-
       - name: Readable logging contracts
         if: always() && steps.install.outcome == 'success'
         run: node scripts/verify-readable-logging-phase-10.mjs
@@ -264,35 +220,26 @@ jobs:
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
-
       - name: Download repository source
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --location \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" |
-            tar --extract --gzip --strip-components=1
-
+          curl --fail --silent --show-error --location --header "Authorization: Bearer ${GH_TOKEN}" --header "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" | tar --extract --gzip --strip-components=1
       - name: Set up Node.js 24.19.0
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "24.19.0"
           cache: npm
-
       - name: Install dependencies
         id: install
         run: npm ci --no-audit --bin-links=true
-
       - name: Type-check
         id: typecheck
         if: always() && steps.install.outcome == 'success'
         run: |
           set -o pipefail
           npm run check 2>&1 | tee ts-errors-ci.txt
-
       - name: Upload type-check failure log
         if: always() && steps.typecheck.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -313,35 +260,26 @@ jobs:
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
-
       - name: Download repository source
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --location \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" |
-            tar --extract --gzip --strip-components=1
-
+          curl --fail --silent --show-error --location --header "Authorization: Bearer ${GH_TOKEN}" --header "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" | tar --extract --gzip --strip-components=1
       - name: Set up Node.js 24.19.0
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "24.19.0"
           cache: npm
-
       - name: Install dependencies
         id: install
         run: npm ci --no-audit --bin-links=true
-
       - name: Lint
         id: lint
         if: always() && steps.install.outcome == 'success'
         run: |
           set -o pipefail
           npm run lint 2>&1 | tee lint-errors-ci.txt
-
       - name: Upload lint failure log
         if: always() && steps.lint.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -350,11 +288,9 @@ jobs:
           path: lint-errors-ci.txt
           if-no-files-found: error
           retention-days: 7
-
       - name: Lint warning ratchet
         if: always() && steps.lint.conclusion != 'skipped'
         run: npm run audit:lint-ratchet
-
       - name: Format changed source files
         id: format_check
         if: always() && steps.install.outcome == 'success'
@@ -364,31 +300,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base_sha="$PR_BASE_SHA"
-          else
-            base_sha="$PUSH_BASE_SHA"
-            if [ -z "$base_sha" ] || [ "$base_sha" = "0000000000000000000000000000000000000000" ]; then
-              base_sha="HEAD^"
-            fi
-          fi
-
-          mapfile -t changed_files < <(
-            gh api --paginate \
-              "repos/${GITHUB_REPOSITORY}/compare/${base_sha}...${GITHUB_SHA}" \
-              --jq '.files[] | select(.status != "removed") | .filename' |
-              grep -E '^(client/src|server|shared|tests|scripts)/.*\.(ts|tsx|css|mjs)$' || true
-          )
-
-          if [ "${#changed_files[@]}" -eq 0 ]; then
-            echo "No changed TypeScript, TSX, or CSS source files require formatting checks." | tee "$RUNNER_TEMP/format-errors-ci.txt"
-            exit 0
-          fi
-
+          if [ "${{ github.event_name }}" = "pull_request" ]; then base_sha="$PR_BASE_SHA"; else base_sha="$PUSH_BASE_SHA"; if [ -z "$base_sha" ] || [ "$base_sha" = "0000000000000000000000000000000000000000" ]; then base_sha="HEAD^"; fi; fi
+          mapfile -t changed_files < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/compare/${base_sha}...${GITHUB_SHA}" --jq '.files[] | select(.status != "removed") | .filename' | grep -E '^(client/src|server|shared|tests|scripts)/.*\.(ts|tsx|css|mjs)$' || true)
+          if [ "${#changed_files[@]}" -eq 0 ]; then echo "No changed TypeScript, TSX, or CSS source files require formatting checks." | tee "$RUNNER_TEMP/format-errors-ci.txt"; exit 0; fi
           printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}" | tee "$RUNNER_TEMP/format-errors-ci.txt"
           printf ' - %s\n' "${changed_files[@]}" | tee -a "$RUNNER_TEMP/format-errors-ci.txt"
           node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}" 2>&1 | tee -a "$RUNNER_TEMP/format-errors-ci.txt"
-
       - name: Upload format failure log
         if: always() && steps.format_check.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -409,35 +326,26 @@ jobs:
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
-
       - name: Download repository source
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --location \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" |
-            tar --extract --gzip --strip-components=1
-
+          curl --fail --silent --show-error --location --header "Authorization: Bearer ${GH_TOKEN}" --header "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" | tar --extract --gzip --strip-components=1
       - name: Set up Node.js 24.19.0
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "24.19.0"
           cache: npm
-
       - name: Install dependencies
         id: install
         run: npm ci --no-audit --bin-links=true
-
       - name: Build
         id: build
         if: always() && steps.install.outcome == 'success'
         run: |
           set -o pipefail
           npm run build 2>&1 | tee build-errors-ci.txt
-
       - name: Upload build failure log
         if: always() && steps.build.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -476,35 +384,26 @@ jobs:
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
-
       - name: Download repository source
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --location \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" |
-            tar --extract --gzip --strip-components=1
-
+          curl --fail --silent --show-error --location --header "Authorization: Bearer ${GH_TOKEN}" --header "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" | tar --extract --gzip --strip-components=1
       - name: Set up Node.js 24.19.0
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "24.19.0"
           cache: npm
-
       - name: Install dependencies
         id: install
         run: npm ci --no-audit --bin-links=true
-
       - name: Build for startup migration verification
         id: build
         if: always() && steps.install.outcome == 'success'
         run: |
           set -o pipefail
           npm run build 2>&1 | tee backend-build-errors-ci.txt
-
       - name: Upload backend build failure log
         if: always() && steps.build.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -513,14 +412,12 @@ jobs:
           path: backend-build-errors-ci.txt
           if-no-files-found: error
           retention-days: 7
-
       - name: Prepare test database schema
         id: db_schema
         if: always() && steps.install.outcome == 'success'
         run: |
           set -o pipefail
           node node_modules/drizzle-kit/bin.cjs push --force 2>&1 | tee db-schema-ci.txt
-
       - name: Upload database schema failure log
         if: always() && steps.db_schema.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -529,7 +426,6 @@ jobs:
           path: db-schema-ci.txt
           if-no-files-found: error
           retention-days: 7
-
       - name: Run application startup migrations
         id: runtime_migrations
         if: always() && steps.db_schema.outcome == 'success' && steps.build.outcome == 'success'
@@ -537,29 +433,16 @@ jobs:
           set -o pipefail
           node dist/index.js > "$RUNNER_TEMP/startup-migrations-ci.txt" 2>&1 &
           app_pid=$!
-          cleanup() {
-            kill "$app_pid" 2>/dev/null || true
-            wait "$app_pid" 2>/dev/null || true
-          }
+          cleanup() { kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true; }
           trap cleanup EXIT
-
           for _attempt in $(seq 1 180); do
-            if curl --fail --silent --show-error "http://127.0.0.1:${PORT}/api/health/db" > "$RUNNER_TEMP/health-db-ci.json"; then
-              cat "$RUNNER_TEMP/health-db-ci.json"
-              exit 0
-            fi
-            if ! kill -0 "$app_pid" 2>/dev/null; then
-              echo "Application exited before startup migrations became ready."
-              cat "$RUNNER_TEMP/startup-migrations-ci.txt"
-              exit 1
-            fi
+            if curl --fail --silent --show-error "http://127.0.0.1:${PORT}/api/health/db" > "$RUNNER_TEMP/health-db-ci.json"; then cat "$RUNNER_TEMP/health-db-ci.json"; exit 0; fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then echo "Application exited before startup migrations became ready."; cat "$RUNNER_TEMP/startup-migrations-ci.txt"; exit 1; fi
             sleep 1
           done
-
           echo "Timed out waiting for application startup migrations."
           cat "$RUNNER_TEMP/startup-migrations-ci.txt"
           exit 1
-
       - name: Upload startup migration failure log
         if: always() && steps.runtime_migrations.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -570,38 +453,22 @@ jobs:
             ${{ runner.temp }}/health-db-ci.json
           if-no-files-found: warn
           retention-days: 7
-
       - name: Startup migration ratchet
         id: startup_migration_ratchet
         if: always() && steps.runtime_migrations.outcome == 'success'
         run: |
           set -o pipefail
-          HEALTH_REPORT="$RUNNER_TEMP/health-db-ci.json" HEALTH_LABEL='first boot, fresh schema' \
-            npm run verify:startup-migrations
-
+          HEALTH_REPORT="$RUNNER_TEMP/health-db-ci.json" HEALTH_LABEL='first boot, fresh schema' npm run verify:startup-migrations
           node dist/index.js > "$RUNNER_TEMP/startup-migrations-verify.txt" 2>&1 &
           app_pid=$!
-          cleanup() {
-            kill "$app_pid" 2>/dev/null || true
-            wait "$app_pid" 2>/dev/null || true
-          }
+          cleanup() { kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true; }
           trap cleanup EXIT
-
           for _attempt in $(seq 1 180); do
-            if curl --fail --silent "http://127.0.0.1:${PORT}/api/health/db" | grep -q '"status":"ok"'; then
-              break
-            fi
-            if ! kill -0 "$app_pid" 2>/dev/null; then
-              echo "Application exited before the migration report was readable."
-              cat "$RUNNER_TEMP/startup-migrations-verify.txt"
-              exit 1
-            fi
+            if curl --fail --silent "http://127.0.0.1:${PORT}/api/health/db" | grep -q '"status":"ok"'; then break; fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then echo "Application exited before the migration report was readable."; cat "$RUNNER_TEMP/startup-migrations-verify.txt"; exit 1; fi
             sleep 1
           done
-
-          HEALTH_URL="http://127.0.0.1:${PORT}" HEALTH_LABEL='second boot, schema already applied' \
-            npm run verify:startup-migrations
-
+          HEALTH_URL="http://127.0.0.1:${PORT}" HEALTH_LABEL='second boot, schema already applied' npm run verify:startup-migrations
       - name: Upload startup migration ratchet log
         if: always() && steps.startup_migration_ratchet.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -610,14 +477,12 @@ jobs:
           path: ${{ runner.temp }}/startup-migrations-verify.txt
           if-no-files-found: warn
           retention-days: 7
-
       - name: Backend tests and coverage thresholds
         id: backend_coverage
         if: always() && steps.runtime_migrations.outcome == 'success'
         run: |
           set -o pipefail
           npm run test:backend:coverage 2>&1 | tee backend-coverage-errors-ci.txt
-
       - name: Upload backend coverage failure log
         if: always() && steps.backend_coverage.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -626,7 +491,6 @@ jobs:
           path: backend-coverage-errors-ci.txt
           if-no-files-found: error
           retention-days: 7
-
       - name: Upload backend coverage summary
         if: always() && steps.backend_coverage.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -647,35 +511,26 @@ jobs:
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
-
       - name: Download repository source
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --location \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" |
-            tar --extract --gzip --strip-components=1
-
+          curl --fail --silent --show-error --location --header "Authorization: Bearer ${GH_TOKEN}" --header "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" | tar --extract --gzip --strip-components=1
       - name: Set up Node.js 24.19.0
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "24.19.0"
           cache: npm
-
       - name: Install dependencies
         id: install
         run: npm ci --no-audit --bin-links=true
-
       - name: Frontend tests and coverage thresholds
         id: frontend_coverage
         if: always() && steps.install.outcome == 'success'
         run: |
           set -o pipefail
           npm run test:frontend:coverage 2>&1 | tee frontend-coverage-errors-ci.txt
-
       - name: Upload frontend coverage failure log
         if: always() && steps.frontend_coverage.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -684,7 +539,6 @@ jobs:
           path: frontend-coverage-errors-ci.txt
           if-no-files-found: error
           retention-days: 7
-
       - name: Upload frontend coverage summary
         if: always() && steps.frontend_coverage.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -713,38 +567,119 @@ jobs:
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
-
       - name: Download repository source
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --location \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" |
-            tar --extract --gzip --strip-components=1
-
+          curl --fail --silent --show-error --location --header "Authorization: Bearer ${GH_TOKEN}" --header "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" | tar --extract --gzip --strip-components=1
       - name: Set up Node.js 24.19.0
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "24.19.0"
           cache: npm
-
       - name: Install dependencies
         run: npm ci --no-audit --bin-links=true
-
       - name: Download backend coverage summary
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: backend-coverage-summary
           path: coverage/backend
-
       - name: Download frontend coverage summary
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: frontend-coverage-summary
           path: coverage/frontend
-
       - name: Coverage ratchet audit
         run: npm run audit:coverage-ratchet
+
+  ci-gate:
+    name: CI Gate
+    if: always()
+    needs:
+      - changes
+      - repo-audits
+      - typecheck
+      - lint-format
+      - build
+      - backend-tests
+      - frontend-tests
+      - coverage-ratchet
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Evaluate applicable CI jobs
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          REPO_AUDITS_SELECTED: ${{ needs.changes.outputs.repo_audits }}
+          REPO_AUDITS_RESULT: ${{ needs.repo-audits.result }}
+          TYPECHECK_SELECTED: ${{ needs.changes.outputs.typecheck }}
+          TYPECHECK_RESULT: ${{ needs.typecheck.result }}
+          LINT_FORMAT_SELECTED: ${{ needs.changes.outputs.lint_format }}
+          LINT_FORMAT_RESULT: ${{ needs.lint-format.result }}
+          BUILD_SELECTED: ${{ needs.changes.outputs.build }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          BACKEND_SELECTED: ${{ needs.changes.outputs.backend }}
+          BACKEND_RESULT: ${{ needs.backend-tests.result }}
+          FRONTEND_SELECTED: ${{ needs.changes.outputs.frontend }}
+          FRONTEND_RESULT: ${{ needs.frontend-tests.result }}
+          COVERAGE_RESULT: ${{ needs.coverage-ratchet.result }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$CHANGES_RESULT" != "success" ]]; then
+            echo "::error::Change detection did not succeed: ${CHANGES_RESULT}"
+            exit 1
+          fi
+
+          failed=0
+          check_job() {
+            local label="$1"
+            local selected="$2"
+            local result="$3"
+            if [[ "$selected" == "true" ]]; then
+              if [[ "$result" != "success" ]]; then
+                echo "::error::${label} was selected but finished as '${result}'."
+                failed=1
+              else
+                echo "${label}: success"
+              fi
+            else
+              if [[ "$result" != "skipped" ]]; then
+                echo "::error::${label} was not selected but finished as '${result}' instead of 'skipped'."
+                failed=1
+              else
+                echo "${label}: correctly skipped"
+              fi
+            fi
+          }
+
+          check_job "Repository Audits" "$REPO_AUDITS_SELECTED" "$REPO_AUDITS_RESULT"
+          check_job "Type-check" "$TYPECHECK_SELECTED" "$TYPECHECK_RESULT"
+          check_job "Lint / Format" "$LINT_FORMAT_SELECTED" "$LINT_FORMAT_RESULT"
+          check_job "Build" "$BUILD_SELECTED" "$BUILD_RESULT"
+          check_job "Backend / Database Tests" "$BACKEND_SELECTED" "$BACKEND_RESULT"
+          check_job "Frontend Tests" "$FRONTEND_SELECTED" "$FRONTEND_RESULT"
+
+          if [[ "$BACKEND_SELECTED" == "true" && "$FRONTEND_SELECTED" == "true" ]]; then
+            if [[ "$COVERAGE_RESULT" != "success" ]]; then
+              echo "::error::Coverage Ratchet was applicable but finished as '${COVERAGE_RESULT}'."
+              failed=1
+            else
+              echo "Coverage Ratchet: success"
+            fi
+          else
+            if [[ "$COVERAGE_RESULT" != "skipped" ]]; then
+              echo "::error::Coverage Ratchet was not applicable but finished as '${COVERAGE_RESULT}' instead of 'skipped'."
+              failed=1
+            else
+              echo "Coverage Ratchet: correctly skipped"
+            fi
+          fi
+
+          if [[ "$failed" -ne 0 ]]; then
+            echo "::error::CI Gate rejected this commit."
+            exit 1
+          fi
+
+          echo "CI Gate accepted all applicable jobs."
