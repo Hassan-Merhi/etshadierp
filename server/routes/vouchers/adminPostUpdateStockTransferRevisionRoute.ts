@@ -51,6 +51,18 @@ function closeEnough(left: number, right: number) {
 }
 
 /**
+ * Pending revisions belong to the canonical immutable lifecycle, which is the
+ * route that accepts POS submissions and enforces the POS source-location
+ * boundary. This compatibility route is registered first, so it must skip the
+ * entire route before requireNonPOS runs. A plain next() would continue into
+ * requireNonPOS and incorrectly reject every POS revision with a 403.
+ */
+function bypassAdminCompatibilityForPendingRevision(req: Request, _res: Response, next: NextFunction) {
+  if (req.body?.optional === true) return next("route");
+  return next();
+}
+
+/**
  * Compatibility lane for the current admin editor, which persists the transfer
  * before posting its immutable revision snapshot. Pending/POS revisions still
  * flow through the canonical immutable lifecycle unchanged.
@@ -64,10 +76,9 @@ export function registerAdminPostUpdateStockTransferRevisionRoute(app: Express) 
   app.post(
     "/api/stock-transfers/:transferId/revisions",
     requireAuth,
+    bypassAdminCompatibilityForPendingRevision,
     requireNonPOS,
     async (req: Request, res: Response, next: NextFunction) => {
-      if (req.body?.optional === true) return next();
-
       try {
         const companyId = req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
