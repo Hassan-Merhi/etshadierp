@@ -49,6 +49,18 @@
     {
       "expected": "POST /api/sp/migration/rollback [requireAuth > <anonymous> > <anonymous>]",
       "actual": "POST /api/sp/migration/rollback [requireAuth > <anonymous> > <anonymous> > <anonymous> > <anonymous> > <anonymous>]"
+    },
+    {
+      "expected": "POST /api/factory/users [requireAuth > <anonymous>]",
+      "actual": "POST /api/factory/users [requireAuth > privilegedMutationRateLimit > requirePasswordConfirmation > <anonymous>]"
+    },
+    {
+      "expected": "PUT /api/factory/users/:userId [requireAuth > <anonymous>]",
+      "actual": "PUT /api/factory/users/:userId [requireAuth > privilegedMutationRateLimit > requirePasswordConfirmation > <anonymous>]"
+    },
+    {
+      "expected": "DELETE /api/factory/users/:userId [requireAuth > <anonymous>]",
+      "actual": "DELETE /api/factory/users/:userId [requireAuth > privilegedMutationRateLimit > requirePasswordConfirmation > <anonymous>]"
     }
   ],
   "sourceTextAssertionDelta": {
