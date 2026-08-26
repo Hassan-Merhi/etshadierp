@@ -28,6 +28,11 @@ jobs:
       - run: npm ci
       - name: Bisect compiler-safe server candidates
         run: node scripts/phase4-bisect-inference.mjs
+      - name: Restore cross-file-sensitive services
+        run: |
+          git checkout -- \
+            server/routes/factory/invoice-loading/_helpers.ts \
+            server/routes/performance/supplierVoucherEntryBatcher.ts
       - name: Certify source tree
         run: |
           npm run check
