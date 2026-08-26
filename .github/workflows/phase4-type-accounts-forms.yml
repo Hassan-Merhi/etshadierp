@@ -1,0 +1,47 @@
+name: Phase 4 Type Accounts Forms
+
+on:
+  push:
+    branches: [phase-4-remaining-type-safety]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase4-type-accounts-forms-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  type-forms:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=5120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: phase-4-remaining-type-safety
+          fetch-depth: 1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24.19.0"
+          cache: npm
+      - run: npm ci
+      - name: Type Accounts forms from shared schemas
+        run: node scripts/phase4-type-accounts-forms.mjs
+      - name: Certify Accounts contract repair
+        run: |
+          npm run check
+          npm run audit:type-escapes
+          npm run lint
+          git diff --check
+      - name: Commit repair and retire one-shot tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/phase4-type-accounts-forms.yml scripts/phase4-type-accounts-forms.mjs
+          git add client/src/pages/accountslegacy/useAccountsLegacyModel.ts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "refactor: type Accounts forms from shared schemas"
+          git push origin HEAD:phase-4-remaining-type-safety
