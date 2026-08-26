@@ -94,7 +94,7 @@ function desiredDatabaseScope(): {
 
   if (context?.kind === "maintenance") {
     return {
-      signature: `maintenance:${context.reason}`,
+      signature: "maintenance",
       maintenance: "on",
       companyId: "",
       authorizedCompanyIds: "",
@@ -102,12 +102,15 @@ function desiredDatabaseScope(): {
   }
 
   if (context?.kind === "tenant") {
-    const authorizedCompanyIds = context.authorizedCompanyIds.join(",");
     return {
-      signature: `tenant:${context.companyId}:${authorizedCompanyIds}`,
+      // The pooled session-wide boundary is intentionally the active company
+      // only. Verified secondary companies stay in the request context for
+      // explicit intercompany transaction helpers; blindly widening every query
+      // because a request supplied targetCompanyId would defeat fail-closed RLS.
+      signature: `tenant:${context.companyId}`,
       maintenance: "off",
       companyId: String(context.companyId),
-      authorizedCompanyIds,
+      authorizedCompanyIds: "",
     };
   }
 
