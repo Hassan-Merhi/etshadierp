@@ -10,6 +10,7 @@ const WHATSAPP_GROUP_PATTERN = /\b(\d{6,})-\d+@g\.us\b/gi;
 const WHATSAPP_CONTACT_PATTERN = /\b(\d{7,})@c\.us\b/gi;
 const QUERY_SECRET_PATTERN = /([?&](?:access_token|token|api_key|apikey|key|signature|sig|secret|auth)=)[^&#\s]+/gi;
 const CONNECTION_STRING_PATTERN = /\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis):\/\/[^\s]+/gi;
+const INLINE_SECRET_ASSIGNMENT_PATTERN = /\b(expected|got)=([A-Fa-f0-9]{8,})(?:…|\.\.\.)?/g;
 
 function maskTail(value: string, label: string): string {
   const digits = value.replace(/\D/g, "");
@@ -45,6 +46,7 @@ export function redactLogString(value: string, key = ""): string {
     .replace(JWT_PATTERN, "[JWT_REDACTED]")
     .replace(CONNECTION_STRING_PATTERN, "[CONNECTION_STRING_REDACTED]")
     .replace(QUERY_SECRET_PATTERN, "$1[REDACTED]")
+    .replace(INLINE_SECRET_ASSIGNMENT_PATTERN, "$1=[REDACTED]")
     .replace(WHATSAPP_GROUP_PATTERN, (_, digits: string) => maskTail(digits, "WhatsApp group"))
     .replace(WHATSAPP_CONTACT_PATTERN, (_, digits: string) => maskTail(digits, "WhatsApp contact"));
 
