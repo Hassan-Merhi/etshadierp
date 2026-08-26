@@ -173,7 +173,7 @@ function buildConditions(ws: ExcelJS.Worksheet): FortuneCondition[] {
               color: colors.map((color) => argbToHex(color?.argb) ?? "#ffffff"),
             });
           } else if (rule.type === "dataBar") {
-            const color = !Array.isArray(rule.color) ? rule.color : undefined;
+            const color = !Array.isArray(rule.color) ? (rule.color as ArgbColor | undefined) : undefined;
             conditions.push({
               ...base,
               cfvo: rule.cfvo,
