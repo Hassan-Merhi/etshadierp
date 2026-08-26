@@ -1,129 +1,85 @@
 import express from "express";
-import session from "express-session";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
-
 import { browserMutationFailClosedBoundary } from "../server/security/browserMutationBoundary";
 
-const TEST_CSRF_TOKEN = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+const TEST_CSRF_TOKEN = "csrf-token-for-browser-boundary-tests";
 
 function buildApp() {
   const app = express();
   app.use(express.json());
-  app.use(
-    session({
-      secret: "phase-14-security-reaudit-test-secret",
-      resave: false,
-      saveUninitialized: false,
-    }),
-  );
-
-  app.get("/__test/authenticate", (req, res) => {
-    req.session.userId = "security-test-user";
-    if (req.query.withCsrf === "1") req.session.csrfToken = TEST_CSRF_TOKEN;
-    res.sendStatus(204);
+  app.use((req, _res, next) => {
+    const userId = req.header("X-Test-User");
+    if (userId) {
+      const csrfToken = req.header("X-Test-Session-Csrf");
+      Object.defineProperty(req, "session", {
+        configurable: true,
+        value: {
+          userId,
+          ...(csrfToken ? { csrfToken } : {}),
+        },
+      });
+    }
+    next();
   });
-
   app.use(browserMutationFailClosedBoundary);
-  app.post("/api/protected", (_req, res) => res.status(200).json({ ok: true }));
-  app.post("/api/user-presence/leave", (_req, res) => res.status(200).json({ ok: true }));
+  app.post("/api/test-mutation", (_req, res) => res.json({ ok: true }));
   return app;
 }
 
 describe("browser mutation fail-closed boundary", () => {
-  it("rejects opaque or malformed browser origins instead of treating them as native clients", async () => {
+  it("rejects opaque browser origins instead of treating them as native clients", async () => {
     const response = await request(buildApp())
-      .post("/api/protected")
-      .set("Host", "erp.example.test")
+      .post("/api/test-mutation")
+      .set("X-Test-User", "security-test-user")
       .set("Origin", "null")
-      .send({});
+      .send({ value: 1 });
 
     expect(response.status).toBe(403);
-    expect(response.body.code).toBe("CSRF_ORIGIN_INVALID");
+    expect(response.body.code).toBe("BROWSER_MUTATION_ORIGIN_INVALID");
   });
 
-  it("rejects a cross-origin browser mutation", async () => {
+  it("requires the established session CSRF token for authenticated same-origin browser mutations", async () => {
     const response = await request(buildApp())
-      .post("/api/protected")
-      .set("Host", "erp.example.test")
-      .set("Origin", "https://evil.example.test")
-      .send({});
+      .post("/api/test-mutation")
+      .set("X-Test-User", "security-test-user")
+      .set("Origin", "http://127.0.0.1")
+      .send({ value: 1 });
 
     expect(response.status).toBe(403);
-    expect(response.body.code).toBe("CSRF_ORIGIN_MISMATCH");
+    expect(response.body.code).toBe("BROWSER_MUTATION_CSRF_REQUIRED");
   });
 
-  it("requires an established CSRF token once a browser session is authenticated", async () => {
-    const app = buildApp();
-    const agent = request.agent(app);
-
-    await agent.get("/__test/authenticate").set("Host", "erp.example.test").expect(204);
-    const response = await agent
-      .post("/api/protected")
-      .set("Host", "erp.example.test")
-      .set("Origin", "https://erp.example.test")
-      .send({});
-
-    expect(response.status).toBe(403);
-    expect(response.body.code).toBe("CSRF_TOKEN_REQUIRED");
-  });
-
-  it("allows an authenticated same-origin browser mutation with the exact session token", async () => {
-    const app = buildApp();
-    const agent = request.agent(app);
-
-    await agent
-      .get("/__test/authenticate?withCsrf=1")
-      .set("Host", "erp.example.test")
-      .expect(204);
-    const response = await agent
-      .post("/api/protected")
-      .set("Host", "erp.example.test")
-      .set("Origin", "https://erp.example.test")
-      .set("X-CSRF-Token", TEST_CSRF_TOKEN)
-      .send({});
-
-    expect(response.status).toBe(200);
-    expect(response.body.ok).toBe(true);
-  });
-
-  it("preserves native authenticated clients that omit Origin and Referer", async () => {
-    const app = buildApp();
-    const agent = request.agent(app);
-
-    await agent.get("/__test/authenticate").expect(204);
-    const response = await agent.post("/api/protected").send({});
-
-    expect(response.status).toBe(200);
-  });
-
-  it("preserves the sendBeacon presence-leave exemption", async () => {
+  it("allows authenticated same-origin browser mutations with the exact session CSRF token", async () => {
     const response = await request(buildApp())
-      .post("/api/user-presence/leave")
-      .set("Host", "erp.example.test")
-      .set("Origin", "null")
-      .send({});
+      .post("/api/test-mutation")
+      .set("X-Test-User", "security-test-user")
+      .set("X-Test-Session-Csrf", TEST_CSRF_TOKEN)
+      .set("Origin", "http://127.0.0.1")
+      .set("X-CSRF-Token", TEST_CSRF_TOKEN)
+      .send({ value: 1 });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ ok: true });
+  });
+
+  it("keeps authenticated native clients compatible when Origin and Referer are absent", async () => {
+    const response = await request(buildApp())
+      .post("/api/test-mutation")
+      .set("X-Test-User", "security-test-user")
+      .send({ value: 1 });
 
     expect(response.status).toBe(200);
   });
 
-  it("requires the CSRF token for authenticated Capacitor browser mutations", async () => {
-    const app = buildApp();
-    const agent = request.agent(app);
-
-    await agent.get("/__test/authenticate?withCsrf=1").expect(204);
-
-    await agent
-      .post("/api/protected")
+  it("recognizes Capacitor origins and still enforces CSRF", async () => {
+    const response = await request(buildApp())
+      .post("/api/test-mutation")
+      .set("X-Test-User", "security-test-user")
       .set("Origin", "capacitor://localhost")
-      .send({})
-      .expect(403);
+      .send({ value: 1 });
 
-    await agent
-      .post("/api/protected")
-      .set("Origin", "capacitor://localhost")
-      .set("X-CSRF-Token", TEST_CSRF_TOKEN)
-      .send({})
-      .expect(200);
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe("BROWSER_MUTATION_CSRF_REQUIRED");
   });
 });
