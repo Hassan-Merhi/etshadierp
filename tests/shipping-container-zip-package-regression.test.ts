@@ -42,4 +42,18 @@ describe("shipping container ZIP package regression", () => {
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ message: "Invalid id" });
   });
+
+  it("builds a non-empty ZIP from in-memory files", async () => {
+    const { buildShippingZipBuffer } = await import("../server/routes/factory/shipping-containers/zip-package");
+
+    const zip = await buildShippingZipBuffer([
+      { name: "Commercial_Invoice.xlsx", data: Buffer.from("invoice-data") },
+      { name: "Customer_Statement.pdf", data: Buffer.from("statement-data") },
+    ]);
+
+    expect(zip.length).toBeGreaterThan(30);
+    expect(zip.subarray(0, 2).toString("ascii")).toBe("PK");
+    expect(zip.includes(Buffer.from("Commercial_Invoice.xlsx"))).toBe(true);
+    expect(zip.includes(Buffer.from("Customer_Statement.pdf"))).toBe(true);
+  });
 });
