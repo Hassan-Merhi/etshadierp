@@ -21,6 +21,19 @@ async function applyMigration(client: Client) {
   }
 }
 
+async function setProbeScope(
+  client: Client,
+  scope: { maintenance?: "on" | "off"; companyId?: string; authorizedCompanyIds?: string }
+) {
+  await client.query(
+    `SELECT
+       set_config('app.company_scope_maintenance', $1, false),
+       set_config('app.current_company_id', $2, false),
+       set_config('app.authorized_company_ids', $3, false)`,
+    [scope.maintenance ?? "off", scope.companyId ?? "", scope.authorizedCompanyIds ?? ""]
+  );
+}
+
 describeDatabase("company-scope RLS runtime", () => {
   let client: Client;
 
@@ -100,15 +113,22 @@ describeDatabase("company-scope RLS runtime", () => {
     }
   });
 
-  it("preserves legacy access when no company context is asserted", async () => {
+  it("fails closed when no tenant or maintenance scope is asserted", async () => {
     await client.query(`SET ROLE ${roleName}`);
-    await client.query("RESET app.current_company_id");
+    await setProbeScope(client, { companyId: "" });
+    await expect(client.query(`SELECT marker FROM ${probeTable} ORDER BY marker`)).rejects.toMatchObject({ code: "22023" });
+    await client.query("RESET ROLE");
+  });
+
+  it("allows explicit process-owned maintenance scope without inventing a tenant", async () => {
+    await client.query(`SET ROLE ${roleName}`);
+    await setProbeScope(client, { maintenance: "on" });
     const result = await client.query(`SELECT marker FROM ${probeTable} ORDER BY marker`);
     expect(result.rows.map((row) => row.marker)).toEqual(["company-a", "company-b"]);
     await client.query("RESET ROLE");
   });
 
-  it("isolates the table owner and rejects cross-company writes when context is asserted", async () => {
+  it("isolates the table owner and rejects cross-company writes when tenant context is asserted", async () => {
     await client.query(`SET ROLE ${roleName}`);
     const identity = await client.query(
       `SELECT current_user, pg_get_userbyid(c.relowner) AS owner, c.relforcerowsecurity AS forced
@@ -117,7 +137,7 @@ describeDatabase("company-scope RLS runtime", () => {
     );
     expect(identity.rows[0]).toMatchObject({ current_user: roleName, owner: roleName, forced: true });
 
-    await client.query("SELECT set_config('app.current_company_id', '101', false)");
+    await setProbeScope(client, { companyId: "101" });
     const result = await client.query(`SELECT marker FROM ${probeTable} ORDER BY marker`);
     expect(result.rows.map((row) => row.marker)).toEqual(["company-a"]);
     await expect(
@@ -126,21 +146,37 @@ describeDatabase("company-scope RLS runtime", () => {
     await client.query("RESET ROLE");
   });
 
-  it("fails closed for malformed and non-positive tenant assertions", async () => {
+  it("supports only explicitly asserted secondary company ids for intentional intercompany work", async () => {
     await client.query(`SET ROLE ${roleName}`);
-    await client.query("SELECT set_config('app.current_company_id', 'garbage', false)");
+    await setProbeScope(client, { companyId: "101", authorizedCompanyIds: "202" });
+    const result = await client.query(`SELECT marker FROM ${probeTable} ORDER BY marker`);
+    expect(result.rows.map((row) => row.marker)).toEqual(["company-a", "company-b"]);
+    await client.query("RESET ROLE");
+  });
+
+  it("fails closed for malformed, non-positive, and malformed-secondary tenant assertions", async () => {
+    await client.query(`SET ROLE ${roleName}`);
+    await setProbeScope(client, { companyId: "garbage" });
     await expect(client.query(`SELECT marker FROM ${probeTable}`)).rejects.toMatchObject({ code: "22P02" });
-    await client.query("SELECT set_config('app.current_company_id', '0', false)");
+
+    await setProbeScope(client, { companyId: "0" });
     await expect(client.query(`SELECT marker FROM ${probeTable}`)).rejects.toMatchObject({ code: "22023" });
-    await client.query("RESET app.current_company_id");
+
+    await setProbeScope(client, { companyId: "101", authorizedCompanyIds: "202,garbage" });
+    await expect(client.query("SELECT erp_authorized_company_ids()" )).rejects.toMatchObject({ code: "22023" });
     await client.query("RESET ROLE");
   });
 
   it("does not leak transaction-local company scope after commit", async () => {
+    await setProbeScope(client, { companyId: "" });
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.current_company_id', '101', true)");
     expect((await client.query("SELECT erp_current_company_id() AS company_id")).rows[0].company_id).toBe(101);
     await client.query("COMMIT");
-    expect((await client.query("SELECT erp_current_company_id() AS company_id")).rows[0].company_id).toBeNull();
+    expect(
+      (await client.query("SELECT nullif(current_setting('app.current_company_id', true), '') AS company_id")).rows[0]
+        .company_id
+    ).toBeNull();
+    await expect(client.query("SELECT erp_current_company_id() AS company_id")).rejects.toMatchObject({ code: "22023" });
   });
 });
