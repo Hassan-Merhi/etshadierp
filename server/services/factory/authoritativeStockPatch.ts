@@ -11,9 +11,7 @@ export interface AuthoritativeStockSnapshot {
 }
 
 export function normalizeStockArticleCode(value: unknown): string {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase();
+  return String(value ?? "").trim().toLowerCase();
 }
 
 function mergeAggregate(
@@ -29,9 +27,7 @@ function mergeAggregate(
   };
 }
 
-export function buildAuthoritativeStockSnapshot(
-  rows: AuthoritativeStockAggregate[]
-): AuthoritativeStockSnapshot {
+export function buildAuthoritativeStockSnapshot(rows: AuthoritativeStockAggregate[]): AuthoritativeStockSnapshot {
   const byProductId = new Map<number, AuthoritativeStockAggregate>();
   const byArticleCode = new Map<string, AuthoritativeStockAggregate>();
 
@@ -92,10 +88,7 @@ function resolveStock(
   return null;
 }
 
-export function patchInventoryStockRows(
-  body: unknown,
-  snapshot: AuthoritativeStockSnapshot
-): unknown {
+export function patchInventoryStockRows(body: unknown, snapshot: AuthoritativeStockSnapshot): unknown {
   if (!Array.isArray(body)) return body;
 
   return body.map((row) => {
@@ -144,10 +137,7 @@ function patchStockQtyArray(
   });
 }
 
-export function patchVerificationSummaryStock(
-  body: unknown,
-  snapshot: AuthoritativeStockSnapshot
-): unknown {
+export function patchVerificationSummaryStock(body: unknown, snapshot: AuthoritativeStockSnapshot): unknown {
   if (!body || typeof body !== "object" || Array.isArray(body)) return body;
   const summary = body as Record<string, unknown>;
   return {
