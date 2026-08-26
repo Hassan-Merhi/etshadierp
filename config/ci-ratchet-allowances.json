@@ -25,7 +25,13 @@
     "USE /api/sp/migration [spMigrationRateLimit]",
     "USE /api/sp/migration [spMigrationRequestBudgetMiddleware]",
     "USE /api/golden-coast/accounting [<anonymous>]",
-    "USE /api/golden-coast/accounting/phase1/post [<anonymous>]"
+    "USE /api/golden-coast/accounting/phase1/post [<anonymous>]",
+    "USE /api/factory/location-inventory/:locationId [<anonymous>]",
+    "USE /api/factory/location-inventory/:locationId [requireAuth]",
+    "USE /api/factory/location-inventory/:locationId [authoritativeInventoryStockMiddleware]",
+    "USE /api/factory/customer-orders/:id/verification-summary [<anonymous>]",
+    "USE /api/factory/customer-orders/:id/verification-summary [requireAuth]",
+    "USE /api/factory/customer-orders/:id/verification-summary [authoritativeVerificationStockMiddleware]"
   ],
   "routeManifestReplacements": [
     {
