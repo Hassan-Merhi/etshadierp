@@ -10,6 +10,7 @@ import { generateNetPositionExcel } from "../../helpers/generateNetPositionExcel
 import { retryAsync, isEmailConfigError, isWaConfigError } from "../../helpers/retryAsync";
 import { createExportRun, updateExportRun, finishExportRun } from "../../helpers/exportRunTracker";
 import { createScheduledExportArtifact } from "../../helpers/scheduledExportArtifact";
+import { runWithDatabaseMaintenanceScope } from "../security/databaseScopeRuntimeContext";
 
 import { isScheduleEnabled } from "./net-position";
 import { runDailyWhatsAppSend } from "./whatsapp-send";
@@ -85,49 +86,55 @@ export async function isTodayExportRunning(): Promise<boolean> {
 
 /**
  * Re-runs the daily export if today's scheduled run hasn't succeeded yet.
- * Called at startup (after server restart).
+ * Called at startup (after server restart) as well as from the scheduler.
  * Will NOT fire before the configured schedule hour to avoid early-restart surprises.
+ *
+ * Startup has no request-owned tenant identity, so this function establishes
+ * the same explicit maintenance capability used by cron ticks before touching
+ * any potentially tenant-scoped export/report data.
  */
 export async function checkAndRecoverDailyExport(): Promise<void> {
-  try {
-    // Read schedule config first — only recover if the scheduled hour has already passed today.
-    const r = await pool.query(
-      `SELECT schedule_enabled, schedule_hour, schedule_timezone FROM export_settings WHERE id = 1`
-    );
-    if (!r.rows.length) return;
-    const row = r.rows[0];
-
-    if (!row.schedule_enabled) {
-      logger.info("[DailyExport] Recovery check: schedule is disabled — skipping.");
-      return;
-    }
-
-    const configuredHour: number = row.schedule_hour ?? 18;
-    const tz: string = row.schedule_timezone || "America/New_York";
-    const nowInTz = new Date(new Date().toLocaleString("en-US", { timeZone: tz }));
-    const currentHour = nowInTz.getHours();
-
-    // Don't trigger recovery before the scheduled time has even arrived today.
-    if (currentHour < configuredHour) {
-      logger.info(
-        `[DailyExport] Recovery check: current hour (${currentHour}:xx ${tz}) is before scheduled hour (${configuredHour}:00) — skipping.`
+  return runWithDatabaseMaintenanceScope("daily-export-recovery", async () => {
+    try {
+      // Read schedule config first — only recover if the scheduled hour has already passed today.
+      const r = await pool.query(
+        `SELECT schedule_enabled, schedule_hour, schedule_timezone FROM export_settings WHERE id = 1`
       );
-      return;
-    }
+      if (!r.rows.length) return;
+      const row = r.rows[0];
 
-    if (await hasTodayExportSucceeded()) {
-      logger.info("[DailyExport] Recovery check: today's export already succeeded — nothing to do.");
-      return;
+      if (!row.schedule_enabled) {
+        logger.info("[DailyExport] Recovery check: schedule is disabled — skipping.");
+        return;
+      }
+
+      const configuredHour: number = row.schedule_hour ?? 18;
+      const tz: string = row.schedule_timezone || "America/New_York";
+      const nowInTz = new Date(new Date().toLocaleString("en-US", { timeZone: tz }));
+      const currentHour = nowInTz.getHours();
+
+      // Don't trigger recovery before the scheduled time has even arrived today.
+      if (currentHour < configuredHour) {
+        logger.info(
+          `[DailyExport] Recovery check: current hour (${currentHour}:xx ${tz}) is before scheduled hour (${configuredHour}:00) — skipping.`
+        );
+        return;
+      }
+
+      if (await hasTodayExportSucceeded()) {
+        logger.info("[DailyExport] Recovery check: today's export already succeeded — nothing to do.");
+        return;
+      }
+      if (await isTodayExportRunning()) {
+        logger.info("[DailyExport] Recovery check: export is currently running — skipping.");
+        return;
+      }
+      logger.info("[DailyExport] Recovery check: re-running today's failed/missed export...");
+      await runDailyExport();
+    } catch (e: unknown) {
+      logger.error("[DailyExport] Recovery check error:", { error: getErrorMessage(e) || e });
     }
-    if (await isTodayExportRunning()) {
-      logger.info("[DailyExport] Recovery check: export is currently running — skipping.");
-      return;
-    }
-    logger.info("[DailyExport] Recovery check: re-running today's failed/missed export...");
-    await runDailyExport();
-  } catch (e: unknown) {
-    logger.error("[DailyExport] Recovery check error:", { error: getErrorMessage(e) || e });
-  }
+  });
 }
 
 export async function runDailyExport(): Promise<boolean> {
