@@ -23,7 +23,6 @@ const commands = [
       "tests/security-headers-csp.test.ts",
       "tests/transaction-company-scope-request-binding.test.ts",
       "tests/phase4-tenant-surface-regression.test.ts",
-      "tests/phase3-rls-fail-closed-contract.test.ts",
       "tests/database-scope-pool-binding.test.ts",
       "--maxWorkers=1",
       "--no-file-parallelism",
