@@ -9,8 +9,9 @@
  *
  * In addition to comparing literal versions, this audit checks GitHub Actions
  * job structure: any job that executes node/npm/npx must set up the canonical
- * Node version in that same job. Comments, labels, output names, and unrelated
- * text containing the word "node" do not count as runtime use.
+ * Node version in that same job. Comments, labels, output names, filenames, and
+ * unrelated text containing the words "node" or "npm" do not count as runtime
+ * use.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -49,23 +50,67 @@ function workflowJobs(text) {
   return jobs;
 }
 
+function shellSegmentUsesNode(segment) {
+  let command = segment.trim();
+  if (!command || command.startsWith("#")) return false;
+
+  // Peel off shell control words that can legally precede a command.
+  let previous;
+  do {
+    previous = command;
+    command = command.replace(/^(?:if|elif|while|until|then|do)\s+/, "");
+    command = command.replace(/^!\s+/, "");
+    command = command.replace(/^(?:command|time)\s+/, "");
+  } while (command !== previous);
+
+  // Environment assignments may prefix a command, for example
+  // `HEALTH_URL=... npm run verify:startup-migrations`.
+  while (/^[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^\s]+)\s+/.test(command)) {
+    command = command.replace(/^[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^\s]+)\s+/, "");
+  }
+
+  const executable = command.match(/^([^\s]+)/)?.[1]?.replace(/^.*\//, "");
+  return executable === "node" || executable === "npm" || executable === "npx";
+}
+
+function runScriptUsesNode(script) {
+  return script.split(/\r?\n/).some((rawLine) => {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) return false;
+    return line.split(/\s*(?:&&|\|\||;|\|)\s*/).some(shellSegmentUsesNode);
+  });
+}
+
 function jobUsesNode(jobText) {
   const lines = jobText.split(/\r?\n/);
   let runIndent = null;
+  let runLines = [];
+
+  const finishRun = () => {
+    const usesNode = runScriptUsesNode(runLines.join("\n"));
+    runIndent = null;
+    runLines = [];
+    return usesNode;
+  };
+
   for (const line of lines) {
     const run = line.match(/^(\s*)run:\s*(.*)$/);
     if (run) {
+      if (runIndent !== null && finishRun()) return true;
       runIndent = run[1].length;
-      if (/\b(?:node|npm|npx)\b/i.test(run[2])) return true;
+      if (run[2] && run[2] !== "|" && run[2] !== ">") runLines.push(run[2]);
       continue;
     }
     if (runIndent !== null) {
       const indent = line.match(/^\s*/)?.[0].length ?? 0;
-      if (line.trim() && indent <= runIndent) runIndent = null;
-      else if (/\b(?:node|npm|npx)\b/i.test(line)) return true;
+      if (line.trim() && indent <= runIndent) {
+        if (finishRun()) return true;
+      } else {
+        runLines.push(line);
+      }
     }
   }
-  return false;
+  return runIndent !== null ? finishRun() : false;
 }
 
 function setupNodeVersions(jobText) {
