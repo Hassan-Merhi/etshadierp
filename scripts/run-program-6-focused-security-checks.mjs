@@ -14,6 +14,7 @@ const commands = [
       "tests/credential-version-service.test.ts",
       "tests/company-user-admin-scope-policy.test.ts",
       "tests/company-context-enforcement.test.ts",
+      "tests/phase3-tenant-isolation-boundary.test.ts",
       "tests/legacy-privileged-write-guard.test.ts",
       "tests/raw-stock-sensitive-input-guard.test.ts",
       "tests/stored-file-protected-access.test.ts",
