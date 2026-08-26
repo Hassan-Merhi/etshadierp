@@ -7,7 +7,7 @@ import { resultRows } from "../../../../lib/queryResult";
 import { getAuthoritativeAvailableStockSnapshot } from "../../../../services/factory/authoritativeAvailableStock";
 import { patchVerificationSummaryStock } from "../../../../services/factory/authoritativeStockPatch";
 
-interface OrderLocationRow {
+interface OrderLocationRow extends Record<string, unknown> {
   location_id: number | null;
 }
 
