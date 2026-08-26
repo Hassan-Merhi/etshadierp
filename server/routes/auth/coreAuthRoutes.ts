@@ -8,6 +8,10 @@ import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { storage } from "../../storage";
+import {
+  advanceCurrentSessionAfterPasswordChange,
+  replacePasswordAndRevokeSessions,
+} from "../../services/security/userPasswordChangeService";
 import { loginHistory, users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { hashPassword, logAudit, verifyPassword } from "../_helpers";
@@ -211,10 +215,17 @@ export function registerCoreAuthRoutes(app: Express) {
       if (!user) return res.status(404).json({ message: "User not found." });
       const { valid } = await verifyPassword(currentPassword, user.password);
       if (!valid) return res.status(400).json({ message: "Current password is incorrect." });
-      await db
-        .update(users)
-        .set({ password: await hashPassword(newPassword) })
-        .where(eq(users.id, userId));
+
+      const credentialVersion = await replacePasswordAndRevokeSessions(
+        userId,
+        await hashPassword(newPassword),
+        { exceptSid: req.sessionID }
+      );
+      advanceCurrentSessionAfterPasswordChange(req.session, credentialVersion);
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((error: unknown) => (error ? reject(error) : resolve()));
+      });
+
       res.json({ ok: true });
     } catch (error: unknown) {
       logger.error("Error changing password:", { error });
