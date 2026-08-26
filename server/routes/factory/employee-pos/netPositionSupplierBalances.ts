@@ -11,6 +11,7 @@ import {
 
 import { db } from "../../../db";
 import { buildBrokerStatement } from "../suppliers/broker";
+import { isSupplierPaidFreight } from "../suppliers/_supplierStatementHelpers";
 import { resolveStoredFxRate } from "../../../services/factory/currencyConversion";
 import { getLockedSupplierRate } from "../../../services/factory/rawStockLockedRate";
 
@@ -208,14 +209,17 @@ export async function computeNetPositionSupplierBalances(
     const ob = parseFloat(s.openingBalance || "0");
     if (ob !== 0) addNative("USD", ob);
 
-    // Containers: goods + freight + commission (native currency each)
+    // Containers: goods + supplier-paid freight + commission (native currency each).
+    // Own-account freight must never increase the supplier liability; use the same
+    // authoritative helper as the Suppliers page / supplier statements so the two
+    // views cannot disagree for standalone suppliers.
     const sc = allContainersF.filter((c) => c.supplierId === s.id);
     for (const c of sc) {
       const cc = c.currencyCode || "USD";
       const kg = parseFloat(c.totalKg || "0");
       const rate = parseFloat(c.ratePerKg || "0");
       addNative(cc, kg * rate);
-      const freight = parseFloat(c.freight || "0");
+      const freight = isSupplierPaidFreight(c) ? parseFloat(c.freight || "0") : 0;
       if (freight > 0) {
         const fcc = c.freightCurrencyCode || cc;
         addNative(fcc, freight);

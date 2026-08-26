@@ -4,9 +4,10 @@ const requiredFiles = [
   "server/routes/factory/factoryRawStockRoutes.ts",
   "server/routes/factory/raw-stock/rawStockContainerRoutes.ts",
   "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts",
-  "server/routes/factory/suppliers/supplierCrudRoutes.ts",
-  "server/routes/factory/suppliers/supplierBrokerRoutes.ts",
-  "server/routes/factory/suppliers/supplierBalanceRoutes.ts",
+  "server/routes/factory/suppliers/crud/suppliers.ts",
+  "server/routes/factory/suppliers/broker/_helpers.ts",
+  "server/routes/factory/suppliers/balance/with-balances.ts",
+  "server/routes/factory/employee-pos/netPositionSupplierBalances.ts",
   "server/services/factory/currencyConversion.ts",
   "server/services/factory/postOffloadChargeMutation.ts",
   "server/services/security/postOffloadLedgerOwnershipGuard.ts",
@@ -21,11 +22,12 @@ const offload = read(requiredFiles[2]);
 const supplierCrud = read(requiredFiles[3]);
 const broker = read(requiredFiles[4]);
 const supplierBalance = read(requiredFiles[5]);
-const currency = read(requiredFiles[6]);
-const mutation = read(requiredFiles[7]);
-const ownershipGuard = read(requiredFiles[8]);
-const phaseDoc = read(requiredFiles[10]);
-const combined = [container, offload, supplierCrud, broker, supplierBalance, mutation].join("\n");
+const netPositionSupplierBalances = read(requiredFiles[6]);
+const currency = read(requiredFiles[7]);
+const mutation = read(requiredFiles[8]);
+const ownershipGuard = read(requiredFiles[9]);
+const phaseDoc = read(requiredFiles[11]);
+const combined = [container, offload, supplierCrud, broker, supplierBalance, netPositionSupplierBalances, mutation].join("\n");
 
 const checks = [
   [phaseDoc.includes("Status: complete"), "Phase 5 documentation must remain complete"],
@@ -47,6 +49,7 @@ const checks = [
   [combined.includes("currency") || combined.includes("Currency"), "container currency handling must remain present"],
   [currency.includes("resolveStoredFxRate") || currency.includes("exchangeRate"), "stored FX handling must remain explicit"],
   [broker.includes("isSupplierPaidFreight") && broker.includes("freightPaidBy"), "executable broker statement must distinguish supplier-paid from own-account freight"],
+  [netPositionSupplierBalances.includes('isSupplierPaidFreight(c) ? parseFloat(c.freight || "0") : 0'), "net position must exclude own-account freight from standalone supplier liabilities"],
   [offload.includes("transaction") || offload.includes("db.transaction"), "offload writes must retain a transaction boundary"],
   [combined.includes("recalculate") || combined.includes("recalc"), "container recalculation boundary must remain present"],
   [phaseDoc.includes("dry-run capable") && phaseDoc.includes("fail closed"), "controlled repair requirements must remain documented"],
