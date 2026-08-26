@@ -147,11 +147,7 @@ function wrapBusinessValidation<T>(builder: () => T): T {
   }
 }
 
-function roleRequirement(
-  value: unknown,
-  label: string,
-  allowedSubTypes: string[]
-): GoldenCoastLedgerRoleRequirement {
+function roleRequirement(value: unknown, label: string, allowedSubTypes: string[]): GoldenCoastLedgerRoleRequirement {
   const account = ledgerAccount(value, label);
   return { accountId: account.id, label, allowedSubTypes };
 }

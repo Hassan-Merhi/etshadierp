@@ -37,9 +37,7 @@ describe("Golden Coast Phase 1 posting batch", () => {
     expect(batch.postings[1].role).toBe("cogs");
     expect(batch.postings[1].request.voucher.totalAmount).toBe("660.00");
     expect(batch.postings[1].request.voucher.voucherType).toBe("Journal");
-    expect(batch.postings[0].request.source.idempotencyKey).toBe(
-      "golden-coast-phase1:gc-sale-c-001:primary"
-    );
+    expect(batch.postings[0].request.source.idempotencyKey).toBe("golden-coast-phase1:gc-sale-c-001:primary");
     expect(batch.postings[1].request.source.idempotencyKey).toBe("golden-coast-phase1:gc-sale-c-001:cogs");
   });
 
@@ -47,12 +45,8 @@ describe("Golden Coast Phase 1 posting batch", () => {
     const original = buildLocationSale("gc-sale-stable", 60);
     const changed = buildLocationSale("gc-sale-stable", 61);
 
-    expect(changed.postings[0].request.source.idempotencyKey).toBe(
-      original.postings[0].request.source.idempotencyKey
-    );
-    expect(changed.postings[1].request.source.idempotencyKey).toBe(
-      original.postings[1].request.source.idempotencyKey
-    );
+    expect(changed.postings[0].request.source.idempotencyKey).toBe(original.postings[0].request.source.idempotencyKey);
+    expect(changed.postings[1].request.source.idempotencyKey).toBe(original.postings[1].request.source.idempotencyKey);
   });
 
   it("accepts a 128-character root request ID without extending it for COGS", () => {

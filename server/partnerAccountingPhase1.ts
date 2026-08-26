@@ -3,8 +3,7 @@ import Decimal from "decimal.js";
 export type MoneyInput = string | number;
 
 export type PostingAccount =
-  | { kind: "ledger"; id: number; name?: string }
-  | { kind: "bank"; id: number; name?: string };
+  { kind: "ledger"; id: number; name?: string } | { kind: "bank"; id: number; name?: string };
 
 export type Phase1VoucherType = "Receipt" | "Payment" | "Journal" | "Contra" | "Sales";
 
@@ -127,9 +126,7 @@ export function assertBalancedPhase1Voucher(voucher: Phase1VoucherDraft): Phase1
     const accountCount = Number(entry.ledgerAccountId !== undefined) + Number(entry.bankAccountId !== undefined);
 
     if (accountCount !== 1) {
-      throw new Phase1AccountingValidationError(
-        `entries[${index}] must reference exactly one ledger or bank account`
-      );
+      throw new Phase1AccountingValidationError(`entries[${index}] must reference exactly one ledger or bank account`);
     }
     if (debitAmount.gt(0) === creditAmount.gt(0)) {
       throw new Phase1AccountingValidationError(
@@ -167,10 +164,7 @@ export function buildPartnerCashContributionVoucher(input: {
     voucherType: "Receipt",
     totalAmount: money(amount),
     description,
-    entries: [
-      debit(input.cashAccount, amount, description),
-      credit(input.partnerCapitalAccount, amount, description),
-    ],
+    entries: [debit(input.cashAccount, amount, description), credit(input.partnerCapitalAccount, amount, description)],
   });
 }
 
@@ -296,7 +290,10 @@ export function buildSavingsTransferVoucher(input: {
     voucherType: "Contra",
     totalAmount: money(amount),
     description,
-    entries: [debit(input.savingsAccount, amount, description), credit(input.operatingCashAccount, amount, description)],
+    entries: [
+      debit(input.savingsAccount, amount, description),
+      credit(input.operatingCashAccount, amount, description),
+    ],
   });
 }
 
@@ -313,7 +310,10 @@ export function buildOwnerWithdrawalVoucher(input: {
     voucherType: "Payment",
     totalAmount: money(amount),
     description,
-    entries: [debit(input.ownerDrawingsAccount, amount, description), credit(input.paymentAccount, amount, description)],
+    entries: [
+      debit(input.ownerDrawingsAccount, amount, description),
+      credit(input.paymentAccount, amount, description),
+    ],
   });
 }
 

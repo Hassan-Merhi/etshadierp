@@ -19,7 +19,7 @@ describe("Golden Coast Phase 1 accounting rules", () => {
         reserveUsd: 22_300,
         expectedDutyUsd: 8_500,
         expectedTransportUsd: 12_200,
-      }),
+      })
     ).toEqual({
       reserveUsd: "22300.00",
       expectedDutyUsd: "8500.00",
@@ -35,7 +35,7 @@ describe("Golden Coast Phase 1 accounting rules", () => {
         fundingBalanceUsd: 100_000,
         inventoryInTransitUsd: 44_000,
         containerReserveUsd: 22_300,
-      }),
+      })
     ).toEqual({
       fundingBalanceUsd: "100000.00",
       inventoryInTransitUsd: "44000.00",
@@ -50,7 +50,7 @@ describe("Golden Coast Phase 1 accounting rules", () => {
         quantity: 30,
         salePricePerUnitUsd: 60,
         inventoryCostPerUnitUsd: 22,
-      }),
+      })
     ).toEqual({
       quantity: "30",
       revenueUsd: "1800.00",
@@ -86,7 +86,7 @@ describe("Golden Coast Phase 1 accounting rules", () => {
           { ledgerAccountId: 1, debitAmount: "100.00", creditAmount: "0.00", narration: "debit" },
           { ledgerAccountId: 2, debitAmount: "0.00", creditAmount: "90.00", narration: "credit" },
         ],
-      }),
+      })
     ).toThrow("Voucher is not balanced");
   });
 });

@@ -60,11 +60,7 @@ function validationStatus(error: PostingValidationError): number {
   return error.code === "POSTING_IDEMPOTENCY_CORRUPT" ? 409 : 400;
 }
 
-async function validatePhase1LedgerRolesTx(
-  tx: DatabaseTransaction,
-  companyId: number,
-  event: unknown
-): Promise<void> {
+async function validatePhase1LedgerRolesTx(tx: DatabaseTransaction, companyId: number, event: unknown): Promise<void> {
   const requirements = getGoldenCoastPhase1LedgerRoleRequirements(event);
   if (requirements.length === 0) return;
 
@@ -95,11 +91,7 @@ async function validatePhase1LedgerRolesTx(
   }
 }
 
-async function validatePhase1CashRolesTx(
-  tx: DatabaseTransaction,
-  companyId: number,
-  event: unknown
-): Promise<void> {
+async function validatePhase1CashRolesTx(tx: DatabaseTransaction, companyId: number, event: unknown): Promise<void> {
   const requirements = getGoldenCoastPhase1CashRoleRequirements(event);
   if (requirements.length === 0) return;
 
@@ -442,7 +434,9 @@ async function handlePhase1Accounts(req: Request, res: Response): Promise<void> 
           bankName: bankAccounts.bankName,
         })
         .from(bankAccounts)
-        .where(and(eq(bankAccounts.companyId, companyId), eq(bankAccounts.active, true), isNull(bankAccounts.deletedAt))),
+        .where(
+          and(eq(bankAccounts.companyId, companyId), eq(bankAccounts.active, true), isNull(bankAccounts.deletedAt))
+        ),
       db
         .select({ id: locations.id, code: locations.code, name: locations.name })
         .from(locations)

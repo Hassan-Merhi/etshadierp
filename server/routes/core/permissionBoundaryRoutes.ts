@@ -1,23 +1,13 @@
 import type { Express } from "express";
 
-import {
-  requireActionAccess,
-  requireExportAccess,
-  requireModuleAccess,
-} from "../../lib/permissionMiddleware";
+import { requireActionAccess, requireExportAccess, requireModuleAccess } from "../../lib/permissionMiddleware";
 
 export function registerPermissionBoundaryRoutes(app: Express): void {
   app.use("/api/factory", requireModuleAccess("mod_factory"));
   app.use("/api/pos", requireModuleAccess("mod_pos"));
   app.use("/api/properties", requireModuleAccess("mod_properties"));
 
-  for (const path of [
-    "/api/customers",
-    "/api/suppliers",
-    "/api/employees",
-    "/api/purchase-orders",
-    "/api/erp",
-  ]) {
+  for (const path of ["/api/customers", "/api/suppliers", "/api/employees", "/api/purchase-orders", "/api/erp"]) {
     app.use(path, requireModuleAccess("mod_erp"));
   }
 
@@ -63,10 +53,7 @@ export function registerPermissionBoundaryRoutes(app: Express): void {
   app.patch("/api/vouchers/:id/sales", requireActionAccess("act_void_sale"));
   app.post("/api/golden-coast/accounting/phase1/post", requireActionAccess("act_create_voucher"));
   app.post("/api/inventory/quick-adjust", requireActionAccess("act_adjust_stock"));
-  app.post(
-    "/api/stock-transfer-revisions/:id/approve",
-    requireActionAccess("act_transfer_stock"),
-  );
+  app.post("/api/stock-transfer-revisions/:id/approve", requireActionAccess("act_transfer_stock"));
 
   for (const path of [
     "/api/stock-items/import-opening-balances",
