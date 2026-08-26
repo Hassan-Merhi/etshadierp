@@ -27,6 +27,8 @@ jobs:
           node-version: "24.19.0"
           cache: npm
       - run: npm ci
+      - name: Apply Excel color narrowing repair
+        run: node scripts/phase4-fix-excel-color.mjs
       - name: Certify Excel contracts
         run: |
           npm run check
@@ -37,8 +39,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git rm .github/workflows/phase4-excel-contracts.yml
+          git rm .github/workflows/phase4-excel-contracts.yml scripts/phase4-fix-excel-color.mjs
+          git add client/src/lib/excelImport.ts
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "refactor: certify Excel import contracts"
+          git commit -m "refactor: certify Excel import contracts"
           git push origin HEAD:phase4-excel-contracts
