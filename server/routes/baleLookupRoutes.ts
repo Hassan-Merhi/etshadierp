@@ -181,7 +181,7 @@ export function registerBaleLookupRoutes(app: Express) {
           return res.status(404).json({ message: "Reference number not found" });
         }
         if (directBaleMatches.length > 1) {
-          return res.status(409).json({ message: "Reference is ambiguous; multiple bale records match" });
+          return res.status(409).json({ message: "Reference number not found", code: "AMBIGUOUS_REFERENCE" });
         }
         const directBale = directBaleMatches[0];
 
@@ -331,7 +331,7 @@ export function registerBaleLookupRoutes(app: Express) {
           .limit(2);
 
         if (fallbackFactoryBales.length > 1) {
-          return res.status(409).json({ message: "Reference is ambiguous; multiple bale records match" });
+          return res.status(409).json({ message: "Reference number not found", code: "AMBIGUOUS_REFERENCE" });
         }
         factoryBale = fallbackFactoryBales[0];
       }
@@ -589,7 +589,7 @@ export function registerBaleLookupRoutes(app: Express) {
         return res.status(404).json({ message: "Reference number not found" });
       }
       if (labelMatches.length > 1) {
-        return res.status(409).json({ message: "Reference is ambiguous; multiple label records match" });
+        return res.status(409).json({ message: "Reference number not found", code: "AMBIGUOUS_REFERENCE" });
       }
 
       const [updated] = await db
@@ -635,7 +635,7 @@ export function registerBaleLookupRoutes(app: Express) {
           ...new Set(labelMatches.map((label) => label.productionBaleId).filter((id): id is number => id != null)),
         ];
         if (linkedBaleIds.length > 1) {
-          return res.status(409).json({ message: "Reference is ambiguous; labels link to multiple bale records" });
+          return res.status(409).json({ message: "Reference number not found", code: "AMBIGUOUS_REFERENCE" });
         }
 
         let bale: typeof factoryBales.$inferSelect | undefined;
@@ -663,7 +663,7 @@ export function registerBaleLookupRoutes(app: Express) {
             return res.status(404).json({ message: "Bale not found for this reference" });
           }
           if (baleMatches.length > 1) {
-            return res.status(409).json({ message: "Reference is ambiguous; multiple bale records match" });
+            return res.status(409).json({ message: "Reference number not found", code: "AMBIGUOUS_REFERENCE" });
           }
           bale = baleMatches[0];
         }
@@ -745,7 +745,7 @@ export function registerBaleLookupRoutes(app: Express) {
           ...new Set(labelMatches.map((label) => label.productionBaleId).filter((id): id is number => id != null)),
         ];
         if (linkedBaleIds.length > 1) {
-          return res.status(409).json({ message: "Reference is ambiguous; labels link to multiple bale records" });
+          return res.status(409).json({ message: "Reference number not found", code: "AMBIGUOUS_REFERENCE" });
         }
 
         let bale: typeof factoryBales.$inferSelect | undefined;
@@ -773,13 +773,13 @@ export function registerBaleLookupRoutes(app: Express) {
             return res.status(404).json({ message: "Bale not found for this reference" });
           }
           if (baleMatches.length > 1) {
-            return res.status(409).json({ message: "Reference is ambiguous; multiple bale records match" });
+            return res.status(409).json({ message: "Reference number not found", code: "AMBIGUOUS_REFERENCE" });
           }
           bale = baleMatches[0];
         }
 
         if (labelMatches.length > 1 && linkedBaleIds.length === 0) {
-          return res.status(409).json({ message: "Reference is ambiguous; multiple unlinked label records match" });
+          return res.status(409).json({ message: "Reference number not found", code: "AMBIGUOUS_REFERENCE" });
         }
 
         // Guard: locked order
@@ -829,9 +829,7 @@ export function registerBaleLookupRoutes(app: Express) {
             await tx
               .update(baleLabelPrints)
               .set({ articleCode: newArticleCode })
-              .where(
-                and(eq(baleLabelPrints.productionBaleId, bale.id), eq(baleLabelPrints.companyId, companyId))
-              );
+              .where(and(eq(baleLabelPrints.productionBaleId, bale.id), eq(baleLabelPrints.companyId, companyId)));
           } else if (labelMatches.length === 1) {
             await tx
               .update(baleLabelPrints)
