@@ -46,10 +46,17 @@ export interface SaleEconomics {
   grossProfitUsd: string;
 }
 
+export class Phase1AccountingValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "Phase1AccountingValidationError";
+  }
+}
+
 function decimal(value: MoneyInput, fieldName: string): Decimal {
   const result = new Decimal(value);
   if (!result.isFinite()) {
-    throw new Error(`${fieldName} must be a finite number`);
+    throw new Phase1AccountingValidationError(`${fieldName} must be a finite number`);
   }
   return result;
 }
@@ -57,7 +64,7 @@ function decimal(value: MoneyInput, fieldName: string): Decimal {
 function positive(value: MoneyInput, fieldName: string): Decimal {
   const result = decimal(value, fieldName);
   if (result.lte(0)) {
-    throw new Error(`${fieldName} must be greater than zero`);
+    throw new Phase1AccountingValidationError(`${fieldName} must be greater than zero`);
   }
   return result;
 }
@@ -65,7 +72,7 @@ function positive(value: MoneyInput, fieldName: string): Decimal {
 function nonNegative(value: MoneyInput, fieldName: string): Decimal {
   const result = decimal(value, fieldName);
   if (result.lt(0)) {
-    throw new Error(`${fieldName} cannot be negative`);
+    throw new Phase1AccountingValidationError(`${fieldName} cannot be negative`);
   }
   return result;
 }
@@ -76,7 +83,7 @@ function money(value: Decimal): string {
 
 function validateAccount(account: PostingAccount, fieldName: string): void {
   if (!Number.isInteger(account.id) || account.id <= 0) {
-    throw new Error(`${fieldName} must reference a positive account id`);
+    throw new Phase1AccountingValidationError(`${fieldName} must reference a positive account id`);
   }
 }
 
@@ -105,10 +112,10 @@ function credit(account: PostingAccount, amount: Decimal, narration: string): Ph
 
 export function assertBalancedPhase1Voucher(voucher: Phase1VoucherDraft): Phase1VoucherDraft {
   if (voucher.entries.length < 2) {
-    throw new Error("A Phase 1 voucher must contain at least two entries");
+    throw new Phase1AccountingValidationError("A Phase 1 voucher must contain at least two entries");
   }
   if (voucher.locationId !== undefined && (!Number.isInteger(voucher.locationId) || voucher.locationId <= 0)) {
-    throw new Error("locationId must be a positive integer when supplied");
+    throw new Phase1AccountingValidationError("locationId must be a positive integer when supplied");
   }
 
   let debits = new Decimal(0);
@@ -120,10 +127,14 @@ export function assertBalancedPhase1Voucher(voucher: Phase1VoucherDraft): Phase1
     const accountCount = Number(entry.ledgerAccountId !== undefined) + Number(entry.bankAccountId !== undefined);
 
     if (accountCount !== 1) {
-      throw new Error(`entries[${index}] must reference exactly one ledger or bank account`);
+      throw new Phase1AccountingValidationError(
+        `entries[${index}] must reference exactly one ledger or bank account`
+      );
     }
     if (debitAmount.gt(0) === creditAmount.gt(0)) {
-      throw new Error(`entries[${index}] must contain either a debit or a credit, but not both`);
+      throw new Phase1AccountingValidationError(
+        `entries[${index}] must contain either a debit or a credit, but not both`
+      );
     }
 
     debits = debits.plus(debitAmount);
@@ -131,7 +142,9 @@ export function assertBalancedPhase1Voucher(voucher: Phase1VoucherDraft): Phase1
   }
 
   if (!debits.eq(credits)) {
-    throw new Error(`Voucher is not balanced: debits ${money(debits)} do not equal credits ${money(credits)}`);
+    throw new Phase1AccountingValidationError(
+      `Voucher is not balanced: debits ${money(debits)} do not equal credits ${money(credits)}`
+    );
   }
 
   return voucher;
@@ -194,7 +207,7 @@ export function buildContainerReservePlan(input: {
   const expectedTotal = duty.plus(transport);
 
   if (expectedTotal.gt(reserve)) {
-    throw new Error(
+    throw new Phase1AccountingValidationError(
       `Container reserve is short by ${money(expectedTotal.minus(reserve))}; increase the reserve before allocating the remainder to savings`
     );
   }
@@ -219,7 +232,9 @@ export function buildFundingAllocationPlan(input: {
   const savings = funding.minus(stockOtw).minus(reserve);
 
   if (savings.lt(0)) {
-    throw new Error(`Funding allocation exceeds the available balance by ${money(savings.abs())}`);
+    throw new Phase1AccountingValidationError(
+      `Funding allocation exceeds the available balance by ${money(savings.abs())}`
+    );
   }
 
   return {
