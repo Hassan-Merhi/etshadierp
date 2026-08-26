@@ -163,9 +163,10 @@ export function registerBaleLookupRoutes(app: Express) {
 
       // If no label print exists, try to find the bale directly in factory_bales
       // (bales can exist without a label print if entered manually / imported)
-      // Use case-insensitive comparison so lowercase refs in DB are still found.
+      // Use normalized comparison for legacy lowercase/whitespace references, but
+      // reject ambiguous normalized duplicates rather than returning an arbitrary bale.
       if (!labelPrint) {
-        const [directBale] = await db
+        const directBaleMatches = await db
           .select()
           .from(factoryBales)
           .where(
@@ -174,11 +175,15 @@ export function registerBaleLookupRoutes(app: Express) {
               sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`
             )
           )
-          .limit(1);
+          .limit(2);
 
-        if (!directBale) {
+        if (directBaleMatches.length === 0) {
           return res.status(404).json({ message: "Reference number not found" });
         }
+        if (directBaleMatches.length > 1) {
+          return res.status(409).json({ message: "Reference is ambiguous; multiple bale records match" });
+        }
+        const directBale = directBaleMatches[0];
 
         // Build a minimal response from the bale row alone
         let locationInfo = null;
@@ -308,15 +313,28 @@ export function registerBaleLookupRoutes(app: Express) {
       let containers_used: unknown[] = [];
 
       const normalizedBaleReferenceMatch = sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`;
-      const factoryBaleMatch = labelPrint.productionBaleId
-        ? or(eq(factoryBales.id, labelPrint.productionBaleId), normalizedBaleReferenceMatch)
-        : normalizedBaleReferenceMatch;
+      let factoryBale: typeof factoryBales.$inferSelect | undefined;
 
-      const [factoryBale] = await db
-        .select()
-        .from(factoryBales)
-        .where(and(eq(factoryBales.companyId, companyId), factoryBaleMatch))
-        .limit(1);
+      if (labelPrint.productionBaleId) {
+        [factoryBale] = await db
+          .select()
+          .from(factoryBales)
+          .where(and(eq(factoryBales.companyId, companyId), eq(factoryBales.id, labelPrint.productionBaleId)))
+          .limit(1);
+      }
+
+      if (!factoryBale) {
+        const fallbackFactoryBales = await db
+          .select()
+          .from(factoryBales)
+          .where(and(eq(factoryBales.companyId, companyId), normalizedBaleReferenceMatch))
+          .limit(2);
+
+        if (fallbackFactoryBales.length > 1) {
+          return res.status(409).json({ message: "Reference is ambiguous; multiple bale records match" });
+        }
+        factoryBale = fallbackFactoryBales[0];
+      }
 
       if (factoryBale) {
         // Use the name stored on the bale row directly — this matches what the bale history page shows.
@@ -556,6 +574,23 @@ export function registerBaleLookupRoutes(app: Express) {
       }
 
       const referenceNumber = decodeURIComponent(req.params.referenceNumber).trim().toUpperCase();
+      const labelMatches = await db
+        .select({ id: baleLabelPrints.id })
+        .from(baleLabelPrints)
+        .where(
+          and(
+            sql`LOWER(TRIM(${baleLabelPrints.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
+            eq(baleLabelPrints.companyId, companyId)
+          )
+        )
+        .limit(2);
+
+      if (labelMatches.length === 0) {
+        return res.status(404).json({ message: "Reference number not found" });
+      }
+      if (labelMatches.length > 1) {
+        return res.status(409).json({ message: "Reference is ambiguous; multiple label records match" });
+      }
 
       const [updated] = await db
         .update(baleLabelPrints)
@@ -563,17 +598,8 @@ export function registerBaleLookupRoutes(app: Express) {
           scannedByUserId: req.session.userId || null,
           scannedAt: new Date(),
         })
-        .where(
-          and(
-            sql`LOWER(TRIM(${baleLabelPrints.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
-            eq(baleLabelPrints.companyId, companyId)
-          )
-        )
+        .where(eq(baleLabelPrints.id, labelMatches[0].id))
         .returning();
-
-      if (!updated) {
-        return res.status(404).json({ message: "Reference number not found" });
-      }
 
       const scannedUser = await storage.getUser(req.session.userId!);
       res.json({ ...updated, scannedByName: scannedUser?.username || null });
@@ -594,34 +620,67 @@ export function registerBaleLookupRoutes(app: Express) {
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const referenceNumber = decodeURIComponent(req.params.referenceNumber).trim().toUpperCase();
-
-        const [bale] = await db
-          .select()
-          .from(factoryBales)
+        const labelMatches = await db
+          .select({ id: baleLabelPrints.id, productionBaleId: baleLabelPrints.productionBaleId })
+          .from(baleLabelPrints)
           .where(
             and(
-              sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
-              eq(factoryBales.companyId, companyId)
+              sql`LOWER(TRIM(${baleLabelPrints.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
+              eq(baleLabelPrints.companyId, companyId)
             )
           )
-          .limit(1);
+          .limit(2);
 
-        if (!bale) return res.status(404).json({ message: "Bale not found for this reference" });
+        const linkedBaleIds = [
+          ...new Set(labelMatches.map((label) => label.productionBaleId).filter((id): id is number => id != null)),
+        ];
+        if (linkedBaleIds.length > 1) {
+          return res.status(409).json({ message: "Reference is ambiguous; labels link to multiple bale records" });
+        }
 
-        // Guard: refuse if bale is on a finalized/locked customer order
-        const [orderBaleRow] = await db
-          .select()
+        let bale: typeof factoryBales.$inferSelect | undefined;
+        if (linkedBaleIds.length === 1) {
+          [bale] = await db
+            .select()
+            .from(factoryBales)
+            .where(and(eq(factoryBales.companyId, companyId), eq(factoryBales.id, linkedBaleIds[0])))
+            .limit(1);
+        }
+
+        if (!bale) {
+          const baleMatches = await db
+            .select()
+            .from(factoryBales)
+            .where(
+              and(
+                sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
+                eq(factoryBales.companyId, companyId)
+              )
+            )
+            .limit(2);
+
+          if (baleMatches.length === 0) {
+            return res.status(404).json({ message: "Bale not found for this reference" });
+          }
+          if (baleMatches.length > 1) {
+            return res.status(409).json({ message: "Reference is ambiguous; multiple bale records match" });
+          }
+          bale = baleMatches[0];
+        }
+
+        // Guard: refuse if bale is on any finalized/locked customer order
+        const orderBaleRows = await db
+          .select({ orderId: customerOrderBales.orderId })
           .from(customerOrderBales)
-          .where(sql`LOWER(TRIM(${customerOrderBales.baleReference})) = LOWER(TRIM(${referenceNumber}))`)
-          .limit(1);
+          .where(sql`LOWER(TRIM(${customerOrderBales.baleReference})) = LOWER(TRIM(${referenceNumber}))`);
 
-        if (orderBaleRow) {
-          const [order] = await db
+        if (orderBaleRows.length > 0) {
+          const orderIds = [...new Set(orderBaleRows.map((row) => row.orderId))];
+          const orders = await db
             .select({ status: customerOrders.status })
             .from(customerOrders)
-            .where(eq(customerOrders.id, orderBaleRow.orderId))
-            .limit(1);
-          if (order && ["FINALIZED", "VERIFIED", "DISPATCHED", "SOLD"].includes(order.status)) {
+            .where(inArray(customerOrders.id, orderIds));
+          if (orders.some((order) => ["FINALIZED", "VERIFIED", "DISPATCHED", "SOLD"].includes(order.status))) {
             return res
               .status(409)
               .json({ message: "This bale is linked to a finalized/locked order and cannot be deleted from here." });
@@ -632,12 +691,7 @@ export function registerBaleLookupRoutes(app: Express) {
         await db
           .update(factoryBales)
           .set({ status: "DELETED", deletedAt, updatedAt: deletedAt })
-          .where(
-            and(
-              sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
-              eq(factoryBales.companyId, companyId)
-            )
-          );
+          .where(and(eq(factoryBales.id, bale.id), eq(factoryBales.companyId, companyId)));
 
         // Write audit entry so "Deleted by" info is available on the barcode lookup
         await logAudit({
@@ -676,33 +730,71 @@ export function registerBaleLookupRoutes(app: Express) {
           return res.status(400).json({ message: "newProductId (number) is required" });
         }
 
-        const [bale] = await db
-          .select()
-          .from(factoryBales)
+        const labelMatches = await db
+          .select({ id: baleLabelPrints.id, productionBaleId: baleLabelPrints.productionBaleId })
+          .from(baleLabelPrints)
           .where(
             and(
-              sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
-              eq(factoryBales.companyId, companyId)
+              sql`LOWER(TRIM(${baleLabelPrints.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
+              eq(baleLabelPrints.companyId, companyId)
             )
           )
-          .limit(1);
+          .limit(2);
 
-        if (!bale) return res.status(404).json({ message: "Bale not found for this reference" });
+        const linkedBaleIds = [
+          ...new Set(labelMatches.map((label) => label.productionBaleId).filter((id): id is number => id != null)),
+        ];
+        if (linkedBaleIds.length > 1) {
+          return res.status(409).json({ message: "Reference is ambiguous; labels link to multiple bale records" });
+        }
+
+        let bale: typeof factoryBales.$inferSelect | undefined;
+        if (linkedBaleIds.length === 1) {
+          [bale] = await db
+            .select()
+            .from(factoryBales)
+            .where(and(eq(factoryBales.companyId, companyId), eq(factoryBales.id, linkedBaleIds[0])))
+            .limit(1);
+        }
+
+        if (!bale) {
+          const baleMatches = await db
+            .select()
+            .from(factoryBales)
+            .where(
+              and(
+                sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
+                eq(factoryBales.companyId, companyId)
+              )
+            )
+            .limit(2);
+
+          if (baleMatches.length === 0) {
+            return res.status(404).json({ message: "Bale not found for this reference" });
+          }
+          if (baleMatches.length > 1) {
+            return res.status(409).json({ message: "Reference is ambiguous; multiple bale records match" });
+          }
+          bale = baleMatches[0];
+        }
+
+        if (labelMatches.length > 1 && linkedBaleIds.length === 0) {
+          return res.status(409).json({ message: "Reference is ambiguous; multiple unlinked label records match" });
+        }
 
         // Guard: locked order
-        const [orderBaleRow] = await db
-          .select()
+        const orderBaleRows = await db
+          .select({ orderId: customerOrderBales.orderId })
           .from(customerOrderBales)
-          .where(sql`LOWER(TRIM(${customerOrderBales.baleReference})) = LOWER(TRIM(${referenceNumber}))`)
-          .limit(1);
+          .where(sql`LOWER(TRIM(${customerOrderBales.baleReference})) = LOWER(TRIM(${referenceNumber}))`);
 
-        if (orderBaleRow) {
-          const [order] = await db
+        if (orderBaleRows.length > 0) {
+          const orderIds = [...new Set(orderBaleRows.map((row) => row.orderId))];
+          const orders = await db
             .select({ status: customerOrders.status })
             .from(customerOrders)
-            .where(eq(customerOrders.id, orderBaleRow.orderId))
-            .limit(1);
-          if (order && ["FINALIZED", "VERIFIED", "DISPATCHED", "SOLD"].includes(order.status)) {
+            .where(inArray(customerOrders.id, orderIds));
+          if (orders.some((order) => ["FINALIZED", "VERIFIED", "DISPATCHED", "SOLD"].includes(order.status))) {
             return res
               .status(409)
               .json({ message: "This bale is linked to a finalized/locked order and cannot be changed." });
@@ -731,22 +823,21 @@ export function registerBaleLookupRoutes(app: Express) {
               productName: newProductName,
               updatedAt: new Date(),
             })
-            .where(
-              and(
-                sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
-                eq(factoryBales.companyId, companyId)
-              )
-            );
+            .where(and(eq(factoryBales.id, bale.id), eq(factoryBales.companyId, companyId)));
 
-          await tx
-            .update(baleLabelPrints)
-            .set({ articleCode: newArticleCode })
-            .where(
-              and(
-                sql`LOWER(TRIM(${baleLabelPrints.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
-                eq(baleLabelPrints.companyId, companyId)
-              )
-            );
+          if (linkedBaleIds.length === 1) {
+            await tx
+              .update(baleLabelPrints)
+              .set({ articleCode: newArticleCode })
+              .where(
+                and(eq(baleLabelPrints.productionBaleId, bale.id), eq(baleLabelPrints.companyId, companyId))
+              );
+          } else if (labelMatches.length === 1) {
+            await tx
+              .update(baleLabelPrints)
+              .set({ articleCode: newArticleCode })
+              .where(eq(baleLabelPrints.id, labelMatches[0].id));
+          }
         });
 
         res.json({ message: "Bale product changed", newArticleCode, newProductName });
