@@ -56,6 +56,18 @@ export function buildAuthoritativeStockSnapshot(
   return { byProductId, byArticleCode };
 }
 
+export function buildArticleCodeStockCountRecord(
+  articleCodes: string[],
+  snapshot: AuthoritativeStockSnapshot
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const articleCode of articleCodes) {
+    const key = normalizeStockArticleCode(articleCode);
+    counts[articleCode] = key ? snapshot.byArticleCode.get(key)?.baleCount ?? 0 : 0;
+  }
+  return counts;
+}
+
 function resolveStock(
   item: Record<string, unknown>,
   snapshot: AuthoritativeStockSnapshot
