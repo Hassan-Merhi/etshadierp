@@ -174,15 +174,10 @@ export async function runDailyExport(): Promise<boolean> {
     const exportFromDate = threeYearsAgo.toISOString().substring(0, 10);
 
     logger.info(
-      `[DailyExport] Building export for ${companies.length} company/companies (label: ${today}, from: ${exportFromDate})`,
+      `[DailyExport] Building export for ${companies.length} company/companies (label: ${today}, from: ${exportFromDate})`
     );
 
-    const artifact = await createScheduledExportArtifact(
-      `daily-${runId}`,
-      companies,
-      exportFromDate,
-      undefined,
-    );
+    const artifact = await createScheduledExportArtifact(`daily-${runId}`, companies, exportFromDate, undefined);
 
     try {
       const { attachment, names, skipped, sizeBytes } = artifact;
@@ -200,7 +195,7 @@ export async function runDailyExport(): Promise<boolean> {
       logger.info(
         `[DailyExport] Run ${runId} — ZIP ready: ${zipSizeMb} MB, ${names.length} companies${
           skipped.length ? `, ${skipped.length} skipped: ${skipped.join(", ")}` : ""
-        }`,
+        }`
       );
 
       await updateExportRun(runId, {
@@ -288,7 +283,7 @@ export async function runDailyExport(): Promise<boolean> {
       logger.info(
         `[DailyExport] Run ${runId} finished — status: ${finalStatus}` +
           ` | email: ${emailEnabled ? (emailSuccess ? "ok" : "failed") : "n/a"}` +
-          ` | wa: ${whatsappReady ? (waSuccess ? "ok" : "failed") : "n/a"}`,
+          ` | wa: ${whatsappReady ? (waSuccess ? "ok" : "failed") : "n/a"}`
       );
 
       await finishExportRun(runId, {

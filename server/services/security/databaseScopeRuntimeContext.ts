@@ -18,7 +18,7 @@ const databaseScopeRuntime = new AsyncLocalStorage<DatabaseScopeRuntimeContext>(
 function positiveCompanyId(value: unknown): number {
   const companyId = Number(value);
   if (!Number.isSafeInteger(companyId) || companyId <= 0) {
-    throw new Error("database tenant scope requires a positive company id");
+    throw new Error("DATABASE_TENANT_SCOPE_REQUIRES_POSITIVE_COMPANY_ID");
   }
   return companyId;
 }
@@ -42,7 +42,7 @@ export function createTenantDatabaseScope(
 export function createMaintenanceDatabaseScope(reason: string): MaintenanceDatabaseScopeRuntimeContext {
   const normalizedReason = reason.trim();
   if (!normalizedReason) {
-    throw new Error("database maintenance scope requires a reason");
+    throw new Error("DATABASE_MAINTENANCE_SCOPE_REQUIRES_REASON");
   }
   return { kind: "maintenance", reason: normalizedReason };
 }
@@ -54,7 +54,7 @@ export function runWithDatabaseScopeRuntimeContext<T>(context: DatabaseScopeRunt
 export function runWithDatabaseMaintenanceScope<T>(reason: string, callback: () => T): T {
   const currentContext = databaseScopeRuntime.getStore();
   if (currentContext?.kind === "tenant") {
-    throw new Error("tenant request database scope cannot be elevated to maintenance scope");
+    throw new Error("DATABASE_TENANT_SCOPE_MAINTENANCE_ELEVATION_FORBIDDEN");
   }
 
   return runWithDatabaseScopeRuntimeContext(createMaintenanceDatabaseScope(reason), callback);

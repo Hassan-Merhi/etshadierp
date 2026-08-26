@@ -116,7 +116,9 @@ describeDatabase("company-scope RLS runtime", () => {
   it("fails closed when no tenant or maintenance scope is asserted", async () => {
     await client.query(`SET ROLE ${roleName}`);
     await setProbeScope(client, { companyId: "" });
-    await expect(client.query(`SELECT marker FROM ${probeTable} ORDER BY marker`)).rejects.toMatchObject({ code: "22023" });
+    await expect(client.query(`SELECT marker FROM ${probeTable} ORDER BY marker`)).rejects.toMatchObject({
+      code: "22023",
+    });
     await client.query("RESET ROLE");
   });
 
@@ -163,7 +165,7 @@ describeDatabase("company-scope RLS runtime", () => {
     await expect(client.query(`SELECT marker FROM ${probeTable}`)).rejects.toMatchObject({ code: "22023" });
 
     await setProbeScope(client, { companyId: "101", authorizedCompanyIds: "202,garbage" });
-    await expect(client.query("SELECT erp_authorized_company_ids()" )).rejects.toMatchObject({ code: "22023" });
+    await expect(client.query("SELECT erp_authorized_company_ids()")).rejects.toMatchObject({ code: "22023" });
     await client.query("RESET ROLE");
   });
 
@@ -177,6 +179,8 @@ describeDatabase("company-scope RLS runtime", () => {
       (await client.query("SELECT nullif(current_setting('app.current_company_id', true), '') AS company_id")).rows[0]
         .company_id
     ).toBeNull();
-    await expect(client.query("SELECT erp_current_company_id() AS company_id")).rejects.toMatchObject({ code: "22023" });
+    await expect(client.query("SELECT erp_current_company_id() AS company_id")).rejects.toMatchObject({
+      code: "22023",
+    });
   });
 });

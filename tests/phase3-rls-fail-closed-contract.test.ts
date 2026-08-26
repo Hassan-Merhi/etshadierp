@@ -39,7 +39,7 @@ describe("Phase 3 RLS fail-closed contract", () => {
     expect(database).toContain("app.company_scope_maintenance");
     expect(database).toContain("app.current_company_id");
     expect(database).toContain("app.authorized_company_ids");
-    expect(database).toContain('signature: `tenant:${context.companyId}`');
+    expect(database).toContain("signature: `tenant:${context.companyId}`");
     expect(database).toContain('authorizedCompanyIds: ""');
   });
 

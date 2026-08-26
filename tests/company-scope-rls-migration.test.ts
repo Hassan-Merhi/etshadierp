@@ -168,7 +168,9 @@ describe("company scope RLS migration 0016", () => {
     await scopeTo(null);
 
     for (const table of SCOPED_TABLES) {
-      await expect(probe!.query(`SELECT count(*)::int AS total FROM ${table}`)).rejects.toMatchObject({ code: "22023" });
+      await expect(probe!.query(`SELECT count(*)::int AS total FROM ${table}`)).rejects.toMatchObject({
+        code: "22023",
+      });
     }
   });
 
@@ -237,7 +239,7 @@ describe("company scope RLS migration 0016", () => {
     }
 
     await scopeTo(String(HOME_COMPANY), "8,bad");
-    await expect(probe!.query("SELECT erp_authorized_company_ids()")) .rejects.toMatchObject({ code: "22023" });
+    await expect(probe!.query("SELECT erp_authorized_company_ids()")).rejects.toMatchObject({ code: "22023" });
   });
 
   it("scopes voucher entries through their parent voucher", async () => {
