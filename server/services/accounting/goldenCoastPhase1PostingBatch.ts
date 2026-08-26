@@ -34,13 +34,12 @@ function retagPosting(
   rootClientRequestId: string,
   role: "primary" | "cogs"
 ): CentralPostingRequest {
-  const fingerprint = built.request.source.idempotencyKey.split(":").pop() || "posting";
   return {
     ...built.request,
     source: {
       sourceType: "golden-coast-phase1",
       sourceId: `${eventType}:${rootClientRequestId}:${role}`,
-      idempotencyKey: `golden-coast-phase1:${rootClientRequestId}:${role}:${fingerprint}`,
+      idempotencyKey: `golden-coast-phase1:${rootClientRequestId}:${role}`,
     },
   };
 }
@@ -92,7 +91,7 @@ export function buildGoldenCoastPhase1PostingBatch(
   if (cogsEntries.length > 0) {
     const cogs = buildGenericVoucherPostingRequest({
       companyId: input.companyId,
-      clientRequestId: `${primary.clientRequestId}:cogs`,
+      clientRequestId: primary.clientRequestId,
       voucher: {
         locationId: preview.voucher.locationId,
         voucherNumber: `${primary.request.voucher.voucherNumber}-COGS`,
