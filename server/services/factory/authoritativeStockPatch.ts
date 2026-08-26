@@ -11,12 +11,14 @@ export interface AuthoritativeStockSnapshot {
 }
 
 export function normalizeStockArticleCode(value: unknown): string {
-  return String(value ?? "").trim().toLowerCase();
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
 }
 
 function mergeAggregate(
   current: AuthoritativeStockAggregate | undefined,
-  incoming: AuthoritativeStockAggregate
+  incoming: AuthoritativeStockAggregate,
 ): AuthoritativeStockAggregate {
   if (!current) return { ...incoming };
   return {
@@ -28,7 +30,7 @@ function mergeAggregate(
 }
 
 export function buildAuthoritativeStockSnapshot(
-  rows: AuthoritativeStockAggregate[]
+  rows: AuthoritativeStockAggregate[],
 ): AuthoritativeStockSnapshot {
   const byProductId = new Map<number, AuthoritativeStockAggregate>();
   const byArticleCode = new Map<string, AuthoritativeStockAggregate>();
@@ -41,13 +43,23 @@ export function buildAuthoritativeStockSnapshot(
       totalWeight: Math.max(0, Number(row.totalWeight) || 0),
     };
 
-    if (aggregate.productId != null && Number.isFinite(aggregate.productId) && aggregate.productId > 0) {
-      byProductId.set(aggregate.productId, mergeAggregate(byProductId.get(aggregate.productId), aggregate));
+    if (
+      aggregate.productId != null &&
+      Number.isFinite(aggregate.productId) &&
+      aggregate.productId > 0
+    ) {
+      byProductId.set(
+        aggregate.productId,
+        mergeAggregate(byProductId.get(aggregate.productId), aggregate),
+      );
     }
 
     const codeKey = normalizeStockArticleCode(aggregate.articleCode);
     if (codeKey) {
-      byArticleCode.set(codeKey, mergeAggregate(byArticleCode.get(codeKey), aggregate));
+      byArticleCode.set(
+        codeKey,
+        mergeAggregate(byArticleCode.get(codeKey), aggregate),
+      );
     }
   }
 
@@ -56,19 +68,21 @@ export function buildAuthoritativeStockSnapshot(
 
 export function buildArticleCodeStockCountRecord(
   articleCodes: string[],
-  snapshot: AuthoritativeStockSnapshot
+  snapshot: AuthoritativeStockSnapshot,
 ): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const articleCode of articleCodes) {
     const key = normalizeStockArticleCode(articleCode);
-    counts[articleCode] = key ? (snapshot.byArticleCode.get(key)?.baleCount ?? 0) : 0;
+    counts[articleCode] = key
+      ? (snapshot.byArticleCode.get(key)?.baleCount ?? 0)
+      : 0;
   }
   return counts;
 }
 
 function resolveStock(
   item: Record<string, unknown>,
-  snapshot: AuthoritativeStockSnapshot
+  snapshot: AuthoritativeStockSnapshot,
 ): AuthoritativeStockAggregate | null {
   const articleKey = normalizeStockArticleCode(item.articleCode);
   if (articleKey) {
@@ -83,7 +97,12 @@ function resolveStock(
   }
 
   if (articleKey) {
-    return { productId: null, articleCode: String(item.articleCode ?? ""), baleCount: 0, totalWeight: 0 };
+    return {
+      productId: null,
+      articleCode: String(item.articleCode ?? ""),
+      baleCount: 0,
+      totalWeight: 0,
+    };
   }
 
   if (Number.isFinite(productId) && productId > 0) {
@@ -93,7 +112,10 @@ function resolveStock(
   return null;
 }
 
-export function patchInventoryStockRows(body: unknown, snapshot: AuthoritativeStockSnapshot): unknown {
+export function patchInventoryStockRows(
+  body: unknown,
+  snapshot: AuthoritativeStockSnapshot,
+): unknown {
   if (!Array.isArray(body)) return body;
 
   return body.map((row) => {
@@ -116,14 +138,19 @@ export function patchInventoryStockRows(body: unknown, snapshot: AuthoritativeSt
 
     if ("totalCost" in item) {
       const productionPrice = Number(item.productionPrice);
-      if (Number.isFinite(productionPrice)) next.totalCost = productionPrice * stock.baleCount;
+      if (Number.isFinite(productionPrice))
+        next.totalCost = productionPrice * stock.baleCount;
     }
 
     return next;
   });
 }
 
-function patchStockQtyArray(value: unknown, snapshot: AuthoritativeStockSnapshot, includeWeight: boolean): unknown {
+function patchStockQtyArray(
+  value: unknown,
+  snapshot: AuthoritativeStockSnapshot,
+  includeWeight: boolean,
+): unknown {
   if (!Array.isArray(value)) return value;
   return value.map((row) => {
     if (!row || typeof row !== "object") return row;
@@ -138,7 +165,10 @@ function patchStockQtyArray(value: unknown, snapshot: AuthoritativeStockSnapshot
   });
 }
 
-export function patchVerificationSummaryStock(body: unknown, snapshot: AuthoritativeStockSnapshot): unknown {
+export function patchVerificationSummaryStock(
+  body: unknown,
+  snapshot: AuthoritativeStockSnapshot,
+): unknown {
   if (!body || typeof body !== "object" || Array.isArray(body)) return body;
   const summary = body as Record<string, unknown>;
   return {
