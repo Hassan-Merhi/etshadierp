@@ -43,6 +43,12 @@ describe("shipping container ZIP package regression", () => {
     expect(response.body).toEqual({ message: "Invalid id" });
   });
 
+  it("rejects ZIP builds with no entries", async () => {
+    const { buildShippingZipBuffer } = await import("../server/routes/factory/shipping-containers/zip-package");
+
+    await expect(buildShippingZipBuffer([])).rejects.toThrow("Download failed");
+  });
+
   it("builds a non-empty ZIP from in-memory files", async () => {
     const { buildShippingZipBuffer } = await import("../server/routes/factory/shipping-containers/zip-package");
 
