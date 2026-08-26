@@ -48,9 +48,12 @@ export const privilegedMutationRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: (_req: Request, res: Response) => {
-    return res
-      .status(429)
-      .json(privilegedError("Too many privileged mutation requests. Try again later.", "PRIVILEGED_MUTATION_RATE_LIMITED"));
+    return res.status(429).json(
+      privilegedError(
+        "Too many privileged mutation requests. Try again later.",
+        "PRIVILEGED_MUTATION_RATE_LIMITED"
+      )
+    );
   },
 });
 
