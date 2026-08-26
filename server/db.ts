@@ -1,13 +1,14 @@
 import "./startupMigrationCoordinator";
 import "./companyScopeRlsBridge.mjs";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import * as schema from "@shared/schema";
 import { logger } from "./lib/logger";
 import { readDatabaseRuntimeConfig } from "./lib/databaseConfig";
 import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 import { logDatabasePoolSnapshot, logSlowDatabaseQuery } from "./lib/databaseTelemetry";
 import { isRequestPerformanceContextActive, recordDatabaseQuery } from "./lib/requestPerformanceContext";
+import { getDatabaseScopeRuntimeContext } from "./services/security/databaseScopeRuntimeContext";
 
 let connectionString: string;
 let databaseSource: "DATABASE_URL" | "PG_ENV";
@@ -60,7 +61,7 @@ logger.info("Database pool configured", {
   slowQueryThresholdMillis: databaseRuntimeConfig.slowQueryThresholdMillis,
 });
 
-export const pool = new Pool({
+const basePool = new Pool({
   connectionString,
   ssl: resolveDatabaseSsl(connectionString),
   max: databaseRuntimeConfig.poolMax,
@@ -71,13 +72,88 @@ export const pool = new Pool({
   options: `-c statement_timeout=${databaseRuntimeConfig.statementTimeoutMillis}`,
 });
 
-const originalPoolQuery = pool.query.bind(pool);
-(pool as typeof pool & { query: typeof pool.query }).query = ((...args: Parameters<typeof pool.query>) => {
+/**
+ * Tracks the last scope written to each physical PostgreSQL connection.
+ *
+ * Scope values are session-local so a client can be returned to the pool without
+ * an extra RESET round-trip. Before that client is handed to the next caller we
+ * always compare its remembered signature to the current AsyncLocalStorage
+ * scope and overwrite all three GUCs when they differ. An unscoped caller is a
+ * real state (`off||`) rather than "leave whatever was there", which prevents a
+ * tenant or maintenance identity from leaking across pooled requests.
+ */
+const clientScopeSignatures = new WeakMap<PoolClient, string>();
+
+function desiredDatabaseScope(): {
+  signature: string;
+  maintenance: "on" | "off";
+  companyId: string;
+  authorizedCompanyIds: string;
+} {
+  const context = getDatabaseScopeRuntimeContext();
+
+  if (context?.kind === "maintenance") {
+    return {
+      signature: `maintenance:${context.reason}`,
+      maintenance: "on",
+      companyId: "",
+      authorizedCompanyIds: "",
+    };
+  }
+
+  if (context?.kind === "tenant") {
+    const authorizedCompanyIds = context.authorizedCompanyIds.join(",");
+    return {
+      signature: `tenant:${context.companyId}:${authorizedCompanyIds}`,
+      maintenance: "off",
+      companyId: String(context.companyId),
+      authorizedCompanyIds,
+    };
+  }
+
+  return {
+    signature: "unscoped",
+    maintenance: "off",
+    companyId: "",
+    authorizedCompanyIds: "",
+  };
+}
+
+async function ensureDatabaseClientScope(client: PoolClient): Promise<void> {
+  const desired = desiredDatabaseScope();
+  if (clientScopeSignatures.get(client) === desired.signature) return;
+
+  await client.query(
+    `SELECT
+       set_config('app.company_scope_maintenance', $1, false),
+       set_config('app.current_company_id', $2, false),
+       set_config('app.authorized_company_ids', $3, false)`,
+    [desired.maintenance, desired.companyId, desired.authorizedCompanyIds]
+  );
+  clientScopeSignatures.set(client, desired.signature);
+}
+
+const scopedPoolConnect = (async () => {
+  const client = await basePool.connect();
+  try {
+    await ensureDatabaseClientScope(client);
+    return client;
+  } catch (error) {
+    client.release();
+    throw error;
+  }
+}) as typeof basePool.connect;
+
+const scopedPoolQuery = (async (...args: Parameters<typeof basePool.query>) => {
   const shouldRecordRequestQuery = isRequestPerformanceContextActive();
   const startedAt = performance.now();
-  const result = originalPoolQuery(...args);
+  const client = await basePool.connect();
 
-  const recordQueryCompletion = () => {
+  try {
+    await ensureDatabaseClientScope(client);
+    return await Reflect.apply(client.query, client, args);
+  } finally {
+    client.release();
     const durationMillis = performance.now() - startedAt;
 
     if (shouldRecordRequestQuery) {
@@ -85,16 +161,24 @@ const originalPoolQuery = pool.query.bind(pool);
     }
 
     logSlowDatabaseQuery(durationMillis, databaseRuntimeConfig.slowQueryThresholdMillis);
-  };
-
-  const maybePromise = result as unknown as Promise<unknown> | undefined;
-  if (maybePromise && typeof maybePromise.finally === "function") {
-    return maybePromise.finally(recordQueryCompletion);
   }
+}) as typeof basePool.query;
 
-  recordQueryCompletion();
-  return result;
-}) as typeof pool.query;
+/**
+ * Public application pool. `query` and `connect` are the only lease-producing
+ * surfaces and both establish an explicit database scope before tenant data can
+ * be touched. Everything else (events, counters, shutdown) stays bound to the
+ * physical node-postgres pool.
+ */
+export const pool = new Proxy(basePool, {
+  get(target, property) {
+    if (property === "query") return scopedPoolQuery;
+    if (property === "connect") return scopedPoolConnect;
+
+    const value = Reflect.get(target, property, target);
+    return typeof value === "function" ? value.bind(target) : value;
+  },
+});
 
 pool.on("error", (error) => {
   logger.error("Database pool idle-client error", {
