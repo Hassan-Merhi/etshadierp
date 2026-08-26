@@ -31,52 +31,20 @@ jobs:
         run: |
           python <<'PY'
           from pathlib import Path
-
           path = Path('server/routes/baleLookupRoutes.ts')
           source = path.read_text()
-          old = '''      // ── Enrich with factory_bales data (matched by referenceNumber) ──
-      let baleInfo: any = null;
-      let locationInfo = null;
-      let pressingBatch = null;
-      let mixBatch = null;
-      let containers_used: unknown[] = [];
-
-      const [factoryBale] = await db
-        .select()
-        .from(factoryBales)
-        .where(
-          and(
-            sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
-            eq(factoryBales.companyId, companyId)
-          )
-        )
-        .limit(1);
-'''
-          new = '''      // ── Enrich with factory_bales data ──
-      // productionBaleId is the durable relationship written when a label is printed.
-      // Prefer it when present, then fall back to normalized reference matching for
-      // older/imported label records that predate the explicit link.
-      let baleInfo: any = null;
-      let locationInfo = null;
-      let pressingBatch = null;
-      let mixBatch = null;
-      let containers_used: unknown[] = [];
-
-      const normalizedBaleReferenceMatch =
-        sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`;
-      const factoryBaleMatch = labelPrint.productionBaleId
-        ? or(eq(factoryBales.id, labelPrint.productionBaleId), normalizedBaleReferenceMatch)
-        : normalizedBaleReferenceMatch;
-
-      const [factoryBale] = await db
-        .select()
-        .from(factoryBales)
-        .where(and(eq(factoryBales.companyId, companyId), factoryBaleMatch))
-        .limit(1);
-'''
-          if source.count(old) != 1:
-              raise SystemExit(f'Expected one reference enrichment block, found {source.count(old)}')
-          path.write_text(source.replace(old, new))
+          marker = '      const [factoryBale] = await db\n'
+          if source.count(marker) != 1:
+              raise SystemExit(f'Expected one reference enrichment query, found {source.count(marker)}')
+          prefix = "      const normalizedBaleReferenceMatch = sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`;\n      const factoryBaleMatch = labelPrint.productionBaleId\n        ? or(eq(factoryBales.id, labelPrint.productionBaleId), normalizedBaleReferenceMatch)\n        : normalizedBaleReferenceMatch;\n\n"
+          source = source.replace(marker, prefix + marker, 1)
+          old_where = '        .where(\n          and(\n            sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,\n            eq(factoryBales.companyId, companyId)\n          )\n        )\n        .limit(1);'
+          new_where = '        .where(and(eq(factoryBales.companyId, companyId), factoryBaleMatch))\n        .limit(1);'
+          if source.count(old_where) != 1:
+              raise SystemExit(f'Expected one normalized factory bale where block, found {source.count(old_where)}')
+          source = source.replace(old_where, new_where, 1)
+          source = source.replace('      // ── Enrich with factory_bales data (matched by referenceNumber) ──', '      // ── Enrich with factory_bales data (stable id first, normalized reference fallback) ──', 1)
+          path.write_text(source)
           PY
 
       - name: Install dependencies
