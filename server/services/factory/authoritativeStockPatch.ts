@@ -59,7 +59,7 @@ export function buildArticleCodeStockCountRecord(
   const counts: Record<string, number> = {};
   for (const articleCode of articleCodes) {
     const key = normalizeStockArticleCode(articleCode);
-    counts[articleCode] = key ? (snapshot.byArticleCode.get(key)?.baleCount ?? 0) : 0;
+    counts[articleCode] = key ? snapshot.byArticleCode.get(key)?.baleCount ?? 0 : 0;
   }
   return counts;
 }
@@ -118,11 +118,7 @@ export function patchInventoryStockRows(body: unknown, snapshot: AuthoritativeSt
   });
 }
 
-function patchStockQtyArray(
-  value: unknown,
-  snapshot: AuthoritativeStockSnapshot,
-  includeWeight: boolean
-): unknown {
+function patchStockQtyArray(value: unknown, snapshot: AuthoritativeStockSnapshot, includeWeight: boolean): unknown {
   if (!Array.isArray(value)) return value;
   return value.map((row) => {
     if (!row || typeof row !== "object") return row;
