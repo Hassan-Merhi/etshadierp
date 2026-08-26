@@ -36,23 +36,25 @@ describe("browser mutation fail-closed boundary", () => {
       .send({ value: 1 });
 
     expect(response.status).toBe(403);
-    expect(response.body.code).toBe("BROWSER_MUTATION_ORIGIN_INVALID");
+    expect(response.body.code).toBe("CSRF_ORIGIN_INVALID");
   });
 
   it("requires the established session CSRF token for authenticated same-origin browser mutations", async () => {
     const response = await request(buildApp())
       .post("/api/test-mutation")
+      .set("Host", "127.0.0.1")
       .set("X-Test-User", "security-test-user")
       .set("Origin", "http://127.0.0.1")
       .send({ value: 1 });
 
     expect(response.status).toBe(403);
-    expect(response.body.code).toBe("BROWSER_MUTATION_CSRF_REQUIRED");
+    expect(response.body.code).toBe("CSRF_TOKEN_REQUIRED");
   });
 
   it("allows authenticated same-origin browser mutations with the exact session CSRF token", async () => {
     const response = await request(buildApp())
       .post("/api/test-mutation")
+      .set("Host", "127.0.0.1")
       .set("X-Test-User", "security-test-user")
       .set("X-Test-Session-Csrf", TEST_CSRF_TOKEN)
       .set("Origin", "http://127.0.0.1")
@@ -80,6 +82,6 @@ describe("browser mutation fail-closed boundary", () => {
       .send({ value: 1 });
 
     expect(response.status).toBe(403);
-    expect(response.body.code).toBe("BROWSER_MUTATION_CSRF_REQUIRED");
+    expect(response.body.code).toBe("CSRF_TOKEN_REQUIRED");
   });
 });
