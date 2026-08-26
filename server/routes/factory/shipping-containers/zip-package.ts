@@ -5,7 +5,7 @@
  * first-match, so that order is behaviour.
  */
 import type { Express, Request, Response } from "express";
-import { PassThrough } from "stream";
+import { Writable } from "stream";
 import { finished } from "stream/promises";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -23,6 +23,55 @@ import fs from "fs";
 import archiver from "archiver";
 
 import { fetchInternalBuffer, getCompanyId } from "./_helpers";
+
+type ShippingZipEntry = { name: string; data: Buffer };
+
+/**
+ * Build the entire archive before touching the HTTP response.
+ *
+ * Use a write-only sink rather than a PassThrough/readable collector. The ZIP
+ * bytes are captured in the Writable's write callback, which is the exact path
+ * Archiver pipes through and cannot race readable-side flow/end events.
+ */
+export async function buildShippingZipBuffer(entries: ShippingZipEntry[]): Promise<Buffer> {
+  if (entries.length === 0) {
+    throw new Error("Download failed");
+  }
+
+  const archive = archiver("zip", { zlib: { level: 6 } });
+  const chunks: Buffer[] = [];
+  const output = new Writable({
+    write(chunk: Buffer, _encoding, callback) {
+      chunks.push(Buffer.from(chunk));
+      callback();
+    },
+  });
+
+  archive.on("warning", (warning) => {
+    logger.warn("Warning while generating shipping ZIP package", { warning });
+  });
+  archive.on("error", (archiveError) => output.destroy(archiveError));
+  archive.pipe(output);
+
+  for (const entry of entries) {
+    archive.append(entry.data, { name: entry.name });
+  }
+
+  const outputFinished = finished(output);
+  const finalizePromise = archive.finalize();
+  await Promise.all([finalizePromise, outputFinished]);
+
+  const zipBuffer = Buffer.concat(chunks);
+  if (zipBuffer.length === 0) {
+    logger.error("shipping_zip_zero_bytes", {
+      entryCount: entries.length,
+      archivePointer: archive.pointer(),
+    });
+    throw new Error("Download failed");
+  }
+
+  return zipBuffer;
+}
 
 export function registerShippingZipPackageRoutes(app: Express) {
   // ── GET download ZIP package ──────────────────────────────────────────────────
@@ -124,7 +173,7 @@ export function registerShippingZipPackageRoutes(app: Express) {
       ]);
 
       const missingFiles: string[] = [];
-      const entries: Array<{ name: string; data: Buffer }> = [];
+      const entries: ShippingZipEntry[] = [];
 
       if (fileIds.includes("invoice_excel")) {
         if (excelBuf && excelBuf.length > 0) {
@@ -192,33 +241,7 @@ export function registerShippingZipPackageRoutes(app: Express) {
         return res.status(409).json({ message: "No selected files contained downloadable data." });
       }
 
-      // Pipe Archiver into a real writable stream and wait for that stream to
-      // finish. Listening for Archiver's readable-side `end` event directly can
-      // race or yield an empty buffer in production. The PassThrough gives us a
-      // deterministic completion signal after all ZIP bytes have been emitted.
-      const archive = archiver("zip", { zlib: { level: 6 } });
-      const output = new PassThrough();
-      const chunks: Buffer[] = [];
-
-      output.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
-      archive.on("warning", (warning) => {
-        logger.warn("Warning while generating shipping ZIP package", { warning });
-      });
-      archive.on("error", (archiveError) => output.destroy(archiveError));
-      archive.pipe(output);
-
-      for (const entry of entries) {
-        archive.append(entry.data, { name: entry.name });
-      }
-
-      const outputFinished = finished(output);
-      await archive.finalize();
-      await outputFinished;
-
-      const zipBuffer = Buffer.concat(chunks);
-      if (zipBuffer.length === 0) {
-        throw new Error("ZIP generation completed without producing any bytes");
-      }
+      const zipBuffer = await buildShippingZipBuffer(entries);
 
       // Only send response after the ZIP is fully built — clean, no partial writes.
       res.setHeader("Content-Type", "application/zip");
