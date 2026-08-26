@@ -10,7 +10,11 @@
     "client/src/pages/vouchers/StockTransferForm.tsx": 2388
   },
   "routeManifestAdditions": [
-    "POST /api/stock-transfers/:transferId/revisions [requireAuth > requireNonPOS > <anonymous>]"
+    "POST /api/stock-transfers/:transferId/revisions [requireAuth > requireNonPOS > <anonymous>]",
+    "POST /api/golden-coast/accounting/phase1/setup-accounts [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/golden-coast/accounting/phase1/accounts [<anonymous> > requireAuth > requireNonPOS > <anonymous>]",
+    "POST /api/golden-coast/accounting/phase1/preview [<anonymous> > <anonymous> > requireAuth > requireNonPOS > <anonymous>]",
+    "POST /api/golden-coast/accounting/phase1/post [<anonymous> > <anonymous> > requireAuth > requireNonPOS > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/v5/stock-allocation [<anonymous>]",
@@ -19,7 +23,9 @@
     "USE /api/admin/repair-balances [balanceRepairBudgetMiddleware]",
     "USE /api/admin/repair-balances [balanceRepairConcurrencyMiddleware]",
     "USE /api/sp/migration [spMigrationRateLimit]",
-    "USE /api/sp/migration [spMigrationRequestBudgetMiddleware]"
+    "USE /api/sp/migration [spMigrationRequestBudgetMiddleware]",
+    "USE /api/golden-coast/accounting [<anonymous>]",
+    "USE /api/golden-coast/accounting/phase1/post [<anonymous>]"
   ],
   "routeManifestReplacements": [
     {
