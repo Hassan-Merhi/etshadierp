@@ -51,14 +51,17 @@ export function registerUserAdministrationRoutes(app: Express) {
 
   app.patch("/api/users/:id", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
-      const updates = { ...(req.body as Record<string, unknown>) };
+      const updates = req.body;
       const requestedPassword = typeof updates.password === "string" ? updates.password : null;
       delete updates.password;
 
+      let rotatedCredentialVersion: number | null = null;
       if (requestedPassword) {
-        await replacePasswordAndRevokeSessions(req.params.id, await hashPassword(requestedPassword), {
-          exceptSid: req.params.id === req.session.userId ? req.sessionID : undefined,
-        });
+        rotatedCredentialVersion = await replacePasswordAndRevokeSessions(
+          req.params.id,
+          await hashPassword(requestedPassword),
+          { exceptSid: req.params.id === req.session.userId ? req.sessionID : undefined }
+        );
       }
 
       const user =
@@ -67,11 +70,8 @@ export function registerUserAdministrationRoutes(app: Express) {
           : await storage.getUser(req.params.id);
       if (!user) return res.status(404).json({ message: "User not found" });
 
-      if (requestedPassword && req.params.id === req.session.userId) {
-        const activeVersion = await import("../../services/security/credentialVersionService").then(({ loadCredentialVersion }) =>
-          loadCredentialVersion(db, req.params.id)
-        );
-        advanceCurrentSessionAfterPasswordChange(req.session, activeVersion);
+      if (rotatedCredentialVersion !== null && req.params.id === req.session.userId) {
+        advanceCurrentSessionAfterPasswordChange(req.session, rotatedCredentialVersion);
         await new Promise<void>((resolve, reject) => {
           req.session.save((error: unknown) => (error ? reject(error) : resolve()));
         });
@@ -112,7 +112,7 @@ export function registerUserAdministrationRoutes(app: Express) {
         return res.status(400).json({ message: "Current password and new password are required" });
       }
       if (newPassword.length < 6)
-        return res.status(400).json({ message: "New password must be at least 6 characters" });
+        return res.status(400).json({ message: "New password must be at least 6 characters." });
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ message: "Not authenticated" });
       const user = await storage.getUser(userId);
