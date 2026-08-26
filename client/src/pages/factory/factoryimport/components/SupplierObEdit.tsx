@@ -3,16 +3,16 @@
  *
  * Extracted from FactoryImport.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {useMutation, useQuery} from "@tanstack/react-query";
-import {queryClient} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {useToast} from "@/hooks/use-toast";
-import {factoryApiRequest} from "@/lib/factoryApi";
+import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { factoryApiRequest } from "@/lib/factoryApi";
 
 export function SupplierObEdit() {
   const { toast } = useToast();
@@ -22,7 +22,7 @@ export function SupplierObEdit() {
   const { data: suppliers } = useQuery<{ id: number; name: string; openingBalance: string; parentId: number | null }[]>(
     {
       queryKey: ["/api/factory/suppliers/with-balances"],
-      select: (data: any[]) =>
+      select: (data) =>
         data.map((s) => ({
           id: s.id,
           name: s.name,

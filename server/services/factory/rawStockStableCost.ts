@@ -64,7 +64,7 @@ export async function getStableSupplierCost(
     )
     .orderBy(factoryRawStock.offloadedAt, factoryRawStock.id);
   const rawRows = await (opts.forUpdate ? query.for("update") : query);
-  const rows: StableSupplierRawStockRow[] = rawRows.map((row: any) => {
+  const rows: StableSupplierRawStockRow[] = rawRows.map((row) => {
     const receivedKg = new Decimal(row.receivedKg || 0).toNumber();
     const rawUsdRate = new Decimal(row.costPerKgUsd || 0);
     const costPerKgUsd = rawUsdRate.gt(0) ? rawUsdRate.toNumber() : new Decimal(row.costPerKg || 0).toNumber();

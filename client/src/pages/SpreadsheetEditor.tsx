@@ -54,7 +54,7 @@ const FS_VT: Record<string, string> = { "0": "center", "1": "top", "2": "bottom"
 // Fortune Sheet's onChange delivers sheets in dense `data` format.
 // When re-opening a saved sheet, convert back to sparse `celldata` so
 // Fortune Sheet's initSheetData() correctly populates the grid.
-function ensureCelldata(sheet: any): any {
+function ensureCelldata(sheet: any) {
   if (sheet.celldata !== undefined) return sheet; // already sparse
   if (!Array.isArray(sheet.data)) return sheet;
   const celldata: any[] = [];
@@ -72,7 +72,7 @@ function ensureCelldata(sheet: any): any {
   return { ...rest, celldata };
 }
 
-function fortuneToXlsx(sheets: FortuneSheet[], XLSX: typeof import("xlsx-js-style")): any {
+function fortuneToXlsx(sheets: FortuneSheet[], XLSX: typeof import("xlsx-js-style")) {
   const wb = XLSX.utils.book_new();
 
   for (const sheet of sheets) {
@@ -325,7 +325,7 @@ export default function SpreadsheetEditor() {
   const seqRef = useRef<string>("");
   const seqTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { data: library = [], isLoading: libraryLoading } = useQuery<any[]>({
+  const { data: library = [], isLoading: libraryLoading } = useQuery({
     queryKey: ["/api/spreadsheets"],
   });
 

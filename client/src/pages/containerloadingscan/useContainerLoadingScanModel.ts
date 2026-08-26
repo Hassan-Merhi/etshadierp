@@ -156,7 +156,7 @@ export function useContainerLoadingScanModel() {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales`, data);
       return await res.json();
     },
-    onSuccess: (data: any, variables: { scanCode: string }) => {
+    onSuccess: (data, variables: { scanCode: string }) => {
       setPendingBypassBaleRef(null);
       setPendingBypassOverloadRef(null);
       setScanFlash("success");

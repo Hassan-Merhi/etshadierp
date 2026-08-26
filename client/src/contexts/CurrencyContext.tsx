@@ -104,7 +104,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const isMultiCurrency = !!displayCurrency;
 
   // Fetch the latest exchange rate using company's currencies
-  const { data: rateData, isLoading: isLoadingRate } = useQuery<any>({
+  const { data: rateData, isLoading: isLoadingRate } = useQuery({
     queryKey: ["/api/exchange-rates/latest", selectedCompany?.id, baseCurrency, displayCurrency],
     queryFn: async () => {
       if (!selectedCompany?.id || !displayCurrency || displayCurrency === "none") return null;
@@ -231,7 +231,10 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
    * display currency using the CURRENT exchange rate.
    * For balance-sheet current-translation only — not for historical accounting figures.
    */
-  const formatCurrentCashTranslation = (nativeAmount: number | string | null | undefined, nativeCurrency: string): string => {
+  const formatCurrentCashTranslation = (
+    nativeAmount: number | string | null | undefined,
+    nativeCurrency: string
+  ): string => {
     if (nativeAmount === null || nativeAmount === undefined) return "";
     const numAmount = typeof nativeAmount === "string" ? parseFloat(nativeAmount) : nativeAmount;
     if (isNaN(numAmount)) return "";
