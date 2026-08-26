@@ -82,7 +82,7 @@ jobs:
 
             for file in "${changed_files[@]}"; do
               case "$file" in
-                *.md|docs/*|.github/*.md)
+                *.md|docs/*)
                   ;;
                 client/*|public/*)
                   typecheck=true
