@@ -59,7 +59,7 @@ export function buildArticleCodeStockCountRecord(
   const counts: Record<string, number> = {};
   for (const articleCode of articleCodes) {
     const key = normalizeStockArticleCode(articleCode);
-    counts[articleCode] = key ? snapshot.byArticleCode.get(key)?.baleCount ?? 0 : 0;
+    counts[articleCode] = key ? (snapshot.byArticleCode.get(key)?.baleCount ?? 0) : 0;
   }
   return counts;
 }
