@@ -300,22 +300,22 @@ export function registerBaleLookupRoutes(app: Express) {
         product = await storage.getBaleProductByArticleCode(labelPrint.articleCode, companyId);
       }
 
-      // ── Enrich with factory_bales data (matched by referenceNumber) ──
+      // ── Enrich with factory_bales data (stable id first, normalized reference fallback) ──
       let baleInfo: any = null;
       let locationInfo = null;
       let pressingBatch = null;
       let mixBatch = null;
       let containers_used: unknown[] = [];
 
+      const normalizedBaleReferenceMatch = sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`;
+      const factoryBaleMatch = labelPrint.productionBaleId
+        ? or(eq(factoryBales.id, labelPrint.productionBaleId), normalizedBaleReferenceMatch)
+        : normalizedBaleReferenceMatch;
+
       const [factoryBale] = await db
         .select()
         .from(factoryBales)
-        .where(
-          and(
-            sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
-            eq(factoryBales.companyId, companyId)
-          )
-        )
+        .where(and(eq(factoryBales.companyId, companyId), factoryBaleMatch))
         .limit(1);
 
       if (factoryBale) {
