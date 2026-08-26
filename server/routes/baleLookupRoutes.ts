@@ -158,7 +158,7 @@ export function registerBaleLookupRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const referenceNumber = decodeURIComponent(req.params.referenceNumber).toUpperCase();
+      const referenceNumber = decodeURIComponent(req.params.referenceNumber).trim().toUpperCase();
       const labelPrint = await storage.getBaleLabelPrintByReference(referenceNumber, companyId);
 
       // If no label print exists, try to find the bale directly in factory_bales
@@ -171,7 +171,7 @@ export function registerBaleLookupRoutes(app: Express) {
           .where(
             and(
               eq(factoryBales.companyId, companyId),
-              sql`LOWER(${factoryBales.referenceNumber}) = LOWER(${referenceNumber})`
+              sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`
             )
           )
           .limit(1);
@@ -213,7 +213,7 @@ export function registerBaleLookupRoutes(app: Express) {
         const [directOrderBale] = await db
           .select({ orderId: customerOrderBales.orderId })
           .from(customerOrderBales)
-          .where(eq(customerOrderBales.baleReference, referenceNumber))
+          .where(sql`LOWER(TRIM(${customerOrderBales.baleReference})) = LOWER(TRIM(${referenceNumber}))`)
           .limit(1);
         let directLoadedOnOrder = null;
         let directIsInLoadingOrder = false;
@@ -310,7 +310,12 @@ export function registerBaleLookupRoutes(app: Express) {
       const [factoryBale] = await db
         .select()
         .from(factoryBales)
-        .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)))
+        .where(
+          and(
+            sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
+            eq(factoryBales.companyId, companyId)
+          )
+        )
         .limit(1);
 
       if (factoryBale) {
@@ -451,7 +456,7 @@ export function registerBaleLookupRoutes(app: Express) {
       const orderBaleRows = await db
         .select()
         .from(customerOrderBales)
-        .where(eq(customerOrderBales.baleReference, referenceNumber));
+        .where(sql`LOWER(TRIM(${customerOrderBales.baleReference})) = LOWER(TRIM(${referenceNumber}))`);
 
       if (orderBaleRows.length > 0) {
         // Fetch all matching orders in one query
@@ -550,7 +555,7 @@ export function registerBaleLookupRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const referenceNumber = decodeURIComponent(req.params.referenceNumber).toUpperCase();
+      const referenceNumber = decodeURIComponent(req.params.referenceNumber).trim().toUpperCase();
 
       const [updated] = await db
         .update(baleLabelPrints)
@@ -558,7 +563,12 @@ export function registerBaleLookupRoutes(app: Express) {
           scannedByUserId: req.session.userId || null,
           scannedAt: new Date(),
         })
-        .where(and(eq(baleLabelPrints.referenceNumber, referenceNumber), eq(baleLabelPrints.companyId, companyId)))
+        .where(
+          and(
+            sql`LOWER(TRIM(${baleLabelPrints.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
+            eq(baleLabelPrints.companyId, companyId)
+          )
+        )
         .returning();
 
       if (!updated) {
@@ -583,12 +593,17 @@ export function registerBaleLookupRoutes(app: Express) {
         const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-        const referenceNumber = decodeURIComponent(req.params.referenceNumber).toUpperCase();
+        const referenceNumber = decodeURIComponent(req.params.referenceNumber).trim().toUpperCase();
 
         const [bale] = await db
           .select()
           .from(factoryBales)
-          .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)))
+          .where(
+            and(
+              sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
+              eq(factoryBales.companyId, companyId)
+            )
+          )
           .limit(1);
 
         if (!bale) return res.status(404).json({ message: "Bale not found for this reference" });
@@ -597,7 +612,7 @@ export function registerBaleLookupRoutes(app: Express) {
         const [orderBaleRow] = await db
           .select()
           .from(customerOrderBales)
-          .where(eq(customerOrderBales.baleReference, referenceNumber))
+          .where(sql`LOWER(TRIM(${customerOrderBales.baleReference})) = LOWER(TRIM(${referenceNumber}))`)
           .limit(1);
 
         if (orderBaleRow) {
@@ -617,7 +632,12 @@ export function registerBaleLookupRoutes(app: Express) {
         await db
           .update(factoryBales)
           .set({ status: "DELETED", deletedAt, updatedAt: deletedAt })
-          .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)));
+          .where(
+            and(
+              sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
+              eq(factoryBales.companyId, companyId)
+            )
+          );
 
         // Write audit entry so "Deleted by" info is available on the barcode lookup
         await logAudit({
@@ -649,7 +669,7 @@ export function registerBaleLookupRoutes(app: Express) {
         const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-        const referenceNumber = decodeURIComponent(req.params.referenceNumber).toUpperCase();
+        const referenceNumber = decodeURIComponent(req.params.referenceNumber).trim().toUpperCase();
         const { newProductId } = req.body;
 
         if (!newProductId || typeof newProductId !== "number") {
@@ -659,7 +679,12 @@ export function registerBaleLookupRoutes(app: Express) {
         const [bale] = await db
           .select()
           .from(factoryBales)
-          .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)))
+          .where(
+            and(
+              sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
+              eq(factoryBales.companyId, companyId)
+            )
+          )
           .limit(1);
 
         if (!bale) return res.status(404).json({ message: "Bale not found for this reference" });
@@ -668,7 +693,7 @@ export function registerBaleLookupRoutes(app: Express) {
         const [orderBaleRow] = await db
           .select()
           .from(customerOrderBales)
-          .where(eq(customerOrderBales.baleReference, referenceNumber))
+          .where(sql`LOWER(TRIM(${customerOrderBales.baleReference})) = LOWER(TRIM(${referenceNumber}))`)
           .limit(1);
 
         if (orderBaleRow) {
@@ -706,12 +731,22 @@ export function registerBaleLookupRoutes(app: Express) {
               productName: newProductName,
               updatedAt: new Date(),
             })
-            .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)));
+            .where(
+              and(
+                sql`LOWER(TRIM(${factoryBales.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
+                eq(factoryBales.companyId, companyId)
+              )
+            );
 
           await tx
             .update(baleLabelPrints)
             .set({ articleCode: newArticleCode })
-            .where(and(eq(baleLabelPrints.referenceNumber, referenceNumber), eq(baleLabelPrints.companyId, companyId)));
+            .where(
+              and(
+                sql`LOWER(TRIM(${baleLabelPrints.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
+                eq(baleLabelPrints.companyId, companyId)
+              )
+            );
         });
 
         res.json({ message: "Bale product changed", newArticleCode, newProductName });
