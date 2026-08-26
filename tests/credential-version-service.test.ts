@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { decideSessionSecurity } from "../server/services/security/sessionSecurityPolicy";
-import { hydrateActiveCredentialVersion, revokeUserSessions } from "../server/services/security/credentialVersionService";
+import {
+  hydrateActiveCredentialVersion,
+  revokeUserCompanySessions,
+  revokeUserSessions,
+} from "../server/services/security/credentialVersionService";
 import { advanceCurrentSessionAfterPasswordChange } from "../server/services/security/userPasswordChangeService";
 
 function selectDb(version: number) {
@@ -69,6 +73,15 @@ describe("credential version lifecycle", () => {
       "user-5",
       "sid-current",
     ]);
+  });
+
+  it("revokes only sessions operating in the affected company", async () => {
+    const query = vi.fn(async () => ({ rowCount: 1 }));
+    await revokeUserCompanySessions({ query }, "user-6", 42);
+    expect(query).toHaveBeenCalledWith(
+      `DELETE FROM session WHERE sess->>'userId' = $1 AND sess->>'currentCompanyId' = $2`,
+      ["user-6", "42"],
+    );
   });
 
   it("advances the verified current session after a self-service password change", () => {
