@@ -592,7 +592,7 @@ jobs:
         run: npm run audit:coverage-ratchet
 
   ci-gate:
-    name: CI Gate
+    name: Check / Build / Lint / Test
     if: always()
     needs:
       - changes
