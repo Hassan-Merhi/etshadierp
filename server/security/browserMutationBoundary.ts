@@ -1,4 +1,4 @@
-import type { RequestHandler } from "express";
+import type { Request, RequestHandler, Response } from "express";
 
 import { logger } from "../lib/logger";
 
@@ -17,16 +17,11 @@ const CAPACITOR_ORIGINS = new Set([
   "http://localhost",
 ]);
 
-function rejectBrowserMutation(
-  res: Parameters<RequestHandler>[1],
-  statusCode: number,
-  code: string,
-  message: string,
-) {
+function rejectBrowserMutation(res: Response, statusCode: number, code: string, message: string) {
   return res.status(statusCode).json({ code, message });
 }
 
-function browserSourceAllowed(req: Parameters<RequestHandler>[0]):
+function browserSourceAllowed(req: Request):
   | { browserRequest: false }
   | { browserRequest: true; allowed: true }
   | { browserRequest: true; allowed: false; code: string; message: string } {
