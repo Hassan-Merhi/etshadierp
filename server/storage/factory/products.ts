@@ -141,7 +141,10 @@ export async function getBaleLabelPrintByReference(
     .select()
     .from(schema.baleLabelPrints)
     .where(
-      and(eq(schema.baleLabelPrints.referenceNumber, referenceNumber), eq(schema.baleLabelPrints.companyId, companyId))
+      and(
+        sql`LOWER(TRIM(${schema.baleLabelPrints.referenceNumber})) = LOWER(TRIM(${referenceNumber}))`,
+        eq(schema.baleLabelPrints.companyId, companyId)
+      )
     );
   return record;
 }
