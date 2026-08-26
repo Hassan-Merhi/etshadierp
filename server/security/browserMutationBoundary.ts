@@ -21,7 +21,9 @@ function rejectBrowserMutation(res: Response, statusCode: number, code: string, 
   return res.status(statusCode).json({ code, message });
 }
 
-function browserSourceAllowed(req: Request):
+function browserSourceAllowed(
+  req: Request
+):
   | { browserRequest: false }
   | { browserRequest: true; allowed: true }
   | { browserRequest: true; allowed: false; code: string; message: string } {
@@ -115,7 +117,7 @@ export const browserMutationFailClosedBoundary: RequestHandler = (req, res, next
       res,
       403,
       "CSRF_TOKEN_REQUIRED",
-      "CSRF token must be established before an authenticated browser mutation.",
+      "CSRF token must be established before an authenticated browser mutation."
     );
   }
 

@@ -4,10 +4,7 @@ export interface CompanyUserRoleRow {
   role: string;
 }
 
-export function visibleUserIdsForCompany(
-  rows: readonly CompanyUserRoleRow[],
-  activeCompanyId: number
-): Set<string> {
+export function visibleUserIdsForCompany(rows: readonly CompanyUserRoleRow[], activeCompanyId: number): Set<string> {
   const developerUserIds = new Set(rows.filter((row) => row.role === "Developer").map((row) => row.userId));
 
   return new Set(
@@ -67,11 +64,7 @@ export function canAssignRole(actorRole: string, requestedRole: unknown): boolea
   return requestedRole !== "Developer" || actorRole === "Developer";
 }
 
-export function canAssignCompany(
-  actorRole: string,
-  requestedCompanyId: unknown,
-  activeCompanyId: number
-): boolean {
+export function canAssignCompany(actorRole: string, requestedCompanyId: unknown, activeCompanyId: number): boolean {
   if (actorRole === "Developer") return true;
   const parsedCompanyId = Number(requestedCompanyId);
   return Number.isInteger(parsedCompanyId) && parsedCompanyId > 0 && parsedCompanyId === activeCompanyId;

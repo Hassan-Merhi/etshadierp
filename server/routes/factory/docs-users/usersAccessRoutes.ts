@@ -68,7 +68,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
         .from(users)
         .innerJoin(
           userCompanyRoles,
-          and(eq(userCompanyRoles.userId, users.id), eq(userCompanyRoles.companyId, companyId)),
+          and(eq(userCompanyRoles.userId, users.id), eq(userCompanyRoles.companyId, companyId))
         );
 
       const isDeveloper = requesterIsDeveloper(currentRole, requestRole);
@@ -165,7 +165,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
                 companyId,
                 userId: created.id,
                 pageKey,
-              })),
+              }))
             );
           }
           return created;
@@ -183,7 +183,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
         logger.error("Error creating factory user:", { error });
         res.status(400).json({ message: getErrorMessage(error) });
       }
-    },
+    }
   );
 
   app.put(
@@ -294,7 +294,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
                   companyId,
                   userId,
                   pageKey,
-                })),
+                }))
               );
             }
           }
@@ -317,7 +317,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
         logger.error("Error updating factory user:", { error });
         res.status(500).json({ message: getErrorMessage(error) });
       }
-    },
+    }
   );
 
   app.delete(
@@ -366,7 +366,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
         logger.error("Error removing factory user:", { error });
         res.status(500).json({ message: getErrorMessage(error) });
       }
-    },
+    }
   );
 
   app.get("/api/factory/my-access", requireAuth, async (req: any, res: import("express").Response) => {

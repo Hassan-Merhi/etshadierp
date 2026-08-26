@@ -243,9 +243,9 @@ export default function FactoryUsers() {
                   hideAllCosts: isPrivileged ? false : hideAllCosts,
                 },
               }),
-            "Update User",
+            "Update User"
           ),
-        "Update User",
+        "Update User"
       );
     } else {
       wrapAdminAction(
@@ -262,9 +262,9 @@ export default function FactoryUsers() {
                 hiddenCostFields,
                 hideAllCosts,
               }),
-            "Create User",
+            "Create User"
           ),
-        "Create User",
+        "Create User"
       );
     }
   };
@@ -363,9 +363,9 @@ export default function FactoryUsers() {
                                       userId: user.id,
                                       data: { hasErpAccess: checked },
                                     }),
-                                  "Update User",
+                                  "Update User"
                                 ),
-                              "Update User",
+                              "Update User"
                             );
                           }}
                           data-testid={`switch-erp-access-${user.id}`}
@@ -384,9 +384,9 @@ export default function FactoryUsers() {
                                       userId: user.id,
                                       data: { hasFactoryAccess: checked },
                                     }),
-                                  "Update User",
+                                  "Update User"
                                 ),
-                              "Update User",
+                              "Update User"
                             );
                           }}
                           data-testid={`switch-factory-access-${user.id}`}
@@ -709,9 +709,9 @@ export default function FactoryUsers() {
                   () =>
                     requestPasswordConfirmation(
                       () => deletingUser && deleteMutation.mutate(deletingUser.id),
-                      "Remove User",
+                      "Remove User"
                     ),
-                  "Remove User",
+                  "Remove User"
                 )
               }
               disabled={deleteMutation.isPending}

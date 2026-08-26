@@ -249,7 +249,7 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
             if (!isPrivileged) saveErpRestrictionsMutation.mutate();
           },
         }),
-      "Update User",
+      "Update User"
     );
   };
 

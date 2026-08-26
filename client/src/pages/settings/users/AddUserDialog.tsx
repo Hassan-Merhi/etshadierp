@@ -67,8 +67,7 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
       <Dialog
         open={open}
         onOpenChange={(v) => {
-          if (!v)
-            setForm({ username: "", password: "", displayName: "", hasErpAccess: true, hasFactoryAccess: true });
+          if (!v) setForm({ username: "", password: "", displayName: "", hasErpAccess: true, hasFactoryAccess: true });
           onOpenChange(v);
         }}
       >

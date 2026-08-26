@@ -216,11 +216,9 @@ export function registerCoreAuthRoutes(app: Express) {
       const { valid } = await verifyPassword(currentPassword, user.password);
       if (!valid) return res.status(400).json({ message: "Current password is incorrect." });
 
-      const credentialVersion = await replacePasswordAndRevokeSessions(
-        userId,
-        await hashPassword(newPassword),
-        { exceptSid: req.sessionID }
-      );
+      const credentialVersion = await replacePasswordAndRevokeSessions(userId, await hashPassword(newPassword), {
+        exceptSid: req.sessionID,
+      });
       advanceCurrentSessionAfterPasswordChange(req.session, credentialVersion);
       await new Promise<void>((resolve, reject) => {
         req.session.save((error: unknown) => (error ? reject(error) : resolve()));

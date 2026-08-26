@@ -17,7 +17,7 @@
  */
 export function shouldDeliverBroadcast(
   socketCompanyId: number | null | undefined,
-  messageCompanyId: number | null | undefined,
+  messageCompanyId: number | null | undefined
 ): boolean {
   if (messageCompanyId === undefined || messageCompanyId === null) return true;
   if (socketCompanyId === undefined || socketCompanyId === null) return false;
