@@ -9,6 +9,7 @@ import {
   type PostingAccount,
 } from "./partnerAccountingPhase1";
 
+// Phase 1 acceptance examples are intentionally kept as explicit regression cases.
 const ledger = (id: number, name: string): PostingAccount => ({ kind: "ledger", id, name });
 const bank = (id: number, name: string): PostingAccount => ({ kind: "bank", id, name });
 
