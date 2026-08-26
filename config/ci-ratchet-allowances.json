@@ -46,7 +46,7 @@
     },
     {
       "expected": "GET /api/sp/migration/runs [requireAuth > <anonymous> > <anonymous>]",
-      "actual": "GET /api/sp/migration/runs [requireAuth > <anonymous> > <anonymous> > <anonymous> > <anonymous>]"
+      "actual": "GET /api/sp/migration/runs [requireAuth > <anonymous> > <anonymous> > <anonymous>]"
     },
     {
       "expected": "POST /api/sp/migration/rehearsal [requireAuth > <anonymous> > <anonymous>]",
