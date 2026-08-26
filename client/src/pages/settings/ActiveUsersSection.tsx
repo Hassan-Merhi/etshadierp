@@ -71,17 +71,14 @@ export function ActiveUsersSection() {
   // Group users by company
   const safePresenceData = Array.isArray(presenceData) ? presenceData : [];
   const groupedUsers =
-    safePresenceData.reduce(
-      (acc, presence) => {
-        const companyId = presence.companyId || "unassigned";
-        if (!acc[companyId]) {
-          acc[companyId] = [];
-        }
-        acc[companyId].push(presence);
-        return acc;
-      },
-      ({})
-    ) || {};
+    safePresenceData.reduce((acc, presence) => {
+      const companyId = presence.companyId || "unassigned";
+      if (!acc[companyId]) {
+        acc[companyId] = [];
+      }
+      acc[companyId].push(presence);
+      return acc;
+    }, {}) || {};
 
   return (
     <div className="space-y-4">

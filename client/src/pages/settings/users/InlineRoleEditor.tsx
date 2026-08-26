@@ -173,7 +173,7 @@ export function InlineRoleEditor({ userId, companies, editingRole, onClose, onSa
         const missing = locationsNeedingCash.filter((id) => !locationCashAccounts[id]);
         if (missing.length > 0) {
           const locNames = missing.map((id) => {
-            const loc = (locations).find((l) => l.id === id);
+            const loc = locations.find((l) => l.id === id);
             return loc?.name || `Location #${id}`;
           });
           throw new Error(`Cash account required for: ${locNames.join(", ")}`);

@@ -231,7 +231,10 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
    * display currency using the CURRENT exchange rate.
    * For balance-sheet current-translation only — not for historical accounting figures.
    */
-  const formatCurrentCashTranslation = (nativeAmount: number | string | null | undefined, nativeCurrency: string): string => {
+  const formatCurrentCashTranslation = (
+    nativeAmount: number | string | null | undefined,
+    nativeCurrency: string
+  ): string => {
     if (nativeAmount === null || nativeAmount === undefined) return "";
     const numAmount = typeof nativeAmount === "string" ? parseFloat(nativeAmount) : nativeAmount;
     if (isNaN(numAmount)) return "";

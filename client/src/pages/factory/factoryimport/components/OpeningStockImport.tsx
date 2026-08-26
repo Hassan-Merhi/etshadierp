@@ -68,7 +68,7 @@ export function OpeningStockImport() {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        complete: (results) => parse((results.data)),
+        complete: (results) => parse(results.data),
       });
     } else if (ext === "xlsx" || ext === "xls") {
       const reader = new FileReader();

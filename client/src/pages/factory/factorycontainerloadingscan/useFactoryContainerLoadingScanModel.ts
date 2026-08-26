@@ -151,8 +151,8 @@ export function useFactoryContainerLoadingScanModel() {
   const { data: orderDetail } = useQuery<OrderDetail>({
     queryKey: ["/api/factory/customer-orders", orderId],
     queryFn: async () => {
-       const continuationQuery = continuationFromOrderId ? `?continuationFromOrderId=${continuationFromOrderId}` : "";
-       const res = await fetch(`/api/factory/customer-orders/${orderId}${continuationQuery}`, {
+      const continuationQuery = continuationFromOrderId ? `?continuationFromOrderId=${continuationFromOrderId}` : "";
+      const res = await fetch(`/api/factory/customer-orders/${orderId}${continuationQuery}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch order");
@@ -698,9 +698,7 @@ export function useFactoryContainerLoadingScanModel() {
   const totalLines = proformaProgress.length;
 
   // Extra bales not in proforma
-  const proformaArticleCodes = new Set(
-    effectiveProformaLines.map((l) => l.articleCode)
-  );
+  const proformaArticleCodes = new Set(effectiveProformaLines.map((l) => l.articleCode));
   const remainingProformaBales = proformaProgress.reduce((sum, line) => sum + Math.max(0, line.remaining), 0);
   const extraArticles = Object.keys(loadedByArticle).filter((code) => !proformaArticleCodes.has(code));
 
