@@ -24,6 +24,7 @@ import { useEscapeBack } from "@/hooks/use-escape-back";
 import { useDebounce } from "@/hooks/use-debounce";
 import { getDefaultPeriodValue, PeriodFilterValue } from "@/components/ui/period-filter";
 import { LedgerAccount, BankAccount, insertBankAccountSchema, updateLedgerAccountSchema } from "@shared/schema";
+import type { InsertBankAccount, UpdateLedgerAccount } from "@shared/schema";
 import { Account, Transaction, WaRule, WaChat } from "../accounts/accountTypes";
 
 /** Voucher type → Vouchers page tab, for statement row navigation. */
@@ -615,13 +616,16 @@ export function useAccountsLegacyModel() {
     navigate(`${modePrefix}/vouchers?edit=${id}&tab=${tab}`);
   };
 
-  const bankForm = useForm({
+  const bankForm = useForm<Omit<InsertBankAccount, "companyId">>({
     resolver: zodResolver(insertBankAccountSchema.omit({ companyId: true })),
   });
 
   // Populate bank form fields whenever a bank account is selected for editing.
   useEffect(() => {
     if (bankToEdit) {
+      const openingBalanceSide = insertBankAccountSchema.shape.openingBalanceSide.safeParse(
+        bankToEdit.openingBalanceSide ?? "Dr"
+      );
       bankForm.reset({
         code: bankToEdit.code ?? "",
         name: bankToEdit.name ?? "",
@@ -629,13 +633,13 @@ export function useAccountsLegacyModel() {
         accountNumber: bankToEdit.accountNumber ?? "",
         routingCode: bankToEdit.routingCode ?? "",
         openingBalance: bankToEdit.openingBalance ?? "0",
-        openingBalanceSide: bankToEdit.openingBalanceSide ?? "Dr",
+        openingBalanceSide: openingBalanceSide.success ? openingBalanceSide.data : "Dr",
       });
     } else {
       bankForm.reset();
     }
   }, [bankForm, bankToEdit]);
-  const editForm = useForm({
+  const editForm = useForm<Omit<UpdateLedgerAccount, "id" | "companyId">>({
     resolver: zodResolver(updateLedgerAccountSchema.omit({ id: true, companyId: true })),
   });
   const alterAccountType = editForm.watch("accountType") as string | undefined;
@@ -643,10 +647,11 @@ export function useAccountsLegacyModel() {
   /** Opens the alter/edit dialog pre-filled from an account table row. */
   const openEditAccountDialog = (account: Account) => {
     setAlterSelectedAccount(account);
+    const accountType = updateLedgerAccountSchema.shape.accountType.safeParse(account.accountType || account.type);
     editForm.reset({
       code: account.code,
       name: account.name,
-      accountType: account.accountType || account.type || "",
+      accountType: accountType.success ? accountType.data : undefined,
       subType: account.subType || "",
       openingBalance: String(Math.abs(account.openingBalance || 0)),
       openingBalanceSide: (account.openingBalanceSide as "Dr" | "Cr") || "Dr",

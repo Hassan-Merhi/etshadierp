@@ -39,7 +39,7 @@ export function ActiveUsersSection() {
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const isDeveloper = currentUser?.role === "Developer";
 
-  const { data: presenceData, isLoading } = useQuery<any[]>({
+  const { data: presenceData, isLoading } = useQuery({
     queryKey: ["/api/user-presence"],
     refetchInterval: 30000,
   });
@@ -71,17 +71,14 @@ export function ActiveUsersSection() {
   // Group users by company
   const safePresenceData = Array.isArray(presenceData) ? presenceData : [];
   const groupedUsers =
-    safePresenceData.reduce(
-      (acc, presence) => {
-        const companyId = presence.companyId || "unassigned";
-        if (!acc[companyId]) {
-          acc[companyId] = [];
-        }
-        acc[companyId].push(presence);
-        return acc;
-      },
-      ({})
-    ) || {};
+    safePresenceData.reduce((acc, presence) => {
+      const companyId = presence.companyId || "unassigned";
+      if (!acc[companyId]) {
+        acc[companyId] = [];
+      }
+      acc[companyId].push(presence);
+      return acc;
+    }, {}) || {};
 
   return (
     <div className="space-y-4">

@@ -141,7 +141,7 @@ export const utils = {
       worksheet.eachRow((row) => {
         const rowData: any[] = [];
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-          let value: any = cell.value;
+          let value = cell.value;
           if (value && typeof value === "object" && "result" in value) {
             value = value.result;
           }
@@ -165,7 +165,7 @@ export const utils = {
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
           const header = headers[colNumber - 1];
           if (header) {
-            let value: any = cell.value;
+            let value = cell.value;
             if (value && typeof value === "object" && "result" in value) {
               value = value.result;
             }

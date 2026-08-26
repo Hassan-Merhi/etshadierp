@@ -76,7 +76,7 @@ export default function FactoryInsurance() {
 
   // Find the Insurance Expense account dynamically from the fetched accounts list
   const insuranceExpenseAccount = useMemo(
-    () => (ledgerAccounts as any[]).find((a) => a.name === "Insurance Expense"),
+    () => ledgerAccounts.find((a) => a.name === "Insurance Expense"),
     [ledgerAccounts]
   );
   const { data: insExpenseBalance } = useQuery<{ balance: number }>({
