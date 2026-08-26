@@ -33,12 +33,26 @@ export const privilegedMigrationRateLimit = privilegedRateLimit(
   "Too many privileged migration requests. Try again later."
 );
 
-/** Privileged imports, bulk writes, repair applies, and migration steps. */
-export const privilegedMutationRateLimit = privilegedRateLimit(
-  30,
-  "PRIVILEGED_MUTATION_RATE_LIMITED",
-  "Too many privileged mutation requests. Try again later."
-);
+/**
+ * Privileged imports, bulk writes, repair applies, and migration steps.
+ *
+ * Keep this as a direct express-rate-limit construction instead of routing it
+ * through privilegedRateLimit(). CodeQL models express-rate-limit directly and
+ * can therefore prove that sensitive route handlers using this exported
+ * middleware are rate-limited, while the runtime policy remains identical to
+ * the other privileged limiters.
+ */
+export const privilegedMutationRateLimit = rateLimit({
+  windowMs: FIFTEEN_MINUTES_MS,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, res: Response) => {
+    return res
+      .status(429)
+      .json(privilegedError("Too many privileged mutation requests. Try again later.", "PRIVILEGED_MUTATION_RATE_LIMITED"));
+  },
+});
 
 /** Destructive rollback/rebuild-style operations. */
 export const privilegedDestructiveRateLimit = privilegedRateLimit(
