@@ -15,6 +15,7 @@
  *   tsx scripts/backfill-charge-voucher-fk.ts --apply    # COMMIT
  */
 import { db } from "../server/db";
+import { runWithDatabaseMaintenanceScope } from "../server/services/security/databaseScopeRuntimeContext";
 import { vouchers, customerOrderCharges, customerOrders } from "../shared/schema";
 import { and, eq, isNull, sql } from "drizzle-orm";
 
@@ -26,7 +27,12 @@ type ChargeVoucher = {
   voucherNumber: string;
 };
 
-function parseChargeVoucherNumber(vn: string): { kind: "PRE"; orderId: number; chargeId: number } | { kind: "INV"; invoiceNumber: string; chargeId: number } | null {
+function parseChargeVoucherNumber(
+  vn: string,
+):
+  | { kind: "PRE"; orderId: number; chargeId: number }
+  | { kind: "INV"; invoiceNumber: string; chargeId: number }
+  | null {
   if (!vn.startsWith("CHARGE-")) return null;
   const parts = vn.split("-");
   // CHARGE - PRE - orderId - chargeId
@@ -87,19 +93,24 @@ async function main() {
       chargeRows = await db
         .select({ id: customerOrderCharges.id, voucherId: customerOrderCharges.voucherId })
         .from(customerOrderCharges)
-        .where(and(
-          eq(customerOrderCharges.id, parsed.chargeId),
-          eq(customerOrderCharges.orderId, parsed.orderId),
-        ));
+        .where(
+          and(
+            eq(customerOrderCharges.id, parsed.chargeId),
+            eq(customerOrderCharges.orderId, parsed.orderId),
+          ),
+        );
     } else {
       chargeRows = await db
         .select({ id: customerOrderCharges.id, voucherId: customerOrderCharges.voucherId })
         .from(customerOrderCharges)
-        .innerJoin(customerOrders, and(
-          eq(customerOrderCharges.orderId, customerOrders.id),
-          eq(customerOrders.companyId, v.companyId),
-          eq(customerOrders.invoiceNumber, parsed.invoiceNumber),
-        ))
+        .innerJoin(
+          customerOrders,
+          and(
+            eq(customerOrderCharges.orderId, customerOrders.id),
+            eq(customerOrders.companyId, v.companyId),
+            eq(customerOrders.invoiceNumber, parsed.invoiceNumber),
+          ),
+        )
         .where(eq(customerOrderCharges.id, parsed.chargeId));
     }
 
@@ -114,7 +125,8 @@ async function main() {
     const charge = chargeRows[0] as any;
     // For INV variant, the row shape is { customer_order_charges: {...}, customer_orders: {...} }
     const chargeId: number = charge.id ?? charge.customer_order_charges?.id;
-    const existingVoucherId: number | null = charge.voucherId ?? charge.customer_order_charges?.voucherId ?? null;
+    const existingVoucherId: number | null =
+      charge.voucherId ?? charge.customer_order_charges?.voucherId ?? null;
 
     if (existingVoucherId === v.id) {
       skippedAlready++;
@@ -122,13 +134,16 @@ async function main() {
     }
     if (existingVoucherId != null && existingVoucherId !== v.id) {
       // FK already points elsewhere — don't overwrite, log it
-      console.warn(`  charge#${chargeId}: already linked to voucher#${existingVoucherId}, current voucher is #${v.id} (${v.voucherNumber}) — skipping`);
+      console.warn(
+        `  charge#${chargeId}: already linked to voucher#${existingVoucherId}, current voucher is #${v.id} (${v.voucherNumber}) — skipping`,
+      );
       skippedAlready++;
       continue;
     }
 
     if (APPLY) {
-      await db.update(customerOrderCharges)
+      await db
+        .update(customerOrderCharges)
         .set({ voucherId: v.id })
         .where(eq(customerOrderCharges.id, chargeId));
     }
@@ -149,7 +164,7 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((err) => {
+runWithDatabaseMaintenanceScope("script:backfill-charge-voucher-fk", main).catch((err) => {
   console.error("Backfill error:", err);
   process.exit(1);
 });
