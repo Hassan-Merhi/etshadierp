@@ -15,7 +15,7 @@ describe("Golden Coast Phase 1 route surface", () => {
   it("enforces accounting module and voucher-create permissions on live posting", () => {
     expect(permissionBoundarySource).toContain('"/api/golden-coast/accounting"');
     expect(permissionBoundarySource).toContain(
-      'app.post("/api/golden-coast/accounting/phase1/post", requireActionAccess("act_create_voucher"));'
+      'app.use("/api/golden-coast/accounting/phase1/post", requireActionAccess("act_create_voucher"));'
     );
   });
 
