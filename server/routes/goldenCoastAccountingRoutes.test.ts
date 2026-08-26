@@ -15,12 +15,24 @@ describe("Golden Coast Phase 1 route surface", () => {
   it("enforces accounting module and voucher-create permissions on live posting", () => {
     expect(permissionBoundarySource).toContain('"/api/golden-coast/accounting"');
     expect(permissionBoundarySource).toContain(
-      'app.post("/api/golden-coast/accounting/phase1/post", requireActionAccess("act_create_voucher"));',
+      'app.post("/api/golden-coast/accounting/phase1/post", requireActionAccess("act_create_voucher"));'
     );
   });
 
-  it("reactivates inactive required ledgers during setup", () => {
-    expect(routeSource).toContain(".set({ active: true })");
-    expect(routeSource).toContain("eq(ledgerAccounts.active, false)");
+  it("rate-limits reads and mutations and caps request size", () => {
+    expect(routeSource).toContain("privilegedReadRateLimit");
+    expect(routeSource).toContain("privilegedMutationRateLimit");
+    expect(routeSource).toContain("phase1RequestBudget");
+  });
+
+  it("restores inactive or soft-deleted required ledgers during setup", () => {
+    expect(routeSource).toContain(".set({ active: true, deletedAt: null })");
+    expect(routeSource).toContain("GOLDEN_COAST_PHASE1_LEDGER_SUBTYPES");
+  });
+
+  it("validates cash-side posting roles before central persistence", () => {
+    expect(routeSource).toContain("getGoldenCoastPhase1CashRoleRequirements");
+    expect(routeSource).toContain("validatePhase1CashRolesTx");
+    expect(routeSource).toContain('["Cash", "Bank"]');
   });
 });
