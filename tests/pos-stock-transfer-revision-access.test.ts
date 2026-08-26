@@ -8,7 +8,7 @@ describe("POS stock transfer revision access", () => {
       "utf8"
     );
 
-    const routeStart = compatibilityRoute.indexOf('app.post(\n    "/api/stock-transfers/:transferId/revisions"');
+    const routeStart = compatibilityRoute.indexOf('"/api/stock-transfers/:transferId/revisions"');
     expect(routeStart).toBeGreaterThanOrEqual(0);
 
     const routeRegistration = compatibilityRoute.slice(routeStart);
