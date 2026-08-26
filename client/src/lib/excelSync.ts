@@ -262,7 +262,7 @@ export async function syncFortuneToXlsx(rawXlsx: string, sheets: FortuneSheet[])
     }
     const cfg = fsSheet.config || {};
     if (cfg.merge) {
-      for (const m of Object.values(cfg.merge) as any[]) {
+      for (const m of Object.values(cfg.merge)) {
         try {
           ws.mergeCells(m.r + 1, m.c + 1, m.r + m.rs, m.c + m.cs);
         } catch {

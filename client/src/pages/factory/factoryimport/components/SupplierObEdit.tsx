@@ -22,7 +22,7 @@ export function SupplierObEdit() {
   const { data: suppliers } = useQuery<{ id: number; name: string; openingBalance: string; parentId: number | null }[]>(
     {
       queryKey: ["/api/factory/suppliers/with-balances"],
-      select: (data: any[]) =>
+      select: (data) =>
         data.map((s) => ({
           id: s.id,
           name: s.name,

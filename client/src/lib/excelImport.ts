@@ -47,7 +47,7 @@ const V_ALIGN: Record<string, number> = {
 
 // ─── Fortune Sheet conditional format helpers ────────────────────────────────
 
-function cfStyleToFortune(style: any): any {
+function cfStyleToFortune(style: any) {
   if (!style) return {};
   const result: any = {};
   if (style.fill?.fgColor?.argb) result.bg = argbToHex(style.fill.fgColor.argb);
@@ -57,7 +57,7 @@ function cfStyleToFortune(style: any): any {
   return result;
 }
 
-function buildConditions(ws: any): any[] {
+function buildConditions(ws: any) {
   const conditions: any[] = [];
   try {
     const cfs: any[] = ws.conditionalFormattings || [];
