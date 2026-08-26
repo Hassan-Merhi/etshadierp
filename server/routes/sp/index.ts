@@ -3,6 +3,7 @@ import { logger } from "../../lib/logger";
 import { registerSpAccessControl } from "./spAccessControl";
 import { registerSpPermissionRoutes } from "./spPermissionRoutes";
 import { registerSpSetupRoutes } from "./spSetupRoutes";
+import { registerSpGoldenCoastSetupRoutes } from "./spGoldenCoastSetupRoutes";
 import { registerSpContainerRoutes } from "./spContainerRoutes";
 import { registerSpLifecycleGuards } from "./spLifecycleGuards";
 import { registerSpReoffloadPreparationGuard } from "./spReoffloadPreparationGuard";
@@ -61,6 +62,7 @@ export function registerSpRoutes(app: Express) {
   });
 
   registerSpSetupRoutes(app);
+  registerSpGoldenCoastSetupRoutes(app);
   registerSpLifecycleGuards(app);
   registerSpContainerRoutes(app);
   registerSpReoffloadPreparationGuard(app);
