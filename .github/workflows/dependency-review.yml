@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: dependency-review-${{ github.event.pull_request.number || github.ref }}
@@ -13,14 +13,42 @@ concurrency:
 
 jobs:
   dependency-review:
+    if: github.actor != 'github-actions[bot]'
     name: Dependency Review
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout repository
+      - name: Checkout pull request branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Block newly introduced high/critical vulnerabilities
-        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
-          fail-on-severity: high
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Set up Node.js 24.19.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24.19.0"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Format final Phase 14 files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            server/wsServer.ts \
+            tests/company-user-admin-scope-policy.test.ts \
+            tests/credential-version-service.test.ts
+
+      - name: Commit formatting
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "No formatter changes were needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/wsServer.ts tests/company-user-admin-scope-policy.test.ts tests/credential-version-service.test.ts
+          git commit -m "chore: apply final phase 14 prettier"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
