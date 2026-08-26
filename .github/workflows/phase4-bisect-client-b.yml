@@ -28,6 +28,13 @@ jobs:
       - run: npm ci
       - name: Bisect compiler-safe client candidates
         run: node scripts/phase4-bisect-inference.mjs
+      - name: Restore cross-file-sensitive controllers
+        run: |
+          git checkout -- \
+            client/src/pages/accountslegacy/useAccountsLegacyModel.ts \
+            client/src/pages/containerdetail/useContainerDetailModel.tsx \
+            client/src/pages/pos/hooks/usePosQueries.ts \
+            client/src/pages/vouchers/stock-transfer-form/useStockTransferFormModel.ts
       - name: Certify source tree
         run: |
           npm run check
