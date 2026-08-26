@@ -32,6 +32,7 @@ export function registerPermissionBoundaryRoutes(app: Express): void {
     "/api/fiscal-period",
     "/api/financial",
     "/api/credit-notes",
+    "/api/golden-coast/accounting",
   ]) {
     app.use(path, requireModuleAccess("mod_accounting"));
   }
@@ -60,6 +61,7 @@ export function registerPermissionBoundaryRoutes(app: Express): void {
   app.post("/api/vouchers", requireActionAccess("act_create_voucher"));
   app.put("/api/vouchers/:id/with-entries", requireActionAccess("act_create_voucher"));
   app.patch("/api/vouchers/:id/sales", requireActionAccess("act_void_sale"));
+  app.post("/api/golden-coast/accounting/phase1/post", requireActionAccess("act_create_voucher"));
   app.post("/api/inventory/quick-adjust", requireActionAccess("act_adjust_stock"));
   app.post(
     "/api/stock-transfer-revisions/:id/approve",
