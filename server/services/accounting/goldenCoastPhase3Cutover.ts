@@ -7,8 +7,7 @@ export const GOLDEN_COAST_PHASE3_PARTNER_EQUITY_USD = "100000.00";
 export type GoldenCoastPhase3MoneyInput = string | number;
 
 export type GoldenCoastPhase3CashAccount =
-  | { kind: "ledger"; id: number; name?: string }
-  | { kind: "bank"; id: number; name?: string };
+  { kind: "ledger"; id: number; name?: string } | { kind: "bank"; id: number; name?: string };
 
 export interface GoldenCoastPhase3RoleAccounts {
   freshStartEquityAccountId: number;
@@ -32,6 +31,7 @@ export interface GoldenCoastPhase3CutoverInput {
 }
 
 export interface GoldenCoastPhase3VoucherEntry {
+  [key: string]: unknown;
   ledgerAccountId?: number;
   bankAccountId?: number;
   debitAmount: string;
@@ -166,9 +166,7 @@ function pushIfPositive(
  * amount needed to satisfy Assets = Equity + Liabilities is the opening cash or
  * bank debit. Profit Pending Distribution deliberately starts at zero.
  */
-export function buildGoldenCoastPhase3CutoverPlan(
-  input: GoldenCoastPhase3CutoverInput
-): GoldenCoastPhase3CutoverPlan {
+export function buildGoldenCoastPhase3CutoverPlan(input: GoldenCoastPhase3CutoverInput): GoldenCoastPhase3CutoverPlan {
   if (!input || typeof input !== "object") {
     throw new GoldenCoastPhase3CutoverError("Phase 3 cutover input is required");
   }

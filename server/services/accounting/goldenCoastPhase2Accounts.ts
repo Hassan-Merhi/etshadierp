@@ -312,10 +312,29 @@ function pickForSubType(accounts: readonly GoldenCoastLedgerRow[], subType: stri
 export function planGoldenCoastAccountProvisioning(input: {
   companyId: number;
   accounts: readonly GoldenCoastLedgerRow[];
+  /**
+   * Every live account name already used in this company, as name -> account id.
+   * `uq_ledger_accounts_company_name_active` makes (company_id, name) unique
+   * among non-deleted rows, so a rename or an insert that collides would abort
+   * the whole provisioning transaction. Supplying this lets the planner avoid
+   * the collision instead. Omitting it keeps the previous behaviour.
+   */
+  existingNames?: ReadonlyMap<string, number> | null;
 }): GoldenCoastProvisioningPlan {
   const companyId = assertCompanyId(input.companyId);
   const accounts = input.accounts ?? [];
   assertCompanyScoped(companyId, accounts);
+  const existingNames = input.existingNames ?? null;
+
+  // Names this plan will consume, so two roles cannot claim the same name in
+  // one run either.
+  const claimedNames = new Set<string>();
+  const nameIsFree = (name: string, ownerId: number | null): boolean => {
+    if (claimedNames.has(name)) return false;
+    if (!existingNames) return true;
+    const holder = existingNames.get(name);
+    return holder === undefined || (ownerId !== null && holder === ownerId);
+  };
 
   const claimedAccountIds = new Set<number>();
   const items: GoldenCoastRolePlanItem[] = [];
@@ -360,6 +379,7 @@ export function planGoldenCoastAccountProvisioning(input: {
     if (match) {
       const resolved = match;
       claimedAccountIds.add(resolved.id);
+      claimedNames.add(resolved.name);
       item.accountId = resolved.id;
       item.code = resolved.code;
 
@@ -394,13 +414,20 @@ export function planGoldenCoastAccountProvisioning(input: {
       }
 
       if (resolved.name !== definition.name) {
-        if (definition.legacyNames.includes(resolved.name)) {
+        if (definition.legacyNames.includes(resolved.name) && nameIsFree(definition.name, resolved.id)) {
+          claimedNames.add(definition.name);
           item.repairs.push({
             field: "name",
             from: resolved.name,
             to: definition.name,
             reason: "Rename legacy Supplier Partner account to its Golden Coast role name",
           });
+        } else if (definition.legacyNames.includes(resolved.name)) {
+          // Renaming would collide with another live account in this company.
+          item.name = resolved.name;
+          item.warnings.push(
+            `Account #${resolved.id} kept the name "${resolved.name}": another active account is already named "${definition.name}"`
+          );
         } else {
           item.name = resolved.name;
           item.warnings.push(
@@ -436,6 +463,19 @@ export function planGoldenCoastAccountProvisioning(input: {
       }
 
       item.action = adopted ? "adopt" : item.repairs.length > 0 ? "repair" : "none";
+    }
+
+    if (item.accountId === null) {
+      // Nothing existing to adopt: make sure the name we plan to insert cannot
+      // trip the (company_id, name) unique index.
+      if (!nameIsFree(item.name, null)) {
+        const disambiguated = `${item.name} (${definition.code})`;
+        item.warnings.push(
+          `Another active account is already named "${item.name}"; creating the ${definition.role} account as "${disambiguated}"`
+        );
+        item.name = disambiguated;
+      }
+      claimedNames.add(item.name);
     }
 
     warnings.push(...item.warnings);
@@ -506,8 +546,13 @@ export function summarizeGoldenCoastAccountSetup(input: {
   companyId: number;
   accounts: readonly GoldenCoastLedgerRow[];
   settings?: GoldenCoastSettingsSnapshot | null;
+  existingNames?: ReadonlyMap<string, number> | null;
 }): GoldenCoastSetupStatus {
-  const plan = planGoldenCoastAccountProvisioning({ companyId: input.companyId, accounts: input.accounts });
+  const plan = planGoldenCoastAccountProvisioning({
+    companyId: input.companyId,
+    accounts: input.accounts,
+    existingNames: input.existingNames,
+  });
   const byId = new Map(input.accounts.map((account) => [account.id, account]));
   const settings = input.settings ?? {};
 

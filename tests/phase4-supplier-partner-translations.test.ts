@@ -7,8 +7,8 @@ import {
 
 describe("Phase 4 Supplier Partner translations", () => {
   it("covers every reviewed Supplier Partner phrase exactly once", () => {
-    expect(supplierPartnerPhase4Translations).toHaveLength(231);
-    expect(new Set(supplierPartnerPhase4Translations.map((entry) => entry.en)).size).toBe(231);
+    expect(supplierPartnerPhase4Translations).toHaveLength(235);
+    expect(new Set(supplierPartnerPhase4Translations.map((entry) => entry.en)).size).toBe(235);
 
     for (const entry of supplierPartnerPhase4Translations) {
       expect(entry.en.trim()).not.toBe("");

@@ -6,6 +6,11 @@ import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import {
+  privilegedMutationRateLimit,
+  privilegedReadRateLimit,
+  privilegedRequestBudget,
+} from "../../middleware/privilegedEndpointSecurity";
+import {
   PostingValidationError,
   postBalancedVoucherTx,
   type CentralPostingResult,
@@ -30,6 +35,7 @@ import { requireSpCompany } from "./spHelpers";
 import { loadGoldenCoastAccounts, loadGoldenCoastSettings } from "./spGoldenCoastSetupRoutes";
 
 const postingDependencies = createDatabasePostingDependencies();
+const phase3RequestBudget = privilegedRequestBudget({ maxBodyBytes: 16 * 1024, maxCollectionItems: 25 });
 type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type PersistedPostingResult = CentralPostingResult<typeof vouchers.$inferSelect, typeof voucherEntries.$inferSelect>;
 
@@ -115,7 +121,7 @@ function resolveRoleAccounts(accounts: readonly GoldenCoastLedgerRow[]): GoldenC
 }
 
 async function validateCashAccountTx(
-  tx: DatabaseTransaction,
+  tx: DatabaseTransaction | typeof db,
   companyId: number,
   account: GoldenCoastPhase3CashAccount
 ): Promise<void> {
@@ -210,9 +216,7 @@ async function canonicalPreCutoverBalances(
     })
   );
   const voucherById = new Map(
-    rows.map(
-      (row) => [Number(row.ledgerAccountId), Number(row.debit ?? 0) - Number(row.credit ?? 0)] as const
-    )
+    rows.map((row) => [Number(row.ledgerAccountId), Number(row.debit ?? 0) - Number(row.credit ?? 0)] as const)
   );
 
   return resolved.map(({ role, account }) => ({
@@ -315,6 +319,7 @@ async function handlePreview(req: Request, res: Response): Promise<void> {
     }
     const resolved = resolveRoleAccounts(accounts);
     const cashAccount = parseCashAccount(req.body?.cashAccount);
+    await validateCashAccountTx(db, companyId, cashAccount);
     const plan = buildGoldenCoastPhase3CutoverPlan({
       companyId,
       stockOtwUsd: req.body?.stockOtwUsd,
@@ -435,18 +440,38 @@ async function handlePost(req: Request, res: Response): Promise<void> {
 }
 
 export function registerSpGoldenCoastPhase3CutoverRoutes(app: Express): void {
-  app.get("/api/sp/golden-coast/phase3/status", requireAuth, requireRole("Admin"), (req, res) => {
-    void handleStatus(req, res);
-  });
-  app.post("/api/sp/golden-coast/phase3/preview", requireAuth, requireRole("Admin"), (req, res) => {
-    void handlePreview(req, res);
-  });
+  app.get(
+    "/api/sp/golden-coast/phase3/status",
+    privilegedReadRateLimit,
+    requireAuth,
+    requireRole("Admin"),
+    (req, res) => {
+      void handleStatus(req, res);
+    }
+  );
+  app.post(
+    "/api/sp/golden-coast/phase3/preview",
+    privilegedReadRateLimit,
+    phase3RequestBudget,
+    requireAuth,
+    requireRole("Admin"),
+    (req, res) => {
+      void handlePreview(req, res);
+    }
+  );
   // `cutover` in the path deliberately activates the existing SP sensitive-action
   // guard: exact confirmation "RUN SP MIGRATION", reason >= 5 characters and a
   // unique idempotency key are required before this handler can run.
-  app.post("/api/sp/golden-coast/phase3/cutover", requireAuth, requireRole("Admin"), (req, res) => {
-    void handlePost(req, res);
-  });
+  app.post(
+    "/api/sp/golden-coast/phase3/cutover",
+    privilegedMutationRateLimit,
+    phase3RequestBudget,
+    requireAuth,
+    requireRole("Admin"),
+    (req, res) => {
+      void handlePost(req, res);
+    }
+  );
 }
 
 export { businessDate, canonicalPreCutoverBalances, parseCashAccount, resolveRoleAccounts };

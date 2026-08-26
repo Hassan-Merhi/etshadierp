@@ -14,8 +14,15 @@ describe("Golden Coast Phase 3 cutover route surface", () => {
   });
 
   it("restricts Phase 3 handlers to authenticated Admins on the SP company", () => {
-    expect(routeSource).toContain('requireAuth, requireRole("Admin")');
+    expect(routeSource).toContain("requireAuth");
+    expect(routeSource).toContain('requireRole("Admin")');
     expect(routeSource).toContain("requireSpCompany(req, res)");
+  });
+
+  it("rate limits every endpoint and caps preview and cutover request bodies", () => {
+    expect(routeSource).toContain("privilegedMutationRateLimit");
+    expect(routeSource).toContain("privilegedReadRateLimit");
+    expect(routeSource).toContain("phase3RequestBudget");
   });
 
   it("keeps cutover behind the existing migration confirmation and idempotency guard", () => {
@@ -27,6 +34,14 @@ describe("Golden Coast Phase 3 cutover route surface", () => {
   it("uses one database transaction for the posting operation", () => {
     expect(routeSource).toContain("db.transaction(async (tx)");
     expect(routeSource).toContain("postBalancedVoucherTx(tx");
+  });
+
+  it("validates the selected cash or bank target during preview and posting", () => {
+    expect(routeSource.match(/validateCashAccountTx\(/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(routeSource).toContain("eq(bankAccounts.companyId, companyId)");
+    expect(routeSource).toContain("eq(ledgerAccounts.companyId, companyId)");
+    expect(routeSource).toContain("eq(bankAccounts.active, true)");
+    expect(routeSource).toContain("eq(ledgerAccounts.active, true)");
   });
 
   it("refuses a fresh opening journal over stored opening balances or voucher history", () => {

@@ -82,19 +82,17 @@ describe("Golden Coast Phase 3 opening-balance cutover", () => {
   });
 
   it("carries an existing GC Sales Cash payable and Hassan Savings loan as opening liabilities", () => {
-    const plan = buildGoldenCoastPhase3CutoverPlan(
-      input({ gcSalesCashUsd: "12500.50", hassanSavingsUsd: "7500.25" })
-    );
+    const plan = buildGoldenCoastPhase3CutoverPlan(input({ gcSalesCashUsd: "12500.50", hassanSavingsUsd: "7500.25" }));
 
     expect(plan.gcSalesCashUsd).toBe("12500.50");
     expect(plan.hassanSavingsUsd).toBe("7500.25");
     expect(plan.openingCashUsd).toBe("153700.75");
-    expect(
-      plan.entries.find((entry) => entry.ledgerAccountId === accounts.gcSalesCashAccountId)?.creditAmount
-    ).toBe("12500.50");
-    expect(
-      plan.entries.find((entry) => entry.ledgerAccountId === accounts.hassanSavingsAccountId)?.creditAmount
-    ).toBe("7500.25");
+    expect(plan.entries.find((entry) => entry.ledgerAccountId === accounts.gcSalesCashAccountId)?.creditAmount).toBe(
+      "12500.50"
+    );
+    expect(plan.entries.find((entry) => entry.ledgerAccountId === accounts.hassanSavingsAccountId)?.creditAmount).toBe(
+      "7500.25"
+    );
   });
 
   it("supports an active Cash/Bank ledger account instead of a bank-account row", () => {

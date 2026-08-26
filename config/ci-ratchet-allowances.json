@@ -15,11 +15,11 @@
     "GET /api/golden-coast/accounting/phase1/accounts [<anonymous> > requireAuth > requireNonPOS > <anonymous>]",
     "POST /api/golden-coast/accounting/phase1/preview [<anonymous> > <anonymous> > requireAuth > requireNonPOS > <anonymous>]",
     "POST /api/golden-coast/accounting/phase1/post [<anonymous> > <anonymous> > requireAuth > requireNonPOS > <anonymous>]",
-    "POST /api/sp/setup/golden-coast [requireAuth > <anonymous> > <anonymous>]",
-    "GET /api/sp/setup/golden-coast/status [requireAuth > <anonymous>]",
-    "GET /api/sp/golden-coast/phase3/status [requireAuth > <anonymous> > <anonymous>]",
-    "POST /api/sp/golden-coast/phase3/preview [requireAuth > <anonymous> > <anonymous>]",
-    "POST /api/sp/golden-coast/phase3/cutover [requireAuth > <anonymous> > <anonymous>]"
+    "POST /api/sp/setup/golden-coast [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/sp/setup/golden-coast/status [<anonymous> > requireAuth > <anonymous>]",
+    "GET /api/sp/golden-coast/phase3/status [<anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "POST /api/sp/golden-coast/phase3/preview [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "POST /api/sp/golden-coast/phase3/cutover [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/v5/stock-allocation [<anonymous>]",
@@ -51,11 +51,11 @@
     },
     {
       "expected": "GET /api/sp/migration/runs [requireAuth > <anonymous> > <anonymous>]",
-      "actual": "GET /api/sp/migration/runs [requireAuth > <anonymous> > <anonymous> > <anonymous> > <anonymous>]"
+      "actual": "GET /api/sp/migration/runs [requireAuth > <anonymous> > <anonymous> > <anonymous>]"
     },
     {
       "expected": "POST /api/sp/migration/rehearsal [requireAuth > <anonymous> > <anonymous>]",
-      "actual": "POST /api/sp/migration/rehearsal [requireAuth > <anonymous> > <anonymous> > <anonymous> > <anonymous>]"
+      "actual": "POST /api/sp/migration/rehearsal [requireAuth > <anonymous> > <anonymous> > <anonymous>]"
     },
     {
       "expected": "POST /api/sp/migration/rollback [requireAuth > <anonymous> > <anonymous>]",
