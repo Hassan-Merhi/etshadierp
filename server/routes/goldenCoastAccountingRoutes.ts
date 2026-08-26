@@ -223,7 +223,7 @@ async function handlePhase1Post(req: Request, res: Response): Promise<void> {
     }
 
     const primary = result.postings[0]?.posted;
-    if (!primary) throw new Error("Golden Coast Phase 1 posting produced no vouchers");
+    if (!primary) throw new GoldenCoastPhase1InputError("Golden Coast Phase 1 posting produced no vouchers");
     const replayed = result.postings.every((item) => item.posted.replayed);
 
     logger.info("Golden Coast Phase 1 posting succeeded", {
