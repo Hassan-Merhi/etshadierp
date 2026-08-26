@@ -228,4 +228,16 @@ export const supplierPartnerPhase4TranslationsPart4: readonly Phase4SupplierPart
     ar: "يفتقد الهدف الحسابات المطلوبة: {0}.",
     fr: "Les comptes requis suivants manquent dans la cible : {0}.",
   },
+  {
+    en: "Golden Coast Balance Sheet Accounts",
+    ar: "حسابات الميزانية العمومية لغولدن كوست",
+    fr: "Comptes du bilan Golden Coast",
+  },
+  { en: "Action needed", ar: "يلزم اتخاذ إجراء", fr: "Action requise" },
+  { en: "Cr GC Sales Cash", ar: "دائن نقدية مبيعات GC", fr: "Crédit Trésorerie ventes GC" },
+  {
+    en: "Golden Coast accounts provisioned",
+    ar: "تم تجهيز حسابات غولدن كوست",
+    fr: "Comptes Golden Coast provisionnés",
+  },
 ];
