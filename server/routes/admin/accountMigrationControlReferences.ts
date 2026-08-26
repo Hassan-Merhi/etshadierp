@@ -51,7 +51,7 @@ export async function detachAccountMigrationControlReferences(
       .where(
         inArray(
           userCompanyRoles.id,
-          roleRows.map((row: any) => row.id)
+          roleRows.map((row) => row.id)
         )
       );
   }
