@@ -30,9 +30,5 @@ async function authoritativeInventoryStockMiddleware(req: Request, res: Response
 }
 
 export function registerAuthoritativeInventoryStockMiddleware(app: Express) {
-  app.use(
-    "/api/factory/location-inventory/:locationId",
-    requireAuth,
-    authoritativeInventoryStockMiddleware
-  );
+  app.use("/api/factory/location-inventory/:locationId", requireAuth, authoritativeInventoryStockMiddleware);
 }
