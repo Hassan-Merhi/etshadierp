@@ -72,6 +72,6 @@ describeDatabase("database pool scope binding", () => {
       runWithDatabaseScopeRuntimeContext(createTenantDatabaseScope(101), () =>
         runWithDatabaseMaintenanceScope("forbidden-request-elevation", () => undefined)
       )
-    ).toThrow(/cannot be elevated to maintenance/i);
+    ).toThrow("database_tenant_maintenance_elevation_forbidden");
   });
 });
