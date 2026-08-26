@@ -36,9 +36,7 @@ const commands = [
 ];
 
 if (skipTypeScript) {
-  console.log(
-    "Skipping duplicate TypeScript compilation; the CI static-build job already completed it.",
-  );
+  console.log("Skipping duplicate TypeScript compilation; the CI static-build job already completed it.");
 }
 
 for (const [command, args] of commands) {
