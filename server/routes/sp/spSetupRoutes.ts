@@ -6,7 +6,7 @@ import { eq, and, isNull, asc } from "drizzle-orm";
 import { ledgerAccounts, locations, bankAccounts } from "@shared/schema";
 import { requireSpCompany, getSpAccount, SP_ACCOUNTS } from "./spHelpers";
 import { getSpSupplierVoucherLinkGapCount, repairSpSupplierVoucherLinks } from "./spSupplierVoucherSync";
-import { loadGoldenCoastAccounts, loadGoldenCoastSettings } from "./spGoldenCoastSetupRoutes";
+import { loadGoldenCoastAccounts, loadGoldenCoastSettings, loadCompanyAccountNames } from "./spGoldenCoastSetupRoutes";
 import { summarizeGoldenCoastAccountSetup } from "../../services/accounting/goldenCoastPhase2Accounts";
 
 // ── Setup ─────────────────────────────────────────────────────────────────
@@ -96,14 +96,16 @@ export function registerSpSetupRoutes(app: Express) {
 
       // Golden Coast Phase 2 balance-sheet roles are reported alongside the
       // legacy SP chart so an Admin can verify both from one setup screen.
-      const [goldenCoastAccounts, goldenCoastSettings] = await Promise.all([
+      const [goldenCoastAccounts, goldenCoastSettings, goldenCoastNames] = await Promise.all([
         loadGoldenCoastAccounts(db, companyId),
         loadGoldenCoastSettings(db, companyId),
+        loadCompanyAccountNames(db, companyId),
       ]);
       const goldenCoast = summarizeGoldenCoastAccountSetup({
         companyId,
         accounts: goldenCoastAccounts,
         settings: goldenCoastSettings,
+        existingNames: goldenCoastNames,
       });
 
       res.json({

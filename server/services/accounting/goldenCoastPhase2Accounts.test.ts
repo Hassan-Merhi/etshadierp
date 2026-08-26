@@ -438,3 +438,69 @@ describe("historical ledger safety", () => {
     expect(GOLDEN_COAST_PHASE2_LOOKUP_SUBTYPES).not.toContain("sp_unrelated_legacy");
   });
 });
+
+describe("account name uniqueness", () => {
+  // Production enforces uq_ledger_accounts_company_name_active on
+  // (company_id, name) WHERE deleted_at IS NULL. A rename or insert that
+  // collides would abort the whole provisioning transaction.
+  it("skips a legacy rename when another live account already holds the target name", () => {
+    const accounts = [
+      row({ id: 30, subType: "sp_stock", code: "SP-STOCK", name: "Stock on Floor", accountType: "Asset" }),
+    ];
+    const existingNames = new Map([
+      ["Stock on Floor", 30],
+      ["Stock in Hand", 31],
+    ]);
+    const item = itemFor(
+      planGoldenCoastAccountProvisioning({ companyId: COMPANY_ID, accounts, existingNames }),
+      "stock_in_hand"
+    );
+
+    expect(item.repairs.some((repair) => repair.field === "name")).toBe(false);
+    expect(item.name).toBe("Stock on Floor");
+    expect(item.warnings.join(" ")).toContain("already named");
+  });
+
+  it("still renames when the target name is held by the same account", () => {
+    const accounts = [
+      row({ id: 32, subType: "sp_stock", code: "SP-STOCK", name: "Stock on Floor", accountType: "Asset" }),
+    ];
+    const existingNames = new Map([["Stock on Floor", 32]]);
+    const item = itemFor(
+      planGoldenCoastAccountProvisioning({ companyId: COMPANY_ID, accounts, existingNames }),
+      "stock_in_hand"
+    );
+
+    expect(item.repairs.find((repair) => repair.field === "name")?.to).toBe("Stock in Hand");
+  });
+
+  it("disambiguates a created account whose canonical name is already taken", () => {
+    const existingNames = new Map([["Hassan Savings", 99]]);
+    const item = itemFor(
+      planGoldenCoastAccountProvisioning({ companyId: COMPANY_ID, accounts: [], existingNames }),
+      "hassan_savings"
+    );
+
+    expect(item.action).toBe("create");
+    expect(item.name).toBe("Hassan Savings (GC-HSAV)");
+    expect(item.warnings.join(" ")).toContain("already named");
+  });
+
+  it("never plans two roles onto the same name in one run", () => {
+    const plan = planGoldenCoastAccountProvisioning({
+      companyId: COMPANY_ID,
+      accounts: [],
+      existingNames: new Map(),
+    });
+    const names = plan.items.map((item) => item.name);
+
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("keeps the previous behaviour when no name index is supplied", () => {
+    const plan = planGoldenCoastAccountProvisioning({ companyId: COMPANY_ID, accounts: [] });
+    expect(plan.items.map((item) => item.name)).toEqual(
+      GOLDEN_COAST_PHASE2_ACCOUNT_DEFS.map((definition) => definition.name)
+    );
+  });
+});

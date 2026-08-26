@@ -1,5 +1,5 @@
 import type { Express, Request, Response } from "express";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { companySettings, ledgerAccounts } from "@shared/schema";
 import { requireAuth, requireRole } from "../../auth";
 import { db } from "../../db";
@@ -53,6 +53,22 @@ async function loadGoldenCoastAccounts(
     );
 
   return rows.map((row) => ({ ...row, id: Number(row.id), companyId: Number(row.companyId) }));
+}
+
+/**
+ * Every live account name in this company, as name -> id. Provisioning consults
+ * it so a rename or insert cannot violate uq_ledger_accounts_company_name_active
+ * and abort the transaction.
+ */
+async function loadCompanyAccountNames(
+  tx: DatabaseTransaction | typeof db,
+  companyId: number
+): Promise<Map<string, number>> {
+  const rows = await tx
+    .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+    .from(ledgerAccounts)
+    .where(and(eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt)));
+  return new Map(rows.map((row) => [row.name, Number(row.id)]));
 }
 
 async function loadGoldenCoastSettings(
@@ -116,7 +132,8 @@ async function handleGoldenCoastSetup(req: Request, res: Response): Promise<void
 
     const result = await db.transaction(async (tx) => {
       const accounts = await loadGoldenCoastAccounts(tx, companyId);
-      const plan = planGoldenCoastAccountProvisioning({ companyId, accounts });
+      const existingNames = await loadCompanyAccountNames(tx, companyId);
+      const plan = planGoldenCoastAccountProvisioning({ companyId, accounts, existingNames });
 
       const created: Array<{ role: string; accountId: number; code: string; name: string }> = [];
       const repaired: Array<{ role: string; accountId: number; fields: string[] }> = [];
@@ -178,7 +195,13 @@ async function handleGoldenCoastSetup(req: Request, res: Response): Promise<void
 
       const finalAccounts = await loadGoldenCoastAccounts(tx, companyId);
       const finalSettings = await loadGoldenCoastSettings(tx, companyId);
-      const status = summarizeGoldenCoastAccountSetup({ companyId, accounts: finalAccounts, settings: finalSettings });
+      const finalNames = await loadCompanyAccountNames(tx, companyId);
+      const status = summarizeGoldenCoastAccountSetup({
+        companyId,
+        accounts: finalAccounts,
+        settings: finalSettings,
+        existingNames: finalNames,
+      });
 
       return { created, repaired, settingsChanged, warnings: plan.warnings, status };
     });
@@ -214,12 +237,13 @@ async function handleGoldenCoastSetupStatus(req: Request, res: Response): Promis
     const companyId = await requireSpCompany(req, res);
     if (!companyId) return;
 
-    const [accounts, settings] = await Promise.all([
+    const [accounts, settings, existingNames] = await Promise.all([
       loadGoldenCoastAccounts(db, companyId),
       loadGoldenCoastSettings(db, companyId),
+      loadCompanyAccountNames(db, companyId),
     ]);
 
-    res.json(summarizeGoldenCoastAccountSetup({ companyId, accounts, settings }));
+    res.json(summarizeGoldenCoastAccountSetup({ companyId, accounts, settings, existingNames }));
   } catch (error: unknown) {
     if (error instanceof GoldenCoastPhase2SetupError) {
       res.status(400).json({ message: error.message, code: "GC_PHASE2_SETUP_INVALID" });
@@ -239,4 +263,4 @@ export function registerSpGoldenCoastSetupRoutes(app: Express): void {
   });
 }
 
-export { loadGoldenCoastAccounts, loadGoldenCoastSettings };
+export { loadGoldenCoastAccounts, loadGoldenCoastSettings, loadCompanyAccountNames };
