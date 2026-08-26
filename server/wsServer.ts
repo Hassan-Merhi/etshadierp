@@ -10,8 +10,13 @@ import { shouldDeliverBroadcast } from "./lib/broadcastScope";
 let wss: WebSocketServer | null = null;
 let resolveSession: SessionResolver | null = null;
 
+type SessionResolution =
+  | { status: "resolved"; companyId: number }
+  | { status: "missing" }
+  | { status: "unresolved" };
+
 /** Runs the app's session middleware over a bare upgrade request. */
-type SessionResolver = (request: IncomingMessage) => Promise<number | null>;
+type SessionResolver = (request: IncomingMessage) => Promise<SessionResolution>;
 type SessionUpgradeRequest = IncomingMessage & { session?: { currentCompanyId?: unknown } };
 
 /**
@@ -48,10 +53,10 @@ function sessionCompanyResolver(sessionMiddleware: RequestHandler): SessionResol
   return (request) =>
     new Promise((resolve) => {
       let settled = false;
-      const finish = (companyId: number | null) => {
+      const finish = (result: SessionResolution) => {
         if (settled) return;
         settled = true;
-        resolve(companyId);
+        resolve(result);
       };
 
       try {
@@ -60,20 +65,31 @@ function sessionCompanyResolver(sessionMiddleware: RequestHandler): SessionResol
         sessionMiddleware(
           request as unknown as Parameters<RequestHandler>[0],
           upgradeResponseStub() as unknown as Parameters<RequestHandler>[1],
-          () => {
-          const session = (request as SessionUpgradeRequest).session;
-          const companyId = Number(session?.currentCompanyId);
-          finish(Number.isInteger(companyId) && companyId > 0 ? companyId : null);
+          (error?: unknown) => {
+            if (error) {
+              logger.warn("[WS] Session-store lookup failed for a socket.", { error });
+              finish({ status: "unresolved" });
+              return;
+            }
+
+            const session = (request as SessionUpgradeRequest).session;
+            const companyId = Number(session?.currentCompanyId);
+            if (Number.isInteger(companyId) && companyId > 0) {
+              finish({ status: "resolved", companyId });
+              return;
+            }
+            finish({ status: "missing" });
           },
         );
       } catch (error) {
-        logger.warn("[WS] Could not resolve the session for a socket; it will receive every broadcast.", { error });
-        finish(null);
+        logger.warn("[WS] Could not resolve the session for a socket.", { error });
+        finish({ status: "unresolved" });
       }
 
-      // A store that never answers must not leave the socket in limbo. Falling
-      // back to null keeps it subscribed to everything, which is the safe side.
-      setTimeout(() => finish(null), 5_000).unref?.();
+      // A hung session store must not leave a live socket permanently unable to
+      // receive tenant-scoped invalidations. Mark it unresolved so setupWS can
+      // close it and let the client reconnect with a fresh lookup.
+      setTimeout(() => finish({ status: "unresolved" }), 5_000).unref?.();
     });
 }
 
@@ -84,14 +100,26 @@ export function setupWS(server: Server, sessionMiddleware?: RequestHandler): voi
   wss.on("connection", (ws, request) => {
     const connectionId = `websocket-${randomUUID()}`;
 
-    // Until the session resolves, the socket has no company. An unscoped socket
-    // receives every broadcast: missing an invalidation is worse than an extra
-    // one, so the fallback stays on the safe side.
+    // Tenant-scoped broadcasts fail closed until the company resolves. If the
+    // session store itself errors or times out, close the socket so the client
+    // reconnects instead of remaining permanently stale with a null scope.
     socketCompanies.set(ws, null);
     if (resolveSession) {
       void resolveSession(request)
-        .then((companyId) => socketCompanies.set(ws, companyId))
-        .catch(() => socketCompanies.set(ws, null));
+        .then((result) => {
+          if (result.status === "resolved") {
+            socketCompanies.set(ws, result.companyId);
+            return;
+          }
+          if (result.status === "unresolved" && ws.readyState !== WebSocket.CLOSED) {
+            logger.warn("[WS] Closing socket after unresolved session company; client should reconnect.");
+            ws.close(1013, "Session company unavailable");
+          }
+        })
+        .catch((error) => {
+          logger.warn("[WS] Closing socket after unexpected session-resolution failure.", { error });
+          if (ws.readyState !== WebSocket.CLOSED) ws.close(1013, "Session company unavailable");
+        });
     }
 
     runWithTraceContext(
@@ -134,8 +162,8 @@ export function setupWS(server: Server, sessionMiddleware?: RequestHandler): voi
 export interface BroadcastOptions {
   /**
    * The company the change belongs to. Sockets in other companies are skipped;
-   * sockets whose company is not known yet still receive it. Omit to reach
-   * every client — correct for server-wide messages, wasteful for writes.
+   * sockets whose company is unresolved also fail closed. Omit companyId to
+   * reach every client for intentionally server-wide messages.
    */
   companyId?: number | null;
 }
