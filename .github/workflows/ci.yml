@@ -21,8 +21,161 @@ env:
   PORT: "5000"
 
 jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      repo_audits: ${{ steps.filter.outputs.repo_audits }}
+      typecheck: ${{ steps.filter.outputs.typecheck }}
+      lint_format: ${{ steps.filter.outputs.lint_format }}
+      build: ${{ steps.filter.outputs.build }}
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - name: Harden Runner (audit mode)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Classify changed files
+        id: filter
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          repo_audits=true
+          typecheck=false
+          lint_format=false
+          build=false
+          backend=false
+          frontend=false
+
+          enable_all() {
+            typecheck=true
+            lint_format=true
+            build=true
+            backend=true
+            frontend=true
+          }
+
+          # Keep main maximally conservative. Selective execution is a PR
+          # feedback optimization; every commit that actually lands on main
+          # still receives the complete application validation suite.
+          if [[ "${GITHUB_EVENT_NAME}" != "pull_request" ]]; then
+            enable_all
+            echo "Non-PR event: running the full CI suite."
+          else
+            mapfile -t changed_files < <(
+              gh api --paginate \
+                "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" \
+                --jq '.[].filename'
+            )
+
+            if [[ "${#changed_files[@]}" -eq 0 ]]; then
+              echo "::error::Unable to resolve changed files for PR #${PR_NUMBER}; refusing to skip CI."
+              exit 1
+            fi
+
+            printf 'Changed files (%s):\n' "${#changed_files[@]}"
+            printf ' - %s\n' "${changed_files[@]}"
+
+            for file in "${changed_files[@]}"; do
+              case "$file" in
+                # A CI topology change must exercise every lane before merge.
+                .github/workflows/ci.yml)
+                  enable_all
+                  ;;
+
+                # Documentation-only changes still run repository audits because
+                # env/doc-index ratchets intentionally validate documentation.
+                *.md|docs/*|.github/*.md)
+                  ;;
+
+                # Frontend-only application changes.
+                client/*|public/*)
+                  typecheck=true
+                  lint_format=true
+                  build=true
+                  frontend=true
+                  ;;
+
+                # Backend-only application changes.
+                server/*)
+                  typecheck=true
+                  lint_format=true
+                  build=true
+                  backend=true
+                  ;;
+
+                # Shared code can affect either runtime.
+                shared/*)
+                  typecheck=true
+                  lint_format=true
+                  build=true
+                  backend=true
+                  frontend=true
+                  ;;
+
+                # Tests may exercise either side; stay conservative.
+                tests/*)
+                  typecheck=true
+                  lint_format=true
+                  backend=true
+                  frontend=true
+                  ;;
+
+                # Repository scripts are covered by audits, lint and type/static
+                # checks but do not by themselves require application suites.
+                scripts/*)
+                  typecheck=true
+                  lint_format=true
+                  ;;
+
+                # Database/schema/migration changes require backend + DB coverage.
+                migrations/*|migration/*|drizzle/*|db/*|database/*)
+                  build=true
+                  backend=true
+                  ;;
+
+                # Dependency/toolchain/test-runner changes can affect everything.
+                package.json|package-lock.json|npm-shrinkwrap.json|.node-version|.nvmrc|tsconfig*.json|vite.config.*|vitest.config.*|eslint.config.*|drizzle.config.*)
+                  enable_all
+                  ;;
+
+                # Other workflow-only changes are validated by repository audits
+                # and the dedicated GitHub Actions Quality workflow.
+                .github/*)
+                  ;;
+
+                # Unknown files fail safe. We only skip expensive lanes when a
+                # path is explicitly understood.
+                *)
+                  echo "Unclassified path '${file}': running all application lanes."
+                  enable_all
+                  ;;
+              esac
+            done
+          fi
+
+          {
+            echo "repo_audits=${repo_audits}"
+            echo "typecheck=${typecheck}"
+            echo "lint_format=${lint_format}"
+            echo "build=${build}"
+            echo "backend=${backend}"
+            echo "frontend=${frontend}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Selection: repo_audits=${repo_audits} typecheck=${typecheck} lint_format=${lint_format} build=${build} backend=${backend} frontend=${frontend}"
+
   repo-audits:
     name: Repository Audits
+    needs: changes
+    if: needs.changes.outputs.repo_audits == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -102,6 +255,8 @@ jobs:
 
   typecheck:
     name: Type-check
+    needs: changes
+    if: needs.changes.outputs.typecheck == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -149,6 +304,8 @@ jobs:
 
   lint-format:
     name: Lint / Format
+    needs: changes
+    if: needs.changes.outputs.lint_format == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -243,6 +400,8 @@ jobs:
 
   build:
     name: Build
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -290,6 +449,8 @@ jobs:
 
   backend-tests:
     name: Backend / Database Tests
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 50
     services:
@@ -477,6 +638,8 @@ jobs:
 
   frontend-tests:
     name: Frontend Tests
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -533,11 +696,18 @@ jobs:
 
   coverage-ratchet:
     name: Coverage Ratchet
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
     needs:
+      - changes
       - backend-tests
       - frontend-tests
+    if: >-
+      always() &&
+      needs.changes.outputs.backend == 'true' &&
+      needs.changes.outputs.frontend == 'true' &&
+      needs.backend-tests.result == 'success' &&
+      needs.frontend-tests.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Harden Runner (audit mode)
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
