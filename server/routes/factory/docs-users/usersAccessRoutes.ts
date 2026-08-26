@@ -9,10 +9,15 @@ import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db, pool } from "../../../db";
 import { requireAuth, requirePasswordConfirmation } from "../../../auth";
+import { privilegedMutationRateLimit } from "../../../middleware/privilegedEndpointSecurity";
 import { users, companies, userCompanyRoles, factoryUserProfiles, factoryUserPageAccess } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { hashPassword } from "../../_helpers";
-import { bumpCredentialVersion, revokeUserSessions } from "../../../services/security/credentialVersionService";
+import {
+  bumpCredentialVersion,
+  revokeUserCompanySessions,
+  revokeUserSessions,
+} from "../../../services/security/credentialVersionService";
 
 function requesterIsDeveloper(currentRole: unknown, requestRole: unknown): boolean {
   return currentRole === "Developer" || requestRole === "Developer";
@@ -63,7 +68,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
         .from(users)
         .innerJoin(
           userCompanyRoles,
-          and(eq(userCompanyRoles.userId, users.id), eq(userCompanyRoles.companyId, companyId))
+          and(eq(userCompanyRoles.userId, users.id), eq(userCompanyRoles.companyId, companyId)),
         );
 
       const isDeveloper = requesterIsDeveloper(currentRole, requestRole);
@@ -105,6 +110,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
   app.post(
     "/api/factory/users",
     requireAuth,
+    privilegedMutationRateLimit,
     requirePasswordConfirmation,
     async (req: any, res: import("express").Response) => {
       try {
@@ -159,7 +165,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
                 companyId,
                 userId: created.id,
                 pageKey,
-              }))
+              })),
             );
           }
           return created;
@@ -177,12 +183,13 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
         logger.error("Error creating factory user:", { error });
         res.status(400).json({ message: getErrorMessage(error) });
       }
-    }
+    },
   );
 
   app.put(
     "/api/factory/users/:userId",
     requireAuth,
+    privilegedMutationRateLimit,
     requirePasswordConfirmation,
     async (req: any, res: import("express").Response) => {
       try {
@@ -287,7 +294,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
                   companyId,
                   userId,
                   pageKey,
-                }))
+                })),
               );
             }
           }
@@ -295,21 +302,28 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
           return credentialVersion;
         });
 
-        // Access/profile changes must take effect immediately. Credential changes
-        // additionally bump the persisted credential version inside the same DB
-        // transaction, so even a stale session-store row fails closed.
-        await revokeUserSessions(pool, userId);
-        res.json({ message: credentialChanged || newCredentialVersion != null ? "User updated" : "User access updated" });
+        // Global credential rotation invalidates every session for the shared
+        // identity. Tenant-only profile/access changes revoke only sessions that
+        // are operating inside the affected company.
+        if (newCredentialVersion != null) {
+          await revokeUserSessions(pool, userId);
+        } else {
+          await revokeUserCompanySessions(pool, userId, companyId);
+        }
+        res.json({
+          message: credentialChanged || newCredentialVersion != null ? "User updated" : "User access updated",
+        });
       } catch (error: unknown) {
         logger.error("Error updating factory user:", { error });
         res.status(500).json({ message: getErrorMessage(error) });
       }
-    }
+    },
   );
 
   app.delete(
     "/api/factory/users/:userId",
     requireAuth,
+    privilegedMutationRateLimit,
     requirePasswordConfirmation,
     async (req: any, res: import("express").Response) => {
       try {
@@ -346,13 +360,13 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
             .delete(userCompanyRoles)
             .where(and(eq(userCompanyRoles.companyId, companyId), eq(userCompanyRoles.userId, userId)));
         });
-        await revokeUserSessions(pool, userId);
+        await revokeUserCompanySessions(pool, userId, companyId);
         res.json({ message: "User access removed from this company" });
       } catch (error: unknown) {
         logger.error("Error removing factory user:", { error });
         res.status(500).json({ message: getErrorMessage(error) });
       }
-    }
+    },
   );
 
   app.get("/api/factory/my-access", requireAuth, async (req: any, res: import("express").Response) => {
