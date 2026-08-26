@@ -1,6 +1,7 @@
 import type { CentralPostingRequest, PostingActor } from "./centralPostingEngine";
 import { buildGenericVoucherPostingRequest, type BuiltGenericVoucherPosting } from "./genericVoucherPosting";
 import {
+  GoldenCoastPhase1InputError,
   buildGoldenCoastPhase1PostingRequest,
   buildGoldenCoastPhase1Preview,
   type GoldenCoastPhase1EventType,
@@ -58,7 +59,9 @@ export function buildGoldenCoastPhase1PostingBatch(
     };
   }
 
-  if (preview.kind !== "voucher") throw new Error("Location sale preview must produce a voucher");
+  if (preview.kind !== "voucher") {
+    throw new GoldenCoastPhase1InputError("Location sale preview must produce a voucher");
+  }
 
   const revenueEntries = preview.voucher.entries.slice(0, 2).map((entry) => ({ ...entry }));
   const cogsEntries = preview.voucher.entries.slice(2).map((entry) => ({ ...entry }));
@@ -80,7 +83,10 @@ export function buildGoldenCoastPhase1PostingBatch(
   });
 
   const postings: GoldenCoastPhase1PostingItem[] = [
-    { role: "primary", request: retagPosting(primary, preview.eventType, primary.clientRequestId, "primary") },
+    {
+      role: "primary",
+      request: retagPosting(primary, preview.eventType, primary.clientRequestId, "primary"),
+    },
   ];
 
   if (cogsEntries.length > 0) {
@@ -92,15 +98,22 @@ export function buildGoldenCoastPhase1PostingBatch(
         voucherNumber: `${primary.request.voucher.voucherNumber}-COGS`,
         voucherType: "Journal",
         voucherDate: primary.request.voucher.voucherDate,
-        description: `${preview.voucher.description ?? "Location sale"} - COGS`,
+        description: preview.voucher.description ? `${preview.voucher.description} - COGS` : "COGS",
         currency: "USD",
       },
       entries: cogsEntries,
       exchangeRate: input.exchangeRate,
       actor: input.actor,
     });
-    postings.push({ role: "cogs", request: retagPosting(cogs, preview.eventType, primary.clientRequestId, "cogs") });
+    postings.push({
+      role: "cogs",
+      request: retagPosting(cogs, preview.eventType, primary.clientRequestId, "cogs"),
+    });
   }
 
-  return { eventType: preview.eventType, clientRequestId: primary.clientRequestId, postings };
+  return {
+    eventType: preview.eventType,
+    clientRequestId: primary.clientRequestId,
+    postings,
+  };
 }
