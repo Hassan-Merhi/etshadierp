@@ -67,7 +67,7 @@ export function VoucherDetailsDialog({
     selectedVoucher?.voucherType === "StockTransfer" ||
     selectedVoucher?.voucherType === "Transfer";
 
-  const { data: voucherDetail } = useQuery<any>({
+  const { data: voucherDetail } = useQuery({
     queryKey: ["/api/vouchers", selectedVoucher?.id, "detail-transfer"],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/vouchers/${selectedVoucher!.id}`);

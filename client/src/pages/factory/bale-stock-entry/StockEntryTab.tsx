@@ -94,7 +94,15 @@ export function StockEntryTab() {
         selectedLogoId,
       });
     }
-  }, [cart, productionPositionByProduct, selectedLocationId, entryDate, selectedCustomerId, selectedLogoId, scheduleCartSave]);
+  }, [
+    cart,
+    productionPositionByProduct,
+    selectedLocationId,
+    entryDate,
+    selectedCustomerId,
+    selectedLogoId,
+    scheduleCartSave,
+  ]);
 
   const { data: baleProducts, isLoading: _productsLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: ["/api/factory/bale-products"],
@@ -127,7 +135,7 @@ export function StockEntryTab() {
     enabled: cart.length > 0,
     staleTime: 30000,
   });
-  const { data: allCustomers = [] } = useQuery<any[]>({
+  const { data: allCustomers = [] } = useQuery({
     queryKey: ["/api/factory/customers"],
     queryFn: () => fetch("/api/factory/customers", { credentials: "include" }).then((r) => r.json()),
   });
@@ -146,12 +154,12 @@ export function StockEntryTab() {
 
   const filteredWorkers =
     workerCategoryFilter === "all"
-      ? (workers as any[]).filter((w) => w.active !== false)
+      ? workers.filter((w) => w.active !== false)
       : (() => {
           const cat = workerCategoryGroups.find((c) => String(c.id) === workerCategoryFilter);
-          if (!cat) return (workers as any[]).filter((w) => w.active !== false);
+          if (!cat) return workers.filter((w) => w.active !== false);
           const ids = Array.isArray(cat.workerIds) ? (cat.workerIds as number[]) : [];
-          return (workers as any[]).filter((w) => w.active !== false && ids.includes(w.id));
+          return workers.filter((w) => w.active !== false && ids.includes(w.id));
         })();
 
   // Keep attribution valid when the entry date, membership configuration, cart,

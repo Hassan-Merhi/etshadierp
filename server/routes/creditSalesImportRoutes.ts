@@ -266,7 +266,7 @@ export function registerCreditSalesImportRoutes(app: Express) {
       }
 
       let totalSales = 0;
-      let createdVoucher: any = null;
+      let createdVoucher = null;
 
       const operationKey = resolveFinancialOperationKey(req);
       const operation = await withDurableFinancialOperation(

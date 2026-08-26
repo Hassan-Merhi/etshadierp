@@ -1,19 +1,26 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { Account, Transaction } from "./accountTypes";
+
+export interface AccountStatementRow extends Transaction {
+  totalDebit: number;
+  totalCredit: number;
+  runningBalance: number;
+}
 
 export interface AccountTransactionRowsProps {
-  vouchersWithBalance: any[];
+  vouchersWithBalance: AccountStatementRow[];
   selectedVoucherIds: Set<number>;
   toggleSelectAll: () => void;
   toggleVoucherSelection: (id: number) => void;
-  handleOpenVoucher: (v: unknown) => void;
+  handleOpenVoucher: (v: AccountStatementRow) => void;
   formatAmount: (amt: number) => string;
   formatTransactionAmount?: (amt: number | string, currency: string) => string;
   hideBalances: boolean;
   appMode: string;
   openingBalance: number;
   closingBalance: number;
-  selectedAccount: any;
+  selectedAccount: Account;
   formatDisplayDate: (date: Date | string) => string;
 }
 
@@ -35,7 +42,7 @@ export function AccountTransactionRows({
   const colSpanMid = appMode === "factory" ? 3 : 2;
   const totalDebit = vouchersWithBalance.reduce((s, v) => s + (v.totalDebit || 0), 0);
   const totalCredit = vouchersWithBalance.reduce((s, v) => s + (v.totalCredit || 0), 0);
-  const isSupplier = selectedAccount?.type === "supplier";
+  const isSupplier = selectedAccount.type === "supplier";
 
   const balSide = (val: number) => (val >= 0 ? "Dr" : "Cr");
 
@@ -51,19 +58,31 @@ export function AccountTransactionRows({
                 data-testid="checkbox-select-all"
               />
             </TableHead>
-            <TableHead className="col-date w-[100px] py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</TableHead>
-            <TableHead className="col-particulars py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Particulars</TableHead>
+            <TableHead className="col-date w-[100px] py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Date
+            </TableHead>
+            <TableHead className="col-particulars py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Particulars
+            </TableHead>
             {appMode === "factory" && (
-              <TableHead className="py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Notes</TableHead>
+              <TableHead className="py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Notes
+              </TableHead>
             )}
             {!hideBalances && (
-              <TableHead className="col-amount text-right w-[120px] py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Debit</TableHead>
+              <TableHead className="col-amount text-right w-[120px] py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Debit
+              </TableHead>
             )}
             {!hideBalances && (
-              <TableHead className="col-amount text-right w-[120px] py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Credit</TableHead>
+              <TableHead className="col-amount text-right w-[120px] py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Credit
+              </TableHead>
             )}
             {!hideBalances && (
-              <TableHead className="col-balance text-right w-[130px] py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Balance</TableHead>
+              <TableHead className="col-balance text-right w-[130px] py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Balance
+              </TableHead>
             )}
           </TableRow>
         </TableHeader>
@@ -124,7 +143,9 @@ export function AccountTransactionRows({
               </TableCell>
               <TableCell className="py-3 max-w-[420px]">
                 <div className="text-sm font-medium text-foreground leading-snug truncate">
-                  {v.voucherDescription || v.narration || <span className="text-muted-foreground italic">No description</span>}
+                  {v.voucherDescription || v.narration || (
+                    <span className="text-muted-foreground italic">No description</span>
+                  )}
                 </div>
                 <div className="text-[11px] text-muted-foreground mt-0.5 truncate">{v.voucherType}</div>
               </TableCell>
@@ -164,7 +185,9 @@ export function AccountTransactionRows({
                   {v.runningBalance != null ? (
                     <>
                       {fmt(Math.abs(v.runningBalance))}
-                      <span className="ml-1 text-[10px] font-normal opacity-50">{v.runningBalance >= 0 ? "Dr" : "Cr"}</span>
+                      <span className="ml-1 text-[10px] font-normal opacity-50">
+                        {v.runningBalance >= 0 ? "Dr" : "Cr"}
+                      </span>
                     </>
                   ) : (
                     <span className="text-muted-foreground/40">—</span>

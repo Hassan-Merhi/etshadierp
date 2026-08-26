@@ -95,7 +95,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
     }
   }, [open, editingRole.id, editingRole, form, userId, companies]);
 
-  const { data: locations = [] } = useQuery<any[]>({
+  const { data: locations = [] } = useQuery({
     queryKey: ["/api/locations", { companyId: selectedCompanyId }],
     queryFn: async () => {
       if (!selectedCompanyId) return [];

@@ -130,7 +130,7 @@ export function useLocationInventoryQueries({
     enabled: !!closingInventoryUrl && !!companyId,
   });
 
-  const { data: allInventoryRaw, isLoading: allInventoryLoading } = useQuery<any>({
+  const { data: allInventoryRaw, isLoading: allInventoryLoading } = useQuery({
     queryKey: companyId ? ["/api/inventory", companyId] : [],
     queryFn: async () => {
       // Fetch the first page at the maximum allowed page size.
@@ -169,7 +169,7 @@ export function useLocationInventoryQueries({
   // queryFn always resolves to a flat array of inventory rows.
   const allInventoryData = Array.isArray(allInventoryRaw) ? allInventoryRaw : [];
 
-  const { data: allNegativeStock = [], isLoading: negativeStockLoading } = useQuery<any[]>({
+  const { data: allNegativeStock = [], isLoading: negativeStockLoading } = useQuery({
     queryKey: companyId ? ["/api/inventory/negative", companyId] : [],
     queryFn: async () => {
       const res = await fetch("/api/inventory/negative", { credentials: "include" });

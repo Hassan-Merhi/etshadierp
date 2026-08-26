@@ -72,10 +72,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const { selectedCompany } = useCompany();
   const vouchersBase = selectedCompany?.companyType === "properties" ? "/properties/vouchers" : "/vouchers";
   const { formatDisplayDate, formatDisplayTime } = useDateFormat();
-  const {
-    formatHistoricalBaseAmount: formatAmount,
-    formatTransactionAmount,
-  } = useCurrencyContext();
+  const { formatHistoricalBaseAmount: formatAmount, formatTransactionAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hiddenErpCosts = myErpPages?.hiddenErpCostFields ?? [];
@@ -92,14 +89,17 @@ export default function Daybook({ user }: { user?: any } = {}) {
     hasActiveFilters: hasActiveDaybookFilters,
   } = useDaybookFilterState(selectedCompany?.id);
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
-  const shiftDay = useCallback((delta: number) => {
-    const fmt = "yyyy-MM-dd";
-    setPeriodFilter((prev) => ({
-      fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), delta), fmt),
-      toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), delta), fmt),
-      preset: "custom",
-    }));
-  }, [setPeriodFilter]);
+  const shiftDay = useCallback(
+    (delta: number) => {
+      const fmt = "yyyy-MM-dd";
+      setPeriodFilter((prev) => ({
+        fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), delta), fmt),
+        toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), delta), fmt),
+        preset: "custom",
+      }));
+    },
+    [setPeriodFilter]
+  );
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -253,7 +253,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     isError: revisionsError,
     error: revisionsErrorDetail,
     refetch: retryVoucherRevisions,
-  } = useQuery<any[]>({
+  } = useQuery({
     queryKey:
       selectedVoucher && isStockTransferVoucher && viewDialogOpen
         ? companyDataKey(
@@ -444,14 +444,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     if (voucherToEdit && voucherEntries.length > 0 && !entriesLoading && !editFormInitialized) {
       editForm.reset({
         voucherType: voucherToEdit.voucherType as
-          | "Journal"
-          | "Payment"
-          | "Receipt"
-          | "Stock Transfer"
-          | "Sales"
-          | "Purchase"
-          | "Contra"
-          | undefined,
+          "Journal" | "Payment" | "Receipt" | "Stock Transfer" | "Sales" | "Purchase" | "Contra" | undefined,
         voucherDate: voucherToEdit.voucherDate,
         description: voucherToEdit.description || "",
         optional: voucherToEdit.optional,
@@ -789,7 +782,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
               expandedLoading={expandedLoading}
               expandedEntries={expandedEntries}
               formatAmount={formatAmount}
-            formatTransactionAmount={formatTransactionAmount}
+              formatTransactionAmount={formatTransactionAmount}
               formatDisplayDate={formatDisplayDate}
               formatDisplayTime={formatDisplayTime}
               handleView={handleView}

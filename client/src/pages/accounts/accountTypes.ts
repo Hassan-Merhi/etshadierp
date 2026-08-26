@@ -1,3 +1,7 @@
+import type { Dispatch, SetStateAction } from "react";
+import type { SubmitHandler, UseFormReturn } from "react-hook-form";
+import type { BankAccount, InsertBankAccount, LedgerAccount, UpdateLedgerAccount } from "@shared/schema";
+
 export interface Account {
   id: string;
   accountId: number;
@@ -67,88 +71,48 @@ export interface WaChat {
   type: string;
 }
 
+type BankFormValues = Omit<InsertBankAccount, "companyId">;
+type EditLedgerFormValues = Omit<UpdateLedgerAccount, "id" | "companyId">;
+
+interface PendingMutationState {
+  isPending?: boolean;
+}
+
+interface SaveWaRuleMutation extends PendingMutationState {
+  mutate: (rule: WaRule) => void;
+}
+
 export interface AccountDialogsProps {
-  bankToEdit: any | null;
-  setBankToEdit: (bank: null) => void;
-  bankForm: any;
-  onBankSubmit: (data: any) => void;
-  updateBankMutation: any;
-  deleteBankMutation: any;
+  bankToEdit: BankAccount | null;
+  setBankToEdit: Dispatch<SetStateAction<BankAccount | null>>;
+  bankForm: UseFormReturn<BankFormValues>;
+  onBankSubmit: SubmitHandler<BankFormValues>;
+  updateBankMutation: PendingMutationState;
+  deleteBankMutation: PendingMutationState;
   handleDeleteBankAccount: () => void;
-  accountToEdit: any | null;
-  setAccountToEdit: (acc: null) => void;
-  supplierToEdit: any | null;
-  setSupplierToEdit: (acc: null) => void;
-  customerToEdit: any | null;
-  setCustomerToEdit: (acc: null) => void;
-  employeeToEdit: any | null;
-  setEmployeeToEdit: (acc: null) => void;
-  editForm: any;
-  onEditSubmit: (data: any) => void;
-  updateLedgerMutation: any;
+  accountToEdit: LedgerAccount | null;
+  setAccountToEdit: Dispatch<SetStateAction<LedgerAccount | null>>;
+  supplierToEdit: Account | null;
+  setSupplierToEdit: Dispatch<SetStateAction<Account | null>>;
+  customerToEdit: Account | null;
+  setCustomerToEdit: Dispatch<SetStateAction<Account | null>>;
+  employeeToEdit: Account | null;
+  setEmployeeToEdit: Dispatch<SetStateAction<Account | null>>;
+  editForm: UseFormReturn<EditLedgerFormValues>;
+  onEditSubmit: SubmitHandler<EditLedgerFormValues>;
+  updateLedgerMutation: PendingMutationState;
   handleDeleteAccount: () => void;
   pendingDelete: (() => void) | null;
-  setPendingDelete: (fn: (() => void) | null) => void;
+  setPendingDelete: Dispatch<SetStateAction<(() => void) | null>>;
   waRuleDialogOpen: boolean;
-  setWaRuleDialogOpen: (open: boolean) => void;
+  setWaRuleDialogOpen: Dispatch<SetStateAction<boolean>>;
   waChatSearch: string;
-  setWaChatSearch: (search: string) => void;
+  setWaChatSearch: Dispatch<SetStateAction<string>>;
   waRuleDraft: WaRule;
-  setWaRuleDraft: (rule: WaRule) => void;
+  setWaRuleDraft: Dispatch<SetStateAction<WaRule>>;
   filteredWaChats: WaChat[];
-  saveWaRuleMutation: any;
+  saveWaRuleMutation: SaveWaRuleMutation;
   waChatsLoading: boolean;
-}
-
-export interface AccountStatementViewProps {
-  selectedAccount: Account;
-  onClose: () => void;
-  periodFilter: any;
-  setPeriodFilter: (filter: any) => void;
-  vouchersWithBalance: any[];
-  closingBalance: number;
-  openingBalance: number;
-  transactionsLoading: boolean;
-  transactionError?: string | null;
-  selectedVoucherIds: Set<number>;
-  toggleSelectAll: () => void;
-  setShowBulkDeleteConfirm: (show: boolean) => void;
-  filterCurrency: string;
-  setFilterCurrency: (updater: any) => void;
-  showDeletedVouchers: boolean;
-  setShowDeletedVouchers: (updater: (p: boolean) => boolean) => void;
-  currentUser: any;
-  formatAmount: (amt: number) => string;
-  hideBalances: boolean;
-  printRef: React.RefObject<HTMLDivElement | null>;
-  appMode: string;
-  formatDisplayDate: (date: Date | string) => string;
-  toggleVoucherSelection: (id: number) => void;
-  handleOpenVoucher: (v: any) => void;
-  waRule: WaRule | null;
-  openWaRuleDialog: () => void;
-  sendWaStatementMutation: any;
-  isMultiCurrency: boolean;
-  ledgerCurrencyBalances?: any[];
-  isBrokerSupplier: boolean;
-  brokerStatementData: any;
-  factorySupplierStatement: any;
-  factoryStatementLoading: boolean;
-  brokerStatementLoading: boolean;
-  handlePrint: () => void;
-  exportLang: "en" | "fr" | "ar";
-  setExportLang: (lang: "en" | "fr" | "ar") => void;
-  exportLabels: any;
-}
-
-export interface AccountTableProps {
-  filteredAccounts: any[];
-  expandedParents: Set<string>;
-  toggleParent: (id: string) => void;
-  handleAccountChange: (id: string) => void;
-  hideBalances: boolean;
-  formatAmount: (amt: number) => string;
-  onEdit?: (account: any) => void;
 }
 
 export const exportLabels: Record<

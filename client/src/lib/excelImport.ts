@@ -1,6 +1,95 @@
 import type ExcelJS from "exceljs";
 import type { Sheet as FortuneSheet } from "@fortune-sheet/core";
 
+type ArgbColor = { argb?: string };
+type ExcelConditionalStyle = {
+  fill?: { fgColor?: ArgbColor };
+  font?: { color?: ArgbColor; bold?: boolean; italic?: boolean };
+};
+type ExcelConditionalRule = {
+  type?: string;
+  priority?: number;
+  operator?: string;
+  formulae?: readonly (string | number)[];
+  style?: ExcelConditionalStyle;
+  cfvo?: readonly object[];
+  color?: ArgbColor | readonly ArgbColor[];
+  top?: boolean;
+  percent?: boolean;
+  rank?: number;
+};
+type ExcelConditionalFormatting = { ref?: string; rules?: ExcelConditionalRule[] };
+type WorksheetWithConditionalFormatting = ExcelJS.Worksheet & {
+  conditionalFormattings?: ExcelConditionalFormatting[];
+};
+
+type FortuneConditionalStyle = { bg?: string; fc?: string; bl?: 1; it?: 1 };
+type FortuneCondition = {
+  ref?: string;
+  type?: string;
+  priority: number;
+  operator?: string;
+  formulae?: readonly (string | number)[];
+  format?: FortuneConditionalStyle;
+  cfvo?: readonly object[];
+  color?: string | string[];
+  top?: boolean;
+  percent?: boolean;
+  rank?: number;
+};
+type AutoFilterSelection = { row: [number, number]; column: [number, number] };
+type ExcelAutoFilter =
+  | string
+  | {
+      from?: { row?: number; col?: number };
+      to?: { row?: number; col?: number };
+      ref?: string;
+    };
+
+type FortuneCellFormat = { fa: string; t: string };
+type FortuneBorderSegment = { style: number; color: string };
+type FortuneCellValue = {
+  f?: string;
+  v?: ExcelJS.CellValue | null;
+  m?: string;
+  ct?: FortuneCellFormat;
+  bl?: 1;
+  it?: 1;
+  un?: 1;
+  cl?: 1;
+  fs?: number;
+  fc?: string;
+  ff?: string;
+  bg?: string;
+  ht?: number;
+  vt?: number;
+  tb?: number;
+  b?: Record<string, FortuneBorderSegment>;
+};
+type FortuneCellData = { r: number; c: number; v: FortuneCellValue };
+type FortuneMerge = { r: number; c: number; rs: number; cs: number };
+type FortuneConfig = {
+  merge?: Record<string, FortuneMerge>;
+  columnlen?: Record<string, number>;
+  colhidden?: Record<string, number>;
+  rowlen?: Record<string, number>;
+  rowhidden?: Record<string, number>;
+};
+type FortuneSheetDraft = {
+  id: string;
+  name: string;
+  status: number;
+  order: number;
+  celldata: FortuneCellData[];
+  row: number;
+  column: number;
+  config: FortuneConfig;
+  filter_select?: AutoFilterSelection;
+  conditions?: FortuneCondition[];
+};
+type ExcelBorderSide = { style?: string; color?: ArgbColor };
+type ExcelBorder = Partial<Record<"left" | "right" | "top" | "bottom", ExcelBorderSide>>;
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function argbToHex(argb?: string): string | undefined {
@@ -47,9 +136,9 @@ const V_ALIGN: Record<string, number> = {
 
 // ─── Fortune Sheet conditional format helpers ────────────────────────────────
 
-function cfStyleToFortune(style: any): any {
+function cfStyleToFortune(style?: ExcelConditionalStyle): FortuneConditionalStyle {
   if (!style) return {};
-  const result: any = {};
+  const result: FortuneConditionalStyle = {};
   if (style.fill?.fgColor?.argb) result.bg = argbToHex(style.fill.fgColor.argb);
   if (style.font?.color?.argb) result.fc = argbToHex(style.font.color.argb);
   if (style.font?.bold) result.bl = 1;
@@ -57,12 +146,12 @@ function cfStyleToFortune(style: any): any {
   return result;
 }
 
-function buildConditions(ws: any): any[] {
-  const conditions: any[] = [];
+function buildConditions(ws: ExcelJS.Worksheet): FortuneCondition[] {
+  const conditions: FortuneCondition[] = [];
   try {
-    const cfs: any[] = ws.conditionalFormattings || [];
+    const cfs = (ws as WorksheetWithConditionalFormatting).conditionalFormattings ?? [];
     for (const cf of cfs) {
-      for (const rule of cf.rules || []) {
+      for (const rule of cf.rules ?? []) {
         try {
           const base = {
             ref: cf.ref,
@@ -77,16 +166,18 @@ function buildConditions(ws: any): any[] {
               format: cfStyleToFortune(rule.style),
             });
           } else if (rule.type === "colorScale") {
+            const colors = Array.isArray(rule.color) ? rule.color : [];
             conditions.push({
               ...base,
               cfvo: rule.cfvo,
-              color: (rule.color || []).map((c: any) => argbToHex(c?.argb) ?? "#ffffff"),
+              color: colors.map((color) => argbToHex(color?.argb) ?? "#ffffff"),
             });
           } else if (rule.type === "dataBar") {
+            const color = !Array.isArray(rule.color) ? (rule.color as ArgbColor | undefined) : undefined;
             conditions.push({
               ...base,
               cfvo: rule.cfvo,
-              color: argbToHex(rule.color?.argb),
+              color: argbToHex(color?.argb),
             });
           } else if (rule.type === "formula") {
             conditions.push({
@@ -117,7 +208,7 @@ function buildConditions(ws: any): any[] {
 
 // ─── AutoFilter decoder ──────────────────────────────────────────────────────
 
-function decodeAutoFilter(af: any): { row: [number, number]; column: [number, number] } | null {
+function decodeAutoFilter(af: ExcelAutoFilter): AutoFilterSelection | null {
   try {
     let refStr: string | undefined;
     if (typeof af === "string") {
@@ -163,8 +254,8 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
 
   wb.eachSheet((ws, sheetId) => {
     const order = sheetId - 1;
-    const celldata: any[] = [];
-    const config: any = {};
+    const celldata: FortuneCellData[] = [];
+    const config: FortuneConfig = {};
 
     // ── Cells ────────────────────────────────────────────────────────────
     ws.eachRow({ includeEmpty: false }, (row) => {
@@ -175,18 +266,18 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
         const r = (cell.row as unknown as number) - 1;
         const c = (cell.col as unknown as number) - 1;
 
-        const v: any = {};
+        const v: FortuneCellValue = {};
 
         // Value / formula
         const val = cell.value;
         if (val !== null && val !== undefined) {
           if (typeof val === "object" && "formula" in (val as object)) {
-            const fv = val as { formula: string; result?: unknown };
+            const fv = val as { formula: string; result?: ExcelJS.CellValue };
             v.f = fv.formula;
             v.v = fv.result ?? null;
             v.m = fv.result !== undefined && fv.result !== null ? String(fv.result) : "";
           } else if (typeof val === "object" && "sharedFormula" in (val as object)) {
-            const sfv = val as { sharedFormula: string; result?: unknown };
+            const sfv = val as { sharedFormula: string; result?: ExcelJS.CellValue };
             v.f = sfv.sharedFormula;
             v.v = sfv.result ?? null;
             v.m = sfv.result !== undefined && sfv.result !== null ? String(sfv.result) : "";
@@ -237,20 +328,20 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
         }
 
         // Borders
-        const border = cell.border as any;
+        const border = cell.border as ExcelBorder;
         if (border) {
-          const b: any = {};
+          const b: Record<string, FortuneBorderSegment> = {};
           for (const [side, fsKey] of [
             ["left", "l"],
             ["right", "r"],
             ["top", "t"],
             ["bottom", "b"],
-          ] as [string, string][]) {
+          ] as [keyof ExcelBorder, string][]) {
             const bd = border[side];
             if (bd?.style && bd.style in BORDER_STYLE_MAP) {
               b[fsKey] = {
                 style: BORDER_STYLE_MAP[bd.style],
-                color: argbToHex((bd.color as { argb: string | undefined })?.argb) ?? "#000000",
+                color: argbToHex(bd.color?.argb) ?? "#000000",
               };
             }
           }
@@ -305,15 +396,15 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
       if (row.height && (row.height as number) > 0) {
         rowlen[ri] = Math.round((row.height as number) * 1.333);
       }
-      if ((row as { hidden: unknown }).hidden) rowhidden[ri] = 0;
+      if ((row as { hidden: boolean | undefined }).hidden) rowhidden[ri] = 0;
     });
 
     if (Object.keys(rowlen).length > 0) config.rowlen = rowlen;
     if (Object.keys(rowhidden).length > 0) config.rowhidden = rowhidden;
 
     // ── Auto filter ──────────────────────────────────────────────────────
-    let filter_select = null;
-    const af = (ws as { autoFilter: unknown }).autoFilter;
+    let filter_select: AutoFilterSelection | null = null;
+    const af = (ws as { autoFilter: ExcelAutoFilter | undefined }).autoFilter;
     if (af) {
       filter_select = decodeAutoFilter(af);
     }
@@ -330,7 +421,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
     }
     if (maxColIdx > maxC) maxC = maxColIdx;
 
-    const sheet: any = {
+    const sheet: FortuneSheetDraft = {
       id: String(order + 1),
       name: ws.name,
       status: order === 0 ? 1 : 0,

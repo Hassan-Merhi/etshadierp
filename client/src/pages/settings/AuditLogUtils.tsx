@@ -121,7 +121,7 @@ export function normalizeAuditChanges(source: any): Record<string, AuditChangePa
   return normalized;
 }
 
-function changeValue(changes: Record<string, AuditChangePair>, key: string): any {
+function changeValue(changes: Record<string, AuditChangePair>, key: string) {
   const pair = changes[key];
   if (!pair) return undefined;
   return pair.new !== undefined ? pair.new : pair.old;
