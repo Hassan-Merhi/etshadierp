@@ -7,7 +7,7 @@ import {
   type AuthoritativeStockSnapshot,
 } from "./authoritativeStockPatch";
 
-interface StockRow {
+interface StockRow extends Record<string, unknown> {
   productId: number | null;
   articleCode: string | null;
   baleCount: number | string | null;
