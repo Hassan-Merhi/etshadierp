@@ -22,9 +22,12 @@ describe("company-scoped user administration policy", () => {
   });
 
   it("filters a user's role response to the active company", () => {
-    expect(filterRolesForCompany(rows.filter((row) => row.userId === "shared"), 1)).toEqual([
-      { userId: "shared", companyId: 1, role: "Manager" },
-    ]);
+    expect(
+      filterRolesForCompany(
+        rows.filter((row) => row.userId === "shared"),
+        1
+      )
+    ).toEqual([{ userId: "shared", companyId: 1, role: "Manager" }]);
   });
 
   it("denies targets that are not assigned to the active company", () => {

@@ -10,10 +10,7 @@ import { shouldDeliverBroadcast } from "./lib/broadcastScope";
 let wss: WebSocketServer | null = null;
 let resolveSession: SessionResolver | null = null;
 
-type SessionResolution =
-  | { status: "resolved"; companyId: number }
-  | { status: "missing" }
-  | { status: "unresolved" };
+type SessionResolution = { status: "resolved"; companyId: number } | { status: "missing" } | { status: "unresolved" };
 
 /** Runs the app's session middleware over a bare upgrade request. */
 type SessionResolver = (request: IncomingMessage) => Promise<SessionResolution>;
@@ -79,7 +76,7 @@ function sessionCompanyResolver(sessionMiddleware: RequestHandler): SessionResol
               return;
             }
             finish({ status: "missing" });
-          },
+          }
         );
       } catch (error) {
         logger.warn("[WS] Could not resolve the session for a socket.", { error });
@@ -140,7 +137,7 @@ export function setupWS(server: Server, sessionMiddleware?: RequestHandler): voi
               buildVersion: process.env.BUILD_VERSION || process.env.RENDER_GIT_COMMIT?.substring(0, 8) || "dev",
               source: "websocket",
             },
-            () => undefined,
+            () => undefined
           );
         });
 
@@ -154,7 +151,7 @@ export function setupWS(server: Server, sessionMiddleware?: RequestHandler): voi
           clearInterval(pingInterval);
           socketCompanies.delete(ws);
         });
-      },
+      }
     );
   });
 }
@@ -195,7 +192,7 @@ export function broadcast(message: object, options: BroadcastOptions = {}): void
         delivered += 1;
       });
       recordBroadcast(delivered, skipped);
-    },
+    }
   );
 }
 

@@ -80,7 +80,7 @@ describe("credential version lifecycle", () => {
     await revokeUserCompanySessions({ query }, "user-6", 42);
     expect(query).toHaveBeenCalledWith(
       `DELETE FROM session WHERE sess->>'userId' = $1 AND sess->>'currentCompanyId' = $2`,
-      ["user-6", "42"],
+      ["user-6", "42"]
     );
   });
 
