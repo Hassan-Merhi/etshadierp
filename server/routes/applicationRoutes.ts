@@ -95,9 +95,14 @@ import { registerBandwidthPhase3FactoryReads } from "./performance/bandwidthPhas
 function registerWriteInvalidationSignal(app: Express): void {
   app.use((req, res, next) => {
     if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
+      // Read the company off the session before the handler runs: a write that
+      // changes the session (set-company, logout) would otherwise be attributed
+      // to whichever company the session ended up in.
       const companyId = Number(req.session?.currentCompanyId) || null;
       res.on("finish", () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
+          // A write only concerns the company it happened in. Clients elsewhere
+          // used to refetch everything on screen for it.
           broadcast({ type: "invalidate" }, { companyId });
         }
       });
@@ -110,8 +115,12 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   installRemoteSupportSessionStopAudit();
   registerWriteInvalidationSignal(app);
   registerPermissionBoundaryRoutes(app);
+  // Register the faster WhatsApp file-delivery handlers after the normal module
+  // boundaries but before the legacy account/factory/POS route implementations.
   registerWhatsAppFastSendRoutes(app);
 
+  // The Bale Ledger aggregation accelerator must precede the legacy Factory
+  // registrar. Other Phase 3 fixes live in their owned route modules directly.
   registerBandwidthPhase3FactoryReads(app);
   registerFactoryRoutes(app, requireAuth, db);
   registerFactoryWorkerRoutes(app, requireAuth, db);
@@ -174,6 +183,9 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerImportCycleRoutes(app);
   registerDebugRoutes(app);
   registerReportsRoutes(app);
+  // Must precede registerBaleRoutes: the legacy /api/barcode/:code handler is
+  // retained as a PNG fallback, while browser image requests are intercepted
+  // here and served as compact immutable SVG when supported.
   registerBarcodeImageBandwidthMiddleware(app);
   registerBaleRoutes(app);
   registerAdminRoutes(app);
