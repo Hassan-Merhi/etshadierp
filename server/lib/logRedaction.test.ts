@@ -21,4 +21,14 @@ describe("log redaction", () => {
     expect(redactLogString("+243900005252", "customerPhone")).toBe("contact …5252");
     expect(redactLogString("adam@example.com", "email")).toBe("a***@example.com");
   });
+
+  it("redacts inline CSRF token fragments from legacy warning strings", () => {
+    const redacted = redactLogString(
+      "CSRF: BLOCKED POST /api/example expected=abcdef12… got=1234abcd…",
+    );
+    expect(redacted).toContain("expected=[REDACTED]");
+    expect(redacted).toContain("got=[REDACTED]");
+    expect(redacted).not.toContain("abcdef12");
+    expect(redacted).not.toContain("1234abcd");
+  });
 });
