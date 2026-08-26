@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { decideSessionSecurity } from "../server/services/security/sessionSecurityPolicy";
 import { hydrateActiveCredentialVersion, revokeUserSessions } from "../server/services/security/credentialVersionService";
+import { advanceCurrentSessionAfterPasswordChange } from "../server/services/security/userPasswordChangeService";
 
 function selectDb(version: number) {
   const execute = vi.fn(async () => undefined);
@@ -58,18 +59,31 @@ describe("credential version lifecycle", () => {
   it("revokes every session for a rotated user", async () => {
     const query = vi.fn(async () => ({ rowCount: 2 }));
     await revokeUserSessions({ query }, "user-4");
-    expect(query).toHaveBeenCalledWith(
-      `DELETE FROM session WHERE sess->>'userId' = $1`,
-      ["user-4"]
-    );
+    expect(query).toHaveBeenCalledWith(`DELETE FROM session WHERE sess->>'userId' = $1`, ["user-4"]);
   });
 
   it("can preserve the current session while revoking the others", async () => {
     const query = vi.fn(async () => ({ rowCount: 1 }));
     await revokeUserSessions({ query }, "user-5", "sid-current");
-    expect(query).toHaveBeenCalledWith(
-      `DELETE FROM session WHERE sess->>'userId' = $1 AND sid <> $2`,
-      ["user-5", "sid-current"]
-    );
+    expect(query).toHaveBeenCalledWith(`DELETE FROM session WHERE sess->>'userId' = $1 AND sid <> $2`, [
+      "user-5",
+      "sid-current",
+    ]);
+  });
+
+  it("advances the verified current session after a self-service password change", () => {
+    const session: any = {
+      credentialVersion: 2,
+      activeCredentialVersion: 2,
+      credentialVersionCheckedAt: 500,
+      passwordConfirmedAt: 400,
+    };
+
+    advanceCurrentSessionAfterPasswordChange(session, 3, 1000);
+
+    expect(session.credentialVersion).toBe(3);
+    expect(session.activeCredentialVersion).toBe(3);
+    expect(session.credentialVersionCheckedAt).toBe(1000);
+    expect(session.passwordConfirmedAt).toBe(1000);
   });
 });
