@@ -65,13 +65,39 @@ export async function ensureCompanyScopeRlsReadiness() {
 
     const functionCheck = await client.query(`
       SELECT
+        to_regprocedure('erp_company_scope_maintenance_enabled()') IS NOT NULL AS maintenance_function,
         to_regprocedure('erp_current_company_id()') IS NOT NULL AS current_company_function,
+        to_regprocedure('erp_authorized_company_ids()') IS NOT NULL AS authorized_companies_function,
         to_regprocedure('erp_company_scope_matches(integer)') IS NOT NULL AS scope_match_function
     `);
     const functionState = functionCheck.rows[0] || {};
-    if (!functionState.current_company_function || !functionState.scope_match_function) {
+    if (
+      !functionState.maintenance_function ||
+      !functionState.current_company_function ||
+      !functionState.authorized_companies_function ||
+      !functionState.scope_match_function
+    ) {
       throw new Error("Company-scope RLS helper functions were not installed.");
     }
+
+    // Missing tenant scope must be an error, not the former all-company
+    // compatibility state. Use a nested exception block so the expected 22023
+    // does not poison the surrounding startup transaction.
+    await client.query(`
+      DO $fail_closed_probe$
+      BEGIN
+        PERFORM set_config('app.company_scope_maintenance', 'off', true);
+        PERFORM set_config('app.current_company_id', '', true);
+        PERFORM set_config('app.authorized_company_ids', '', true);
+        BEGIN
+          PERFORM erp_current_company_id();
+        EXCEPTION WHEN SQLSTATE '22023' THEN
+          RETURN;
+        END;
+        RAISE EXCEPTION 'Company-scope RLS did not fail closed without a tenant identity';
+      END
+      $fail_closed_probe$;
+    `);
 
     const relationCheck = await client.query(
       `
@@ -122,7 +148,7 @@ export async function ensureCompanyScopeRlsReadiness() {
     }
 
     await client.query("COMMIT");
-    log("INFO", "Company-scope RLS readiness verified", {
+    log("INFO", "Company-scope RLS fail-closed readiness verified", {
       tablesPresent: existingTables.length,
       policiesPresent: policyCheck.rows.length,
       forcedTables: existingTables.length,
