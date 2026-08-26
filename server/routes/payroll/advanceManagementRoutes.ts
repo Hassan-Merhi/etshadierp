@@ -651,7 +651,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
           .where(and(eq(factoryWorkerAdvances.companyId, companyId), inArray(factoryWorkerAdvances.id, ids)));
 
         // Load worker names for narration
-        const workerIds = [...new Set(advanceRows.map((a: any) => a.workerId))];
+        const workerIds = [...new Set(advanceRows.map((a) => a.workerId))];
         const workerRows =
           workerIds.length > 0
             ? await tx
@@ -659,7 +659,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
                 .from(factoryWorkers)
                 .where(inArray(factoryWorkers.id, workerIds as number[]))
             : [];
-        const workerMap = new Map<number, string>(workerRows.map((w: any) => [w.id, w.fullName]));
+        const workerMap = new Map<number, string>(workerRows.map((w) => [w.id, w.fullName]));
 
         // Find or create the "Factory Worker Advances" asset ledger account
         let [advancesAccount] = await tx

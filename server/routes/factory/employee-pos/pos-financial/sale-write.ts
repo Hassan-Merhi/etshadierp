@@ -172,7 +172,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
                   `INSUFFICIENT_BALE_STOCK: requested ${qty} bale(s) of "${item.productName || item.articleCode || item.productId}" at this location, only ${availableBales.length} available`
                 );
               }
-              const baleIds = availableBales.map((b: any) => b.id);
+              const baleIds = availableBales.map((b) => b.id);
               await tx
                 .update(factoryBales)
                 .set({ status: "SOLD", updatedAt: new Date() })
