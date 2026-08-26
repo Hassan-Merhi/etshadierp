@@ -8,9 +8,7 @@ describe("POS stock transfer revision access", () => {
       "utf8"
     );
 
-    const routeStart = compatibilityRoute.indexOf(
-      'app.post(\n    "/api/stock-transfers/:transferId/revisions"'
-    );
+    const routeStart = compatibilityRoute.indexOf('app.post(\n    "/api/stock-transfers/:transferId/revisions"');
     expect(routeStart).toBeGreaterThanOrEqual(0);
 
     const routeRegistration = compatibilityRoute.slice(routeStart);
@@ -19,16 +17,11 @@ describe("POS stock transfer revision access", () => {
 
     expect(bypassIndex).toBeGreaterThanOrEqual(0);
     expect(requireNonPOSIndex).toBeGreaterThan(bypassIndex);
-    expect(compatibilityRoute).toContain(
-      'if (req.body?.optional === true) return next("route");'
-    );
+    expect(compatibilityRoute).toContain('if (req.body?.optional === true) return next("route");');
   });
 
   it("keeps POS pending revisions on the canonical location-scoped lifecycle", () => {
-    const canonicalRoute = readFileSync(
-      "server/routes/vouchers/immutableStockTransferRevisionRoutes.ts",
-      "utf8"
-    );
+    const canonicalRoute = readFileSync("server/routes/vouchers/immutableStockTransferRevisionRoutes.ts", "utf8");
 
     expect(canonicalRoute).toContain('if (role === "POS" && parsed.optional !== true)');
     expect(canonicalRoute).toContain("sourceLocationIdLimit: assignedLocationId");
