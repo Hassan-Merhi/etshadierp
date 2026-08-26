@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildArticleCodeStockCountRecord,
   buildAuthoritativeStockSnapshot,
   patchInventoryStockRows,
   patchVerificationSummaryStock,
@@ -108,6 +109,21 @@ describe("authoritative factory stock parity", () => {
     expect(patched.comparison[0].stockTotalWeight).toBeCloseTo(183.5, 6);
     expect(patched.comparison[1].stockQty).toBe(9);
     expect(patched.comparison[1].stockTotalWeight).toBeCloseTo(1459.35, 6);
+  });
+
+  it("feeds the loading scan Stock column from the same stock-in-hand snapshot", () => {
+    const counts = buildArticleCodeStockCountRecord(
+      ["HMD16007", "HMD16008", "HMD16012", "HMD16013", "HMD16020"],
+      snapshot
+    );
+
+    expect(counts).toEqual({
+      HMD16007: 2,
+      HMD16008: 1,
+      HMD16012: 5,
+      HMD16013: 9,
+      HMD16020: 0,
+    });
   });
 
   it("falls back to article code when a product id is unavailable", () => {
