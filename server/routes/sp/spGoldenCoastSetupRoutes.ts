@@ -6,6 +6,11 @@ import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import {
+  privilegedMutationRateLimit,
+  privilegedReadRateLimit,
+  privilegedRequestBudget,
+} from "../../middleware/privilegedEndpointSecurity";
+import {
   GOLDEN_COAST_PHASE2_LOOKUP_SUBTYPES,
   GoldenCoastPhase2SetupError,
   type GoldenCoastLedgerRow,
@@ -23,6 +28,12 @@ import { requireSpCompany } from "./spHelpers";
 // are scoped to the currently selected supplier_partner company.
 
 type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+// Provisioning runs a multi-table transaction over the company chart of
+// accounts, and the status read scans every ledger account in the company.
+// Both are rate limited so an authenticated caller cannot use them to hammer
+// the database, matching the Golden Coast Phase 1 accounting endpoints.
+const goldenCoastRequestBudget = privilegedRequestBudget({ maxBodyBytes: 16 * 1024, maxCollectionItems: 25 });
 
 /**
  * Loads every ledger account in this company that Phase 2 may resolve a role
@@ -255,10 +266,17 @@ async function handleGoldenCoastSetupStatus(req: Request, res: Response): Promis
 }
 
 export function registerSpGoldenCoastSetupRoutes(app: Express): void {
-  app.post("/api/sp/setup/golden-coast", requireAuth, requireRole("Admin"), (req, res) => {
-    void handleGoldenCoastSetup(req, res);
-  });
-  app.get("/api/sp/setup/golden-coast/status", requireAuth, (req, res) => {
+  app.post(
+    "/api/sp/setup/golden-coast",
+    privilegedMutationRateLimit,
+    goldenCoastRequestBudget,
+    requireAuth,
+    requireRole("Admin"),
+    (req, res) => {
+      void handleGoldenCoastSetup(req, res);
+    }
+  );
+  app.get("/api/sp/setup/golden-coast/status", privilegedReadRateLimit, requireAuth, (req, res) => {
     void handleGoldenCoastSetupStatus(req, res);
   });
 }

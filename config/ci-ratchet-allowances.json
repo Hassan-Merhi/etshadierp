@@ -15,8 +15,8 @@
     "GET /api/golden-coast/accounting/phase1/accounts [<anonymous> > requireAuth > requireNonPOS > <anonymous>]",
     "POST /api/golden-coast/accounting/phase1/preview [<anonymous> > <anonymous> > requireAuth > requireNonPOS > <anonymous>]",
     "POST /api/golden-coast/accounting/phase1/post [<anonymous> > <anonymous> > requireAuth > requireNonPOS > <anonymous>]",
-    "POST /api/sp/setup/golden-coast [requireAuth > <anonymous> > <anonymous>]",
-    "GET /api/sp/setup/golden-coast/status [requireAuth > <anonymous>]"
+    "POST /api/sp/setup/golden-coast [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/sp/setup/golden-coast/status [<anonymous> > requireAuth > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/v5/stock-allocation [<anonymous>]",

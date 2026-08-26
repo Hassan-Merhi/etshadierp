@@ -13,8 +13,17 @@ describe("Golden Coast Phase 2 setup route surface", () => {
   });
 
   it("restricts provisioning to authenticated Admins on a supplier_partner company", () => {
-    expect(routeSource).toContain('requireAuth, requireRole("Admin")');
+    expect(routeSource).toContain("requireAuth");
+    expect(routeSource).toContain('requireRole("Admin")');
     expect(routeSource).toContain("requireSpCompany(req, res)");
+  });
+
+  it("rate limits both endpoints and caps the provisioning request body", () => {
+    // Provisioning runs a multi-table transaction and the status read scans the
+    // company chart of accounts, so neither may be called without a limiter.
+    expect(routeSource).toContain("privilegedMutationRateLimit");
+    expect(routeSource).toContain("privilegedReadRateLimit");
+    expect(routeSource).toContain("goldenCoastRequestBudget");
   });
 
   it("scopes every ledger read and write to the selected company", () => {
