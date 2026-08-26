@@ -27,7 +27,9 @@ function mergeAggregate(
   };
 }
 
-export function buildAuthoritativeStockSnapshot(rows: AuthoritativeStockAggregate[]): AuthoritativeStockSnapshot {
+export function buildAuthoritativeStockSnapshot(
+  rows: AuthoritativeStockAggregate[]
+): AuthoritativeStockSnapshot {
   const byProductId = new Map<number, AuthoritativeStockAggregate>();
   const byArticleCode = new Map<string, AuthoritativeStockAggregate>();
 
