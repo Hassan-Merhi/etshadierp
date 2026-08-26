@@ -82,9 +82,6 @@ jobs:
 
             for file in "${changed_files[@]}"; do
               case "$file" in
-                .github/workflows/ci.yml)
-                  enable_all
-                  ;;
                 *.md|docs/*|.github/*.md)
                   ;;
                 client/*|public/*)
@@ -120,10 +117,13 @@ jobs:
                   build=true
                   backend=true
                   ;;
-                package.json|package-lock.json|npm-shrinkwrap.json|.node-version|.nvmrc|tsconfig*.json|vite.config.*|vitest.config.*|eslint.config.*|drizzle.config.*)
+                package.json|package-lock.json|npm-shrinkwrap.json|.*-version|.nvmrc|tsconfig*.json|vite.config.*|vitest.config.*|eslint.config.*|drizzle.config.*)
                   enable_all
                   ;;
                 .github/*)
+                  if [[ "$file" == ".github/workflows/ci.yml" ]]; then
+                    enable_all
+                  fi
                   ;;
                 *)
                   echo "Unclassified path '${file}': running all application lanes."
@@ -433,8 +433,7 @@ jobs:
           set -o pipefail
           node dist/index.js > "$RUNNER_TEMP/startup-migrations-ci.txt" 2>&1 &
           app_pid=$!
-          cleanup() { kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true; }
-          trap cleanup EXIT
+          trap 'kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true' EXIT
           for _attempt in $(seq 1 180); do
             if curl --fail --silent --show-error "http://127.0.0.1:${PORT}/api/health/db" > "$RUNNER_TEMP/health-db-ci.json"; then cat "$RUNNER_TEMP/health-db-ci.json"; exit 0; fi
             if ! kill -0 "$app_pid" 2>/dev/null; then echo "Application exited before startup migrations became ready."; cat "$RUNNER_TEMP/startup-migrations-ci.txt"; exit 1; fi
@@ -461,8 +460,7 @@ jobs:
           HEALTH_REPORT="$RUNNER_TEMP/health-db-ci.json" HEALTH_LABEL='first boot, fresh schema' npm run verify:startup-migrations
           node dist/index.js > "$RUNNER_TEMP/startup-migrations-verify.txt" 2>&1 &
           app_pid=$!
-          cleanup() { kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true; }
-          trap cleanup EXIT
+          trap 'kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true' EXIT
           for _attempt in $(seq 1 180); do
             if curl --fail --silent "http://127.0.0.1:${PORT}/api/health/db" | grep -q '"status":"ok"'; then break; fi
             if ! kill -0 "$app_pid" 2>/dev/null; then echo "Application exited before the migration report was readable."; cat "$RUNNER_TEMP/startup-migrations-verify.txt"; exit 1; fi
@@ -482,7 +480,7 @@ jobs:
         if: always() && steps.runtime_migrations.outcome == 'success'
         run: |
           set -o pipefail
-          npm run test:backend:coverage 2>&1 | tee backend-coverage-errors-ci.txt
+          npm run test:backend:coverage -- --maxWorkers=2 2>&1 | tee backend-coverage-errors-ci.txt
       - name: Upload backend coverage failure log
         if: always() && steps.backend_coverage.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
