@@ -21,6 +21,9 @@ const commands = [
       "tests/protected-asset-download-adapter.test.ts",
       "tests/security-audit-runtime.test.ts",
       "tests/security-headers-csp.test.ts",
+      "tests/browser-mutation-security-boundary.test.ts",
+      "tests/ws-broadcast-company-scope.test.ts",
+      "server/lib/logRedaction.test.ts",
       "tests/transaction-company-scope-request-binding.test.ts",
       "tests/phase4-tenant-surface-regression.test.ts",
       "tests/database-scope-pool-binding.test.ts",
@@ -51,4 +54,4 @@ for (const [command, args] of commands) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-console.log("\nProgram 6 + Phase 3 RLS focused security checks passed.");
+console.log("\nProgram 6 + Phase 14 final security re-audit checks passed.");
