@@ -34,6 +34,7 @@ jobs:
     name: Reconcile repair issue for main workflow
     if: >-
       github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
       (github.event.workflow_run.conclusion == 'failure' ||
        github.event.workflow_run.conclusion == 'success')
@@ -70,11 +71,15 @@ jobs:
           canonical_title="[AI Repair] ${REPAIR_WORKFLOW} failing on main"
           legacy_prefix="[AI Repair] ${REPAIR_WORKFLOW} failed on main at "
 
-          mapfile -t matching_numbers < <(
+          matching_output="$(
             gh issue list --state open --label ai-repair --limit 500 \
               --json number,title \
               --jq ".[] | select(.title == \"${canonical_title}\" or (.title | startswith(\"${legacy_prefix}\"))) | .number"
-          )
+          )"
+          matching_numbers=()
+          if [[ -n "$matching_output" ]]; then
+            mapfile -t matching_numbers <<< "$matching_output"
+          fi
 
           if [[ "$REPAIR_CONCLUSION" == "success" ]]; then
             if [[ "${#matching_numbers[@]}" -eq 0 ]]; then
@@ -122,8 +127,7 @@ jobs:
           primary_number="${matching_numbers[0]}"
           gh issue edit "$primary_number" \
             --title "$canonical_title" \
-            --add-label ai-repair \
-            --add-label needs-triage
+            --add-label ai-repair
           gh issue comment "$primary_number" --body-file /tmp/ai-repair-body.md
 
           if [[ "${#matching_numbers[@]}" -gt 1 ]]; then
