@@ -143,10 +143,7 @@ export async function enforceCompanyUserRoleScope(req: Request, res: Response): 
 
   if (method === "POST" && path === "/api/user-company-roles") {
     const body = req.body as Record<string, unknown> | undefined;
-    if (
-      body?.companyId !== undefined &&
-      !canAssignCompany(actorRole, body.companyId, companyId)
-    ) {
+    if (body?.companyId !== undefined && !canAssignCompany(actorRole, body.companyId, companyId)) {
       return deny(
         req,
         res,
