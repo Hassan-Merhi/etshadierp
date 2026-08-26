@@ -12,6 +12,7 @@ const commands = [
       "run",
       "tests/named-permission-service.test.ts",
       "tests/credential-version-service.test.ts",
+      "tests/company-user-admin-scope-policy.test.ts",
       "tests/company-context-enforcement.test.ts",
       "tests/legacy-privileged-write-guard.test.ts",
       "tests/raw-stock-sensitive-input-guard.test.ts",
