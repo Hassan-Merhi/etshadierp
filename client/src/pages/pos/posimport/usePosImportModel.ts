@@ -81,7 +81,7 @@ export function usePosImportModel() {
   /** Excel rates arrive in the sale currency; the backend always stores USD. */
   const toUsdItems = (items: any[]) =>
     saleCurrency === "CFA" && exchangeRate
-      ? items.map((item: any) => ({ ...item, rate: (parseFloat(item.rate) / exchangeRate).toFixed(2) }))
+      ? items.map((item) => ({ ...item, rate: (parseFloat(item.rate) / exchangeRate).toFixed(2) }))
       : items;
 
   const parseMutation = useMutation({

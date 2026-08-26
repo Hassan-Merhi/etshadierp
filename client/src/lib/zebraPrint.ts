@@ -44,7 +44,7 @@ async function loadQzTray(): Promise<any> {
   });
 }
 
-async function getConnection(): Promise<any> {
+async function getConnection() {
   const qz = await loadQzTray();
   if (!qz.websocket.isActive()) {
     try {

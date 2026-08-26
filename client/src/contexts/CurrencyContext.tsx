@@ -104,7 +104,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const isMultiCurrency = !!displayCurrency;
 
   // Fetch the latest exchange rate using company's currencies
-  const { data: rateData, isLoading: isLoadingRate } = useQuery<any>({
+  const { data: rateData, isLoading: isLoadingRate } = useQuery({
     queryKey: ["/api/exchange-rates/latest", selectedCompany?.id, baseCurrency, displayCurrency],
     queryFn: async () => {
       if (!selectedCompany?.id || !displayCurrency || displayCurrency === "none") return null;

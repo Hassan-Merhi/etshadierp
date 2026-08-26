@@ -26,7 +26,7 @@ export function PurchaseVoucherEntries({
   navigate: (path: string) => void;
 }) {
   const purchaseItems = viewVoucherEntries.filter((e) => e.isPurchaseItem);
-  const totalQty = purchaseItems.reduce((sum: number, e: any) => sum + parseFloat(e.quantity || "0"), 0);
+  const totalQty = purchaseItems.reduce((sum: number, e) => sum + parseFloat(e.quantity || "0"), 0);
   const charges = purchaseOrderData
     ? [
         { label: "Items Total", value: purchaseOrderData.itemsTotal },
