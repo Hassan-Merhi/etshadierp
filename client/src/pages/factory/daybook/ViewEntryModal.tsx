@@ -82,7 +82,7 @@ export function ViewEntryModal({
     enabled: isMixBatchCreated,
   });
 
-  const { data: mixBatchSources = [] } = useQuery<any[]>({
+  const { data: mixBatchSources = [] } = useQuery({
     queryKey: [`/api/factory/mix-batches/${entry.referenceId}/sources`],
     enabled: isMixBatchCreated,
   });

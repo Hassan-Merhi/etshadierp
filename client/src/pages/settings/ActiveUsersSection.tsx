@@ -39,7 +39,7 @@ export function ActiveUsersSection() {
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const isDeveloper = currentUser?.role === "Developer";
 
-  const { data: presenceData, isLoading } = useQuery<any[]>({
+  const { data: presenceData, isLoading } = useQuery({
     queryKey: ["/api/user-presence"],
     refetchInterval: 30000,
   });

@@ -325,7 +325,7 @@ export default function SpreadsheetEditor() {
   const seqRef = useRef<string>("");
   const seqTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { data: library = [], isLoading: libraryLoading } = useQuery<any[]>({
+  const { data: library = [], isLoading: libraryLoading } = useQuery({
     queryKey: ["/api/spreadsheets"],
   });
 

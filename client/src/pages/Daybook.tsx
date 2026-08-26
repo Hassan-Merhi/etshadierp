@@ -253,7 +253,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     isError: revisionsError,
     error: revisionsErrorDetail,
     refetch: retryVoucherRevisions,
-  } = useQuery<any[]>({
+  } = useQuery({
     queryKey:
       selectedVoucher && isStockTransferVoucher && viewDialogOpen
         ? companyDataKey(
