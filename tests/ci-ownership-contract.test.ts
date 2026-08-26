@@ -24,7 +24,7 @@ function commandCount(source: string, command: string): number {
   return source
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line === command || line.startsWith(`${command} 2>&1`)).length;
+    .filter((line) => line === command || line.startsWith(`${command} `)).length;
 }
 
 describe("CI ownership", () => {
