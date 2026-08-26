@@ -505,12 +505,15 @@ export function useFactorySuppliersModel() {
   const displayedTopLevel = (showInactive ? allSuppliers : activeSuppliers).filter((supplier) => !supplier.parentId);
   const brokerCount = displayedTopLevel.filter((supplier) => subAccountsByParent[supplier.id]?.length).length;
   const standaloneCount = displayedTopLevel.length - brokerCount;
-  const totalContainers = allSuppliers.reduce((sum, supplier) => sum + (supplier.totalContainers || 0), 0);
-  const totalUsdOwed = allSuppliers.reduce((sum, supplier) => {
+  // Broker rows already roll up linked-supplier containers and exposure into their top-level totals.
+  // Summing all suppliers would count linked suppliers twice in the summary cards.
+  const summarySuppliers = displayedTopLevel;
+  const totalContainers = summarySuppliers.reduce((sum, supplier) => sum + (supplier.totalContainers || 0), 0);
+  const totalUsdOwed = summarySuppliers.reduce((sum, supplier) => {
     const value = parseFloat(supplier.totalValue || "0");
     return value > 0 ? sum + value : sum;
   }, 0);
-  const totalUsdOverpaid = allSuppliers.reduce((sum, supplier) => {
+  const totalUsdOverpaid = summarySuppliers.reduce((sum, supplier) => {
     const value = parseFloat(supplier.totalValue || "0");
     return value < 0 ? sum + Math.abs(value) : sum;
   }, 0);
