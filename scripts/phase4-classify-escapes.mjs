@@ -13,6 +13,8 @@ const parsed = ts.parseJsonConfigFileContent(raw.config, ts.sys, path.dirname(co
 const counts = new Map();
 const byFile = new Map();
 const genericCalls = new Map();
+const paramNames = new Map();
+const paramNamesByRoot = new Map();
 const examples = new Map();
 
 const inc = (map, key, by = 1) => map.set(key, (map.get(key) ?? 0) + by);
@@ -61,6 +63,12 @@ for (const file of parsed.fileNames) {
       addExample(key, `${rel}:${pos.line + 1} ${line}`);
 
       const parent = node.parent;
+      if (ts.isParameter(parent) && parent.type === node) {
+        const name = ts.isIdentifier(parent.name) ? parent.name.text : parent.name.getText(sf);
+        inc(paramNames, name);
+        const rootName = rel.startsWith("server/") ? "server" : rel.startsWith("client/src/") ? "client" : "shared";
+        inc(paramNamesByRoot, `${rootName}:${name}`);
+      }
       if (ts.isTypeReferenceNode(parent)) inc(genericCalls, parent.typeName.getText());
       if (parent && (ts.isCallExpression(parent.parent) || ts.isNewExpression(parent.parent))) {
         inc(genericCalls, parent.parent.expression.getText(sf));
@@ -74,6 +82,14 @@ for (const file of parsed.fileNames) {
 
 console.log("PHASE4_CATEGORY_COUNTS");
 for (const [key, value] of [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) {
+  console.log(`${value}\t${key}`);
+}
+console.log("PHASE4_PARAMETER_NAMES");
+for (const [key, value] of [...paramNames.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 120)) {
+  console.log(`${value}\t${key}`);
+}
+console.log("PHASE4_PARAMETER_NAMES_BY_ROOT");
+for (const [key, value] of [...paramNamesByRoot.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 180)) {
   console.log(`${value}\t${key}`);
 }
 console.log("PHASE4_GENERIC_COUNTS");
