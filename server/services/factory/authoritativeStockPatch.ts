@@ -68,16 +68,19 @@ function resolveStock(
   item: Record<string, unknown>,
   snapshot: AuthoritativeStockSnapshot
 ): AuthoritativeStockAggregate | null {
+  const articleKey = normalizeStockArticleCode(item.articleCode);
+  if (articleKey) {
+    const byCode = snapshot.byArticleCode.get(articleKey);
+    if (byCode) return byCode;
+  }
+
   const productId = Number(item.productId);
   if (Number.isFinite(productId) && productId > 0) {
     const byId = snapshot.byProductId.get(productId);
     if (byId) return byId;
   }
 
-  const articleKey = normalizeStockArticleCode(item.articleCode);
   if (articleKey) {
-    const byCode = snapshot.byArticleCode.get(articleKey);
-    if (byCode) return byCode;
     return { productId: null, articleCode: String(item.articleCode ?? ""), baleCount: 0, totalWeight: 0 };
   }
 

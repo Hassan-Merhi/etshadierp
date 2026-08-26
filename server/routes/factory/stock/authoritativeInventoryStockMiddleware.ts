@@ -1,8 +1,16 @@
 import type { Express, NextFunction, Request, Response } from "express";
+import rateLimit from "express-rate-limit";
 import { requireAuth } from "../../../auth";
 import { parseId } from "../../../lib/parseId";
 import { getAuthoritativeAvailableStockSnapshot } from "../../../services/factory/authoritativeAvailableStock";
 import { patchInventoryStockRows } from "../../../services/factory/authoritativeStockPatch";
+
+const authoritativeInventoryStockRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 240,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 function isInventoryJsonTarget(req: Request): boolean {
   if (req.method !== "GET") return false;
@@ -30,5 +38,10 @@ async function authoritativeInventoryStockMiddleware(req: Request, res: Response
 }
 
 export function registerAuthoritativeInventoryStockMiddleware(app: Express) {
-  app.use("/api/factory/location-inventory/:locationId", requireAuth, authoritativeInventoryStockMiddleware);
+  app.use(
+    "/api/factory/location-inventory/:locationId",
+    authoritativeInventoryStockRateLimit,
+    requireAuth,
+    authoritativeInventoryStockMiddleware
+  );
 }

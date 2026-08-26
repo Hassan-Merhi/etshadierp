@@ -138,4 +138,37 @@ describe("authoritative factory stock parity", () => {
 
     expect(patched.loadedItems[0].stockQty).toBe(2);
   });
+
+  it("includes historical article-only bales alongside product-linked bales", () => {
+    const mixedSnapshot = buildAuthoritativeStockSnapshot([
+      {
+        productId: 8,
+        articleCode: "HMD16008",
+        baleCount: 1,
+        totalWeight: 183.5,
+      },
+      {
+        productId: null,
+        articleCode: "HMD16008",
+        baleCount: 2,
+        totalWeight: 360.25,
+      },
+    ]);
+
+    const patched = patchInventoryStockRows(
+      [
+        {
+          productId: 8,
+          articleCode: "HMD16008",
+          baleCount: 1,
+          totalWeight: 183.5,
+        },
+      ],
+      mixedSnapshot
+    ) as Array<{ baleCount: number; totalWeight: number }>;
+
+    expect(patched[0].baleCount).toBe(3);
+    expect(patched[0].totalWeight).toBeCloseTo(543.75, 6);
+    expect(buildArticleCodeStockCountRecord(["HMD16008"], mixedSnapshot)).toEqual({ HMD16008: 3 });
+  });
 });

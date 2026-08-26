@@ -44,6 +44,7 @@ export async function getAuthoritativeAvailableStockSnapshot(
         INNER JOIN customer_orders co ON co.id = cob.order_id
         WHERE cob.bale_id = fb.id
           AND co.company_id = ${companyId}
+          AND co.deleted_at IS NULL
           AND co.status IN (
             'LOADING',
             'PENDING_VERIFICATION',

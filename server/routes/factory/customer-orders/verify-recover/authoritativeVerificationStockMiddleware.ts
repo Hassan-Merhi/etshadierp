@@ -1,4 +1,5 @@
 import type { Express, NextFunction, Request, Response } from "express";
+import rateLimit from "express-rate-limit";
 import { sql } from "drizzle-orm";
 import { requireAuth } from "../../../../auth";
 import { db } from "../../../../db";
@@ -10,6 +11,13 @@ import { patchVerificationSummaryStock } from "../../../../services/factory/auth
 interface OrderLocationRow extends Record<string, unknown> {
   location_id: number | null;
 }
+
+const authoritativeVerificationStockRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 240,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 async function authoritativeVerificationStockMiddleware(req: Request, res: Response, next: NextFunction) {
   if (req.method !== "GET") return next();
@@ -44,6 +52,7 @@ async function authoritativeVerificationStockMiddleware(req: Request, res: Respo
 export function registerAuthoritativeVerificationStockMiddleware(app: Express) {
   app.use(
     "/api/factory/customer-orders/:id/verification-summary",
+    authoritativeVerificationStockRateLimit,
     requireAuth,
     authoritativeVerificationStockMiddleware
   );
