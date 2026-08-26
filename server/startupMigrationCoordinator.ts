@@ -121,6 +121,23 @@ export function installStartupMigrationCoordinator(): void {
           action: "lock-fail-open",
         });
       }
+
+      // Phase 3 RLS is fail-closed: an absent tenant identity must never regain
+      // all-company visibility. Startup migrations are one of the few legitimate
+      // process-owned all-company operations, so mark that capability explicitly
+      // on this dedicated connection before any repair/backfill SQL is executed.
+      await rawClientQuery.call(
+        this,
+        `SELECT
+           set_config('app.company_scope_maintenance', $1, false),
+           set_config('app.current_company_id', $2, false),
+           set_config('app.authorized_company_ids', $3, false)`,
+        ["on", "", ""]
+      );
+      logger.info("Startup migration database maintenance scope established", {
+        module: "startup-migrations",
+        action: "rls-maintenance-scope",
+      });
     }
 
     return result;
