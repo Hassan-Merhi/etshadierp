@@ -15,6 +15,10 @@ import { decideExplicitCompanyScope } from "../services/security/companyRequestS
 import { isPinnedCompanyRoute } from "../services/security/activeCompanyPermissionPolicy";
 import { chooseAuthorizedFactoryCompany } from "../services/security/factoryCompanyScopePolicy";
 import { runWithCompanyRequestRuntimeContext } from "../services/security/companyRequestRuntimeContext";
+import {
+  createTenantDatabaseScope,
+  runWithDatabaseScopeRuntimeContext,
+} from "../services/security/databaseScopeRuntimeContext";
 
 const CONTEXT_OPTIONAL_PATHS = new Set([
   "/api/csrf-token",
@@ -204,6 +208,11 @@ function logIsolationDenial(req: Request, context: ActiveCompanyPermissionContex
  * session/company-role state, and even privileged roles must switch the active
  * company before using a primary companyId override. Intercompany source/target
  * fields are allowed only when the user has verified membership in every side.
+ *
+ * Once authorization succeeds, the same verified identities are installed in
+ * the database-scope AsyncLocalStorage. The shared PostgreSQL pool consumes that
+ * scope before every lease/query, so Drizzle and raw SQL receive the same RLS
+ * boundary without relying on each individual route to remember SET LOCAL.
  */
 export async function tenantIsolationBoundary(req: Request, res: Response, next: NextFunction) {
   if (!req.path.startsWith("/api")) return next();
@@ -243,16 +252,19 @@ export async function tenantIsolationBoundary(req: Request, res: Response, next:
       await assertCompaniesAccess(context.userId, secondaryCompanyIds);
     }
 
+    const databaseScope = createTenantDatabaseScope(context.companyId, secondaryCompanyIds);
+
     return runWithCompanyRequestRuntimeContext(
       {
         userId: context.userId,
         companyId: context.companyId,
+        authorizedCompanyIds: databaseScope.authorizedCompanyIds,
         role: context.role,
         developerBypass: context.developerBypass,
         method: req.method,
         path: req.path,
       },
-      () => next()
+      () => runWithDatabaseScopeRuntimeContext(databaseScope, () => next())
     );
   } catch (error) {
     if (error instanceof CompanyIsolationError) {

@@ -98,6 +98,18 @@ if (!connectionString) {
 
 const pool = new pg.Pool({ connectionString, max: 3 });
 
+async function establishRlsScope(client, companyIds) {
+  const maintenance = allCompanies;
+  const currentCompanyId = maintenance ? "" : String(companyIds[0] ?? "");
+  await client.query(
+    `SELECT
+       set_config('app.company_scope_maintenance', $1, false),
+       set_config('app.current_company_id', $2, false),
+       set_config('app.authorized_company_ids', '', false)`,
+    [maintenance ? "on" : "off", currentCompanyId]
+  );
+}
+
 // ─── Currency code normalisation ──────────────────────────────────────────────
 
 /**
@@ -374,7 +386,11 @@ async function applyRepairs(client, companyId, report) {
   for (const r of report) {
     if (r.repairable) {
       const voucherProxy = { currency: r.currency, exchange_rate: r.stored_rate, total_amount: null };
-      const entryProxy = { debit_amount: r.current_debit, credit_amount: r.current_credit, transaction_currency: null };
+      const entryProxy = {
+        debit_amount: r.current_debit,
+        credit_amount: r.current_credit,
+        transaction_currency: null,
+      };
       const repair = computeRepair(voucherProxy, entryProxy, r.classification);
       if (repair) toRepair.push({ id: r.entry_id, repair });
     }
@@ -453,6 +469,7 @@ async function main() {
   const resolveClient = await pool.connect();
   try {
     if (allCompanies) {
+      await establishRlsScope(resolveClient, []);
       const { rows } = await resolveClient.query("SELECT id FROM companies ORDER BY id");
       companyIds = rows.map((r) => r.id);
       if (companyIds.length === 0) {
@@ -466,6 +483,7 @@ async function main() {
         process.exit(1);
       }
       companyIds = [parsed];
+      await establishRlsScope(resolveClient, companyIds);
     }
   } finally {
     resolveClient.release();
@@ -473,7 +491,11 @@ async function main() {
 
   const dryRun = !apply;
 
-  console.log(dryRun ? "=== DRY RUN — no changes will be written ===" : "=== APPLY MODE — changes will be written ===");
+  console.log(
+    dryRun
+      ? "=== DRY RUN — no changes will be written ==="
+      : "=== APPLY MODE — changes will be written ==="
+  );
   console.log(`Companies: ${companyIds.join(", ")}`);
 
   // ── In apply mode: pre-validate the confirmation token BEFORE any writes ──
@@ -482,6 +504,7 @@ async function main() {
     const validateClient = await pool.connect();
     let preScanReports = [];
     try {
+      await establishRlsScope(validateClient, companyIds);
       for (const cid of companyIds) {
         const report = await scanCompany(validateClient, cid);
         preScanReports.push(...report);
@@ -512,6 +535,7 @@ async function main() {
   const allReports = [];
   const client = await pool.connect();
   try {
+    await establishRlsScope(client, companyIds);
     if (dryRun) {
       // Dry run: scan only, no transaction needed
       for (const cid of companyIds) {
@@ -524,7 +548,9 @@ async function main() {
         console.log(`\nCompany ${cid}: ${report.length} entries scanned`);
         for (const [cls, count] of Object.entries(counts)) console.log(`  ${cls}: ${count}`);
         console.log(`  → auto-repairable: ${repairable}`);
-        console.log(`  → manual-review: ${(counts["ambiguous"] || 0) + (counts["missing-rate"] || 0) + (counts["invalid-rate"] || 0)}`);
+        console.log(
+          `  → manual-review: ${(counts["ambiguous"] || 0) + (counts["missing-rate"] || 0) + (counts["invalid-rate"] || 0)}`
+        );
       }
 
       // Generate confirmation token
@@ -534,7 +560,9 @@ async function main() {
       console.log(`\nConfirmation token for --apply: ${token}`);
       console.log(`Re-run with: --apply --confirm ${token}`);
       if (companyIds.length === 1) {
-        console.log(`Full command: node scripts/backfill-voucher-entry-currency-amounts.mjs --company ${companyIds[0]} --apply --confirm ${token}`);
+        console.log(
+          `Full command: node scripts/backfill-voucher-entry-currency-amounts.mjs --company ${companyIds[0]} --apply --confirm ${token}`
+        );
       }
     } else {
       // Apply mode: transact per-company with advisory lock
@@ -577,7 +605,9 @@ async function main() {
   for (const r of allReports) counts[r.classification] = (counts[r.classification] || 0) + 1;
 
   const repairableTotal = allReports.filter((r) => r.repairable).length;
-  const manualTotal = allReports.filter((r) => ["ambiguous", "missing-rate", "invalid-rate"].includes(r.classification)).length;
+  const manualTotal = allReports.filter((r) =>
+    ["ambiguous", "missing-rate", "invalid-rate"].includes(r.classification)
+  ).length;
   const alreadyDone = counts["already-repaired"] || 0;
 
   console.log(`\n=== SUMMARY ===`);
