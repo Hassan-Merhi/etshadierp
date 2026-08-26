@@ -27,7 +27,8 @@
     "USE /api/sp/migration [spMigrationRateLimit]",
     "USE /api/sp/migration [spMigrationRequestBudgetMiddleware]",
     "USE /api/golden-coast/accounting [<anonymous>]",
-    "USE /api/golden-coast/accounting/phase1/post [<anonymous>]"
+    "USE /api/golden-coast/accounting/phase1/post [<anonymous>]",
+    "USE / [browserMutationFailClosedBoundary]"
   ],
   "routeManifestReplacements": [
     {
