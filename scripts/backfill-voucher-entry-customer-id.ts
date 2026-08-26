@@ -20,17 +20,18 @@
 
 import { db } from "../server/db";
 import {
-  customers, ledgerAccounts, voucherEntries, vouchers,
-} from "../shared/schema";
+  createTenantDatabaseScope,
+  runWithDatabaseMaintenanceScope,
+  runWithDatabaseScopeRuntimeContext,
+} from "../server/services/security/databaseScopeRuntimeContext";
+import { customers, ledgerAccounts, voucherEntries, vouchers } from "../shared/schema";
 import { eq, and, isNull, inArray, sql } from "drizzle-orm";
 
 const args = process.argv.slice(2);
 const APPLY = args.includes("--apply");
 const companyArgIdx = args.indexOf("--company");
 const COMPANY_ID =
-  companyArgIdx >= 0 && args[companyArgIdx + 1]
-    ? parseInt(args[companyArgIdx + 1])
-    : null;
+  companyArgIdx >= 0 && args[companyArgIdx + 1] ? parseInt(args[companyArgIdx + 1]) : null;
 
 async function main() {
   console.log(`\n== Voucher-Entry customer_id Backfill ==`);
@@ -138,7 +139,12 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((err) => {
+const runMain = () =>
+  COMPANY_ID != null
+    ? runWithDatabaseScopeRuntimeContext(createTenantDatabaseScope(COMPANY_ID), main)
+    : runWithDatabaseMaintenanceScope("script:backfill-voucher-entry-customer-id:all-companies", main);
+
+runMain().catch((err) => {
   console.error("Backfill failed:", err);
   process.exit(1);
 });

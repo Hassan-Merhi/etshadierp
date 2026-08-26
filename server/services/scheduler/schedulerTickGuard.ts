@@ -1,5 +1,6 @@
 import { logger } from "../../lib/logger";
 import { nameSchedulerCallback } from "../../lib/schedulerObservability";
+import { runWithDatabaseMaintenanceScope } from "../security/databaseScopeRuntimeContext";
 
 /**
  * Wraps a scheduled job so a slow run cannot be overtaken by the next tick.
@@ -50,7 +51,10 @@ export function createSchedulerTick(
     const runStartedAt = startedAt;
     if (!options.quiet) logger.info(`cron ${action} started`, { module: "scheduler", action });
     try {
-      await run();
+      // Scheduled jobs are process-owned rather than request-owned. They may
+      // legitimately enumerate multiple companies, but that access must be an
+      // explicit maintenance capability now that missing RLS scope fails closed.
+      await runWithDatabaseMaintenanceScope(`scheduler:${action}`, run);
       if (!options.quiet) {
         logger.info(`cron ${action} succeeded`, {
           module: "scheduler",

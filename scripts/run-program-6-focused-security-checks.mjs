@@ -23,6 +23,7 @@ const commands = [
       "tests/security-headers-csp.test.ts",
       "tests/transaction-company-scope-request-binding.test.ts",
       "tests/phase4-tenant-surface-regression.test.ts",
+      "tests/database-scope-pool-binding.test.ts",
       "--maxWorkers=1",
       "--no-file-parallelism",
     ],
@@ -50,4 +51,4 @@ for (const [command, args] of commands) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-console.log("\nProgram 6 + Phase 4 focused security checks passed.");
+console.log("\nProgram 6 + Phase 3 RLS focused security checks passed.");
