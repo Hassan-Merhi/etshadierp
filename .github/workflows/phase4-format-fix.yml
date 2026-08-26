@@ -1,0 +1,73 @@
+name: Phase 4 formatting fix
+
+on:
+  push:
+    branches: [phase-4-remaining-type-safety]
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js 24.19.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24.19.0"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Format Phase 4 changed files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/contexts/CurrencyContext.tsx \
+            client/src/pages/Daybook.tsx \
+            client/src/pages/accounts/AccountTransactionRows.tsx \
+            client/src/pages/factory/FactoryInsurance.tsx \
+            client/src/pages/factory/bale-stock-entry/StockEntryTab.tsx \
+            client/src/pages/factory/daybook/ViewEntryModal.tsx \
+            client/src/pages/factory/factorycontainerloadingscan/useFactoryContainerLoadingScanModel.ts \
+            client/src/pages/factory/factoryimport/components/OpeningStockImport.tsx \
+            client/src/pages/factory/factoryimport/components/SupplierObEdit.tsx \
+            client/src/pages/settings/ActiveUsersSection.tsx \
+            client/src/pages/settings/datatoolstab/SilentProductionDialog.tsx \
+            client/src/pages/settings/datatoolstab/SilentTransferDialog.tsx \
+            client/src/pages/settings/users/InlineRoleEditor.tsx \
+            client/src/pages/settings/users/PosLocationManager.tsx \
+            client/src/pages/voucher-edit/useFormInitialization.ts
+          git diff --check
+
+      - name: Commit formatting fix
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            client/src/contexts/CurrencyContext.tsx \
+            client/src/pages/Daybook.tsx \
+            client/src/pages/accounts/AccountTransactionRows.tsx \
+            client/src/pages/factory/FactoryInsurance.tsx \
+            client/src/pages/factory/bale-stock-entry/StockEntryTab.tsx \
+            client/src/pages/factory/daybook/ViewEntryModal.tsx \
+            client/src/pages/factory/factorycontainerloadingscan/useFactoryContainerLoadingScanModel.ts \
+            client/src/pages/factory/factoryimport/components/OpeningStockImport.tsx \
+            client/src/pages/factory/factoryimport/components/SupplierObEdit.tsx \
+            client/src/pages/settings/ActiveUsersSection.tsx \
+            client/src/pages/settings/datatoolstab/SilentProductionDialog.tsx \
+            client/src/pages/settings/datatoolstab/SilentTransferDialog.tsx \
+            client/src/pages/settings/users/InlineRoleEditor.tsx \
+            client/src/pages/settings/users/PosLocationManager.tsx \
+            client/src/pages/voucher-edit/useFormInitialization.ts
+          git commit -m "chore: format Phase 4 changed files"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
