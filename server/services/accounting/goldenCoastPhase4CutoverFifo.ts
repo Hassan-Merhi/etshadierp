@@ -107,9 +107,10 @@ export function buildGoldenCoastCutoverFifoPlan(input: {
       companyId,
       sourceType: GOLDEN_COAST_CUTOVER_FIFO_SOURCE,
       articleCode,
-      description:
+      description: releaseDebtEnglish(
         `Golden Coast ${GOLDEN_COAST_CUTOVER_DATE} opening FIFO snapshot ` +
-        `from ERP inventory #${inventoryId}${descriptionSuffix}`,
+          `from ERP inventory #${inventoryId}${descriptionSuffix}`
+      ),
       stockItemId,
       locationId,
       qtyIn: quantity.toDecimalPlaces(4).toFixed(4),
