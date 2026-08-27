@@ -7,16 +7,18 @@
 // place instead of being copy-pasted at every pool construction site.
 //
 // Behaviour, in order of precedence:
-//   1. Local Replit database (PGHOST=helium or an `@helium:` connection
-//      string), Render's same-region private Postgres hostname, or
-//      PGSSLMODE=disable → TLS off entirely (`ssl: false`).
-//   2. PGSSLROOTCERT set → verified TLS against that CA bundle.
-//   3. Otherwise → verified TLS against the system trust store.
+//   1. PGSSLMODE=disable or the local Replit database → TLS off (`ssl: false`).
+//   2. Explicit verification configuration (PGSSLROOTCERT or a truthy
+//      PGSSL_REJECT_UNAUTHORIZED) → verified TLS, including on Render private
+//      hosts.
+//   3. Render's same-region private Postgres hostname → TLS off by default.
+//   4. Otherwise → verified TLS against the system trust store.
 //
 // Render recommends its internal Postgres URL for same-region services. That
 // URL uses a single-label `dpg-*` hostname on Render's private network and does
 // not require TLS. Detecting that case avoids unnecessary TLS there without
-// weakening external database connections.
+// weakening external database connections or overriding explicit operator
+// verification settings.
 
 import { readFileSync } from "node:fs";
 
@@ -66,6 +68,12 @@ export function isRenderInternalDatabase(connectionString = "") {
   return hostname.startsWith("dpg-") && !hostname.includes(".");
 }
 
+function explicitTlsVerificationRequested() {
+  const caPath = (process.env.PGSSLROOTCERT || "").trim();
+  const rejectUnauthorized = (process.env.PGSSL_REJECT_UNAUTHORIZED || "").trim().toLowerCase();
+  return caPath !== "" || ["true", "1", "yes", "on"].includes(rejectUnauthorized);
+}
+
 /**
  * True when the connection should use TLS at all.
  * @param {string} [connectionString]
@@ -74,12 +82,14 @@ export function isRenderInternalDatabase(connectionString = "") {
 export function databaseRequiresSsl(connectionString = "") {
   const sslMode = (process.env.PGSSLMODE || "").trim().toLowerCase();
   if (sslMode === "disable") return false;
+  if (isLocalReplitDatabase(connectionString)) return false;
 
-  // An explicit non-disable SSL mode is an operator override. Otherwise use
-  // Render's documented private-network behavior for its internal DB hostname.
-  if (sslMode === "" && isRenderInternalDatabase(connectionString)) return false;
+  // Explicit verification is an operator override. In particular, do not let
+  // Render's private-host default silently turn off a CA/trust configuration.
+  if (sslMode !== "" || explicitTlsVerificationRequested()) return true;
 
-  return !isLocalReplitDatabase(connectionString);
+  if (isRenderInternalDatabase(connectionString)) return false;
+  return true;
 }
 
 /**
