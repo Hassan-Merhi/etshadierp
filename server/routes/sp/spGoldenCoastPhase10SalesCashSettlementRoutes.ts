@@ -35,7 +35,11 @@ import {
   type GoldenCoastPhase10CashAccount,
   type GoldenCoastPhase10SettlementInput,
 } from "../../services/accounting/goldenCoastPhase10SalesCashSettlement";
-import { isGoldenCoastCompany, type DbLike } from "./spGoldenCoastPhase4CutoverFifoRoutes";
+import {
+  goldenCoastPhase3VoucherNumber,
+  isGoldenCoastCompany,
+  type DbLike,
+} from "./spGoldenCoastPhase4CutoverFifoRoutes";
 import { requireSpCompany } from "./spHelpers";
 
 const postingDependencies = createDatabasePostingDependencies();
@@ -63,6 +67,24 @@ function actorFromRequest(req: Request): PostingActor {
     username: req.session.username ?? null,
     reason: reference || "Golden Coast Phase 10 GC Sales Cash settlement",
   };
+}
+
+async function assertPhase10CutoverPosted(conn: DbLike, companyId: number): Promise<void> {
+  const result = await conn.execute(sql`
+    SELECT id
+    FROM vouchers
+    WHERE company_id = ${companyId}
+      AND voucher_number = ${goldenCoastPhase3VoucherNumber(companyId)}
+      AND deleted_at IS NULL
+    LIMIT 1
+  `);
+  if (!resultRows(result)[0]) {
+    throw new GoldenCoastPhase10RouteError(
+      "Golden Coast Phase 3 cutover must be posted before Phase 10 GC Sales Cash settlement",
+      "GC_PHASE10_NOT_READY",
+      409
+    );
+  }
 }
 
 async function resolveGcSalesCashAccount(
@@ -195,8 +217,8 @@ async function gcSalesCashDebitBalance(
   const query = await conn.execute(sql`
     SELECT (
       CASE
-        WHEN la.opening_balance_side = 'Dr' THEN COALESCE(la.opening_balance, 0)::numeric
-        ELSE -COALESCE(la.opening_balance, 0)::numeric
+        WHEN la.opening_balance_side = 'Cr' THEN -COALESCE(la.opening_balance, 0)::numeric
+        ELSE COALESCE(la.opening_balance, 0)::numeric
       END
       + COALESCE((
         SELECT SUM(CAST(ve.debit_amount AS numeric) - CAST(ve.credit_amount AS numeric))
@@ -206,7 +228,10 @@ async function gcSalesCashDebitBalance(
           AND v.company_id = ${companyId}
           AND v.deleted_at IS NULL
           AND COALESCE(v.optional, false) = false
-          AND COALESCE(v.effective_date, v.voucher_date) <= COALESCE(${cutoffDate ?? null}::date, CURRENT_DATE)
+          AND (
+            ${cutoffDate ?? null}::date IS NULL
+            OR COALESCE(v.effective_date, v.voucher_date) <= ${cutoffDate ?? null}::date
+          )
       ), 0)
     )::text AS debit_minus_credit
     FROM ledger_accounts la
@@ -351,6 +376,7 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
       });
       return;
     }
+    await assertPhase10CutoverPosted(db, companyId);
     const gcSalesCashAccount = await resolveGcSalesCashAccount(db, companyId);
     const [balanceUsd, receiptAccounts] = await Promise.all([
       gcSalesCashDebitBalance(db, companyId, gcSalesCashAccount.id),
@@ -389,6 +415,9 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
     const actor = actorFromRequest(req);
 
     const outcome = await db.transaction(async (tx) => {
+      // Phase 7 and Phase 10 both reduce GC Sales Cash. Take Phase 7's
+      // company lock first so the two cap checks cannot race each other.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase7:${companyId}`}))`);
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase10:${companyId}`}))`);
       await tx.execute(
         sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase10:${companyId}:${settlement.clientRequestId}`}))`
@@ -401,6 +430,7 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
         );
       }
 
+      await assertPhase10CutoverPosted(tx, companyId);
       const gcSalesCashAccount = await resolveGcSalesCashAccount(tx, companyId);
       await validateReceiptAccount(tx, companyId, settlement.receiptAccount);
 
@@ -416,12 +446,7 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
         settlementDigest
       );
       if (replayed) {
-        const currentBalance = await gcSalesCashDebitBalance(
-          tx,
-          companyId,
-          gcSalesCashAccount.id,
-          settlement.settlementDate
-        );
+        const currentBalance = await gcSalesCashDebitBalance(tx, companyId, gcSalesCashAccount.id);
         return {
           replayed: true as const,
           settlement,
@@ -437,12 +462,19 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
       // the balance read and the Phase 10 posting commit.
       await tx.execute(sql`LOCK TABLE voucher_entries IN SHARE ROW EXCLUSIVE MODE`);
 
-      const gcSalesCashDebitBalanceUsd = await gcSalesCashDebitBalance(
+      const datedBalanceUsd = await gcSalesCashDebitBalance(
         tx,
         companyId,
         gcSalesCashAccount.id,
         settlement.settlementDate
       );
+      const allPostedBalanceUsd = await gcSalesCashDebitBalance(tx, companyId, gcSalesCashAccount.id);
+      // Use the lower balance: future-dated debits cannot be collected early,
+      // while already-posted later credits/settlements can never be ignored.
+      const gcSalesCashDebitBalanceUsd = Decimal.min(
+        new Decimal(datedBalanceUsd),
+        new Decimal(allPostedBalanceUsd)
+      ).toString();
       const plan = planGoldenCoastPhase10Settlement({ settlement, gcSalesCashDebitBalanceUsd });
       const request = buildGoldenCoastPhase10SettlementPosting({
         plan,
