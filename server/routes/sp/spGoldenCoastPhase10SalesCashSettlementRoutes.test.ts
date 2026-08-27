@@ -60,7 +60,8 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement route surface", () => {
   it("computes the collectible balance from opening semantics plus posted vouchers at the settlement date", () => {
     expect(routeSource).toContain("gcSalesCashDebitBalance");
     expect(routeSource).toContain("SUM(CAST(ve.debit_amount AS numeric) - CAST(ve.credit_amount AS numeric))");
-    expect(routeSource).toContain("opening_balance_side = 'Dr'");
+    expect(routeSource).toContain("WHEN la.opening_balance_side = 'Cr'");
+    expect(routeSource).toContain("ELSE COALESCE(la.opening_balance, 0)::numeric");
     expect(routeSource).toContain("COALESCE(v.effective_date, v.voucher_date) <=");
     expect(routeSource).toContain("COALESCE(v.optional, false) = false");
     expect(serviceSource).toContain("GC_PHASE10_SETTLEMENT_EXCEEDS_BALANCE");
@@ -70,20 +71,23 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement route surface", () => {
     const digestIndex = routeSource.indexOf("const settlementDigest = goldenCoastPhase10SettlementDigest");
     const replayIndex = routeSource.indexOf("const replayed = await findReplayedSettlement");
     const lockIndex = routeSource.indexOf("LOCK TABLE voucher_entries IN SHARE ROW EXCLUSIVE MODE");
-    const balanceIndex = routeSource.lastIndexOf("const gcSalesCashDebitBalanceUsd = await gcSalesCashDebitBalance");
+    const datedBalanceIndex = routeSource.indexOf("const datedBalanceUsd = await gcSalesCashDebitBalance");
+    const allPostedBalanceIndex = routeSource.indexOf("const allPostedBalanceUsd = await gcSalesCashDebitBalance");
 
     expect(digestIndex).toBeGreaterThan(-1);
     expect(replayIndex).toBeGreaterThan(digestIndex);
     expect(lockIndex).toBeGreaterThan(replayIndex);
-    expect(balanceIndex).toBeGreaterThan(lockIndex);
+    expect(datedBalanceIndex).toBeGreaterThan(lockIndex);
+    expect(allPostedBalanceIndex).toBeGreaterThan(datedBalanceIndex);
     expect(routeSource).toContain("GC_PHASE10_IDEMPOTENCY_CONFLICT");
     expect(routeSource).toContain("GC_PHASE10_IDEMPOTENCY_INCONSISTENT");
     expect(routeSource).toContain("accountingPostingRequests");
   });
 
-  it("serializes the capped balance against both Phase 10 and all voucher-entry writers", () => {
+  it("serializes the capped balance against Phase 7, Phase 10 and all voucher-entry writers", () => {
     expect(routeSource).toContain("db.transaction(async (tx) =>");
     expect(routeSource).toContain("pg_advisory_xact_lock");
+    expect(routeSource).toContain("golden-coast-phase7:${companyId}");
     expect(routeSource).toContain("golden-coast-phase10:${companyId}");
     expect(routeSource).toContain("LOCK TABLE voucher_entries IN SHARE ROW EXCLUSIVE MODE");
   });
