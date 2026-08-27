@@ -212,7 +212,9 @@ export function BaleProductsDialog1({ model }: { model: Model }) {
           </div>
           <div className="flex items-start gap-2 p-3 rounded-md bg-muted text-sm text-muted-foreground">
             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-            <span>Changes to name, weight, and article code will also update all existing bales using this product.</span>
+            <span>
+              Changes to name, weight, and article code will also update all existing bales using this product.
+            </span>
           </div>
           <div className="flex justify-between gap-2">
             <Button
