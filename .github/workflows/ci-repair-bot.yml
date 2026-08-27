@@ -563,7 +563,7 @@ jobs:
     # cron has never fired for this repository. Re-running the shared sweep as
     # the last step of every repair run makes the loop self-continuing until
     # no trusted PR is red, without adding a privileged trigger.
-    if: always()
+    if: always() && needs.diagnose.outputs.ready == 'true'
     permissions:
       actions: write
       checks: read
