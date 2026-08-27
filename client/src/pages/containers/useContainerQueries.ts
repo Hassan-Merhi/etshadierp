@@ -47,7 +47,16 @@ export function useContainerQueries(
 
   const suppliersPath = isSupplierPartner ? "/api/suppliers" : "/api/suppliers?allowParentFallback=true";
   const { data: suppliers = [] } = useQuery<Supplier[]>({
-    queryKey: companyQueryKey(suppliersPath, selectedCompany?.id),
+    queryKey: companyQueryKey(
+      "/api/suppliers",
+      selectedCompany?.id,
+      isSupplierPartner ? "strict" : "allow-parent-fallback"
+    ),
+    queryFn: async () => {
+      const res = await fetch(suppliersPath, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load suppliers");
+      return res.json();
+    },
     enabled: !!selectedCompany?.id,
   });
 
