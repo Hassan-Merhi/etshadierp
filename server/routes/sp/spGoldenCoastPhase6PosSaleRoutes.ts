@@ -1,0 +1,730 @@
+import type { Express, Request, Response } from "express";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import Decimal from "decimal.js";
+import {
+  accountingPostingRequests,
+  bankAccounts,
+  ledgerAccounts,
+  locations,
+  spStockMovements,
+  voucherEntries,
+  vouchers,
+} from "@shared/schema";
+import { requireAuth } from "../../auth";
+import { db } from "../../db";
+import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
+import { getErrorMessage } from "../../lib/httpHandlers";
+import { logger } from "../../lib/logger";
+import { resultRows } from "../../lib/queryResult";
+import {
+  privilegedMutationRateLimit,
+  privilegedReadRateLimit,
+  privilegedRequestBudget,
+} from "../../middleware/privilegedEndpointSecurity";
+import {
+  PostingValidationError,
+  postBalancedVoucherTx,
+  type CentralPostingResult,
+} from "../../services/accounting/centralPostingEngine";
+import { createDatabasePostingDependencies } from "../../services/accounting/databasePostingDependencies";
+import {
+  getGoldenCoastAccountDefinition,
+  type GoldenCoastAccountRole,
+  type GoldenCoastLedgerRow,
+} from "../../services/accounting/goldenCoastPhase2Accounts";
+import {
+  GOLDEN_COAST_CUTOVER_DATE,
+  GOLDEN_COAST_CUTOVER_FIFO_SOURCE,
+} from "../../services/accounting/goldenCoastPhase4CutoverFifo";
+import {
+  GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES,
+  GoldenCoastPhase5SaleError,
+  buildGoldenCoastPhase5SalePostings,
+  goldenCoastPhase5IdempotencyKey,
+  goldenCoastPhase5SaleDigest,
+  goldenCoastPhase5SourceId,
+  parseGoldenCoastPhase5SaleInput,
+  planGoldenCoastPhase5Sale,
+  type GoldenCoastFifoLot,
+  type GoldenCoastPhase5PostingRole,
+  type GoldenCoastPhase5RoleAccounts,
+  type GoldenCoastPhase5SaleInput,
+  type GoldenCoastPhase5SalePlan,
+  type GoldenCoastPhase5SaleSideAccount,
+} from "../../services/accounting/goldenCoastPhase5PosSale";
+import {
+  GoldenCoastPhase6DeductionError,
+  buildGoldenCoastPhase6SpecialLocationDeductionPosting,
+  goldenCoastPhase6IdempotencyKey,
+  goldenCoastPhase6SourceId,
+  planGoldenCoastPhase6SpecialLocationDeduction,
+  type GoldenCoastPhase6DeductionPlan,
+} from "../../services/accounting/goldenCoastPhase6SpecialLocationDeduction";
+import { adjustSpInventoryAtomic, respondToSpInventoryIntegrityError } from "../../services/sp/spInventoryIntegrity";
+import { getCurrentExchangeRate } from "../helpers/exchangeRateHelpers";
+import { isGoldenCoastCompany } from "./spGoldenCoastPhase4CutoverFifoRoutes";
+import { loadGoldenCoastAccounts } from "./spGoldenCoastSetupRoutes";
+import { requireSpCompany } from "./spHelpers";
+
+const postingDependencies = createDatabasePostingDependencies();
+const phase6RequestBudget = privilegedRequestBudget({ maxBodyBytes: 32 * 1024, maxCollectionItems: 50 });
+const PHASE6_MAX_SALE_LINES = 50;
+const SALES_REVENUE_SUBTYPE = "sp_sales";
+const COGS_SUBTYPE = "sp_cogs";
+const PHASE6_REQUIRED_ROLES = ["gc_sales_cash", "stock_in_hand", "hassan_savings"] as const satisfies readonly GoldenCoastAccountRole[];
+
+type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type DbLike = typeof db | DatabaseTransaction;
+type PersistedPostingResult = CentralPostingResult<typeof vouchers.$inferSelect, typeof voucherEntries.$inferSelect>;
+
+type Phase6ResolvedAccounts = GoldenCoastPhase5RoleAccounts & {
+  saleSideAccountName: string;
+  gcSalesCashAccountId: number;
+  hassanSavingsAccountId: number;
+};
+
+class GoldenCoastPhase6RouteError extends Error {
+  readonly code: string;
+  readonly status: number;
+
+  constructor(message: string, code = "GC_PHASE6_SALE_INVALID", status = 400) {
+    super(releaseDebtEnglish(message));
+    this.name = "GoldenCoastPhase6RouteError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
+function activeCanonicalRoleAccount(accounts: readonly GoldenCoastLedgerRow[], role: GoldenCoastAccountRole): GoldenCoastLedgerRow {
+  const definition = getGoldenCoastAccountDefinition(role);
+  const matches = accounts.filter(
+    (account) => account.subType === definition.subType && account.active === true && account.deletedAt == null
+  );
+  if (matches.length !== 1) {
+    throw new GoldenCoastPhase6RouteError(
+      matches.length === 0
+        ? `Golden Coast role ${role} is missing; run Golden Coast account setup first`
+        : `Golden Coast role ${role} is ambiguous (${matches.length} active accounts share ${definition.subType})`,
+      "GC_PHASE6_ROLES_INVALID",
+      409
+    );
+  }
+  return matches[0];
+}
+
+async function activeSubTypeAccount(
+  conn: DbLike,
+  companyId: number,
+  subType: string,
+  expectedAccountTypes: readonly string[]
+): Promise<{ id: number; name: string; accountType: string }> {
+  const rows = await conn
+    .select({ id: ledgerAccounts.id, name: ledgerAccounts.name, accountType: ledgerAccounts.accountType })
+    .from(ledgerAccounts)
+    .where(
+      and(
+        eq(ledgerAccounts.companyId, companyId),
+        eq(ledgerAccounts.subType, subType),
+        eq(ledgerAccounts.active, true),
+        isNull(ledgerAccounts.deletedAt)
+      )
+    )
+    .orderBy(asc(ledgerAccounts.id))
+    .limit(2);
+  if (rows.length !== 1) {
+    throw new GoldenCoastPhase6RouteError(
+      rows.length === 0
+        ? `Golden Coast accounting role ${subType} is not configured for this company`
+        : `Golden Coast accounting role ${subType} is ambiguous; repair duplicate canonical accounts first`,
+      "GC_PHASE6_ROLES_INVALID",
+      409
+    );
+  }
+  const account = { id: Number(rows[0].id), name: rows[0].name, accountType: String(rows[0].accountType) };
+  if (!expectedAccountTypes.includes(account.accountType)) {
+    throw new GoldenCoastPhase6RouteError(
+      `Golden Coast accounting role ${subType} must be one of ${expectedAccountTypes.join(", ")}; account "${account.name}" is ${account.accountType}`,
+      "GC_PHASE6_ROLES_INVALID",
+      409
+    );
+  }
+  return account;
+}
+
+async function resolvePhase6Accounts(conn: DbLike, companyId: number): Promise<Phase6ResolvedAccounts> {
+  const goldenCoastAccounts = await loadGoldenCoastAccounts(conn, companyId);
+  for (const role of PHASE6_REQUIRED_ROLES) activeCanonicalRoleAccount(goldenCoastAccounts, role);
+  const saleSide = activeCanonicalRoleAccount(goldenCoastAccounts, "gc_sales_cash");
+  const stockInHand = activeCanonicalRoleAccount(goldenCoastAccounts, "stock_in_hand");
+  const hassanSavings = activeCanonicalRoleAccount(goldenCoastAccounts, "hassan_savings");
+  const [salesRevenue, cogs] = await Promise.all([
+    activeSubTypeAccount(conn, companyId, SALES_REVENUE_SUBTYPE, ["Income", "Direct Income"]),
+    activeSubTypeAccount(conn, companyId, COGS_SUBTYPE, ["Direct Expense", "Expense"]),
+  ]);
+  return {
+    saleSideAccountId: saleSide.id,
+    saleSideAccountName: saleSide.name,
+    salesRevenueAccountId: salesRevenue.id,
+    cogsAccountId: cogs.id,
+    stockInHandAccountId: stockInHand.id,
+    gcSalesCashAccountId: saleSide.id,
+    hassanSavingsAccountId: hassanSavings.id,
+  };
+}
+
+async function assertPhase4BridgePosted(conn: DbLike, companyId: number): Promise<number> {
+  const rows = await conn.execute(sql`
+    SELECT COUNT(*)::int AS lot_count
+    FROM sp_stock_movements
+    WHERE company_id = ${companyId}
+      AND source_type = ${GOLDEN_COAST_CUTOVER_FIFO_SOURCE}
+  `);
+  const lotCount = Number(resultRows(rows)[0]?.lot_count ?? 0);
+  if (lotCount <= 0) {
+    throw new GoldenCoastPhase6RouteError(
+      `The Golden Coast ${GOLDEN_COAST_CUTOVER_DATE} opening FIFO bridge has not been posted yet`,
+      "GC_PHASE6_NOT_READY",
+      409
+    );
+  }
+  return lotCount;
+}
+
+async function resolveSpecialLocationConfig(
+  conn: DbLike,
+  companyId: number,
+  saleLocationId: number
+): Promise<{ deductionPerQtyUsd: string; specialLocationId: number | null }> {
+  const [saleLocation] = await conn
+    .select({
+      id: locations.id,
+      deduction: locations.supplierPartnerPayableDeductionPerQty,
+    })
+    .from(locations)
+    .where(
+      and(
+        eq(locations.id, saleLocationId),
+        eq(locations.companyId, companyId),
+        eq(locations.active, true),
+        isNull(locations.deletedAt)
+      )
+    )
+    .limit(1);
+  if (!saleLocation) {
+    throw new GoldenCoastPhase6RouteError(
+      `Location ${saleLocationId} is not an active location in this company`,
+      "GC_PHASE6_LOCATION_INVALID",
+      400
+    );
+  }
+
+  const configured = await conn
+    .select({ id: locations.id, deduction: locations.supplierPartnerPayableDeductionPerQty })
+    .from(locations)
+    .where(
+      and(
+        eq(locations.companyId, companyId),
+        eq(locations.active, true),
+        isNull(locations.deletedAt),
+        sql`CAST(${locations.supplierPartnerPayableDeductionPerQty} AS numeric) > 0`
+      )
+    )
+    .orderBy(asc(locations.id))
+    .limit(2);
+
+  if (configured.length > 1) {
+    throw new GoldenCoastPhase6RouteError(
+      "Golden Coast allows exactly one special deduction location; more than one active location has a positive deduction configured",
+      "GC_PHASE6_SPECIAL_LOCATION_AMBIGUOUS",
+      409
+    );
+  }
+
+  const special = configured[0] ?? null;
+  if (!special || Number(special.id) !== saleLocationId) {
+    return { deductionPerQtyUsd: "0", specialLocationId: special ? Number(special.id) : null };
+  }
+  return { deductionPerQtyUsd: String(special.deduction ?? "0"), specialLocationId: Number(special.id) };
+}
+
+async function resolveSaleSideAccount(
+  conn: DbLike,
+  companyId: number,
+  raw: unknown,
+  fallbackLedgerAccountId: number
+): Promise<GoldenCoastPhase5SaleSideAccount> {
+  if (raw == null) return { kind: "ledger", id: fallbackLedgerAccountId };
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    throw new GoldenCoastPhase6RouteError("saleSideAccount must be an object when supplied");
+  }
+  const input = raw as Record<string, unknown>;
+  if (input.kind !== "ledger" && input.kind !== "bank") {
+    throw new GoldenCoastPhase6RouteError('saleSideAccount.kind must be "ledger" or "bank"');
+  }
+  const id = Number(input.id);
+  if (!Number.isInteger(id) || id <= 0) throw new GoldenCoastPhase6RouteError("saleSideAccount.id must be a positive integer");
+
+  if (input.kind === "bank") {
+    const [row] = await conn
+      .select({ id: bankAccounts.id })
+      .from(bankAccounts)
+      .where(and(eq(bankAccounts.id, id), eq(bankAccounts.companyId, companyId), eq(bankAccounts.active, true), isNull(bankAccounts.deletedAt)))
+      .limit(1);
+    if (!row) throw new GoldenCoastPhase6RouteError("saleSideAccount must reference an active bank account in this company");
+    return { kind: "bank", id };
+  }
+
+  if (id === fallbackLedgerAccountId) return { kind: "ledger", id };
+  const [row] = await conn
+    .select({ id: ledgerAccounts.id })
+    .from(ledgerAccounts)
+    .where(
+      and(
+        eq(ledgerAccounts.id, id),
+        eq(ledgerAccounts.companyId, companyId),
+        eq(ledgerAccounts.active, true),
+        isNull(ledgerAccounts.deletedAt),
+        inArray(ledgerAccounts.accountType, ["Cash", "Bank"])
+      )
+    )
+    .limit(1);
+  if (!row) {
+    throw new GoldenCoastPhase6RouteError(
+      "saleSideAccount must reference the Golden Coast sale-side role or an active Cash/Bank ledger account in this company"
+    );
+  }
+  return { kind: "ledger", id };
+}
+
+async function lockFifoLots(
+  tx: DatabaseTransaction,
+  companyId: number,
+  locationId: number,
+  stockItemIds: readonly number[]
+): Promise<GoldenCoastFifoLot[]> {
+  const rows = await tx
+    .select({
+      id: spStockMovements.id,
+      companyId: spStockMovements.companyId,
+      locationId: spStockMovements.locationId,
+      stockItemId: spStockMovements.stockItemId,
+      articleCode: spStockMovements.articleCode,
+      description: spStockMovements.description,
+      sourceType: spStockMovements.sourceType,
+      qtyRemaining: spStockMovements.qtyRemaining,
+      finalUnitCostUsd: spStockMovements.finalUnitCostUsd,
+      createdAt: spStockMovements.createdAt,
+    })
+    .from(spStockMovements)
+    .where(
+      and(
+        eq(spStockMovements.companyId, companyId),
+        eq(spStockMovements.locationId, locationId),
+        inArray(spStockMovements.stockItemId, [...stockItemIds]),
+        inArray(spStockMovements.sourceType, [...GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES]),
+        sql`CAST(${spStockMovements.qtyRemaining} AS numeric) > 0`
+      )
+    )
+    .orderBy(asc(spStockMovements.createdAt), asc(spStockMovements.id))
+    .for("update");
+
+  return rows.map((row) => ({
+    id: Number(row.id),
+    companyId: Number(row.companyId),
+    locationId: row.locationId == null ? null : Number(row.locationId),
+    stockItemId: row.stockItemId == null ? null : Number(row.stockItemId),
+    articleCode: String(row.articleCode ?? ""),
+    description: row.description == null ? null : String(row.description),
+    sourceType: row.sourceType == null ? null : String(row.sourceType),
+    qtyRemaining: String(row.qtyRemaining ?? "0"),
+    finalUnitCostUsd: String(row.finalUnitCostUsd ?? "0"),
+    createdAt: row.createdAt == null ? null : new Date(row.createdAt).toISOString(),
+  }));
+}
+
+async function consumeFifoLot(
+  tx: DatabaseTransaction,
+  companyId: number,
+  allocation: { lotId: number; qty: string; qtyRemainingAfter: string }
+): Promise<void> {
+  const updated = await tx.execute(sql`
+    UPDATE sp_stock_movements
+    SET qty_remaining = ${allocation.qtyRemainingAfter}
+    WHERE id = ${allocation.lotId}
+      AND company_id = ${companyId}
+      AND CAST(qty_remaining AS numeric) >= CAST(${allocation.qty} AS numeric)
+    RETURNING id
+  `);
+  if (resultRows(updated).length !== 1) {
+    throw new GoldenCoastPhase6RouteError(
+      `Golden Coast FIFO lot #${allocation.lotId} changed while the sale was being posted`,
+      "GC_PHASE6_FIFO_CONFLICT",
+      409
+    );
+  }
+}
+
+async function findPostedVoucher(
+  tx: DatabaseTransaction,
+  companyId: number,
+  idempotencyKey: string
+): Promise<{ voucher: typeof vouchers.$inferSelect; sourceId: string } | null> {
+  const [marker] = await tx
+    .select({ voucherId: accountingPostingRequests.voucherId, sourceId: accountingPostingRequests.sourceId })
+    .from(accountingPostingRequests)
+    .where(and(eq(accountingPostingRequests.companyId, companyId), eq(accountingPostingRequests.idempotencyKey, idempotencyKey)))
+    .limit(1);
+  if (!marker) return null;
+  const [voucher] = await tx
+    .select()
+    .from(vouchers)
+    .where(and(eq(vouchers.id, Number(marker.voucherId)), eq(vouchers.companyId, companyId)))
+    .limit(1);
+  if (!voucher) {
+    throw new GoldenCoastPhase6RouteError(
+      `Golden Coast sale idempotency marker ${idempotencyKey} references a missing voucher`,
+      "GC_PHASE6_IDEMPOTENCY_INCONSISTENT",
+      409
+    );
+  }
+  return { voucher, sourceId: String(marker.sourceId ?? "") };
+}
+
+async function loadVoucherEntries(tx: DatabaseTransaction, voucherId: number) {
+  return tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
+}
+
+function preDeductionPlan(sale: GoldenCoastPhase5SaleInput, rate: string): GoldenCoastPhase6DeductionPlan | null {
+  const totalQty = sale.lines.reduce((sum, line) => sum.plus(new Decimal(line.qty)), new Decimal(0));
+  const revenue = sale.lines.reduce(
+    (sum, line) => sum.plus(new Decimal(line.qty).times(new Decimal(line.unitPriceUsd))),
+    new Decimal(0)
+  );
+  const pseudoPlan: GoldenCoastPhase5SalePlan = {
+    companyId: sale.companyId,
+    locationId: sale.locationId,
+    saleDate: sale.saleDate,
+    customerName: sale.customerName,
+    clientRequestId: sale.clientRequestId,
+    revenueUsd: revenue.toDecimalPlaces(2).toFixed(2),
+    cogsUsd: "0.00",
+    grossProfitUsd: revenue.toDecimalPlaces(2).toFixed(2),
+    totalQty: totalQty.toDecimalPlaces(4).toFixed(4),
+    lines: [],
+    allocations: [],
+  };
+  return planGoldenCoastPhase6SpecialLocationDeduction({ salePlan: pseudoPlan, deductionPerQtyUsd: rate });
+}
+
+async function findReplayedSale(input: {
+  tx: DatabaseTransaction;
+  companyId: number;
+  sale: GoldenCoastPhase5SaleInput;
+  saleDigest: string;
+  deductionPlan: GoldenCoastPhase6DeductionPlan | null;
+}) {
+  const roles: GoldenCoastPhase5PostingRole[] = ["revenue", "cogs"];
+  const phase5 = await Promise.all(
+    roles.map(async (role) => ({
+      role,
+      marker: await findPostedVoucher(
+        input.tx,
+        input.companyId,
+        goldenCoastPhase5IdempotencyKey(input.companyId, input.sale.clientRequestId, role)
+      ),
+    }))
+  );
+  const deductionMarker = await findPostedVoucher(
+    input.tx,
+    input.companyId,
+    goldenCoastPhase6IdempotencyKey(input.companyId, input.sale.clientRequestId)
+  );
+  const phase5Posted = phase5.filter((item) => item.marker != null);
+  const anyPosted = phase5Posted.length > 0 || deductionMarker != null;
+  if (!anyPosted) return null;
+  if (phase5Posted.length !== roles.length) {
+    throw new GoldenCoastPhase6RouteError(
+      `Golden Coast sale ${input.sale.clientRequestId} has a partially recorded revenue/COGS pair`,
+      "GC_PHASE6_IDEMPOTENCY_INCONSISTENT",
+      409
+    );
+  }
+
+  for (const item of phase5) {
+    const expected = goldenCoastPhase5SourceId(input.sale.clientRequestId, input.saleDigest, item.role);
+    if (item.marker?.sourceId !== expected) {
+      throw new GoldenCoastPhase6RouteError(
+        `Golden Coast sale ${input.sale.clientRequestId} was already posted with different sale data`,
+        "GC_PHASE6_IDEMPOTENCY_CONFLICT",
+        409
+      );
+    }
+  }
+
+  if (input.deductionPlan) {
+    if (!deductionMarker) {
+      throw new GoldenCoastPhase6RouteError(
+        `Golden Coast sale ${input.sale.clientRequestId} is missing its required special-location deduction posting`,
+        "GC_PHASE6_IDEMPOTENCY_INCONSISTENT",
+        409
+      );
+    }
+    const expected = goldenCoastPhase6SourceId({
+      requestId: input.sale.clientRequestId,
+      saleDigest: input.saleDigest,
+      deductionPerQtyUsd: input.deductionPlan.deductionPerQtyUsd,
+      deductionUsd: input.deductionPlan.deductionUsd,
+    });
+    if (deductionMarker.sourceId !== expected) {
+      throw new GoldenCoastPhase6RouteError(
+        `Golden Coast sale ${input.sale.clientRequestId} was already posted under a different special-location deduction configuration`,
+        "GC_PHASE6_IDEMPOTENCY_CONFLICT",
+        409
+      );
+    }
+  } else if (deductionMarker) {
+    throw new GoldenCoastPhase6RouteError(
+      `Golden Coast sale ${input.sale.clientRequestId} already has a special-location deduction but the current configuration no longer matches`,
+      "GC_PHASE6_IDEMPOTENCY_CONFLICT",
+      409
+    );
+  }
+
+  const postings = await Promise.all(
+    phase5.map(async (item) => {
+      const voucher = item.marker!.voucher;
+      return { role: item.role as string, voucher, entries: await loadVoucherEntries(input.tx, voucher.id) };
+    })
+  );
+  if (deductionMarker) {
+    postings.push({
+      role: "special_deduction",
+      voucher: deductionMarker.voucher,
+      entries: await loadVoucherEntries(input.tx, deductionMarker.voucher.id),
+    });
+  }
+  return postings;
+}
+
+async function handleReadiness(req: Request, res: Response): Promise<void> {
+  try {
+    const companyId = await requireSpCompany(req, res);
+    if (!companyId) return;
+    if (!(await isGoldenCoastCompany(db, companyId))) {
+      res.status(409).json({ code: "GC_PHASE6_NOT_CONFIGURED", message: releaseDebtEnglish("Golden Coast account setup is not configured.") });
+      return;
+    }
+
+    const blockers: string[] = [];
+    let accounts: Phase6ResolvedAccounts | null = null;
+    let cutoverLotCount = 0;
+    try {
+      accounts = await resolvePhase6Accounts(db, companyId);
+    } catch (error) {
+      blockers.push(error instanceof Error ? error.message : String(error));
+    }
+    try {
+      cutoverLotCount = await assertPhase4BridgePosted(db, companyId);
+    } catch (error) {
+      blockers.push(error instanceof Error ? error.message : String(error));
+    }
+
+    const configured = await db
+      .select({ id: locations.id, name: locations.name, deductionPerQtyUsd: locations.supplierPartnerPayableDeductionPerQty })
+      .from(locations)
+      .where(
+        and(
+          eq(locations.companyId, companyId),
+          eq(locations.active, true),
+          isNull(locations.deletedAt),
+          sql`CAST(${locations.supplierPartnerPayableDeductionPerQty} AS numeric) > 0`
+        )
+      )
+      .orderBy(asc(locations.id))
+      .limit(3);
+    if (configured.length > 1) blockers.push("More than one active location has a Golden Coast per-unit deduction configured");
+
+    res.json({
+      cutoverDate: GOLDEN_COAST_CUTOVER_DATE,
+      cutoverLotCount,
+      accounts,
+      specialLocation: configured.length === 1 ? configured[0] : null,
+      blockers,
+      canPost: blockers.length === 0,
+    });
+  } catch (error) {
+    logger.error("Golden Coast Phase 6 readiness failed", { error });
+    res.status(500).json({ message: getErrorMessage(error) });
+  }
+}
+
+async function handlePostSale(req: Request, res: Response): Promise<void> {
+  const startedAt = Date.now();
+  let companyId: number | null = null;
+  const userId = req.session.userId;
+  try {
+    companyId = await requireSpCompany(req, res);
+    if (!companyId) return;
+    const selectedCompany = companyId;
+    if (!(await isGoldenCoastCompany(db, selectedCompany))) {
+      res.status(409).json({ code: "GC_PHASE6_NOT_CONFIGURED", message: releaseDebtEnglish("Golden Coast account setup is not configured.") });
+      return;
+    }
+
+    const sale = parseGoldenCoastPhase5SaleInput({ companyId: selectedCompany, body: req.body, maxLines: PHASE6_MAX_SALE_LINES });
+    const exchangeRate = await getCurrentExchangeRate(selectedCompany);
+
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase6-sale:${selectedCompany}:${sale.clientRequestId}`}))`);
+      if (!(await isGoldenCoastCompany(tx, selectedCompany))) {
+        throw new GoldenCoastPhase6RouteError("Golden Coast account setup is not configured", "GC_PHASE6_NOT_CONFIGURED", 409);
+      }
+      await assertPhase4BridgePosted(tx, selectedCompany);
+      const specialConfig = await resolveSpecialLocationConfig(tx, selectedCompany, sale.locationId);
+      const accounts = await resolvePhase6Accounts(tx, selectedCompany);
+      const saleSideAccount = await resolveSaleSideAccount(
+        tx,
+        selectedCompany,
+        (req.body as Record<string, unknown> | undefined)?.saleSideAccount,
+        accounts.saleSideAccountId
+      );
+      const saleDigest = goldenCoastPhase5SaleDigest({ sale, saleSideAccount });
+      const expectedDeduction = preDeductionPlan(sale, specialConfig.deductionPerQtyUsd);
+      const replayed = await findReplayedSale({
+        tx,
+        companyId: selectedCompany,
+        sale,
+        saleDigest,
+        deductionPlan: expectedDeduction,
+      });
+      if (replayed) return { replayed: true as const, postings: replayed, plan: null, deductionPlan: expectedDeduction };
+
+      const stockItemIds = [...new Set(sale.lines.map((line) => line.stockItemId))];
+      const lots = await lockFifoLots(tx, selectedCompany, sale.locationId, stockItemIds);
+      const plan = planGoldenCoastPhase5Sale({ sale, lots });
+      const deductionPlan = planGoldenCoastPhase6SpecialLocationDeduction({
+        salePlan: plan,
+        deductionPerQtyUsd: specialConfig.deductionPerQtyUsd,
+      });
+
+      for (const allocation of plan.allocations) {
+        await consumeFifoLot(tx, selectedCompany, allocation);
+        await adjustSpInventoryAtomic(tx, {
+          companyId: selectedCompany,
+          locationId: allocation.locationId,
+          stockItemId: allocation.stockItemId,
+          deltaQty: -Number(allocation.qty),
+          context: `Golden Coast Phase 6 sale ${sale.clientRequestId} from FIFO lot #${allocation.lotId}`,
+          sourceVoucherType: "GC_PHASE6_SALE",
+        });
+      }
+
+      const batch = buildGoldenCoastPhase5SalePostings({
+        plan,
+        accounts,
+        saleSideAccount,
+        saleDigest,
+        exchangeRate: exchangeRate != null ? String(exchangeRate) : null,
+        actor: { userId: userId ?? null, username: req.session.username || "unknown", reason: "Golden Coast Phase 6 POS sale" },
+      });
+
+      const postings: Array<{ role: string; voucher: PersistedPostingResult["voucher"]; entries: PersistedPostingResult["entries"] }> = [];
+      for (const item of batch.postings) {
+        const posted = (await postBalancedVoucherTx(tx, item.request, postingDependencies)) as PersistedPostingResult;
+        if (posted.replayed) {
+          throw new GoldenCoastPhase6RouteError(
+            `Golden Coast sale ${sale.clientRequestId} ${item.role} voucher was already posted`,
+            "GC_PHASE6_IDEMPOTENCY_INCONSISTENT",
+            409
+          );
+        }
+        postings.push({ role: item.role, voucher: posted.voucher, entries: posted.entries });
+      }
+
+      if (deductionPlan) {
+        const deductionRequest = buildGoldenCoastPhase6SpecialLocationDeductionPosting({
+          plan: deductionPlan,
+          gcSalesCashAccountId: accounts.gcSalesCashAccountId,
+          hassanSavingsAccountId: accounts.hassanSavingsAccountId,
+          saleDigest,
+          exchangeRate: exchangeRate != null ? String(exchangeRate) : null,
+          actor: { userId: userId ?? null, username: req.session.username || "unknown", reason: "Golden Coast special-location deduction" },
+        });
+        const posted = (await postBalancedVoucherTx(tx, deductionRequest, postingDependencies)) as PersistedPostingResult;
+        if (posted.replayed) {
+          throw new GoldenCoastPhase6RouteError(
+            `Golden Coast sale ${sale.clientRequestId} special deduction was already posted`,
+            "GC_PHASE6_IDEMPOTENCY_INCONSISTENT",
+            409
+          );
+        }
+        postings.push({ role: "special_deduction", voucher: posted.voucher, entries: posted.entries });
+      }
+
+      return { replayed: false as const, postings, plan, deductionPlan };
+    });
+
+    logger.info("Golden Coast Phase 6 POS sale posted", {
+      module: "golden-coast-phase6",
+      companyId: selectedCompany,
+      userId,
+      clientRequestId: sale.clientRequestId,
+      locationId: sale.locationId,
+      replayed: result.replayed,
+      voucherIds: result.postings.map((item) => item.voucher.id),
+      deductionUsd: result.deductionPlan?.deductionUsd ?? "0.00",
+      durationMs: Date.now() - startedAt,
+    });
+
+    res.json({
+      clientRequestId: sale.clientRequestId,
+      locationId: sale.locationId,
+      replayed: result.replayed,
+      revenueUsd: result.plan?.revenueUsd ?? null,
+      cogsUsd: result.plan?.cogsUsd ?? null,
+      grossProfitUsd: result.plan?.grossProfitUsd ?? null,
+      specialLocationDeductionUsd: result.deductionPlan?.deductionUsd ?? "0.00",
+      deductionPerQtyUsd: result.deductionPlan?.deductionPerQtyUsd ?? "0.0000",
+      lines: result.plan?.lines ?? null,
+      allocations: result.plan?.allocations ?? null,
+      postings: result.postings.map((item) => ({ role: item.role, voucher: item.voucher, entries: item.entries })),
+    });
+  } catch (error: unknown) {
+    logger.error("Golden Coast Phase 6 POS sale failed", { module: "golden-coast-phase6", companyId, userId, durationMs: Date.now() - startedAt, error });
+    if (error instanceof GoldenCoastPhase6RouteError) {
+      res.status(error.status).json({ code: error.code, message: error.message });
+      return;
+    }
+    if (error instanceof GoldenCoastPhase6DeductionError) {
+      res.status(error.code === "GC_PHASE6_DEDUCTION_INVALID" ? 400 : 409).json({ code: error.code, message: error.message });
+      return;
+    }
+    if (error instanceof GoldenCoastPhase5SaleError) {
+      const status = error.code === "GC_PHASE5_INPUT_INVALID" ? 400 : 409;
+      res.status(status).json({ code: error.code, message: error.message });
+      return;
+    }
+    if (respondToSpInventoryIntegrityError(res, error)) return;
+    if (error instanceof PostingValidationError) {
+      res.status(error.code === "POSTING_IDEMPOTENCY_CORRUPT" ? 409 : 400).json({ code: error.code, message: error.message });
+      return;
+    }
+    res.status(500).json({ message: getErrorMessage(error) });
+  }
+}
+
+export function registerSpGoldenCoastPhase6PosSaleRoutes(app: Express): void {
+  app.get(
+    "/api/sp/golden-coast/phase6/pos-sale/readiness",
+    privilegedReadRateLimit,
+    requireAuth,
+    (req, res) => void handleReadiness(req, res)
+  );
+  app.post(
+    "/api/sp/golden-coast/phase6/pos-sale",
+    privilegedMutationRateLimit,
+    phase6RequestBudget,
+    requireAuth,
+    (req, res) => void handlePostSale(req, res)
+  );
+}
