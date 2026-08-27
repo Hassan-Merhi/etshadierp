@@ -62,14 +62,14 @@ jobs:
             --data '{"state":"pending","context":"phase15/final-100-certification","description":"Phase 15 final certification is running"}'
 
       - name: Checkout exact PR head
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ env.CERT_SHA }}
           persist-credentials: false
           fetch-depth: 2
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "24.19.0"
           cache: npm
@@ -131,6 +131,7 @@ jobs:
 
           node dist/index.js > "$RUNNER_TEMP/phase15-startup-migrations.txt" 2>&1 &
           app_pid=$!
+          # shellcheck disable=SC2317
           cleanup() {
             kill "$app_pid" 2>/dev/null || true
             wait "$app_pid" 2>/dev/null || true
