@@ -16,6 +16,7 @@ export const SP_PERMISSIONS = [
   "sp_container_manage",
   "sp_offload",
   "sp_offload_reverse",
+  "sp_owner_withdrawal",
   "sp_opening_stock",
   "sp_reports",
   "sp_setup",
@@ -27,7 +28,15 @@ type SpPermission = (typeof SP_PERMISSIONS)[number];
 const ROLE_DEFAULTS: Record<string, readonly SpPermission[]> = {
   Developer: SP_PERMISSIONS,
   Admin: SP_PERMISSIONS,
-  Owner: ["sp_view", "sp_sales_create", "sp_container_manage", "sp_offload", "sp_opening_stock", "sp_reports"],
+  Owner: [
+    "sp_view",
+    "sp_sales_create",
+    "sp_container_manage",
+    "sp_offload",
+    "sp_owner_withdrawal",
+    "sp_opening_stock",
+    "sp_reports",
+  ],
   Manager: ["sp_view", "sp_sales_create", "sp_container_manage", "sp_offload", "sp_reports"],
   POS: ["sp_view", "sp_sales_create"],
   "View Only": ["sp_view", "sp_reports"],
@@ -105,6 +114,7 @@ function classifyPermission(req: Request): SpPermission {
     return "sp_migration";
   if (path.includes("setup")) return "sp_setup";
   if (path.includes("opening-stock")) return "sp_opening_stock";
+  if (path === "/golden-coast/phase9/hassan-savings-withdrawal" && method === "POST") return "sp_owner_withdrawal";
   if (
     path.includes("/report/") ||
     path.includes("/export") ||
