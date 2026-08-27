@@ -37,6 +37,15 @@ describe("Golden Coast Phase 6 POS sale route", () => {
     expect(routeSource).toContain("Golden Coast allows exactly one special deduction location");
   });
 
+  it("validates canonical account types and matches Phase 5 line-level revenue rounding", () => {
+    expect(routeSource).toContain("definition.acceptedAccountTypes.includes(account.accountType)");
+    expect(routeSource).toContain("times(new Decimal(line.unitPriceUsd)).toDecimalPlaces(2)");
+  });
+
+  it("does not reactivate the retired Phase 1 location-sale mutation source", () => {
+    expect(routeSource).not.toContain('sourceType: "location_sale"');
+    expect(phase6ServiceSource).not.toContain('sourceType: "location_sale"');
+  });
   it("credits the deduction to canonical Hassan Savings and debits GC Sales Cash", () => {
     for (const role of ["gc_sales_cash", "stock_in_hand", "hassan_savings"]) {
       expect(routeSource).toContain(`"${role}"`);

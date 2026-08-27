@@ -137,7 +137,7 @@ describe("Golden Coast Phase 5 — replay safety", () => {
       .send({ ...body, lines: [{ stockItemId: fixture.goldenCoastStockItemId, qty: "5", unitPriceUsd: "99" }] });
 
     expect(tampered.status).toBe(409);
-    expect(tampered.body.code).toBe("GC_PHASE5_IDEMPOTENCY_CONFLICT");
+    expect(tampered.body.code).toBe("GC_PHASE6_IDEMPOTENCY_CONFLICT");
     expect(await lotRemaining(lotId)).toBeCloseTo(remainingAfterFirst, 4);
   });
 
@@ -222,7 +222,7 @@ describe("Golden Coast Phase 5 — atomicity and isolation", () => {
 
     const foreignLocation = await postSale(saleBody({ locationId: fixture.plainLocationId }));
     expect(foreignLocation.status).toBe(400);
-    expect(foreignLocation.body.code).toBe("GC_PHASE5_LOCATION_INVALID");
+    expect(foreignLocation.body.code).toBe("GC_PHASE6_LOCATION_INVALID");
   });
 
   it("keeps the Golden Coast company's partner capital untouched by Phase 5 sales", async () => {
@@ -263,7 +263,7 @@ describe("Golden Coast Phase 5 — non-Golden-Coast Supplier Partner companies",
         lines: [{ stockItemId: fixture.plainStockItemId, qty: "1", unitPriceUsd: "60" }],
       });
       expect(blocked.status).toBe(409);
-      expect(blocked.body.code).toBe("GC_PHASE5_NOT_CONFIGURED");
+      expect(blocked.body.code).toBe("GC_PHASE6_NOT_CONFIGURED");
 
       await clearLots(fixture.plainCompanyId);
       await seedCutoverLot({
