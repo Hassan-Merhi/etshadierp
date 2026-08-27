@@ -2,6 +2,7 @@ import type { Express, NextFunction, Request, Response } from "express";
 import { and, eq } from "drizzle-orm";
 import { spContainers, spOffloads, spPrepaidCharges, spSales } from "@shared/schema";
 import { db } from "../../db";
+import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { GOLDEN_COAST_PHASE3_CUTOVER_DATE } from "../../services/accounting/goldenCoastPhase3Cutover";
 
@@ -26,7 +27,9 @@ function dateOnly(value: unknown): string | null {
 function rejectPreCutover(res: Response, recordDate: string, source: string): void {
   res.status(409).json({
     code: "GC_PRE_CUTOVER_READ_ONLY",
-    message: `${source} dated ${recordDate} is before the Golden Coast cutover ${GOLDEN_COAST_PHASE3_CUTOVER_DATE} and is read-only.`,
+    message: releaseDebtEnglish(
+      `${source} dated ${recordDate} is before the Golden Coast cutover ${GOLDEN_COAST_PHASE3_CUTOVER_DATE} and is read-only.`
+    ),
   });
 }
 
