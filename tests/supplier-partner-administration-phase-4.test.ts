@@ -40,7 +40,9 @@ describe("Supplier Partner administration phase 4", () => {
 
   it("preserves the existing setup API and repair behavior", () => {
     expect(panel).toContain('queryKey: ["/api/sp/setup/status"]');
-    expect(panel).toContain('apiRequest("POST", "/api/sp/setup")');
+    // The setup POST now carries the CHANGE SP SETUP confirmation payload that
+    // spAccessControl requires, but it must remain the same endpoint and method.
+    expect(panel).toContain('apiRequest("POST", "/api/sp/setup", payload)');
     expect(panel).toContain("repairedSupplierVoucherLinks");
   });
 });
