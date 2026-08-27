@@ -6,7 +6,7 @@ import { registerSpSetupRoutes } from "./spSetupRoutes";
 import { registerSpGoldenCoastSetupRoutes } from "./spGoldenCoastSetupRoutes";
 import { registerSpGoldenCoastPhase3CutoverRoutes } from "./spGoldenCoastPhase3CutoverRoutes";
 import { registerSpGoldenCoastPhase4CutoverFifoRoutes } from "./spGoldenCoastPhase4CutoverFifoRoutes";
-import { registerSpGoldenCoastPhase5PosSaleRoutes } from "./spGoldenCoastPhase5PosSaleRoutes";
+import { registerSpGoldenCoastPhase6PosSaleRoutes } from "./spGoldenCoastPhase6PosSaleRoutes";
 import { registerSpContainerRoutes } from "./spContainerRoutes";
 import { registerSpLifecycleGuards } from "./spLifecycleGuards";
 import { registerSpReoffloadPreparationGuard } from "./spReoffloadPreparationGuard";
@@ -66,7 +66,11 @@ export function registerSpRoutes(app: Express) {
   registerSpGoldenCoastSetupRoutes(app);
   registerSpGoldenCoastPhase3CutoverRoutes(app);
   registerSpGoldenCoastPhase4CutoverFifoRoutes(app);
-  registerSpGoldenCoastPhase5PosSaleRoutes(app);
+  // Phase 6 supersedes the Phase 5 mutation surface: it keeps the same FIFO
+  // revenue/COGS behavior and atomically adds the Golden Coast special-location
+  // Hassan Savings deduction. The Phase 5 source remains in the repository for
+  // history/tests, but its production route is intentionally no longer mounted.
+  registerSpGoldenCoastPhase6PosSaleRoutes(app);
   registerSpLifecycleGuards(app);
   registerSpContainerRoutes(app);
   registerSpReoffloadPreparationGuard(app);
