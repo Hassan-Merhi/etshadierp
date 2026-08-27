@@ -1,9 +1,16 @@
 import { pool } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
+import {
+  getDatabaseScopeRuntimeContext,
+  runWithDatabaseMaintenanceScope,
+} from "../security/databaseScopeRuntimeContext";
+
+type DeferredRentReclassificationOrigin = "startup" | "request";
 
 let inFlight: Promise<void> | null = null;
 let completed = false;
+const completedTenantCompanies = new Set<number>();
 
 const RECLASSIFY_DEFERRED_RENT_SQL = `
 DO $reclass$
@@ -20,6 +27,10 @@ BEGIN
     FROM companies
     WHERE active = true
       AND company_type = 'properties'
+      AND CASE
+        WHEN erp_company_scope_maintenance_enabled() THEN true
+        ELSE id = erp_current_company_id()
+      END
     ORDER BY id
   LOOP
     PERFORM pg_advisory_xact_lock(734210000 + company_row.id);
@@ -187,20 +198,48 @@ $reclass$;
  * the existing Rental Income account. The SQL block is atomic and idempotent:
  * it locks each Properties company, journals only the current remaining balance,
  * hides the obsolete deferred account, and clears legacy landlord prepaid flags.
+ *
+ * Startup work is explicitly marked and may enter maintenance scope to repair all
+ * Properties companies. Request-triggered retries never elevate an unscoped HTTP
+ * request: they run only when tenant isolation has already established a verified
+ * tenant scope, and each successfully repaired tenant becomes a process no-op.
  */
-export function reclassifyLegacyDeferredRentForProperties(): Promise<void> {
+export function reclassifyLegacyDeferredRentForProperties(
+  origin: DeferredRentReclassificationOrigin = "startup"
+): Promise<void> {
+  const scope = getDatabaseScopeRuntimeContext();
   if (completed) return Promise.resolve();
 
+  if (origin === "request") {
+    if (scope?.kind !== "tenant") return Promise.resolve();
+    if (completedTenantCompanies.has(scope.companyId)) return Promise.resolve();
+  }
+
   if (!inFlight) {
-    inFlight = pool
-      .query(RECLASSIFY_DEFERRED_RENT_SQL)
+    const tenantCompanyId = origin === "request" && scope?.kind === "tenant" ? scope.companyId : null;
+    const runReclassification = () => pool.query(RECLASSIFY_DEFERRED_RENT_SQL).then(() => undefined);
+    const reclassificationPromise =
+      origin === "startup"
+        ? runWithDatabaseMaintenanceScope("properties-deferred-rent-reclassification", runReclassification)
+        : runReclassification();
+
+    inFlight = reclassificationPromise
       .then(() => {
-        completed = true;
-        logger.info("[RentalIncome] Properties deferred-rent reclassification completed");
+        if (origin === "startup") {
+          completed = true;
+        } else if (tenantCompanyId !== null) {
+          completedTenantCompanies.add(tenantCompanyId);
+        }
+        logger.info("[RentalIncome] Properties deferred-rent reclassification completed", {
+          origin,
+          tenantCompanyId,
+        });
       })
       .catch((error: unknown) => {
         logger.error("[RentalIncome] Properties deferred-rent reclassification failed", {
           error: getErrorMessage(error),
+          origin,
+          tenantCompanyId,
         });
         throw error;
       })
