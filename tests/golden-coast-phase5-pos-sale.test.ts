@@ -184,7 +184,7 @@ describe("Golden Coast Phase 5 — FIFO sale accounting", () => {
     await clearLots(fixture.ctx.companyId);
     const res = await postSale(saleBody());
     expect(res.status).toBe(409);
-    expect(res.body.code).toBe("GC_PHASE5_NOT_READY");
+    expect(res.body.code).toBe("GC_PHASE6_NOT_READY");
   });
 
   it("never consumes legacy pre-cutover movement rows", async () => {
