@@ -32,6 +32,7 @@ import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import type { CentralPostingRequest, PostingActor } from "./centralPostingEngine";
 import { buildGenericVoucherPostingRequest } from "./genericVoucherPosting";
 import { GOLDEN_COAST_CUTOVER_DATE, GOLDEN_COAST_CUTOVER_FIFO_SOURCE } from "./goldenCoastPhase4CutoverFifo";
+import { GOLDEN_COAST_PHASE8_OFFLOAD_FIFO_SOURCE } from "./goldenCoastPhase8ContainerOffload";
 
 /** Posting `sourceType` every Phase 5 sale voucher is tagged with. */
 export const GOLDEN_COAST_PHASE5_SOURCE_TYPE = "golden-coast-phase5-pos-sale";
@@ -44,9 +45,13 @@ export const GOLDEN_COAST_PHASE5_SOURCE_TYPE = "golden-coast-phase5-pos-sale";
  * Consuming them would derive COGS from unreconciled pre-cutover costs and
  * double the quantity the cutover actually reconciled, so Phase 5 reads only
  * the canonical post-cutover lots. A later Golden Coast phase that creates new
- * post-cutover stock adds its source here.
+ * post-cutover stock adds its source here. Phase 8 offloads are the first such
+ * addition: they land real post-cutover containers with their own provenance.
  */
-export const GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES: readonly string[] = [GOLDEN_COAST_CUTOVER_FIFO_SOURCE];
+export const GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES: readonly string[] = [
+  GOLDEN_COAST_CUTOVER_FIFO_SOURCE,
+  GOLDEN_COAST_PHASE8_OFFLOAD_FIFO_SOURCE,
+];
 
 /** Keeps the derived voucher numbers inside `vouchers.voucher_number` (100). */
 export const GOLDEN_COAST_PHASE5_MAX_REQUEST_ID_LENGTH = 64;
