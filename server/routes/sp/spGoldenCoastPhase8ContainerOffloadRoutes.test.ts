@@ -4,6 +4,11 @@ import { describe, expect, it } from "vitest";
 const routeSource = readFileSync(new URL("./spGoldenCoastPhase8ContainerOffloadRoutes.ts", import.meta.url), "utf8");
 const spIndexSource = readFileSync(new URL("./index.ts", import.meta.url), "utf8");
 const accessControlSource = readFileSync(new URL("./spAccessControl.ts", import.meta.url), "utf8");
+const phase4RouteSource = readFileSync(new URL("./spGoldenCoastPhase4CutoverFifoRoutes.ts", import.meta.url), "utf8");
+const phase4ServiceSource = readFileSync(
+  new URL("../../services/accounting/goldenCoastPhase4CutoverFifo.ts", import.meta.url),
+  "utf8"
+);
 const phase5ServiceSource = readFileSync(
   new URL("../../services/accounting/goldenCoastPhase5PosSale.ts", import.meta.url),
   "utf8"
@@ -37,10 +42,22 @@ describe("Golden Coast Phase 8 container/offload route", () => {
     expect(routeSource).toContain("adjustSpInventoryAtomic");
   });
 
-  it("refuses to post before the Phase 4 cutover FIFO bridge exists", () => {
+  it("refuses to post before the cutover is posted", () => {
     expect(routeSource).toContain("GOLDEN_COAST_CUTOVER_FIFO_SOURCE");
     expect(routeSource).toContain("GC_PHASE8_NOT_READY");
     expect(routeSource).toContain("GC_PHASE8_NOT_CONFIGURED");
+    // Readiness keys off the Phase 3 cutover voucher, which exists for every
+    // company that crossed the cutover.
+    expect(routeSource).toContain("goldenCoastPhase3VoucherNumber(companyId)");
+    expect(phase4RouteSource).toContain("export const goldenCoastPhase3VoucherNumber");
+  });
+
+  it("still admits a company that carried no stock in hand across the cutover", () => {
+    // Phase 4 skips zero-quantity inventory, so an empty FIFO bridge is a
+    // legitimate outcome and must not lock the company out of Phase 8.
+    expect(phase4ServiceSource).toContain("if (quantity.isZero()) continue;");
+    expect(routeSource).toContain("CAST(inv.quantity AS numeric) <> 0");
+    expect(routeSource).toContain("pending_count");
   });
 
   it("resolves every posting account from the canonical Golden Coast role definitions", () => {

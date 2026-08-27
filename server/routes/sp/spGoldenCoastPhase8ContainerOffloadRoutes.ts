@@ -54,7 +54,11 @@ import {
   type GoldenCoastPhase8RoleAccounts,
 } from "../../services/accounting/goldenCoastPhase8ContainerOffload";
 import { adjustSpInventoryAtomic, respondToSpInventoryIntegrityError } from "../../services/sp/spInventoryIntegrity";
-import { isGoldenCoastCompany, type DbLike } from "./spGoldenCoastPhase4CutoverFifoRoutes";
+import {
+  goldenCoastPhase3VoucherNumber,
+  isGoldenCoastCompany,
+  type DbLike,
+} from "./spGoldenCoastPhase4CutoverFifoRoutes";
 import { requireSpCompany } from "./spHelpers";
 
 const postingDependencies = createDatabasePostingDependencies();
@@ -154,6 +158,28 @@ async function assertPhase8Ready(conn: DbLike, companyId: number): Promise<numbe
     );
   }
   await resolveRoleAccounts(conn, companyId);
+
+  // The durable "the cutover happened" marker is the Phase 3 voucher, not the
+  // Phase 4 lot count: Phase 4 skips zero-quantity inventory, so a company that
+  // carried no stock in hand across the cutover legitimately ends with an empty
+  // FIFO bridge. Gating on the lot count alone would lock those companies out of
+  // Phase 8 permanently.
+  const cutoverVoucherResult = await conn.execute(sql`
+    SELECT id
+    FROM vouchers
+    WHERE company_id = ${companyId}
+      AND voucher_number = ${goldenCoastPhase3VoucherNumber(companyId)}
+      AND deleted_at IS NULL
+    LIMIT 1
+  `);
+  if (!resultRows(cutoverVoucherResult)[0]) {
+    throw new GoldenCoastPhase8RouteError(
+      `Golden Coast ${GOLDEN_COAST_CUTOVER_DATE} cutover must be posted before Phase 8 container activity`,
+      "GC_PHASE8_NOT_READY",
+      409
+    );
+  }
+
   const bridgeResult = await conn.execute(sql`
     SELECT COUNT(*)::int AS lot_count
     FROM sp_stock_movements
@@ -162,11 +188,23 @@ async function assertPhase8Ready(conn: DbLike, companyId: number): Promise<numbe
   `);
   const bridgeCount = Number(resultRows(bridgeResult)[0]?.lot_count ?? 0);
   if (bridgeCount <= 0) {
-    throw new GoldenCoastPhase8RouteError(
-      `Golden Coast ${GOLDEN_COAST_CUTOVER_DATE} cutover FIFO bridge must be posted before Phase 8 container activity`,
-      "GC_PHASE8_NOT_READY",
-      409
-    );
+    // No lots yet is only legitimate when there was nothing for Phase 4 to
+    // bridge. Mirror the plan builder's own filter: it skips zero-quantity
+    // inventory rows and bridges every other one.
+    const pendingResult = await conn.execute(sql`
+      SELECT COUNT(*)::int AS pending_count
+      FROM inventory inv
+      INNER JOIN locations loc ON loc.id = inv.location_id AND loc.company_id = ${companyId}
+      WHERE inv.company_id = ${companyId}
+        AND CAST(inv.quantity AS numeric) <> 0
+    `);
+    if (Number(resultRows(pendingResult)[0]?.pending_count ?? 0) > 0) {
+      throw new GoldenCoastPhase8RouteError(
+        `Golden Coast ${GOLDEN_COAST_CUTOVER_DATE} cutover FIFO bridge must be posted before Phase 8 container activity`,
+        "GC_PHASE8_NOT_READY",
+        409
+      );
+    }
   }
   return bridgeCount;
 }
@@ -454,6 +492,7 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
       phase: 8,
       cutoverDate: GOLDEN_COAST_CUTOVER_DATE,
       bridgeCount,
+      cutoverVoucherNumber: goldenCoastPhase3VoucherNumber(companyId),
       openContainers: Number(resultRows(openResult)[0]?.count ?? 0),
       blockers,
       canPost: blockers.length === 0,
