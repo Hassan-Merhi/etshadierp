@@ -10,23 +10,15 @@
 //   1. Local Replit database (PGHOST=helium or an `@helium:` connection
 //      string), Render's same-region private Postgres hostname, or
 //      PGSSLMODE=disable → TLS off entirely (`ssl: false`).
-//   2. PGSSLROOTCERT set             → verified TLS against that CA bundle.
-//   3. PGSSL_REJECT_UNAUTHORIZED true → verified TLS against the system trust
-//      store.
-//   4. Otherwise                     → unverified TLS (`rejectUnauthorized:
-//      false`), preserving compatibility for external providers, and a one-time
-//      startup warning is emitted so operators know verification is off.
+//   2. PGSSLROOTCERT set → verified TLS against that CA bundle.
+//   3. Otherwise → verified TLS against the system trust store.
 //
 // Render recommends its internal Postgres URL for same-region services. That
 // URL uses a single-label `dpg-*` hostname on Render's private network and does
-// not require TLS. Detecting that case removes the previous self-signed/unverified
-// TLS configuration without weakening external database connections.
+// not require TLS. Detecting that case avoids unnecessary TLS there without
+// weakening external database connections.
 
 import { readFileSync } from "node:fs";
-
-const TRUTHY = new Set(["1", "true", "yes", "on"]);
-
-let warned = false;
 
 /**
  * Extract a connection hostname without throwing on malformed/unset input.
@@ -93,9 +85,12 @@ export function databaseRequiresSsl(connectionString = "") {
 /**
  * Resolve the `ssl` option for a `pg` Pool/Client.
  *
+ * External TLS is fail-closed: certificate verification is always enabled.
+ * Operators using a private CA can provide it with PGSSLROOTCERT.
+ *
  * @param {string} [connectionString] Connection string, when the caller has
  *   one, so host heuristics work even if PGHOST is unset.
- * @returns {false | { ca?: string, rejectUnauthorized: boolean }}
+ * @returns {false | { ca?: string, rejectUnauthorized: true }}
  */
 export function resolveDatabaseSsl(connectionString = "") {
   if (!databaseRequiresSsl(connectionString)) {
@@ -104,32 +99,11 @@ export function resolveDatabaseSsl(connectionString = "") {
 
   const caPath = process.env.PGSSLROOTCERT;
   if (caPath && caPath.trim() !== "") {
-    // Fail loudly rather than silently degrading to an unverified connection:
-    // an operator who set PGSSLROOTCERT is explicitly asking for verification.
+    // Fail loudly rather than silently degrading verification when an operator
+    // explicitly supplies a CA path.
     const ca = readFileSync(caPath, "utf8");
     return { ca, rejectUnauthorized: true };
   }
 
-  const rejectFlag = process.env.PGSSL_REJECT_UNAUTHORIZED;
-  if (rejectFlag !== undefined && TRUTHY.has(rejectFlag.trim().toLowerCase())) {
-    return { rejectUnauthorized: true };
-  }
-
-  if (!warned) {
-    warned = true;
-    const renderHint =
-      process.env.RENDER === "true"
-        ? " If this service and Render Postgres are in the same region, use the database's internal URL instead; the app will detect that private dpg-* hostname and disable TLS there."
-        : "";
-    console.warn(
-      "[databaseSsl] Connecting to PostgreSQL with TLS certificate verification " +
-        "DISABLED (rejectUnauthorized: false). This accepts any server certificate " +
-        "and is vulnerable to man-in-the-middle interception. Set PGSSLROOTCERT to " +
-        "your deployment's CA bundle to verify the certificate chain, or " +
-        "PGSSL_REJECT_UNAUTHORIZED=true if the platform already provides a trusted chain." +
-        renderHint
-    );
-  }
-
-  return { rejectUnauthorized: false };
+  return { rejectUnauthorized: true };
 }
