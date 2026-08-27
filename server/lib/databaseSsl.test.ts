@@ -1,15 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // Imported for its type only; the runtime module is the untyped `.mjs`.
 import type { resolveDatabaseSsl as ResolveDatabaseSsl } from "./databaseSsl.mjs";
 
-// The module keeps a one-time "verification disabled" warning flag in module
-// scope, so each test re-imports it fresh to get a clean flag and a clean env.
 async function loadResolver(env: Record<string, string | undefined>): Promise<typeof ResolveDatabaseSsl> {
   vi.resetModules();
-  for (const key of ["PGHOST", "PGSSLMODE", "PGSSLROOTCERT", "PGSSL_REJECT_UNAUTHORIZED"]) {
+  for (const key of ["PGHOST", "PGSSLMODE", "PGSSLROOTCERT", "PGSSL_REJECT_UNAUTHORIZED", "RENDER"]) {
     delete process.env[key];
   }
   Object.assign(process.env, env);
@@ -19,15 +17,6 @@ async function loadResolver(env: Record<string, string | undefined>): Promise<ty
 
 describe("resolveDatabaseSsl", () => {
   const REMOTE = "postgresql://user:pass@db.example.com:5432/erp";
-  let warnSpy: ReturnType<typeof vi.spyOn>;
-
-  beforeEach(() => {
-    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    warnSpy.mockRestore();
-  });
 
   it("disables TLS entirely when PGSSLMODE=disable", async () => {
     const resolve = await loadResolver({ PGSSLMODE: "disable" });
@@ -44,25 +33,38 @@ describe("resolveDatabaseSsl", () => {
     expect(resolve("postgresql://user:pass@helium:5432/erp")).toBe(false);
   });
 
-  it("defaults to unverified TLS and warns exactly once", async () => {
-    const resolve = await loadResolver({});
-    expect(resolve(REMOTE)).toEqual({ rejectUnauthorized: false });
-    // Second call must not warn again.
-    expect(resolve(REMOTE)).toEqual({ rejectUnauthorized: false });
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(String(warnSpy.mock.calls[0][0])).toContain("verification");
+  it("disables TLS for Render's private same-region Postgres hostname", async () => {
+    const resolve = await loadResolver({ RENDER: "true" });
+    expect(resolve("postgresql://user:pass@dpg-cabc1234-a:5432/erp")).toBe(false);
   });
 
-  it("verifies against the system trust store when PGSSL_REJECT_UNAUTHORIZED is truthy", async () => {
+  it("verifies TLS for Render's external Postgres hostname", async () => {
+    const resolve = await loadResolver({ RENDER: "true" });
+    expect(resolve("postgresql://user:pass@dpg-cabc1234-a.oregon-postgres.render.com:5432/erp")).toEqual({
+      rejectUnauthorized: true,
+    });
+  });
+
+  it("honors an explicit SSL mode on a Render private hostname", async () => {
+    const resolve = await loadResolver({ RENDER: "true", PGSSLMODE: "require" });
+    expect(resolve("postgresql://user:pass@dpg-cabc1234-a:5432/erp")).toEqual({ rejectUnauthorized: true });
+  });
+
+  it("defaults to verified TLS using the system trust store", async () => {
+    const resolve = await loadResolver({});
+    expect(resolve(REMOTE)).toEqual({ rejectUnauthorized: true });
+  });
+
+  it("keeps verification enabled when PGSSL_REJECT_UNAUTHORIZED is truthy", async () => {
     for (const flag of ["true", "1", "yes", "on", "TRUE"]) {
       const resolve = await loadResolver({ PGSSL_REJECT_UNAUTHORIZED: flag });
       expect(resolve(REMOTE)).toEqual({ rejectUnauthorized: true });
     }
   });
 
-  it("treats a falsy PGSSL_REJECT_UNAUTHORIZED as unverified", async () => {
+  it("does not allow a falsy PGSSL_REJECT_UNAUTHORIZED to disable verification", async () => {
     const resolve = await loadResolver({ PGSSL_REJECT_UNAUTHORIZED: "false" });
-    expect(resolve(REMOTE)).toEqual({ rejectUnauthorized: false });
+    expect(resolve(REMOTE)).toEqual({ rejectUnauthorized: true });
   });
 
   it("verifies against the CA bundle at PGSSLROOTCERT", async () => {
@@ -74,7 +76,6 @@ describe("resolveDatabaseSsl", () => {
       ca: "-----BEGIN CERTIFICATE-----\nFAKE\n-----END CERTIFICATE-----\n",
       rejectUnauthorized: true,
     });
-    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it("prefers PGSSLROOTCERT over PGSSL_REJECT_UNAUTHORIZED", async () => {
