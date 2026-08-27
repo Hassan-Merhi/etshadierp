@@ -95,6 +95,27 @@ describe("Golden Coast Phase 9 Hassan Savings withdrawal", () => {
     });
   });
 
+  it("credits a selected Cash/Bank ledger target when the payment account is a ledger", () => {
+    const parsed = withdrawal({
+      amountUsd: "125.00",
+      paymentAccount: { kind: "ledger", id: 55 },
+    });
+    const plan = planGoldenCoastPhase9Withdrawal({ withdrawal: parsed, savingsBalanceUsd: "1000.00" });
+    const digest = goldenCoastPhase9WithdrawalDigest({ withdrawal: parsed, hassanSavingsAccountId: 44 });
+    const posting = buildGoldenCoastPhase9WithdrawalPosting({
+      plan,
+      hassanSavingsAccountId: 44,
+      withdrawalDigest: digest,
+    });
+
+    expect(posting.entries[1]).toMatchObject({
+      ledgerAccountId: 55,
+      debitAmount: "0",
+      creditAmount: "125",
+    });
+    expect(posting.entries[1].bankAccountId).toBeUndefined();
+  });
+
   it("binds the digest to payment routing and material payload fields", () => {
     const base = withdrawal();
     const baseDigest = goldenCoastPhase9WithdrawalDigest({ withdrawal: base, hassanSavingsAccountId: 44 });
