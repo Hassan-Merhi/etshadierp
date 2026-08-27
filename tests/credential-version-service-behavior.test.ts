@@ -88,7 +88,9 @@ describe("credential version service behavior", () => {
   });
 
   it("returns zero for sessions without a user id", async () => {
-    await expect(hydrateActiveCredentialVersion({}, {}, { now: 1 })).resolves.toBe(0);
+    await expect(
+      hydrateActiveCredentialVersion({}, {}, { now: 1 }),
+    ).resolves.toBe(0);
   });
 
   it("creates a missing credential version row and defaults safely when insert returns nothing", async () => {
@@ -120,30 +122,42 @@ describe("credential version service behavior", () => {
   it("revokes all sessions or preserves one explicitly exempt sid", async () => {
     const pool = { query: vi.fn(async () => undefined) };
     await revokeUserSessions(pool, "u4");
-    expect(pool.query).toHaveBeenLastCalledWith(expect.stringContaining("sess->>'userId' = $1"), ["u4"]);
+    expect(pool.query).toHaveBeenLastCalledWith(
+      expect.stringContaining("sess->>'userId' = $1"),
+      ["u4"],
+    );
 
     await revokeUserSessions(pool, "u4", "sid-keep");
-    expect(pool.query).toHaveBeenLastCalledWith(expect.stringContaining("sid <> $2"), ["u4", "sid-keep"]);
+    expect(pool.query).toHaveBeenLastCalledWith(expect.stringContaining("sid <> $2"), [
+      "u4",
+      "sid-keep",
+    ]);
   });
 
   it("revokes only sessions in the affected company and can preserve one sid", async () => {
     const pool = { query: vi.fn(async () => undefined) };
 
     await revokeUserCompanySessions(pool, "u-company", 42);
-    expect(pool.query).toHaveBeenLastCalledWith(expect.stringContaining("sess->>'currentCompanyId' = $2"), [
-      "u-company",
-      "42",
-    ]);
+    expect(pool.query).toHaveBeenLastCalledWith(
+      expect.stringContaining("sess->>'currentCompanyId' = $2"),
+      ["u-company", "42"],
+    );
 
     await revokeUserCompanySessions(pool, "u-company", 42, "sid-keep");
-    expect(pool.query).toHaveBeenLastCalledWith(expect.stringContaining("sid <> $3"), ["u-company", "42", "sid-keep"]);
+    expect(pool.query).toHaveBeenLastCalledWith(expect.stringContaining("sid <> $3"), [
+      "u-company",
+      "42",
+      "sid-keep",
+    ]);
   });
 
   it("rotates credentials transactionally and then revokes prior sessions", async () => {
     const upsert = insertBuilder([{ credentialVersion: 3 }]);
     const tx: any = { execute: vi.fn(), insert: vi.fn(() => upsert) };
     const db: any = {
-      transaction: vi.fn(async (callback: (inner: any) => Promise<number>) => callback(tx)),
+      transaction: vi.fn(async (callback: (inner: any) => Promise<number>) =>
+        callback(tx),
+      ),
     };
     const pool = { query: vi.fn(async () => undefined) };
 
@@ -153,6 +167,9 @@ describe("credential version service behavior", () => {
       }),
     ).resolves.toBe(3);
     expect(db.transaction).toHaveBeenCalledOnce();
-    expect(pool.query).toHaveBeenCalledWith(expect.stringContaining("sid <> $2"), ["u5", "current"]);
+    expect(pool.query).toHaveBeenCalledWith(expect.stringContaining("sid <> $2"), [
+      "u5",
+      "current",
+    ]);
   });
 });
