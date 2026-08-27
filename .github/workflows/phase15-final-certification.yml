@@ -129,7 +129,6 @@ jobs:
 
           node dist/index.js > "$RUNNER_TEMP/phase15-startup-migrations.txt" 2>&1 &
           app_pid=$!
-          # shellcheck disable=SC2317
           cleanup() {
             kill "$app_pid" 2>/dev/null || true
             wait "$app_pid" 2>/dev/null || true
