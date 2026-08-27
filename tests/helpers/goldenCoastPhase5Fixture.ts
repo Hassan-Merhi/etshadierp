@@ -36,7 +36,7 @@ function stableFixtureCode(prefix: string, suffix: string): string {
   return `${base}${digest}${suffix}`;
 }
 
-export const GOLDEN_COAST_PHASE5_SALE_URL = "/api/sp/golden-coast/phase5/pos-sale";
+export const GOLDEN_COAST_PHASE5_SALE_URL = "/api/sp/golden-coast/phase6/pos-sale";
 /** On or after the September 1, 2026 cutover, which Phase 5 requires. */
 export const GOLDEN_COAST_PHASE5_SALE_DATE = "2026-09-05";
 
@@ -114,6 +114,13 @@ export async function setupGoldenCoastPhase5Fixture(prefix: string): Promise<Gol
     name: "Stock in Hand",
     accountType: "Asset",
     subType: "sp_stock",
+  });
+  await insertLedgerAccount({
+    companyId: ctx.companyId,
+    code: "GC-HSAV",
+    name: "Hassan Savings",
+    accountType: "Loans",
+    subType: "gc_hassan_savings",
   });
   const salesAccountId = await insertLedgerAccount({
     companyId: ctx.companyId,
