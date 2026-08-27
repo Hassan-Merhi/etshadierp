@@ -66,12 +66,26 @@ jobs:
 
           candidate_found=false
 
-          while IFS=$'\t' read -r pr head_ref head_sha head_repo author draft labels base_sha; do
+          while IFS= read -r encoded_pr; do
+            [[ -n "$encoded_pr" ]] || continue
+            pr_json="$(printf '%s' "$encoded_pr" | base64 --decode)"
+            pr="$(jq -r '.number' <<< "$pr_json")"
+            head_ref="$(jq -r '.head.ref' <<< "$pr_json")"
+            head_sha="$(jq -r '.head.sha' <<< "$pr_json")"
+            head_repo="$(jq -r '.head.repo.full_name // ""' <<< "$pr_json")"
+            author="$(jq -r '.user.login' <<< "$pr_json")"
+            draft="$(jq -r '.draft' <<< "$pr_json")"
+            labels="$(jq -r '[.labels[].name] | join(",")' <<< "$pr_json")"
+            base_sha="$(jq -r '.base.sha' <<< "$pr_json")"
+
             [[ "$draft" == "false" ]] || continue
             [[ "$head_repo" == "$GITHUB_REPOSITORY" ]] || continue
             [[ "$author" == "$REPO_OWNER" ]] || continue
-            [[ ",$labels," != *",manual-review,"* ]] || continue
-            [[ ",$labels," != *",no-auto-ship,"* ]] || continue
+
+            if [[ ",$labels," == *",manual-review,"* || ",$labels," == *",no-auto-ship,"* ]]; then
+              gh pr merge "$pr" --disable-auto >/dev/null 2>&1 || true
+              continue
+            fi
 
             compare="$(gh api "repos/$GITHUB_REPOSITORY/compare/${base_sha}...${head_sha}")"
             behind="$(jq -r '.behind_by' <<< "$compare")"
@@ -82,6 +96,7 @@ jobs:
                 echo "PR #$pr synced with main; waiting for fresh checks."
               else
                 gh pr edit "$pr" --add-label manual-review
+                gh pr merge "$pr" --disable-auto >/dev/null 2>&1 || true
                 gh pr comment "$pr" --body "OpenAI CI Repair Bot stopped because this branch conflicts with \`main\`. It will not bypass the conflict."
               fi
               continue
@@ -113,6 +128,7 @@ jobs:
               --jq '[.[] | select(.commit.message | startswith("[ci-repair-bot] repair"))] | length')"
             if (( repairs >= 3 )); then
               gh pr edit "$pr" --add-label manual-review
+              gh pr merge "$pr" --disable-auto >/dev/null 2>&1 || true
               gh pr comment "$pr" --body "OpenAI CI Repair Bot reached its three-repair safety limit and stopped."
               continue
             fi
@@ -126,16 +142,7 @@ jobs:
             candidate_found=true
           done < <(
             gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100" \
-              --jq '.[] | [
-                (.number|tostring),
-                .head.ref,
-                .head.sha,
-                .head.repo.full_name,
-                .user.login,
-                (.draft|tostring),
-                ([.labels[].name] | join(",")),
-                .base.sha
-              ] | @tsv'
+              --jq '.[] | @base64'
           )
 
   repair:
@@ -219,6 +226,13 @@ jobs:
         continue-on-error: true
         run: npm ci --no-audit --prefer-offline
 
+      - name: Restore clean source baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git reset --hard HEAD
+          git clean -fd -e .ci-repair/
+
       - name: Run OpenAI Codex repair
         uses: openai/codex-action@86365089eb2b84e0a8fb0717b304f8bdcb13b20e # v1
         with:
@@ -246,8 +260,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git diff --check
-          changed="$(git diff --name-only)"
+          rm -rf .ci-repair
+          git add -A
+          git diff --cached --check
+          changed="$(git diff --cached --name-only)"
           if [[ -z "$changed" ]]; then
             {
               echo "has_patch=false"
@@ -257,21 +273,23 @@ jobs:
           fi
           if printf '%s\n' "$changed" | grep -q '^\.github/workflows/'; then
             git reset --hard HEAD
+            git clean -fd
             {
               echo "has_patch=false"
               echo "repair_reason=forbidden-workflow-change"
             } >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if git diff -U0 | grep -E '^\+.*(continue-on-error:[[:space:]]*true|@ts-ignore|eslint-disable|describe\.skip|it\.skip|test\.skip|--passWithNoTests|\|\|[[:space:]]+true)' >/dev/null; then
+          if git diff --cached -U0 | grep -E '^\+.*(continue-on-error:[[:space:]]*true|@ts-ignore|eslint-disable|describe\.skip|it\.skip|test\.skip|--passWithNoTests|\|\|[[:space:]]+true)' >/dev/null; then
             git reset --hard HEAD
+            git clean -fd
             {
               echo "has_patch=false"
               echo "repair_reason=guardrail-rejected"
             } >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git diff --binary > repair.patch
+          git diff --cached --binary > repair.patch
           test -s repair.patch
           {
             echo "has_patch=true"
@@ -303,7 +321,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Re-verify exact PR head
+      - name: Re-verify exact PR head and stop labels
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -320,6 +338,11 @@ jobs:
           [[ "$(jq -r '.base.ref' <<< "$pr_json")" == "main" ]]
           [[ "$(jq -r '.state' <<< "$pr_json")" == "open" ]]
           [[ "$(jq -r '.draft' <<< "$pr_json")" == "false" ]]
+          labels="$(jq -r '[.labels[].name] | join(",")' <<< "$pr_json")"
+          if [[ ",$labels," == *",manual-review,"* || ",$labels," == *",no-auto-ship,"* ]]; then
+            echo "A stop label was added while the repair was running; refusing to push."
+            exit 1
+          fi
 
       - name: Check out exact verified head
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -370,4 +393,5 @@ jobs:
           REASON: ${{ needs.repair.outputs.repair_reason }}
         run: |
           gh pr edit "$PR" --add-label manual-review
+          gh pr merge "$PR" --disable-auto >/dev/null 2>&1 || true
           gh pr comment "$PR" --body "OpenAI CI Repair Bot stopped without pushing code (reason: \`${REASON:-unknown}\`). The failure needs manual review rather than an unsafe or speculative change."
