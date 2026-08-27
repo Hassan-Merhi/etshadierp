@@ -8,6 +8,7 @@ import { registerSpGoldenCoastPhase3CutoverRoutes } from "./spGoldenCoastPhase3C
 import { registerSpGoldenCoastPhase4CutoverFifoRoutes } from "./spGoldenCoastPhase4CutoverFifoRoutes";
 import { registerSpGoldenCoastPhase6PosSaleRoutes } from "./spGoldenCoastPhase6PosSaleRoutes";
 import { registerSpGoldenCoastPhase7HadiTransferRoutes } from "./spGoldenCoastPhase7HadiTransferRoutes";
+import { registerSpGoldenCoastPhase8ContainerOffloadRoutes } from "./spGoldenCoastPhase8ContainerOffloadRoutes";
 import { registerSpContainerRoutes } from "./spContainerRoutes";
 import { registerSpLifecycleGuards } from "./spLifecycleGuards";
 import { registerSpReoffloadPreparationGuard } from "./spReoffloadPreparationGuard";
@@ -73,6 +74,7 @@ export function registerSpRoutes(app: Express) {
   // history/tests, but its production route is intentionally no longer mounted.
   registerSpGoldenCoastPhase6PosSaleRoutes(app);
   registerSpGoldenCoastPhase7HadiTransferRoutes(app);
+  registerSpGoldenCoastPhase8ContainerOffloadRoutes(app);
   registerSpLifecycleGuards(app);
   registerSpContainerRoutes(app);
   registerSpReoffloadPreparationGuard(app);
