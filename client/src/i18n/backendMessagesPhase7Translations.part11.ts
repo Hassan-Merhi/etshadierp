@@ -202,4 +202,9 @@ export const backendMessagesPhase7TranslationsPart11: readonly Phase7BackendMess
     ar: "احتوى طلب تعديل المتصفح على قيمة Origin أو Referer غير صالحة.",
     fr: "La requête de modification du navigateur contenait un en-tête Origin ou Referer non valide.",
   },
+  {
+    en: "Article code for grade ${grade} must start with ${targetPrefix}",
+    ar: "يجب أن يبدأ رمز الصنف للدرجة {0} بالبادئة {1}",
+    fr: "Le code article de la qualité {0} doit commencer par {1}",
+  },
 ];
