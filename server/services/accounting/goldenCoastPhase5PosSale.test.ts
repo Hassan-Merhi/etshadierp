@@ -232,7 +232,7 @@ describe("Golden Coast Phase 5 FIFO consumption", () => {
   it("refuses to consume a legacy pre-cutover movement row", () => {
     // Phase 4 leaves legacy rows in place and they sort first by created_at, so
     // this guard is what keeps a sale off unreconciled pre-cutover cost.
-    expect(GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES).toEqual(["golden_coast_cutover"]);
+    expect(GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES).toEqual(["golden_coast_cutover", "golden_coast_phase8_offload"]);
     for (const sourceType of ["offload", "opening_stock", null]) {
       try {
         planGoldenCoastPhase5Sale({
