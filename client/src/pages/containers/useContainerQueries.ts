@@ -54,7 +54,7 @@ export function useContainerQueries(
     ),
     queryFn: async () => {
       const res = await fetch(suppliersPath, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load suppliers");
+      if (!res.ok) throw res;
       return res.json();
     },
     enabled: !!selectedCompany?.id,
