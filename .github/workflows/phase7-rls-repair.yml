@@ -1,0 +1,164 @@
+name: Phase 7 one-shot RLS repair
+
+on:
+  push:
+    branches:
+      - chatgpt/golden-coast-phase7-hadi-transfers
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase7-one-shot-rls-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: chatgpt/golden-coast-phase7-hadi-transfers
+
+      - name: Sync latest main safely
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp config/ci-ratchet-allowances.json /tmp/phase7-ratchet.json
+          git fetch origin main
+          set +e
+          git merge --no-edit origin/main
+          merge_rc=$?
+          set -e
+          if [ "$merge_rc" -ne 0 ]; then
+            conflicts="$(git diff --name-only --diff-filter=U)"
+            if [ "$conflicts" != "config/ci-ratchet-allowances.json" ]; then
+              echo "Unexpected merge conflicts:"
+              echo "$conflicts"
+              exit 1
+            fi
+            git checkout --theirs config/ci-ratchet-allowances.json
+            python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('config/ci-ratchet-allowances.json')
+          data = json.loads(p.read_text())
+          additions = [
+              'GET /api/sp/golden-coast/phase7/sales-cash-transfer/readiness [<anonymous> > requireAuth > requireNonPOS > <anonymous>]',
+              'POST /api/sp/golden-coast/phase7/sales-cash-transfer [<anonymous> > <anonymous> > requireAuth > requireNonPOS > <anonymous>]',
+          ]
+          values = data.setdefault('routeManifestRouteAdditions', [])
+          for item in additions:
+              if item not in values:
+                  values.append(item)
+          p.write_text(json.dumps(data, indent=2) + '\n')
+          PY
+            git add config/ci-ratchet-allowances.json
+            git commit --no-edit
+          fi
+
+      - name: Repair Phase 7 cross-company RLS scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('server/routes/sp/spGoldenCoastPhase7HadiTransferRoutes.ts')
+          s = path.read_text()
+
+          anchor = 'import { resultRows } from "../../lib/queryResult";\n'
+          inject = '''import { assertCompaniesAccess } from "../../security/companyAccessBoundary";\nimport {\n  getCompanyRequestRuntimeContext,\n} from "../../services/security/companyRequestRuntimeContext";\nimport { assertTransactionCompanyScope } from "../../services/security/transactionCompanyScope";\n'''
+          if inject not in s:
+              s = s.replace(anchor, anchor + inject)
+
+          marker = '''interface ResolvedPhase7Accounts extends GoldenCoastPhase7RoleAccounts {\n  gcSalesCashAccountName: string;\n  goldenCoastHadiIntercompanyAccountName: string;\n  hadiGoldenCoastIntercompanyAccountName: string;\n}\n'''
+          helper = marker + '''\nasync function authorizeHadiCompanyForRequest(\n  req: Request,\n  hadiCompanyId: number\n): Promise<void> {\n  const userId = req.session.userId;\n  if (!userId) {\n    throw new GoldenCoastPhase7RouteError(\n      "Authenticated user context is required for HADI company authorization",\n      "GC_PHASE7_HADI_SCOPE_UNAUTHORIZED",\n      403\n    );\n  }\n\n  await assertCompaniesAccess(userId, [hadiCompanyId]);\n  const requestContext = getCompanyRequestRuntimeContext();\n  if (!requestContext) {\n    throw new GoldenCoastPhase7RouteError(\n      "Company request context is unavailable for HADI company authorization",\n      "GC_PHASE7_HADI_SCOPE_UNAUTHORIZED",\n      403\n    );\n  }\n\n  const authorizedCompanyIds = new Set(requestContext.authorizedCompanyIds ?? []);\n  authorizedCompanyIds.add(hadiCompanyId);\n  requestContext.authorizedCompanyIds = [...authorizedCompanyIds];\n}\n'''
+          if 'async function authorizeHadiCompanyForRequest' not in s:
+              s = s.replace(marker, helper)
+
+          old = '''async function resolvePhase7Accounts(\n  conn: DbLike,\n  pair: GoldenCoastPhase7CompanyPair\n): Promise<ResolvedPhase7Accounts> {\n  const goldenCoastAccounts = await loadGoldenCoastAccounts(conn, pair.goldenCoastCompanyId);\n  const gcSalesCash = activeCanonicalGoldenCoastRole(goldenCoastAccounts, pair.goldenCoastCompanyId, "gc_sales_cash");\n  const [goldenCoastIntercompany, hadiIntercompany] = await Promise.all([\n    activeIntercompanyAccount(\n      conn,\n      pair.goldenCoastCompanyId,\n      "sp_hadi_intercompany",\n      "Golden Coast HADI intercompany account"\n    ),\n    activeIntercompanyAccount(\n      conn,\n      pair.hadiCompanyId,\n      "hadi_sp_intercompany",\n      "HADI Golden Coast intercompany account"\n    ),\n  ]);\n\n  return {\n'''
+          new = '''async function resolvePhase7Accounts(\n  conn: DatabaseTransaction,\n  pair: GoldenCoastPhase7CompanyPair\n): Promise<ResolvedPhase7Accounts> {\n  await assertTransactionCompanyScope(conn, pair.goldenCoastCompanyId);\n  const goldenCoastAccounts = await loadGoldenCoastAccounts(conn, pair.goldenCoastCompanyId);\n  const gcSalesCash = activeCanonicalGoldenCoastRole(goldenCoastAccounts, pair.goldenCoastCompanyId, "gc_sales_cash");\n  const goldenCoastIntercompany = await activeIntercompanyAccount(\n    conn,\n    pair.goldenCoastCompanyId,\n    "sp_hadi_intercompany",\n    "Golden Coast HADI intercompany account"\n  );\n\n  await assertTransactionCompanyScope(conn, pair.hadiCompanyId);\n  const hadiIntercompany = await activeIntercompanyAccount(\n    conn,\n    pair.hadiCompanyId,\n    "hadi_sp_intercompany",\n    "HADI Golden Coast intercompany account"\n  );\n  await assertTransactionCompanyScope(conn, pair.goldenCoastCompanyId);\n\n  return {\n'''
+          if old in s:
+              s = s.replace(old, new)
+          elif new not in s:
+              raise SystemExit('resolvePhase7Accounts pattern not found')
+
+          old = '''  const found = await Promise.all(\n    roles.map(async ({ role, markerCompanyId }) => ({\n      role,\n      markerCompanyId,\n      marker: await findPostedVoucher(\n        tx,\n        markerCompanyId,\n        goldenCoastPhase7IdempotencyKey(pair.goldenCoastCompanyId, transfer.clientRequestId, role)\n      ),\n    }))\n  );\n'''
+          new = '''  const found: Array<{\n    role: GoldenCoastPhase7PostingRole;\n    markerCompanyId: number;\n    marker: Awaited<ReturnType<typeof findPostedVoucher>>;\n  }> = [];\n  for (const { role, markerCompanyId } of roles) {\n    await assertTransactionCompanyScope(tx, markerCompanyId);\n    found.push({\n      role,\n      markerCompanyId,\n      marker: await findPostedVoucher(\n        tx,\n        markerCompanyId,\n        goldenCoastPhase7IdempotencyKey(pair.goldenCoastCompanyId, transfer.clientRequestId, role)\n      ),\n    });\n  }\n  await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);\n'''
+          if old in s:
+              s = s.replace(old, new)
+          elif new not in s:
+              raise SystemExit('replay scope pattern not found')
+
+          old = '''        pair = await resolveCompanyPair(tx, companyId);\n        accounts = await resolvePhase7Accounts(tx, pair);\n        [balances, hadiCashAccounts, goldenCoastCashAccounts] = await Promise.all([\n          Promise.all([\n            gcSalesCashDebitBalance(tx, companyId, accounts.gcSalesCashAccountId),\n            outstandingPhase7HadiCollections(tx, companyId),\n          ]).then(([gcSalesCashDebitBalanceUsd, outstandingHadiCollectionsUsd]) => ({\n            gcSalesCashDebitBalanceUsd,\n            outstandingHadiCollectionsUsd,\n          })),\n          listCashAccounts(tx, pair.hadiCompanyId),\n          listCashAccounts(tx, pair.goldenCoastCompanyId),\n        ]);\n'''
+          new = '''        pair = await resolveCompanyPair(tx, companyId);\n        await authorizeHadiCompanyForRequest(req, pair.hadiCompanyId);\n        accounts = await resolvePhase7Accounts(tx, pair);\n\n        await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);\n        const [gcSalesCashDebitBalanceUsd, outstandingHadiCollectionsUsd] = await Promise.all([\n          gcSalesCashDebitBalance(tx, companyId, accounts.gcSalesCashAccountId),\n          outstandingPhase7HadiCollections(tx, companyId),\n        ]);\n        balances = { gcSalesCashDebitBalanceUsd, outstandingHadiCollectionsUsd };\n        goldenCoastCashAccounts = await listCashAccounts(tx, pair.goldenCoastCompanyId);\n\n        await assertTransactionCompanyScope(tx, pair.hadiCompanyId);\n        hadiCashAccounts = await listCashAccounts(tx, pair.hadiCompanyId);\n        await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);\n'''
+          if old in s:
+              s = s.replace(old, new)
+          elif new not in s:
+              raise SystemExit('readiness scope pattern not found')
+
+          old = '''      const pair = await resolveCompanyPair(tx, selectedCompany);\n      const transfer = parseGoldenCoastPhase7TransferInput({\n'''
+          new = '''      const pair = await resolveCompanyPair(tx, selectedCompany);\n      await authorizeHadiCompanyForRequest(req, pair.hadiCompanyId);\n      await assertTransactionCompanyScope(tx, selectedCompany);\n      const transfer = parseGoldenCoastPhase7TransferInput({\n'''
+          if old in s:
+              s = s.replace(old, new)
+          elif new not in s:
+              raise SystemExit('post authorization pattern not found')
+
+          old = '''      const accounts = await resolvePhase7Accounts(tx, pair);\n      await validateCashAccount(tx, pair.hadiCompanyId, transfer.hadiCashAccount, "hadiCashAccount");\n      if (transfer.operation === "remit_from_hadi" && transfer.goldenCoastCashAccount) {\n        await validateCashAccount(\n          tx,\n          pair.goldenCoastCompanyId,\n          transfer.goldenCoastCashAccount,\n          "goldenCoastCashAccount"\n        );\n      }\n'''
+          new = '''      const accounts = await resolvePhase7Accounts(tx, pair);\n      await assertTransactionCompanyScope(tx, pair.hadiCompanyId);\n      await validateCashAccount(tx, pair.hadiCompanyId, transfer.hadiCashAccount, "hadiCashAccount");\n      await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);\n      if (transfer.operation === "remit_from_hadi" && transfer.goldenCoastCashAccount) {\n        await validateCashAccount(\n          tx,\n          pair.goldenCoastCompanyId,\n          transfer.goldenCoastCashAccount,\n          "goldenCoastCashAccount"\n        );\n      }\n'''
+          if old in s:
+              s = s.replace(old, new)
+          elif new not in s:
+              raise SystemExit('cash account scope pattern not found')
+
+          old = '''      for (const item of batch.postings) {\n        const posted = (await postBalancedVoucherTx(tx, item.request, postingDependencies)) as PersistedPostingResult;\n'''
+          new = '''      for (const item of batch.postings) {\n        await assertTransactionCompanyScope(tx, item.request.companyId);\n        const posted = (await postBalancedVoucherTx(tx, item.request, postingDependencies)) as PersistedPostingResult;\n'''
+          if old in s:
+              s = s.replace(old, new)
+          elif new not in s:
+              raise SystemExit('posting scope pattern not found')
+
+          old = '''        postings.push({ role: item.role, voucher: posted.voucher, entries: posted.entries });\n      }\n\n      return { replayed: false as const, transfer, plan, postings };\n'''
+          new = '''        postings.push({ role: item.role, voucher: posted.voucher, entries: posted.entries });\n      }\n      await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);\n\n      return { replayed: false as const, transfer, plan, postings };\n'''
+          if old in s:
+              s = s.replace(old, new)
+          elif new not in s:
+              raise SystemExit('scope restore pattern not found')
+
+          path.write_text(s)
+          PY
+
+      - name: Add focused RLS regression assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('server/routes/sp/spGoldenCoastPhase7HadiTransferRoutes.test.ts')
+          s = p.read_text()
+          needle = 'expect(source).toContain("registerSpGoldenCoastPhase7HadiTransferRoutes(app);");'
+          extra = '''\n    expect(routeSource).toContain("assertCompaniesAccess(userId, [hadiCompanyId])");\n    expect(routeSource).toContain("assertTransactionCompanyScope(tx, pair.hadiCompanyId)");\n    expect(routeSource).toContain("assertTransactionCompanyScope(tx, item.request.companyId)");'''
+          if extra.strip() not in s:
+              if needle not in s:
+                  raise SystemExit('route registration assertion anchor not found')
+              s = s.replace(needle, needle + extra)
+          p.write_text(s)
+          PY
+
+      - name: Remove one-shot workflow and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/phase7-rls-repair.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No repair changes to commit"
+            exit 0
+          fi
+          git commit -m "fix(gc): authorize and scope Phase 7 HADI postings"
+          git push origin HEAD:chatgpt/golden-coast-phase7-hadi-transfers
