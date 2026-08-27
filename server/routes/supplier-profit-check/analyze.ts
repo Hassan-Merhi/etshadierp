@@ -375,7 +375,7 @@ export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: R
       res.json(rows);
     } catch (err: unknown) {
       logger.error("[supplier-profit-check/analyze]", { error: getErrorMessage(err) });
-      res.status(500).json({ message: "Failed to analyze supplier profit" });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }
