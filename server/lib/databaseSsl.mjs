@@ -8,23 +8,42 @@
 //
 // Behaviour, in order of precedence:
 //   1. Local Replit database (PGHOST=helium or an `@helium:` connection
-//      string) or PGSSLMODE=disable  → TLS off entirely (`ssl: false`).
+//      string), Render's same-region private Postgres hostname, or
+//      PGSSLMODE=disable → TLS off entirely (`ssl: false`).
 //   2. PGSSLROOTCERT set             → verified TLS against that CA bundle.
 //   3. PGSSL_REJECT_UNAUTHORIZED true → verified TLS against the system trust
 //      store.
 //   4. Otherwise                     → unverified TLS (`rejectUnauthorized:
-//      false`), preserving the historical default, and a one-time startup
-//      warning is emitted so operators know verification is off.
+//      false`), preserving compatibility for external providers, and a one-time
+//      startup warning is emitted so operators know verification is off.
 //
-// The default is intentionally unchanged: enabling verification requires the CA
-// that signs the deployment's certificate, and guessing wrong takes the
-// database down at boot. Turning verification on is a one-line env change.
+// Render recommends its internal Postgres URL for same-region services. That
+// URL uses a single-label `dpg-*` hostname on Render's private network and does
+// not require TLS. Detecting that case removes the previous self-signed/unverified
+// TLS configuration without weakening external database connections.
 
 import { readFileSync } from "node:fs";
 
 const TRUTHY = new Set(["1", "true", "yes", "on"]);
 
 let warned = false;
+
+/**
+ * Extract a connection hostname without throwing on malformed/unset input.
+ * @param {string} [connectionString]
+ * @returns {string}
+ */
+function connectionHostname(connectionString = "") {
+  if (typeof connectionString === "string" && connectionString.trim() !== "") {
+    try {
+      return new URL(connectionString).hostname.toLowerCase();
+    } catch {
+      // Fall back to PGHOST below. The actual pg client will surface malformed
+      // connection strings when it attempts to connect.
+    }
+  }
+  return (process.env.PGHOST || "").trim().toLowerCase();
+}
 
 /**
  * True when the connection targets the local Replit database, which does not
@@ -39,20 +58,43 @@ export function isLocalReplitDatabase(connectionString = "") {
 }
 
 /**
+ * True for Render's same-region private Postgres DNS name.
+ *
+ * Render sets RENDER=true at runtime. Internal Render Postgres URLs use a
+ * single-label dpg-* hostname, while public/external Render database hosts are
+ * fully-qualified names. Keep this deliberately narrow so unrelated hosts are
+ * never reclassified as private.
+ *
+ * @param {string} [connectionString]
+ * @returns {boolean}
+ */
+export function isRenderInternalDatabase(connectionString = "") {
+  if (process.env.RENDER !== "true") return false;
+  const hostname = connectionHostname(connectionString);
+  return hostname.startsWith("dpg-") && !hostname.includes(".");
+}
+
+/**
  * True when the connection should use TLS at all.
  * @param {string} [connectionString]
  * @returns {boolean}
  */
 export function databaseRequiresSsl(connectionString = "") {
-  const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
-  return !isLocalReplitDatabase(connectionString) && !sslExplicitlyDisabled;
+  const sslMode = (process.env.PGSSLMODE || "").trim().toLowerCase();
+  if (sslMode === "disable") return false;
+
+  // An explicit non-disable SSL mode is an operator override. Otherwise use
+  // Render's documented private-network behavior for its internal DB hostname.
+  if (sslMode === "" && isRenderInternalDatabase(connectionString)) return false;
+
+  return !isLocalReplitDatabase(connectionString);
 }
 
 /**
  * Resolve the `ssl` option for a `pg` Pool/Client.
  *
  * @param {string} [connectionString] Connection string, when the caller has
- *   one, so the `@helium:` heuristic works even if PGHOST is unset.
+ *   one, so host heuristics work even if PGHOST is unset.
  * @returns {false | { ca?: string, rejectUnauthorized: boolean }}
  */
 export function resolveDatabaseSsl(connectionString = "") {
@@ -75,12 +117,17 @@ export function resolveDatabaseSsl(connectionString = "") {
 
   if (!warned) {
     warned = true;
+    const renderHint =
+      process.env.RENDER === "true"
+        ? " If this service and Render Postgres are in the same region, use the database's internal URL instead; the app will detect that private dpg-* hostname and disable TLS there."
+        : "";
     console.warn(
       "[databaseSsl] Connecting to PostgreSQL with TLS certificate verification " +
         "DISABLED (rejectUnauthorized: false). This accepts any server certificate " +
         "and is vulnerable to man-in-the-middle interception. Set PGSSLROOTCERT to " +
         "your deployment's CA bundle to verify the certificate chain, or " +
-        "PGSSL_REJECT_UNAUTHORIZED=true if the platform already provides a trusted chain."
+        "PGSSL_REJECT_UNAUTHORIZED=true if the platform already provides a trusted chain." +
+        renderHint
     );
   }
 
