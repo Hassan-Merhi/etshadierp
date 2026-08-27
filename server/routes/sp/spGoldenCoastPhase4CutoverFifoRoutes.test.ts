@@ -55,11 +55,13 @@ describe("Golden Coast Phase 4 cutover hardening route surface", () => {
     );
   });
 
-  it("keeps the FIFO mutation behind SP migration confirmation and idempotency controls", () => {
+  it("keeps the FIFO mutation behind SP migration confirmation and concurrency-safe idempotency controls", () => {
     expect(routeSource).toContain('"/api/sp/golden-coast/phase4/cutover-fifo"');
     expect(accessControlSource).toContain('path.includes("cutover")');
     expect(accessControlSource).toContain('confirmation: "RUN SP MIGRATION"');
     expect(accessControlSource).toContain('req.header("Idempotency-Key")');
+    expect(routeSource).toContain("pg_advisory_xact_lock");
+    expect(routeSource).toContain("golden-coast-phase4-cutover:${companyId}");
   });
 
   it("does not post accounting or adjust ERP inventory during the FIFO bridge", () => {
