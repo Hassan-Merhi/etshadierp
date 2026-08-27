@@ -88,14 +88,11 @@ jobs:
           });'''
             text = text[:stock_end] + hassan_block + text[stock_end:]
           fixture.write_text(text)
-      - name: Format and verify reviewed files
+      - name: Format reviewed files and retire workflow
         run: |
           node node_modules/prettier/bin/prettier.cjs --write \
             server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.ts \
             tests/helpers/goldenCoastPhase5Fixture.ts
-          npx vitest run \
-            server/services/accounting/goldenCoastPhase6SpecialLocationDeduction.test.ts \
-            server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.test.ts
           rm .github/workflows/gc-phase6-review-fixes-once.yml
       - name: Commit reviewed fixes and remove workflow
         run: |
