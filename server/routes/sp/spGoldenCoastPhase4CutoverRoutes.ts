@@ -186,10 +186,7 @@ async function handleBuildOpeningFifo(req: Request, res: Response): Promise<void
     if (!companyId) return;
     validateMutationIntent(req);
     if (today() < GOLDEN_COAST_PHASE4_CUTOVER_DATE) {
-      res.status(409).json({
-        code: "GC_PHASE4_CUTOVER_NOT_OPEN",
-        message: goldenCoastPhase4CutoverNotOpenMessage(),
-      });
+      res.status(409).json({ code: "GC_PHASE4_CUTOVER_NOT_OPEN", message: goldenCoastPhase4CutoverNotOpenMessage() });
       return;
     }
 
@@ -250,12 +247,7 @@ async function handleBuildOpeningFifo(req: Request, res: Response): Promise<void
 export function registerSpGoldenCoastPhase4CutoverRoutes(app: Express): void {
   // Register before the historical handlers. Express stops here after sending 410,
   // making the superseded Phase 1 accounting/opening-stock mutation paths unreachable.
-  app.post(
-    "/api/golden-coast/accounting/phase1/post",
-    privilegedMutationRateLimit,
-    requireAuth,
-    retiredLegacyWrite
-  );
+  app.post("/api/golden-coast/accounting/phase1/post", privilegedMutationRateLimit, requireAuth, retiredLegacyWrite);
   app.post("/api/sp/opening-stock", privilegedMutationRateLimit, requireAuth, retiredLegacyWrite);
 
   app.use("/api/sp", postCutoverMutationDateGuard);
