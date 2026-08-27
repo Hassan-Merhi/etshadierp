@@ -1,0 +1,50 @@
+name: GC Phase 6 Format Once
+
+on:
+  push:
+    branches:
+      - agent/golden-coast-special-location-deduction
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/golden-coast-special-location-deduction
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+      - run: npm ci --no-audit
+      - name: Format Phase 6 changed TypeScript
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            server/routes/sp/index.ts \
+            server/routes/sp/spGoldenCoastPhase5PosSaleRoutes.test.ts \
+            server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.ts \
+            server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.test.ts \
+            server/services/accounting/goldenCoastPhase6SpecialLocationDeduction.ts \
+            server/services/accounting/goldenCoastPhase6SpecialLocationDeduction.test.ts
+          rm .github/workflows/gc-phase6-format-once.yml
+      - name: Commit canonical formatting and remove this workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/routes/sp/index.ts \
+            server/routes/sp/spGoldenCoastPhase5PosSaleRoutes.test.ts \
+            server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.ts \
+            server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.test.ts \
+            server/services/accounting/goldenCoastPhase6SpecialLocationDeduction.ts \
+            server/services/accounting/goldenCoastPhase6SpecialLocationDeduction.test.ts \
+            .github/workflows/gc-phase6-format-once.yml
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "style(gc): format Phase 6 with repository Prettier"
+          git push origin HEAD:agent/golden-coast-special-location-deduction
