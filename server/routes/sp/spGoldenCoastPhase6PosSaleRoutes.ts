@@ -71,7 +71,11 @@ const phase6RequestBudget = privilegedRequestBudget({ maxBodyBytes: 32 * 1024, m
 const PHASE6_MAX_SALE_LINES = 50;
 const SALES_REVENUE_SUBTYPE = "sp_sales";
 const COGS_SUBTYPE = "sp_cogs";
-const PHASE6_REQUIRED_ROLES = ["gc_sales_cash", "stock_in_hand", "hassan_savings"] as const satisfies readonly GoldenCoastAccountRole[];
+const PHASE6_REQUIRED_ROLES = [
+  "gc_sales_cash",
+  "stock_in_hand",
+  "hassan_savings",
+] as const satisfies readonly GoldenCoastAccountRole[];
 
 type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type DbLike = typeof db | DatabaseTransaction;
@@ -95,7 +99,10 @@ class GoldenCoastPhase6RouteError extends Error {
   }
 }
 
-function activeCanonicalRoleAccount(accounts: readonly GoldenCoastLedgerRow[], role: GoldenCoastAccountRole): GoldenCoastLedgerRow {
+function activeCanonicalRoleAccount(
+  accounts: readonly GoldenCoastLedgerRow[],
+  role: GoldenCoastAccountRole
+): GoldenCoastLedgerRow {
   const definition = getGoldenCoastAccountDefinition(role);
   const matches = accounts.filter(
     (account) => account.subType === definition.subType && account.active === true && account.deletedAt == null
@@ -262,15 +269,24 @@ async function resolveSaleSideAccount(
     throw new GoldenCoastPhase6RouteError('saleSideAccount.kind must be "ledger" or "bank"');
   }
   const id = Number(input.id);
-  if (!Number.isInteger(id) || id <= 0) throw new GoldenCoastPhase6RouteError("saleSideAccount.id must be a positive integer");
+  if (!Number.isInteger(id) || id <= 0)
+    throw new GoldenCoastPhase6RouteError("saleSideAccount.id must be a positive integer");
 
   if (input.kind === "bank") {
     const [row] = await conn
       .select({ id: bankAccounts.id })
       .from(bankAccounts)
-      .where(and(eq(bankAccounts.id, id), eq(bankAccounts.companyId, companyId), eq(bankAccounts.active, true), isNull(bankAccounts.deletedAt)))
+      .where(
+        and(
+          eq(bankAccounts.id, id),
+          eq(bankAccounts.companyId, companyId),
+          eq(bankAccounts.active, true),
+          isNull(bankAccounts.deletedAt)
+        )
+      )
       .limit(1);
-    if (!row) throw new GoldenCoastPhase6RouteError("saleSideAccount must reference an active bank account in this company");
+    if (!row)
+      throw new GoldenCoastPhase6RouteError("saleSideAccount must reference an active bank account in this company");
     return { kind: "bank", id };
   }
 
@@ -372,7 +388,12 @@ async function findPostedVoucher(
   const [marker] = await tx
     .select({ voucherId: accountingPostingRequests.voucherId, sourceId: accountingPostingRequests.sourceId })
     .from(accountingPostingRequests)
-    .where(and(eq(accountingPostingRequests.companyId, companyId), eq(accountingPostingRequests.idempotencyKey, idempotencyKey)))
+    .where(
+      and(
+        eq(accountingPostingRequests.companyId, companyId),
+        eq(accountingPostingRequests.idempotencyKey, idempotencyKey)
+      )
+    )
     .limit(1);
   if (!marker) return null;
   const [voucher] = await tx
@@ -511,7 +532,12 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
     const companyId = await requireSpCompany(req, res);
     if (!companyId) return;
     if (!(await isGoldenCoastCompany(db, companyId))) {
-      res.status(409).json({ code: "GC_PHASE6_NOT_CONFIGURED", message: releaseDebtEnglish("Golden Coast account setup is not configured.") });
+      res
+        .status(409)
+        .json({
+          code: "GC_PHASE6_NOT_CONFIGURED",
+          message: releaseDebtEnglish("Golden Coast account setup is not configured."),
+        });
       return;
     }
 
@@ -530,7 +556,11 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
     }
 
     const configured = await db
-      .select({ id: locations.id, name: locations.name, deductionPerQtyUsd: locations.supplierPartnerPayableDeductionPerQty })
+      .select({
+        id: locations.id,
+        name: locations.name,
+        deductionPerQtyUsd: locations.supplierPartnerPayableDeductionPerQty,
+      })
       .from(locations)
       .where(
         and(
@@ -542,7 +572,8 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
       )
       .orderBy(asc(locations.id))
       .limit(3);
-    if (configured.length > 1) blockers.push("More than one active location has a Golden Coast per-unit deduction configured");
+    if (configured.length > 1)
+      blockers.push("More than one active location has a Golden Coast per-unit deduction configured");
 
     res.json({
       cutoverDate: GOLDEN_COAST_CUTOVER_DATE,
@@ -567,17 +598,32 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
     if (!companyId) return;
     const selectedCompany = companyId;
     if (!(await isGoldenCoastCompany(db, selectedCompany))) {
-      res.status(409).json({ code: "GC_PHASE6_NOT_CONFIGURED", message: releaseDebtEnglish("Golden Coast account setup is not configured.") });
+      res
+        .status(409)
+        .json({
+          code: "GC_PHASE6_NOT_CONFIGURED",
+          message: releaseDebtEnglish("Golden Coast account setup is not configured."),
+        });
       return;
     }
 
-    const sale = parseGoldenCoastPhase5SaleInput({ companyId: selectedCompany, body: req.body, maxLines: PHASE6_MAX_SALE_LINES });
+    const sale = parseGoldenCoastPhase5SaleInput({
+      companyId: selectedCompany,
+      body: req.body,
+      maxLines: PHASE6_MAX_SALE_LINES,
+    });
     const exchangeRate = await getCurrentExchangeRate(selectedCompany);
 
     const result = await db.transaction(async (tx) => {
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase6-sale:${selectedCompany}:${sale.clientRequestId}`}))`);
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase6-sale:${selectedCompany}:${sale.clientRequestId}`}))`
+      );
       if (!(await isGoldenCoastCompany(tx, selectedCompany))) {
-        throw new GoldenCoastPhase6RouteError("Golden Coast account setup is not configured", "GC_PHASE6_NOT_CONFIGURED", 409);
+        throw new GoldenCoastPhase6RouteError(
+          "Golden Coast account setup is not configured",
+          "GC_PHASE6_NOT_CONFIGURED",
+          409
+        );
       }
       await assertPhase4BridgePosted(tx, selectedCompany);
       const specialConfig = await resolveSpecialLocationConfig(tx, selectedCompany, sale.locationId);
@@ -597,7 +643,8 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
         saleDigest,
         deductionPlan: expectedDeduction,
       });
-      if (replayed) return { replayed: true as const, postings: replayed, plan: null, deductionPlan: expectedDeduction };
+      if (replayed)
+        return { replayed: true as const, postings: replayed, plan: null, deductionPlan: expectedDeduction };
 
       const stockItemIds = [...new Set(sale.lines.map((line) => line.stockItemId))];
       const lots = await lockFifoLots(tx, selectedCompany, sale.locationId, stockItemIds);
@@ -625,10 +672,18 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
         saleSideAccount,
         saleDigest,
         exchangeRate: exchangeRate != null ? String(exchangeRate) : null,
-        actor: { userId: userId ?? null, username: req.session.username || "unknown", reason: "Golden Coast Phase 6 POS sale" },
+        actor: {
+          userId: userId ?? null,
+          username: req.session.username || "unknown",
+          reason: "Golden Coast Phase 6 POS sale",
+        },
       });
 
-      const postings: Array<{ role: string; voucher: PersistedPostingResult["voucher"]; entries: PersistedPostingResult["entries"] }> = [];
+      const postings: Array<{
+        role: string;
+        voucher: PersistedPostingResult["voucher"];
+        entries: PersistedPostingResult["entries"];
+      }> = [];
       for (const item of batch.postings) {
         const posted = (await postBalancedVoucherTx(tx, item.request, postingDependencies)) as PersistedPostingResult;
         if (posted.replayed) {
@@ -648,9 +703,17 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
           hassanSavingsAccountId: accounts.hassanSavingsAccountId,
           saleDigest,
           exchangeRate: exchangeRate != null ? String(exchangeRate) : null,
-          actor: { userId: userId ?? null, username: req.session.username || "unknown", reason: "Golden Coast special-location deduction" },
+          actor: {
+            userId: userId ?? null,
+            username: req.session.username || "unknown",
+            reason: "Golden Coast special-location deduction",
+          },
         });
-        const posted = (await postBalancedVoucherTx(tx, deductionRequest, postingDependencies)) as PersistedPostingResult;
+        const posted = (await postBalancedVoucherTx(
+          tx,
+          deductionRequest,
+          postingDependencies
+        )) as PersistedPostingResult;
         if (posted.replayed) {
           throw new GoldenCoastPhase6RouteError(
             `Golden Coast sale ${sale.clientRequestId} special deduction was already posted`,
@@ -690,13 +753,21 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
       postings: result.postings.map((item) => ({ role: item.role, voucher: item.voucher, entries: item.entries })),
     });
   } catch (error: unknown) {
-    logger.error("Golden Coast Phase 6 POS sale failed", { module: "golden-coast-phase6", companyId, userId, durationMs: Date.now() - startedAt, error });
+    logger.error("Golden Coast Phase 6 POS sale failed", {
+      module: "golden-coast-phase6",
+      companyId,
+      userId,
+      durationMs: Date.now() - startedAt,
+      error,
+    });
     if (error instanceof GoldenCoastPhase6RouteError) {
       res.status(error.status).json({ code: error.code, message: error.message });
       return;
     }
     if (error instanceof GoldenCoastPhase6DeductionError) {
-      res.status(error.code === "GC_PHASE6_DEDUCTION_INVALID" ? 400 : 409).json({ code: error.code, message: error.message });
+      res
+        .status(error.code === "GC_PHASE6_DEDUCTION_INVALID" ? 400 : 409)
+        .json({ code: error.code, message: error.message });
       return;
     }
     if (error instanceof GoldenCoastPhase5SaleError) {
@@ -706,7 +777,9 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
     }
     if (respondToSpInventoryIntegrityError(res, error)) return;
     if (error instanceof PostingValidationError) {
-      res.status(error.code === "POSTING_IDEMPOTENCY_CORRUPT" ? 409 : 400).json({ code: error.code, message: error.message });
+      res
+        .status(error.code === "POSTING_IDEMPOTENCY_CORRUPT" ? 409 : 400)
+        .json({ code: error.code, message: error.message });
       return;
     }
     res.status(500).json({ message: getErrorMessage(error) });

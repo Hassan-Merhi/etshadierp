@@ -30,7 +30,8 @@ export interface GoldenCoastPhase6DeductionPlan {
 
 function positiveId(value: unknown, label: string): number {
   const id = Number(value);
-  if (!Number.isInteger(id) || id <= 0) throw new GoldenCoastPhase6DeductionError(`${label} must be a positive integer`);
+  if (!Number.isInteger(id) || id <= 0)
+    throw new GoldenCoastPhase6DeductionError(`${label} must be a positive integer`);
   return id;
 }
 

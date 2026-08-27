@@ -26,9 +26,7 @@ function salePlan(overrides: Partial<GoldenCoastPhase5SalePlan> = {}): GoldenCoa
 
 describe("Golden Coast Phase 6 special-location deduction", () => {
   it("returns null when the configured deduction is zero", () => {
-    expect(
-      planGoldenCoastPhase6SpecialLocationDeduction({ salePlan: salePlan(), deductionPerQtyUsd: "0" })
-    ).toBeNull();
+    expect(planGoldenCoastPhase6SpecialLocationDeduction({ salePlan: salePlan(), deductionPerQtyUsd: "0" })).toBeNull();
   });
 
   it("calculates the deduction from actual total quantity sold", () => {
