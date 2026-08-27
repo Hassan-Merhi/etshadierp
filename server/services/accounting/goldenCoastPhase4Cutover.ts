@@ -19,6 +19,14 @@ export interface GoldenCoastOpeningInventoryRow {
   averageRate: string | number;
 }
 
+export function goldenCoastPhase4CutoverNotOpenMessage(): string {
+  return `Opening FIFO cannot be built before ${GOLDEN_COAST_PHASE4_CUTOVER_DATE}`;
+}
+
+export function goldenCoastPhase4OpeningLotDescription(): string {
+  return `Golden Coast ${GOLDEN_COAST_PHASE4_CUTOVER_DATE} opening FIFO bridge`;
+}
+
 function decimal(value: string | number, label: string): Decimal {
   let parsed: Decimal;
   try {
