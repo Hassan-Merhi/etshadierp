@@ -12,6 +12,8 @@ import { requireAuth } from "../../../auth";
 import { factoryBales, customerOrders, customerOrderBales } from "@shared/schema";
 import { eq, and, asc, desc, sql, inArray, isNull } from "drizzle-orm";
 import { resultRows } from "../../../lib/queryResult";
+import { getAuthoritativeAvailableStockSnapshot } from "../../../services/factory/authoritativeAvailableStock";
+import { buildArticleCodeStockCountRecord } from "../../../services/factory/authoritativeStockPatch";
 
 export function registerFactoryStockQueryRoutes(app: Express) {
   app.get("/api/factory/stock-entry/in-stock", requireAuth, async (req: Request, res: Response) => {
@@ -145,8 +147,9 @@ export function registerFactoryStockQueryRoutes(app: Express) {
   });
 
   // GET /api/factory/bale-stock-count?articleCodes=HMD123,HMD456&locationId=3
-  // Returns { HMD123: 4, HMD456: 0, ... } — IN_STOCK bale counts per article code
-  // Optional locationId filters to only bales at that ERP location (mirrors location-inventory page).
+  // Returns authoritative physical stock-in-hand bale counts per article code.
+  // Uses the same snapshot as Location Inventory and Invoice Verify, excluding
+  // bales already tied to active/finalized customer orders.
   app.get("/api/factory/bale-stock-count", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -160,52 +163,11 @@ export function registerFactoryStockQueryRoutes(app: Express) {
       if (articleCodes.length === 0) return res.json({});
 
       const rawLocationId = req.query.locationId;
-      const locationId = rawLocationId ? parseInt(rawLocationId as string) : null;
+      const parsedLocationId = rawLocationId ? parseInt(rawLocationId as string) : null;
+      const locationId = parsedLocationId != null && !isNaN(parsedLocationId) ? parsedLocationId : null;
+      const snapshot = await getAuthoritativeAvailableStockSnapshot(Number(companyId), locationId);
 
-      const conditions = [
-        eq(factoryBales.companyId, companyId),
-        eq(factoryBales.status, "IN_STOCK"),
-        isNull(factoryBales.deletedAt),
-        inArray(factoryBales.articleCode, articleCodes),
-      ];
-      if (locationId && !isNaN(locationId)) {
-        conditions.push(eq(factoryBales.erpLocationId, locationId));
-      }
-
-      const inStockBales = await db
-        .select({ id: factoryBales.id, articleCode: factoryBales.articleCode, quantity: factoryBales.quantity })
-        .from(factoryBales)
-        .where(and(...conditions));
-
-      // Build initial totals from IN_STOCK bales
-      const result: Record<string, number> = {};
-      articleCodes.forEach((c) => {
-        result[c] = 0;
-      });
-      for (const b of inStockBales) {
-        if (b.articleCode) {
-          result[b.articleCode] = (result[b.articleCode] || 0) + parseFloat(String(b.quantity || "1"));
-        }
-      }
-
-      // Subtract bales currently scanned into an active LOADING order
-      const baleIds = inStockBales.map((b) => b.id).filter((id): id is number => id != null);
-      if (baleIds.length > 0) {
-        const loadingRows = await db
-          .select({ baleId: customerOrderBales.baleId })
-          .from(customerOrderBales)
-          .innerJoin(customerOrders, eq(customerOrderBales.orderId, customerOrders.id))
-          .where(and(eq(customerOrders.status, "LOADING"), inArray(customerOrderBales.baleId, baleIds)));
-        const loadingBaleIds = new Set(loadingRows.map((r) => r.baleId));
-        for (const b of inStockBales) {
-          if (b.id && b.articleCode && loadingBaleIds.has(b.id)) {
-            const qty = parseFloat(String(b.quantity || "1"));
-            result[b.articleCode] = Math.max(0, (result[b.articleCode] || 0) - qty);
-          }
-        }
-      }
-
-      res.json(result);
+      res.json(buildArticleCodeStockCountRecord(articleCodes, snapshot));
     } catch (error: unknown) {
       logger.error("Error fetching bale stock count:", { error: error });
       res.status(500).json({ message: getErrorMessage(error) });
