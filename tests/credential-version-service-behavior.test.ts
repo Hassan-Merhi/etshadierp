@@ -134,21 +134,24 @@ describe("credential version service behavior", () => {
     );
   });
 
-  it("revokes only sessions in the affected company and can preserve one sid", async () => {
-    const pool = { query: vi.fn(async () => undefined) };
+  it(
+    "revokes only sessions in the affected company and can preserve one sid",
+    async () => {
+      const pool = { query: vi.fn(async () => undefined) };
 
-    await revokeUserCompanySessions(pool, "u-company", 42);
-    expect(pool.query).toHaveBeenLastCalledWith(
-      expect.stringContaining("sess->>'currentCompanyId' = $2"),
-      ["u-company", "42"],
-    );
+      await revokeUserCompanySessions(pool, "u-company", 42);
+      expect(pool.query).toHaveBeenLastCalledWith(
+        expect.stringContaining("sess->>'currentCompanyId' = $2"),
+        ["u-company", "42"],
+      );
 
-    await revokeUserCompanySessions(pool, "u-company", 42, "sid-keep");
-    expect(pool.query).toHaveBeenLastCalledWith(
-      expect.stringContaining("sid <> $3"),
-      ["u-company", "42", "sid-keep"],
-    );
-  });
+      await revokeUserCompanySessions(pool, "u-company", 42, "sid-keep");
+      expect(pool.query).toHaveBeenLastCalledWith(
+        expect.stringContaining("sid <> $3"),
+        ["u-company", "42", "sid-keep"],
+      );
+    },
+  );
 
   it("rotates credentials transactionally and then revokes prior sessions", async () => {
     const upsert = insertBuilder([{ credentialVersion: 3 }]);
