@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   GOLDEN_COAST_PHASE5_SOURCE_TYPE,
+  GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES,
   GoldenCoastPhase5SaleError,
   buildGoldenCoastPhase5SalePostings,
   goldenCoastPhase5IdempotencyKey,
+  goldenCoastPhase5SaleDigest,
+  goldenCoastPhase5SourceId,
   parseGoldenCoastPhase5SaleInput,
   planGoldenCoastPhase5Sale,
   type GoldenCoastFifoLot,
@@ -80,6 +83,18 @@ describe("Golden Coast Phase 5 sale request parsing", () => {
         ],
       })
     ).toThrow(/repeats stock item/);
+  });
+
+  it("refuses to date a sale before the Golden Coast cutover", () => {
+    expect(() => parsed({ saleDate: "2026-08-31" })).toThrow(/cannot be earlier than the Golden Coast cutover/);
+    try {
+      parsed({ saleDate: "2026-01-15" });
+      expect.unreachable("a pre-cutover sale date must not parse");
+    } catch (error) {
+      expect((error as GoldenCoastPhase5SaleError).code).toBe("GC_PHASE5_PRE_CUTOVER_DATE");
+    }
+    // The cutover date itself is the first sellable day.
+    expect(parsed({ saleDate: "2026-09-01" }).saleDate).toBe("2026-09-01");
   });
 
   it("rejects an unusable client request id", () => {
@@ -214,6 +229,23 @@ describe("Golden Coast Phase 5 FIFO consumption", () => {
     ).toThrow(/not linked to a stock item/);
   });
 
+  it("refuses to consume a legacy pre-cutover movement row", () => {
+    // Phase 4 leaves legacy rows in place and they sort first by created_at, so
+    // this guard is what keeps a sale off unreconciled pre-cutover cost.
+    expect(GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES).toEqual(["golden_coast_cutover"]);
+    for (const sourceType of ["offload", "opening_stock", null]) {
+      try {
+        planGoldenCoastPhase5Sale({
+          sale: parsed(),
+          lots: [lot({ id: 1, qtyRemaining: "100", sourceType })],
+        });
+        expect.unreachable(`source ${String(sourceType)} must not back a Golden Coast sale`);
+      } catch (error) {
+        expect((error as GoldenCoastPhase5SaleError).code).toBe("GC_PHASE5_SCOPE_MISMATCH");
+      }
+    }
+  });
+
   it("never consumes a lot for a different stock item", () => {
     expect(() =>
       planGoldenCoastPhase5Sale({
@@ -230,10 +262,14 @@ describe("Golden Coast Phase 5 sale postings", () => {
     lots: [lot({ id: 1, qtyRemaining: "100", finalUnitCostUsd: "22" })],
   });
 
+  const saleSideAccount = { kind: "ledger", id: ACCOUNTS.saleSideAccountId } as const;
+  const saleDigest = goldenCoastPhase5SaleDigest({ sale: parsed(), saleSideAccount });
+
   const batch = buildGoldenCoastPhase5SalePostings({
     plan,
     accounts: ACCOUNTS,
-    saleSideAccount: { kind: "ledger", id: ACCOUNTS.saleSideAccountId },
+    saleSideAccount,
+    saleDigest,
     exchangeRate: null,
   });
 
@@ -278,12 +314,12 @@ describe("Golden Coast Phase 5 sale postings", () => {
     expect(batch.postings.map((posting) => posting.request.source)).toEqual([
       {
         sourceType: GOLDEN_COAST_PHASE5_SOURCE_TYPE,
-        sourceId: "gc-phase5-req-1:revenue",
+        sourceId: goldenCoastPhase5SourceId("gc-phase5-req-1", saleDigest, "revenue"),
         idempotencyKey: goldenCoastPhase5IdempotencyKey(COMPANY_ID, "gc-phase5-req-1", "revenue"),
       },
       {
         sourceType: GOLDEN_COAST_PHASE5_SOURCE_TYPE,
-        sourceId: "gc-phase5-req-1:cogs",
+        sourceId: goldenCoastPhase5SourceId("gc-phase5-req-1", saleDigest, "cogs"),
         idempotencyKey: goldenCoastPhase5IdempotencyKey(COMPANY_ID, "gc-phase5-req-1", "cogs"),
       },
     ]);
@@ -297,12 +333,58 @@ describe("Golden Coast Phase 5 sale postings", () => {
       plan,
       accounts: ACCOUNTS,
       saleSideAccount: { kind: "bank", id: 88 },
+      saleDigest: goldenCoastPhase5SaleDigest({ sale: parsed(), saleSideAccount: { kind: "bank", id: 88 } }),
       exchangeRate: null,
     });
     expect(bankBatch.postings[0].request.entries[0]).toEqual(
       expect.objectContaining({ bankAccountId: 88, debitAmount: "1800" })
     );
     expect(bankBatch.postings[0].request.entries[0].ledgerAccountId).toBeUndefined();
+  });
+
+  it("digests everything that makes two submissions the same sale", () => {
+    const base = { sale: parsed(), saleSideAccount } as const;
+    expect(goldenCoastPhase5SaleDigest(base)).toBe(saleDigest);
+
+    // Any change to the accounting meaning of the request changes the digest,
+    // so a reused clientRequestId cannot silently replay a different sale.
+    const variants = [
+      { locationId: LOCATION_ID + 1 },
+      { saleDate: "2026-09-06" },
+      { customerName: "Another Customer" },
+      { notes: "changed" },
+      { lines: [{ stockItemId: STOCK_ITEM_ID, qty: "31", unitPriceUsd: "60" }] },
+      { lines: [{ stockItemId: STOCK_ITEM_ID, qty: "30", unitPriceUsd: "61" }] },
+      { lines: [{ stockItemId: STOCK_ITEM_ID + 1, qty: "30", unitPriceUsd: "60" }] },
+    ];
+    for (const variant of variants) {
+      expect(goldenCoastPhase5SaleDigest({ sale: parsed(variant), saleSideAccount })).not.toBe(saleDigest);
+    }
+
+    // Including a different line mix that happens to total the same revenue.
+    expect(
+      goldenCoastPhase5SaleDigest({
+        sale: parsed({ lines: [{ stockItemId: STOCK_ITEM_ID, qty: "60", unitPriceUsd: "30" }] }),
+        saleSideAccount,
+      })
+    ).not.toBe(saleDigest);
+
+    // And a different settlement account.
+    expect(goldenCoastPhase5SaleDigest({ sale: parsed(), saleSideAccount: { kind: "bank", id: 88 } })).not.toBe(
+      saleDigest
+    );
+  });
+
+  it("requires a sale digest to tag a posting", () => {
+    expect(() =>
+      buildGoldenCoastPhase5SalePostings({
+        plan,
+        accounts: ACCOUNTS,
+        saleSideAccount,
+        saleDigest: "  ",
+        exchangeRate: null,
+      })
+    ).toThrow(/saleDigest is required/);
   });
 
   it("never posts the retired Phase 1 single-voucher or payable-only sale shape", () => {

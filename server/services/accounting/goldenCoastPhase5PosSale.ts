@@ -26,13 +26,27 @@
 // Supplier Partner `/api/sp/sales` payable-only posting are intentionally NOT
 // reused: Phase 4 retired both for Golden Coast companies.
 
+import { createHash } from "node:crypto";
 import Decimal from "decimal.js";
 import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import type { CentralPostingRequest, PostingActor } from "./centralPostingEngine";
 import { buildGenericVoucherPostingRequest } from "./genericVoucherPosting";
+import { GOLDEN_COAST_CUTOVER_DATE, GOLDEN_COAST_CUTOVER_FIFO_SOURCE } from "./goldenCoastPhase4CutoverFifo";
 
 /** Posting `sourceType` every Phase 5 sale voucher is tagged with. */
 export const GOLDEN_COAST_PHASE5_SOURCE_TYPE = "golden-coast-phase5-pos-sale";
+
+/**
+ * `sp_stock_movements.source_type` values a Golden Coast sale may consume.
+ *
+ * Phase 4 adds its opening bridge rows without zeroing the company's legacy
+ * pre-cutover movement rows, and those legacy rows sort first by `created_at`.
+ * Consuming them would derive COGS from unreconciled pre-cutover costs and
+ * double the quantity the cutover actually reconciled, so Phase 5 reads only
+ * the canonical post-cutover lots. A later Golden Coast phase that creates new
+ * post-cutover stock adds its source here.
+ */
+export const GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES: readonly string[] = [GOLDEN_COAST_CUTOVER_FIFO_SOURCE];
 
 /** Keeps the derived voucher numbers inside `vouchers.voucher_number` (100). */
 export const GOLDEN_COAST_PHASE5_MAX_REQUEST_ID_LENGTH = 64;
@@ -47,7 +61,8 @@ export type GoldenCoastPhase5ErrorCode =
   | "GC_PHASE5_INPUT_INVALID"
   | "GC_PHASE5_FIFO_INSUFFICIENT"
   | "GC_PHASE5_FIFO_COST_INVALID"
-  | "GC_PHASE5_SCOPE_MISMATCH";
+  | "GC_PHASE5_SCOPE_MISMATCH"
+  | "GC_PHASE5_PRE_CUTOVER_DATE";
 
 export class GoldenCoastPhase5SaleError extends Error {
   readonly code: GoldenCoastPhase5ErrorCode;
@@ -198,6 +213,15 @@ function saleDate(value: unknown): string {
   if (!ISO_DATE_PATTERN.test(text) || Number.isNaN(Date.parse(`${text}T00:00:00Z`))) {
     throw new GoldenCoastPhase5SaleError("saleDate must be an ISO calendar date (YYYY-MM-DD)");
   }
+  // A sale consumes post-cutover FIFO stock, so dating it before the cutover
+  // would post revenue and COGS into the period the Phase 3 opening balance
+  // already summarizes. ISO dates compare correctly as strings.
+  if (text < GOLDEN_COAST_CUTOVER_DATE) {
+    throw new GoldenCoastPhase5SaleError(
+      `saleDate cannot be earlier than the Golden Coast cutover date ${GOLDEN_COAST_CUTOVER_DATE}`,
+      "GC_PHASE5_PRE_CUTOVER_DATE"
+    );
+  }
   return text;
 }
 
@@ -344,6 +368,13 @@ export function planGoldenCoastPhase5Sale(input: {
         "GC_PHASE5_SCOPE_MISMATCH"
       );
     }
+    if (!GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES.includes(String(lot.sourceType ?? ""))) {
+      throw new GoldenCoastPhase5SaleError(
+        `FIFO lot #${lotId} is a ${lot.sourceType ?? "untyped"} movement, not a canonical Golden Coast ` +
+          `post-cutover lot, and cannot back a sale`,
+        "GC_PHASE5_SCOPE_MISMATCH"
+      );
+    }
 
     const stockItemId = Number(lot.stockItemId);
     const bucket = lotsByStockItem.get(stockItemId);
@@ -486,6 +517,7 @@ export interface GoldenCoastPhase5Posting {
 
 export interface GoldenCoastPhase5PostingBatch {
   clientRequestId: string;
+  saleDigest: string;
   revenueVoucherNumber: string;
   cogsVoucherNumber: string;
   postings: GoldenCoastPhase5Posting[];
@@ -493,6 +525,46 @@ export interface GoldenCoastPhase5PostingBatch {
 
 export function goldenCoastPhase5VoucherNumber(companyId: number, requestId: string): string {
   return `GC-POS-C${companyId}-${requestId}`;
+}
+
+/**
+ * Stable digest of everything about a sale request that changes its accounting
+ * meaning. It is persisted in the posting `sourceId`, so a caller that reuses a
+ * `clientRequestId` with different sale data is rejected instead of being
+ * silently handed the original sale's vouchers.
+ */
+export function goldenCoastPhase5SaleDigest(input: {
+  sale: GoldenCoastPhase5SaleInput;
+  saleSideAccount: GoldenCoastPhase5SaleSideAccount;
+}): string {
+  const { sale, saleSideAccount } = input;
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        companyId: sale.companyId,
+        locationId: sale.locationId,
+        saleDate: sale.saleDate,
+        customerName: sale.customerName,
+        notes: sale.notes ?? null,
+        saleSideAccount: { kind: saleSideAccount.kind, id: saleSideAccount.id },
+        lines: sale.lines.map((line) => ({
+          stockItemId: line.stockItemId,
+          qty: new Decimal(line.qty).toFixed(),
+          unitPriceUsd: new Decimal(line.unitPriceUsd).toFixed(),
+          description: line.description ?? null,
+        })),
+      })
+    )
+    .digest("hex")
+    .slice(0, 32);
+}
+
+export function goldenCoastPhase5SourceId(
+  requestId: string,
+  saleDigest: string,
+  role: GoldenCoastPhase5PostingRole
+): string {
+  return `${requestId}:${saleDigest}:${role}`;
 }
 
 export function goldenCoastPhase5IdempotencyKey(
@@ -523,10 +595,14 @@ export function buildGoldenCoastPhase5SalePostings(input: {
   plan: GoldenCoastPhase5SalePlan;
   accounts: GoldenCoastPhase5RoleAccounts;
   saleSideAccount: GoldenCoastPhase5SaleSideAccount;
+  /** Digest of the originating sale request; see goldenCoastPhase5SaleDigest. */
+  saleDigest: string;
   exchangeRate: string | null;
   actor?: PostingActor;
 }): GoldenCoastPhase5PostingBatch {
   const { plan, accounts } = input;
+  const saleDigest = String(input.saleDigest ?? "").trim();
+  if (!saleDigest) throw new GoldenCoastPhase5SaleError("saleDigest is required to tag a Golden Coast sale posting");
   const companyId = positiveId(plan.companyId, "companyId");
   const locationId = positiveId(plan.locationId, "locationId");
   const saleSide = input.saleSideAccount;
@@ -601,17 +677,22 @@ export function buildGoldenCoastPhase5SalePostings(input: {
     actor: input.actor,
   });
 
+  // The idempotency key stays keyed on the client request id so a replay is
+  // still found by lookup, while the sourceId carries the payload digest. The
+  // central engine compares the stored sourceId on replay, so the same request
+  // id submitted with different sale data conflicts instead of replaying.
   const tag = (request: CentralPostingRequest, role: GoldenCoastPhase5PostingRole): CentralPostingRequest => ({
     ...request,
     source: {
       sourceType: GOLDEN_COAST_PHASE5_SOURCE_TYPE,
-      sourceId: `${plan.clientRequestId}:${role}`,
+      sourceId: goldenCoastPhase5SourceId(plan.clientRequestId, saleDigest, role),
       idempotencyKey: goldenCoastPhase5IdempotencyKey(companyId, plan.clientRequestId, role),
     },
   });
 
   return {
     clientRequestId: plan.clientRequestId,
+    saleDigest,
     revenueVoucherNumber,
     cogsVoucherNumber,
     postings: [

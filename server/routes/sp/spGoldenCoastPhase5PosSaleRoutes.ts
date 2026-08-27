@@ -49,9 +49,12 @@ import {
   GOLDEN_COAST_CUTOVER_DATE,
 } from "../../services/accounting/goldenCoastPhase4CutoverFifo";
 import {
+  GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES,
   GoldenCoastPhase5SaleError,
   buildGoldenCoastPhase5SalePostings,
   goldenCoastPhase5IdempotencyKey,
+  goldenCoastPhase5SaleDigest,
+  goldenCoastPhase5SourceId,
   parseGoldenCoastPhase5SaleInput,
   planGoldenCoastPhase5Sale,
   type GoldenCoastFifoLot,
@@ -318,6 +321,11 @@ async function lockFifoLots(
         eq(spStockMovements.companyId, companyId),
         eq(spStockMovements.locationId, locationId),
         inArray(spStockMovements.stockItemId, [...stockItemIds]),
+        // Legacy pre-cutover movement rows survive the Phase 4 bridge and sort
+        // first by created_at, so consuming them would both double the
+        // available quantity and cost the sale at unreconciled pre-cutover
+        // rates. Only canonical post-cutover lots back a Golden Coast sale.
+        inArray(spStockMovements.sourceType, [...GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES]),
         sql`CAST(${spStockMovements.qtyRemaining} AS numeric) > 0`
       )
     )
@@ -342,9 +350,9 @@ async function findPostedVoucher(
   tx: DatabaseTransaction,
   companyId: number,
   idempotencyKey: string
-): Promise<typeof vouchers.$inferSelect | null> {
+): Promise<{ voucher: typeof vouchers.$inferSelect; sourceId: string } | null> {
   const [marker] = await tx
-    .select({ voucherId: accountingPostingRequests.voucherId })
+    .select({ voucherId: accountingPostingRequests.voucherId, sourceId: accountingPostingRequests.sourceId })
     .from(accountingPostingRequests)
     .where(
       and(
@@ -367,7 +375,7 @@ async function findPostedVoucher(
       409
     );
   }
-  return voucher;
+  return { voucher, sourceId: String(marker.sourceId ?? "") };
 }
 
 async function loadVoucherEntries(tx: DatabaseTransaction, voucherId: number) {
@@ -378,17 +386,23 @@ async function loadVoucherEntries(tx: DatabaseTransaction, voucherId: number) {
  * Replay detection. Both Phase 5 vouchers share one client request id, so a
  * replay is only safe when *both* markers exist; a half-recorded pair means the
  * idempotency state is inconsistent and the sale must not post again.
+ *
+ * A replay is also only safe when the request describes the *same* sale. The
+ * outer voucher-path boundary keys on transport identity, so a caller can reuse
+ * a client request id with changed sale data behind a fresh transport key. The
+ * stored sourceId carries the original payload digest, so that request is
+ * rejected here rather than being answered with the earlier sale's vouchers.
  */
-async function findReplayedSale(tx: DatabaseTransaction, companyId: number, requestId: string) {
+async function findReplayedSale(tx: DatabaseTransaction, companyId: number, requestId: string, saleDigest: string) {
   const roles: GoldenCoastPhase5PostingRole[] = ["revenue", "cogs"];
   const found = await Promise.all(
     roles.map(async (role) => ({
       role,
-      voucher: await findPostedVoucher(tx, companyId, goldenCoastPhase5IdempotencyKey(companyId, requestId, role)),
+      marker: await findPostedVoucher(tx, companyId, goldenCoastPhase5IdempotencyKey(companyId, requestId, role)),
     }))
   );
 
-  const posted = found.filter((item) => item.voucher != null);
+  const posted = found.filter((item) => item.marker != null);
   if (posted.length === 0) return null;
   if (posted.length !== roles.length) {
     throw new GoldenCoastPhase5RouteError(
@@ -398,9 +412,21 @@ async function findReplayedSale(tx: DatabaseTransaction, companyId: number, requ
     );
   }
 
+  for (const item of found) {
+    const expectedSourceId = goldenCoastPhase5SourceId(requestId, saleDigest, item.role);
+    if (item.marker?.sourceId !== expectedSourceId) {
+      throw new GoldenCoastPhase5RouteError(
+        `Golden Coast sale ${requestId} was already posted with different sale data; ` +
+          `use a new clientRequestId for a different sale`,
+        "GC_PHASE5_IDEMPOTENCY_CONFLICT",
+        409
+      );
+    }
+  }
+
   return Promise.all(
     found.map(async (item) => {
-      const voucher = item.voucher as typeof vouchers.$inferSelect;
+      const voucher = (item.marker as { voucher: typeof vouchers.$inferSelect }).voucher;
       return { role: item.role, voucher, entries: await loadVoucherEntries(tx, voucher.id) };
     })
   );
@@ -462,7 +488,13 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
         qtyAvailable: sql<string>`COALESCE(SUM(CAST(${spStockMovements.qtyRemaining} AS numeric)), 0)::text`,
       })
       .from(spStockMovements)
-      .where(and(eq(spStockMovements.companyId, companyId), sql`CAST(${spStockMovements.qtyRemaining} AS numeric) > 0`))
+      .where(
+        and(
+          eq(spStockMovements.companyId, companyId),
+          inArray(spStockMovements.sourceType, [...GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES]),
+          sql`CAST(${spStockMovements.qtyRemaining} AS numeric) > 0`
+        )
+      )
       .groupBy(spStockMovements.locationId, spStockMovements.stockItemId, spStockMovements.articleCode)
       .orderBy(asc(spStockMovements.locationId), asc(spStockMovements.stockItemId));
 
@@ -520,9 +552,6 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
         );
       }
 
-      const replayed = await findReplayedSale(tx, selectedCompany, sale.clientRequestId);
-      if (replayed) return { replayed: true as const, postings: replayed, plan: null };
-
       await assertPhase4BridgePosted(tx, selectedCompany);
       await assertCompanyLocation(tx, selectedCompany, sale.locationId);
       const accounts = await resolvePhase5Accounts(tx, selectedCompany);
@@ -532,6 +561,12 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
         (req.body as Record<string, unknown> | undefined)?.saleSideAccount,
         accounts.saleSideAccountId
       );
+
+      // Resolved before replay detection because the settlement account is part
+      // of what makes two submissions the same sale.
+      const saleDigest = goldenCoastPhase5SaleDigest({ sale, saleSideAccount });
+      const replayed = await findReplayedSale(tx, selectedCompany, sale.clientRequestId, saleDigest);
+      if (replayed) return { replayed: true as const, postings: replayed, plan: null };
 
       const stockItemIds = [...new Set(sale.lines.map((line) => line.stockItemId))];
       const lots = await lockFifoLots(tx, selectedCompany, sale.locationId, stockItemIds);
@@ -553,6 +588,7 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
         plan,
         accounts,
         saleSideAccount,
+        saleDigest,
         exchangeRate: exchangeRate != null ? String(exchangeRate) : null,
         actor: {
           userId: userId ?? null,

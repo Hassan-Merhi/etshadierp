@@ -99,6 +99,36 @@ describe("Golden Coast Phase 5 POS sale route surface", () => {
     expect(routeSource).toContain("accountingPostingRequests");
   });
 
+  it("binds a handler-level replay to the original sale payload", () => {
+    // The outer boundary keys on transport identity, so a caller can reach this
+    // handler with a reused clientRequestId and changed sale data. The stored
+    // sourceId carries the payload digest, which is compared before replaying.
+    expect(routeSource).toContain("goldenCoastPhase5SaleDigest({ sale, saleSideAccount })");
+    expect(routeSource).toContain("goldenCoastPhase5SourceId(requestId, saleDigest, item.role)");
+    expect(routeSource).toContain("GC_PHASE5_IDEMPOTENCY_CONFLICT");
+    expect(routeSource).toContain("sourceId: accountingPostingRequests.sourceId");
+    // The digest must be computed from resolved accounts, so it is bound after
+    // settlement-account resolution and before replay detection.
+    expect(routeSource.indexOf("resolveSaleSideAccount(")).toBeLessThan(
+      routeSource.indexOf("const saleDigest = goldenCoastPhase5SaleDigest")
+    );
+    expect(routeSource.indexOf("const saleDigest = goldenCoastPhase5SaleDigest")).toBeLessThan(
+      routeSource.indexOf("const replayed = await findReplayedSale")
+    );
+  });
+
+  it("reads only canonical post-cutover FIFO lots, never legacy movement rows", () => {
+    expect(routeSource).toContain("inArray(spStockMovements.sourceType, [...GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES])");
+    expect(saleServiceSource).toContain("GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES");
+    // Both the locked sale query and the readiness availability report use it.
+    expect(routeSource.split("GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES").length - 1).toBeGreaterThanOrEqual(3);
+  });
+
+  it("refuses to date a Golden Coast sale before the cutover", () => {
+    expect(saleServiceSource).toContain("text < GOLDEN_COAST_CUTOVER_DATE");
+    expect(saleServiceSource).toContain("GC_PHASE5_PRE_CUTOVER_DATE");
+  });
+
   it("requires the Phase 3/Phase 4 cutover state before any Golden Coast sale posts", () => {
     expect(routeSource).toContain("assertPhase4BridgePosted");
     expect(routeSource).toContain("GC_PHASE5_NOT_READY");
