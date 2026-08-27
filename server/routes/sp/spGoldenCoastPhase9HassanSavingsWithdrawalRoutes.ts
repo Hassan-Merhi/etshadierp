@@ -184,8 +184,13 @@ async function listPaymentAccounts(conn: DbLike, companyId: number) {
   ];
 }
 
-/** Credit-minus-debit is the withdrawable amount on the Hassan Savings loan. */
-async function hassanSavingsCreditBalance(conn: DbLike, companyId: number, accountId: number): Promise<string> {
+/** Credit-minus-debit is the withdrawable amount on the Hassan Savings loan at the requested accounting date. */
+async function hassanSavingsCreditBalance(
+  conn: DbLike,
+  companyId: number,
+  accountId: number,
+  cutoffDate?: string
+): Promise<string> {
   const query = await conn.execute(sql`
     SELECT (
       CASE
@@ -199,6 +204,8 @@ async function hassanSavingsCreditBalance(conn: DbLike, companyId: number, accou
         WHERE ve.ledger_account_id = ${accountId}
           AND v.company_id = ${companyId}
           AND v.deleted_at IS NULL
+          AND COALESCE(v.optional, false) = false
+          AND COALESCE(v.effective_date, v.voucher_date) <= COALESCE(${cutoffDate ?? null}::date, CURRENT_DATE)
       ), 0)
     )::text AS credit_minus_debit
     FROM ledger_accounts la
@@ -401,7 +408,7 @@ async function handleWithdrawal(req: Request, res: Response): Promise<void> {
       });
       const replayed = await findReplayedWithdrawal(tx, companyId, withdrawal, savingsAccount.id, withdrawalDigest);
       if (replayed) {
-        const currentBalance = await hassanSavingsCreditBalance(tx, companyId, savingsAccount.id);
+        const currentBalance = await hassanSavingsCreditBalance(tx, companyId, savingsAccount.id, withdrawal.withdrawalDate);
         return {
           replayed: true as const,
           withdrawal,
@@ -412,7 +419,18 @@ async function handleWithdrawal(req: Request, res: Response): Promise<void> {
         };
       }
 
-      const savingsBalanceUsd = await hassanSavingsCreditBalance(tx, companyId, savingsAccount.id);
+      // Serialize the balance cap against every voucher-entry writer. This database table lock
+      // conflicts with the ROW EXCLUSIVE lock taken by all voucher entry inserts, including
+      // manual journals and non-Phase-9 accounting routes, so the balance cannot change between
+      // this cap check and the Phase 9 posting commit.
+      await tx.execute(sql`LOCK TABLE voucher_entries IN SHARE ROW EXCLUSIVE MODE`);
+
+      const savingsBalanceUsd = await hassanSavingsCreditBalance(
+        tx,
+        companyId,
+        savingsAccount.id,
+        withdrawal.withdrawalDate
+      );
       const plan = planGoldenCoastPhase9Withdrawal({ withdrawal, savingsBalanceUsd });
       const request = buildGoldenCoastPhase9WithdrawalPosting({
         plan,
