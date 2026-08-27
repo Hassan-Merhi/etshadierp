@@ -49,11 +49,7 @@ function postCutoverMutationDateGuard(req: Request, res: Response, next: NextFun
 
   // Migration/setup/cutover endpoints intentionally operate on historical state and
   // have their own privileged guards. The production mutation surface is protected here.
-  if (
-    req.path.startsWith("/migration") ||
-    req.path.startsWith("/setup") ||
-    req.path.startsWith("/golden-coast")
-  ) {
+  if (req.path.startsWith("/migration") || req.path.startsWith("/setup") || req.path.startsWith("/golden-coast")) {
     return next();
   }
 
