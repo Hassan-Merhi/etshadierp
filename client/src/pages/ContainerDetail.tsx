@@ -1,13 +1,27 @@
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Package } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { companyQueryKey } from "@/lib/companyQueryScope";
+import { useCompany } from "@/contexts/CompanyContext";
+import type { Supplier } from "@shared/schema";
 import { useContainerDetailModel } from "./containerdetail/useContainerDetailModel";
 import { ContainerDetailSpView } from "./containerdetail/components/ContainerDetailSpView";
 import { ContainerDetailErpView } from "./containerdetail/components/ContainerDetailErpView";
 
 export default function ContainerDetail({ id: idProp, forceErp }: { id?: string; forceErp?: boolean }) {
   const model = useContainerDetailModel({ id: idProp, forceErp });
+  const { selectedCompany } = useCompany();
+  const { data: containerSuppliers = [] } = useQuery<Supplier[]>({
+    queryKey: companyQueryKey("/api/suppliers", selectedCompany?.id, "allow-parent-fallback"),
+    queryFn: async () => {
+      const res = await fetch("/api/suppliers?allowParentFallback=true", { credentials: "include" });
+      if (!res.ok) throw res;
+      return res.json();
+    },
+    enabled: Boolean(selectedCompany?.id) && !model.isSupplierPartner,
+  });
   const {
     formatDisplayDate: _formatDisplayDate,
     containerId: _containerId,
@@ -104,5 +118,10 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
   if (isSupplierPartner) {
     return <ContainerDetailSpView model={model} />;
   }
-  return <ContainerDetailErpView model={model} />;
+
+  const erpModel = {
+    ...model,
+    suppliers: containerSuppliers.length > 0 ? containerSuppliers : model.suppliers,
+  };
+  return <ContainerDetailErpView model={erpModel} />;
 }
