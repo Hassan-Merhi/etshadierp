@@ -4,6 +4,13 @@ on:
   pull_request:
     branches: [main]
     types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/ci-repair-bot.yml
+      - .github/workflows/ci-repair-failure-trigger.yml
+      - .github/workflows/ci-repair-sweep.yml
+      - .github/agents/bug-repair.agent.md
   status:
   schedule:
     - cron: "2,7,12,17,22,27,32,37,42,47,52,57 * * * *"
@@ -76,9 +83,21 @@ jobs:
             failed_statuses="$(jq '[.statuses[] | select(.state == "failure" or .state == "error")] | length' <<<"$statuses_json")"
 
             if (( failed_checks > 0 || failed_statuses > 0 )); then
-              gh api --method POST \
-                "repos/$GITHUB_REPOSITORY/actions/workflows/ci-repair-bot.yml/dispatches" \
-                -f ref=main
+              # Never queue a second repair run behind one that is already working.
+              active_runs="$(
+                gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci-repair-bot.yml/runs?per_page=50" \
+                  --jq '[.workflow_runs[] | select(
+                          .status == "queued" or
+                          .status == "in_progress" or
+                          .status == "waiting" or
+                          .status == "requested" or
+                          .status == "pending")] | length'
+              )"
+              if (( active_runs == 0 )); then
+                gh api --method POST \
+                  "repos/$GITHUB_REPOSITORY/actions/workflows/ci-repair-bot.yml/dispatches" \
+                  -f ref=main
+              fi
               exit 0
             fi
 
@@ -141,85 +160,60 @@ jobs:
             *) exit 0 ;;
           esac
 
+          # Never queue a second repair run behind one that is already working.
+          active_runs="$(
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci-repair-bot.yml/runs?per_page=50" \
+              --jq '[.workflow_runs[] | select(
+                      .status == "queued" or
+                      .status == "in_progress" or
+                      .status == "waiting" or
+                      .status == "requested" or
+                      .status == "pending")] | length'
+          )"
+          (( active_runs == 0 )) || exit 0
+
           gh api --method POST \
             "repos/$GITHUB_REPOSITORY/actions/workflows/ci-repair-bot.yml/dispatches" \
             -f ref=main
 
-  watchdog-wake:
-    name: Five-minute fallback scan for red PRs
-    if: github.event_name == 'schedule'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
+  deployment-sweep:
+    name: Sweep red PRs after CI repair automation lands
+    # GitHub cron is best-effort and has never been a dependable wake-up for
+    # PRs that were already red before a bot change reached main, so a change
+    # to the CI repair automation itself sweeps for eligible red PRs at once.
+    if: github.event_name == 'push'
     permissions:
       actions: write
       checks: read
       contents: read
       pull-requests: read
       statuses: read
-    steps:
-      - name: Dispatch repair only when a trusted PR is currently red
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
+    uses: ./.github/workflows/ci-repair-sweep.yml
+    with:
+      reason: ci-repair automation deployed to main
 
-          while IFS= read -r encoded_pr; do
-            [[ -n "$encoded_pr" ]] || continue
-            pr_json="$(printf '%s' "$encoded_pr" | base64 --decode)"
-            draft="$(jq -r '.draft' <<<"$pr_json")"
-            head_repo="$(jq -r '.head.repo.full_name // ""' <<<"$pr_json")"
-            head_sha="$(jq -r '.head.sha' <<<"$pr_json")"
-            author_login="$(jq -r '.user.login' <<<"$pr_json")"
-            author_association="$(jq -r '.author_association // ""' <<<"$pr_json")"
-            blocked="$(jq -r '[.labels[].name] | any(. == "ci-repair-blocked")' <<<"$pr_json")"
-
-            [[ "$draft" == false && "$head_repo" == "$GITHUB_REPOSITORY" && "$blocked" == false ]] || continue
-            [[ "$author_login" != 'dependabot[bot]' && "$author_login" != 'renovate[bot]' ]] || continue
-            case "$author_association" in
-              OWNER|MEMBER|COLLABORATOR) ;;
-              *) continue ;;
-            esac
-
-            checks_json="$(gh api "repos/$GITHUB_REPOSITORY/commits/$head_sha/check-runs?per_page=100")"
-            statuses_json="$(gh api "repos/$GITHUB_REPOSITORY/commits/$head_sha/status")"
-            failed_checks="$(jq '[.check_runs[] | select(
-              .name != "Watch trusted PR checks for repair" and
-              .status == "completed" and
-              (.conclusion == "failure" or
-               .conclusion == "timed_out" or
-               .conclusion == "cancelled" or
-               .conclusion == "action_required" or
-               .conclusion == "startup_failure")
-            )] | length' <<<"$checks_json")"
-            failed_statuses="$(jq '[.statuses[] | select(.state == "failure" or .state == "error")] | length' <<<"$statuses_json")"
-
-            if (( failed_checks > 0 || failed_statuses > 0 )); then
-              gh api --method POST \
-                "repos/$GITHUB_REPOSITORY/actions/workflows/ci-repair-bot.yml/dispatches" \
-                -f ref=main
-              exit 0
-            fi
-          done < <(
-            gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&sort=updated&direction=asc&per_page=100" \
-              --jq '.[] | @base64'
-          )
+  watchdog-wake:
+    name: Five-minute fallback scan for red PRs
+    if: github.event_name == 'schedule'
+    permissions:
+      actions: write
+      checks: read
+      contents: read
+      pull-requests: read
+      statuses: read
+    uses: ./.github/workflows/ci-repair-sweep.yml
+    with:
+      reason: scheduled watchdog
 
   manual-wake:
     name: Manually wake guarded CI repair bot
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
     permissions:
       actions: write
+      checks: read
       contents: read
-    steps:
-      - name: Dispatch CI Repair Bot
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          gh api --method POST \
-            "repos/$GITHUB_REPOSITORY/actions/workflows/ci-repair-bot.yml/dispatches" \
-            -f ref=main
+      pull-requests: read
+      statuses: read
+    uses: ./.github/workflows/ci-repair-sweep.yml
+    with:
+      reason: manual workflow_dispatch
