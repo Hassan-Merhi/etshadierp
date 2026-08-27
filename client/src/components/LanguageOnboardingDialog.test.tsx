@@ -51,6 +51,7 @@ describe("LanguageOnboardingDialog", () => {
     const continueButton = screen.getByTestId("language-onboarding-continue");
     expect(continueButton).not.toBeDisabled();
     expect(continueButton).toHaveAttribute("aria-busy", "true");
+    expect(continueButton).toHaveAccessibleName("Continue · متابعة · Continuer");
 
     fireEvent.click(continueButton);
     await waitFor(() => expect(screen.queryByTestId("language-onboarding-dialog")).not.toBeInTheDocument());
