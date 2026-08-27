@@ -120,10 +120,14 @@ async function completeLanguageOnboarding(page) {
   if (!open) return;
 
   await page.click('[data-testid="language-onboarding-en"]');
-  await page.waitForFunction(
-    () => !document.querySelector('[data-testid="language-onboarding-continue"]')?.hasAttribute("disabled"),
-    { timeout: timeoutMs },
-  );
+  // Continue is intentionally never gated on the background preference save, so
+  // wait for the button itself rather than for a disabled attribute to clear.
+  // The old wait hung for the full timeout whenever that save was slow, which
+  // is what made the two login-bearing cases flaky.
+  await page.waitForSelector('[data-testid="language-onboarding-continue"]', {
+    visible: true,
+    timeout: timeoutMs,
+  });
   await page.click('[data-testid="language-onboarding-continue"]');
   await page.waitForFunction(
     (selector) => {
