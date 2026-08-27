@@ -2,8 +2,10 @@ import type { Express, NextFunction, Request, Response } from "express";
 import { sql } from "drizzle-orm";
 import { spStockMovements } from "@shared/schema";
 import { db } from "../../db";
+import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
+import { resultRows } from "../../lib/queryResult";
 import {
   GOLDEN_COAST_CUTOVER_DATE,
   GOLDEN_COAST_CUTOVER_FIFO_SOURCE,
@@ -11,8 +13,7 @@ import {
   buildGoldenCoastCutoverFifoPlan,
   type GoldenCoastInventorySnapshotRow,
 } from "../../services/accounting/goldenCoastPhase4CutoverFifo";
-import { requireSpCompany, getSpAccount } from "./spHelpers";
-import { resultRows } from "../../lib/queryResult";
+import { requireSpCompany } from "./spHelpers";
 
 const phase3VoucherNumber = (companyId: number) => `GC-CUTOVER-20260901-C${companyId}`;
 
@@ -32,14 +33,29 @@ async function isGoldenCoastCompany(conn: DbLike, companyId: number): Promise<bo
 }
 
 async function loadSnapshotState(conn: DbLike, companyId: number) {
-  const stockAccount = await getSpAccount(companyId, "sp_stock");
-  if (!stockAccount) {
-    throw new GoldenCoastPhase4CutoverError("Golden Coast Stock in Hand account is not configured");
+  const stockRows = await conn.execute(sql`
+    SELECT id
+    FROM ledger_accounts
+    WHERE company_id = ${companyId}
+      AND sub_type = 'sp_stock'
+      AND active = true
+      AND deleted_at IS NULL
+    ORDER BY id
+    LIMIT 2
+  `);
+  const stockAccounts = resultRows(stockRows);
+  if (stockAccounts.length !== 1) {
+    throw new GoldenCoastPhase4CutoverError(
+      stockAccounts.length === 0
+        ? "Golden Coast Stock in Hand account is not configured"
+        : "Golden Coast Stock in Hand account is ambiguous; repair duplicate canonical accounts first"
+    );
   }
+  const stockAccountId = Number(stockAccounts[0].id);
 
   const voucherRows = await conn.execute(sql`
     SELECT v.id,
-           COALESCE(SUM(CASE WHEN ve.ledger_account_id = ${stockAccount.id}
+           COALESCE(SUM(CASE WHEN ve.ledger_account_id = ${stockAccountId}
              THEN CAST(ve.debit_amount AS numeric) - CAST(ve.credit_amount AS numeric)
              ELSE 0 END), 0) AS stock_in_hand_opening
     FROM vouchers v
@@ -64,7 +80,6 @@ async function loadSnapshotState(conn: DbLike, companyId: number) {
     INNER JOIN locations loc ON loc.id = inv.location_id AND loc.company_id = ${companyId}
     INNER JOIN stock_items si ON si.id = inv.stock_item_id
     WHERE inv.company_id = ${companyId}
-      AND CAST(COALESCE(inv.quantity, '0') AS numeric) >= 0
     ORDER BY inv.location_id, inv.stock_item_id
   `);
 
@@ -78,9 +93,13 @@ async function loadSnapshotState(conn: DbLike, companyId: number) {
   const existing = resultRows(existingRows);
 
   const blockers: string[] = [];
-  if (!voucherRow) blockers.push("Phase 3 cutover voucher has not been posted yet.");
+  if (!voucherRow) {
+    blockers.push(releaseDebtEnglish("Phase 3 cutover voucher has not been posted yet."));
+  }
   if (new Date().toISOString().slice(0, 10) < GOLDEN_COAST_CUTOVER_DATE) {
-    blockers.push(`Opening FIFO cutover cannot be posted before ${GOLDEN_COAST_CUTOVER_DATE}.`);
+    blockers.push(
+      releaseDebtEnglish(`Opening FIFO cutover cannot be posted before ${GOLDEN_COAST_CUTOVER_DATE}.`)
+    );
   }
 
   let plan: ReturnType<typeof buildGoldenCoastCutoverFifoPlan> | null = null;
@@ -106,7 +125,9 @@ async function loadSnapshotState(conn: DbLike, companyId: number) {
   }
 
   if (existing.length > 0) {
-    blockers.push("Golden Coast cutover FIFO snapshot already exists; rerun is read-only/idempotent.");
+    blockers.push(
+      releaseDebtEnglish("Golden Coast cutover FIFO snapshot already exists; rerun is read-only/idempotent.")
+    );
   }
 
   return {
@@ -121,7 +142,11 @@ async function loadSnapshotState(conn: DbLike, companyId: number) {
   };
 }
 
-async function guardLegacyGoldenCoastMutation(req: Request, res: Response, next: NextFunction): Promise<void> {
+async function guardLegacyGoldenCoastMutation(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
   try {
     const companyId = await requireSpCompany(req, res);
     if (!companyId) return;
@@ -131,8 +156,9 @@ async function guardLegacyGoldenCoastMutation(req: Request, res: Response, next:
     }
     res.status(410).json({
       code: "GC_LEGACY_POSTING_RETIRED",
-      message:
-        "This Golden Coast legacy mutation is retired by the September 1 redesign. Legacy records remain readable, but production changes must use the replacement Golden Coast workflow.",
+      message: releaseDebtEnglish(
+        "This Golden Coast legacy mutation is retired by the September 1 redesign. Legacy records remain readable, but production changes must use the replacement Golden Coast workflow."
+      ),
     });
   } catch (error) {
     res.status(500).json({ message: getErrorMessage(error) });
@@ -150,14 +176,19 @@ export function registerSpGoldenCoastPhase4CutoverFifoRoutes(app: Express): void
   app.post("/api/sp/prepaid", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
   app.post("/api/sp/containers", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
   app.patch("/api/sp/containers/:id", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
-  app.post("/api/sp/containers/:id/cancel", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
+  app.post("/api/sp/containers/:id/cancel", (req, res, next) =>
+    void guardLegacyGoldenCoastMutation(req, res, next)
+  );
 
   app.get("/api/sp/golden-coast/phase4/cutover-fifo/status", async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
       if (!(await isGoldenCoastCompany(db, companyId))) {
-        return res.status(409).json({ code: "GC_PHASE4_NOT_CONFIGURED", message: "Golden Coast account setup is not configured." });
+        return res.status(409).json({
+          code: "GC_PHASE4_NOT_CONFIGURED",
+          message: releaseDebtEnglish("Golden Coast account setup is not configured."),
+        });
       }
       res.json(await loadSnapshotState(db, companyId));
     } catch (error) {
@@ -180,7 +211,9 @@ export function registerSpGoldenCoastPhase4CutoverFifoRoutes(app: Express): void
         const state = await loadSnapshotState(tx, companyId);
         if (state.posted) return { ...state, replayed: true };
         if (!state.canPost || !state.plan) {
-          throw new GoldenCoastPhase4CutoverError(state.blockers.join(" ") || "Cutover FIFO is not ready");
+          throw new GoldenCoastPhase4CutoverError(
+            state.blockers.join(" ") || "Cutover FIFO is not ready"
+          );
         }
         const inserted = [];
         for (const movement of state.plan.movements) {
