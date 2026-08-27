@@ -1,0 +1,51 @@
+name: Golden Coast Phase 4 Format Probe
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  format-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden Runner (audit mode)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+      - name: Download repository source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" |
+            tar --extract --gzip --strip-components=1
+      - name: Set up Node.js 24.19.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24.19.0"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+      - name: Format Phase 4 files and print canonical contents
+        run: |
+          set -euo pipefail
+          files=(
+            server/routes/goldenCoastLegacyPostingRetirement.ts
+            server/routes/sp/spGoldenCoastPhase4CutoverFifoRoutes.test.ts
+            server/routes/sp/spGoldenCoastPhase4CutoverFifoRoutes.ts
+            server/services/accounting/goldenCoastPhase4CutoverFifo.test.ts
+            server/services/accounting/goldenCoastPhase4CutoverFifo.ts
+          )
+          npx prettier --write "${files[@]}"
+          for file in "${files[@]}"; do
+            echo "===== BEGIN ${file} ====="
+            cat "${file}"
+            echo "===== END ${file} ====="
+          done
