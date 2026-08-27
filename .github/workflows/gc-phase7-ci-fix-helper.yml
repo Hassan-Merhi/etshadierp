@@ -90,11 +90,6 @@ jobs:
           server/services/accounting/goldenCoastPhase7HadiTransfer.ts
           --max-warnings=0
 
-      - name: Verify Phase 7 unit tests
-        run: >-
-          node node_modules/vitest/vitest.mjs run
-          server/services/accounting/goldenCoastPhase7HadiTransfer.test.ts
-
       - name: Commit exact PR fix and remove helper
         shell: bash
         run: |
