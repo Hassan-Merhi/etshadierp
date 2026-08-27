@@ -17,6 +17,8 @@ import {
   GOLDEN_COAST_PHASE4_OPENING_SOURCE,
   GoldenCoastPhase4Error,
   assertGoldenCoastPostCutoverMutationDates,
+  goldenCoastPhase4CutoverNotOpenMessage,
+  goldenCoastPhase4OpeningLotDescription,
   reconcileGoldenCoastOpeningInventory,
   type GoldenCoastOpeningInventoryRow,
 } from "../../services/accounting/goldenCoastPhase4Cutover";
@@ -26,6 +28,8 @@ const requestBudget = privilegedRequestBudget({ maxBodyBytes: 8 * 1024, maxColle
 const LEGACY_RETIRED_CODE = "GC_LEGACY_POSTING_RETIRED";
 const LEGACY_RETIRED_MESSAGE =
   "This Golden Coast legacy posting path is retired. Use the September 1 cutover and canonical Supplier Partner flows.";
+
+type DatabaseExecutor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -66,7 +70,7 @@ function postCutoverMutationDateGuard(req: Request, res: Response, next: NextFun
 }
 
 async function loadOpeningSnapshot(
-  executor: typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0],
+  executor: DatabaseExecutor,
   companyId: number
 ): Promise<GoldenCoastOpeningInventoryRow[]> {
   const rows = resultRows(
@@ -95,13 +99,12 @@ async function loadOpeningSnapshot(
   }));
 }
 
-async function loadStockInHandOpeningUsd(
-  executor: typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0],
-  companyId: number
-): Promise<string | null> {
+async function loadStockInHandOpeningUsd(executor: DatabaseExecutor, companyId: number): Promise<string | null> {
   const rows = resultRows(
     await executor.execute(sql`
-      SELECT CAST(COALESCE(SUM(CAST(ve.debit_amount AS numeric) - CAST(ve.credit_amount AS numeric)), 0) AS text) AS value
+      SELECT
+        COUNT(DISTINCT v.id)::int AS "voucherCount",
+        CAST(COALESCE(SUM(CAST(ve.debit_amount AS numeric) - CAST(ve.credit_amount AS numeric)), 0) AS text) AS value
       FROM vouchers v
       JOIN voucher_entries ve ON ve.voucher_id = v.id
       JOIN ledger_accounts la ON la.id = ve.ledger_account_id
@@ -112,14 +115,12 @@ async function loadStockInHandOpeningUsd(
         AND la.sub_type = 'sp_stock'
     `)
   );
-  const value = rows[0]?.value;
-  return value == null ? null : String(value);
+  const row = rows[0];
+  if (!row || Number(row.voucherCount ?? 0) !== 1 || row.value == null) return null;
+  return String(row.value);
 }
 
-async function openingLotCount(
-  executor: typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0],
-  companyId: number
-): Promise<number> {
+async function openingLotCount(executor: DatabaseExecutor, companyId: number): Promise<number> {
   const rows = resultRows(
     await executor.execute(sql`
       SELECT COUNT(*)::int AS count
@@ -130,10 +131,7 @@ async function openingLotCount(
   return Number(rows[0]?.count ?? 0);
 }
 
-async function phase4Status(
-  executor: typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0],
-  companyId: number
-) {
+async function phase4Status(executor: DatabaseExecutor, companyId: number) {
   const [snapshot, stockInHandOpeningUsd, existingLotCount] = await Promise.all([
     loadOpeningSnapshot(executor, companyId),
     loadStockInHandOpeningUsd(executor, companyId),
@@ -141,7 +139,7 @@ async function phase4Status(
   ]);
   const phase3Posted = stockInHandOpeningUsd !== null;
   const reconciliation = phase3Posted
-    ? reconcileGoldenCoastOpeningInventory({ stockInHandOpeningUsd: stockInHandOpeningUsd!, rows: snapshot })
+    ? reconcileGoldenCoastOpeningInventory({ stockInHandOpeningUsd, rows: snapshot })
     : null;
   const cutoverOpen = today() >= GOLDEN_COAST_PHASE4_CUTOVER_DATE;
 
@@ -188,8 +186,10 @@ async function handleBuildOpeningFifo(req: Request, res: Response): Promise<void
     if (!companyId) return;
     validateMutationIntent(req);
     if (today() < GOLDEN_COAST_PHASE4_CUTOVER_DATE) {
-      const cutoverNotOpenMessage = `Opening FIFO cannot be built before ${GOLDEN_COAST_PHASE4_CUTOVER_DATE}`;
-      res.status(409).json({ code: "GC_PHASE4_CUTOVER_NOT_OPEN", message: cutoverNotOpenMessage });
+      res.status(409).json({
+        code: "GC_PHASE4_CUTOVER_NOT_OPEN",
+        message: goldenCoastPhase4CutoverNotOpenMessage(),
+      });
       return;
     }
 
@@ -212,13 +212,12 @@ async function handleBuildOpeningFifo(req: Request, res: Response): Promise<void
       }
 
       if (status.snapshot.length > 0) {
-        const openingLotDescription = `Golden Coast ${GOLDEN_COAST_PHASE4_CUTOVER_DATE} opening FIFO bridge`;
         await tx.insert(spStockMovements).values(
           status.snapshot.map((row) => ({
             companyId: selectedCompanyId,
             sourceType: GOLDEN_COAST_PHASE4_OPENING_SOURCE,
             articleCode: row.articleCode,
-            description: openingLotDescription,
+            description: goldenCoastPhase4OpeningLotDescription(),
             stockItemId: row.stockItemId,
             locationId: row.locationId,
             qtyIn: String(row.quantity),
