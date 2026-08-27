@@ -46,47 +46,48 @@ jobs:
           }
 
           async function activeSubTypeAccount'''
-          if needle not in text:
-            raise SystemExit("canonical role return anchor not found")
-          text = text.replace(needle, replacement, 1)
+          if "definition.acceptedAccountTypes.includes(account.accountType)" not in text:
+            if needle not in text:
+              raise SystemExit("canonical role return anchor not found")
+            text = text.replace(needle, replacement, 1)
 
           revenue_term = 'sum.plus(new Decimal(line.qty).times(new Decimal(line.unitPriceUsd)))'
-          if revenue_term not in text:
-            raise SystemExit("preflight revenue expression not found")
-          text = text.replace(
-            revenue_term,
-            'sum.plus(new Decimal(line.qty).times(new Decimal(line.unitPriceUsd)).toDecimalPlaces(2))',
-            1,
-          )
+          if "times(new Decimal(line.unitPriceUsd)).toDecimalPlaces(2)" not in text:
+            if revenue_term not in text:
+              raise SystemExit("preflight revenue expression not found")
+            text = text.replace(
+              revenue_term,
+              'sum.plus(new Decimal(line.qty).times(new Decimal(line.unitPriceUsd)).toDecimalPlaces(2))',
+              1,
+            )
           route.write_text(text)
 
           fixture = Path("tests/helpers/goldenCoastPhase5Fixture.ts")
           text = fixture.read_text()
           old_url = 'export const GOLDEN_COAST_PHASE5_SALE_URL = "/api/sp/golden-coast/phase5/pos-sale";'
-          if old_url not in text:
-            raise SystemExit("Phase 5 fixture URL not found")
-          text = text.replace(old_url, 'export const GOLDEN_COAST_PHASE5_SALE_URL = "/api/sp/golden-coast/phase6/pos-sale";', 1)
+          new_url = 'export const GOLDEN_COAST_PHASE5_SALE_URL = "/api/sp/golden-coast/phase6/pos-sale";'
+          if new_url not in text:
+            if old_url not in text:
+              raise SystemExit("Phase 5 fixture URL not found")
+            text = text.replace(old_url, new_url, 1)
 
-          stock_block = '''  const stockInHandAccountId = await insertLedgerAccount({
-            companyId: ctx.companyId,
-            code: "SP-STOCK",
-            name: "Stock in Hand",
-            accountType: "Asset",
-            subType: "sp_stock",
-          });
-          '''
-          hassan_block = '''  await insertLedgerAccount({
+          if 'subType: "gc_hassan_savings"' not in text:
+            stock_start = text.find("  const stockInHandAccountId = await insertLedgerAccount({")
+            if stock_start < 0:
+              raise SystemExit("Stock in Hand fixture start not found")
+            stock_end = text.find("  });", stock_start)
+            if stock_end < 0:
+              raise SystemExit("Stock in Hand fixture end not found")
+            stock_end += len("  });")
+            hassan_block = '''
+          await insertLedgerAccount({
             companyId: ctx.companyId,
             code: "GC-HSAV",
             name: "Hassan Savings",
             accountType: "Loans",
             subType: "gc_hassan_savings",
-          });
-          '''
-          if "subType: \"gc_hassan_savings\"" not in text:
-            if stock_block not in text:
-              raise SystemExit("Stock in Hand fixture anchor not found")
-            text = text.replace(stock_block, stock_block + hassan_block, 1)
+          });'''
+            text = text[:stock_end] + hassan_block + text[stock_end:]
           fixture.write_text(text)
 
           test = Path("server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.test.ts")
