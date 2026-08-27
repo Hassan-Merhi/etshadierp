@@ -129,11 +129,7 @@ jobs:
 
           node dist/index.js > "$RUNNER_TEMP/phase15-startup-migrations.txt" 2>&1 &
           app_pid=$!
-          cleanup() {
-            kill "$app_pid" 2>/dev/null || true
-            wait "$app_pid" 2>/dev/null || true
-          }
-          trap cleanup EXIT
+          trap 'kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true' EXIT
 
           for _attempt in $(seq 1 180); do
             if curl --fail --silent --show-error "http://127.0.0.1:${PORT}/api/health/db"; then
