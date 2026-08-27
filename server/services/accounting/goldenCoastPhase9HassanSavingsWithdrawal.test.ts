@@ -52,21 +52,19 @@ describe("Golden Coast Phase 9 Hassan Savings withdrawal", () => {
 
   it("caps withdrawals to the actual credit balance on Hassan Savings", () => {
     const parsed = withdrawal({ amountUsd: "600.00" });
-    expect(
-      planGoldenCoastPhase9Withdrawal({ withdrawal: parsed, savingsBalanceUsd: "1600.00" })
-    ).toMatchObject({
+    expect(planGoldenCoastPhase9Withdrawal({ withdrawal: parsed, savingsBalanceUsd: "1600.00" })).toMatchObject({
       savingsBalanceBeforeUsd: "1600.00",
       savingsBalanceAfterUsd: "1000.00",
     });
-    expect(() =>
-      planGoldenCoastPhase9Withdrawal({ withdrawal: parsed, savingsBalanceUsd: "599.99" })
-    ).toThrow(/exceeds the available Hassan Savings balance/);
+    expect(() => planGoldenCoastPhase9Withdrawal({ withdrawal: parsed, savingsBalanceUsd: "599.99" })).toThrow(
+      /exceeds the available Hassan Savings balance/
+    );
   });
 
   it("fails closed when the Hassan Savings credit balance is negative", () => {
-    expect(() =>
-      planGoldenCoastPhase9Withdrawal({ withdrawal: withdrawal(), savingsBalanceUsd: "-1.00" })
-    ).toThrow(/negative credit balance/);
+    expect(() => planGoldenCoastPhase9Withdrawal({ withdrawal: withdrawal(), savingsBalanceUsd: "-1.00" })).toThrow(
+      /negative credit balance/
+    );
   });
 
   it("posts Dr Hassan Savings / Cr selected bank through the central posting request", () => {
@@ -103,12 +101,12 @@ describe("Golden Coast Phase 9 Hassan Savings withdrawal", () => {
     const differentBank = withdrawal({ paymentAccount: { kind: "bank", id: 92 } });
     const differentReference = withdrawal({ reference: "Different payout" });
 
-    expect(
-      goldenCoastPhase9WithdrawalDigest({ withdrawal: differentBank, hassanSavingsAccountId: 44 })
-    ).not.toBe(baseDigest);
-    expect(
-      goldenCoastPhase9WithdrawalDigest({ withdrawal: differentReference, hassanSavingsAccountId: 44 })
-    ).not.toBe(baseDigest);
+    expect(goldenCoastPhase9WithdrawalDigest({ withdrawal: differentBank, hassanSavingsAccountId: 44 })).not.toBe(
+      baseDigest
+    );
+    expect(goldenCoastPhase9WithdrawalDigest({ withdrawal: differentReference, hassanSavingsAccountId: 44 })).not.toBe(
+      baseDigest
+    );
     expect(goldenCoastPhase9IdempotencyKey(7, base.clientRequestId)).toContain(base.clientRequestId);
   });
 });

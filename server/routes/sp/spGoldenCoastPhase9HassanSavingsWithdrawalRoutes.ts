@@ -1,13 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
-import {
-  accountingPostingRequests,
-  bankAccounts,
-  ledgerAccounts,
-  voucherEntries,
-  vouchers,
-} from "@shared/schema";
+import { accountingPostingRequests, bankAccounts, ledgerAccounts, voucherEntries, vouchers } from "@shared/schema";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { db } from "../../db";
 import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
@@ -180,7 +174,12 @@ async function listPaymentAccounts(conn: DbLike, companyId: number) {
       .orderBy(asc(bankAccounts.name)),
   ]);
   return [
-    ...ledgerRows.map((row) => ({ kind: "ledger" as const, id: Number(row.id), name: row.name, type: row.accountType })),
+    ...ledgerRows.map((row) => ({
+      kind: "ledger" as const,
+      id: Number(row.id),
+      name: row.name,
+      type: row.accountType,
+    })),
     ...bankRows.map((row) => ({ kind: "bank" as const, id: Number(row.id), name: row.name, type: "Bank Account" })),
   ];
 }
@@ -264,7 +263,9 @@ async function findReplayedWithdrawal(
   const [voucher] = await tx
     .select()
     .from(vouchers)
-    .where(and(eq(vouchers.id, Number(marker.voucherId)), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt)))
+    .where(
+      and(eq(vouchers.id, Number(marker.voucherId)), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt))
+    )
     .limit(1);
   if (!voucher) {
     throw new GoldenCoastPhase9RouteError(
@@ -293,7 +294,9 @@ async function findReplayedWithdrawal(
       withdrawal.paymentAccount.kind === "bank"
         ? Number(entry.bankAccountId ?? 0) === withdrawal.paymentAccount.id
         : Number(entry.ledgerAccountId ?? 0) === withdrawal.paymentAccount.id;
-    return targetMatches && amountEquals(entry.creditAmount, withdrawal.amountUsd) && amountEquals(entry.debitAmount, "0");
+    return (
+      targetMatches && amountEquals(entry.creditAmount, withdrawal.amountUsd) && amountEquals(entry.debitAmount, "0")
+    );
   });
   if (!savingsDebit || !paymentCredit) {
     throw new GoldenCoastPhase9RouteError(
@@ -311,7 +314,8 @@ function respondKnownError(res: Response, error: unknown): boolean {
     return true;
   }
   if (error instanceof GoldenCoastPhase9WithdrawalError) {
-    const status = error.code === "GC_PHASE9_WITHDRAWAL_EXCEEDS_SAVINGS" || error.code === "GC_PHASE9_BALANCE_INVALID" ? 409 : 400;
+    const status =
+      error.code === "GC_PHASE9_WITHDRAWAL_EXCEEDS_SAVINGS" || error.code === "GC_PHASE9_BALANCE_INVALID" ? 409 : 400;
     res.status(status).json({ code: error.code, message: error.message });
     return true;
   }
@@ -395,13 +399,7 @@ async function handleWithdrawal(req: Request, res: Response): Promise<void> {
         withdrawal,
         hassanSavingsAccountId: savingsAccount.id,
       });
-      const replayed = await findReplayedWithdrawal(
-        tx,
-        companyId,
-        withdrawal,
-        savingsAccount.id,
-        withdrawalDigest
-      );
+      const replayed = await findReplayedWithdrawal(tx, companyId, withdrawal, savingsAccount.id, withdrawalDigest);
       if (replayed) {
         const currentBalance = await hassanSavingsCreditBalance(tx, companyId, savingsAccount.id);
         return {
