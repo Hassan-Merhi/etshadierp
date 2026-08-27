@@ -128,10 +128,10 @@ describe("credential version service behavior", () => {
     );
 
     await revokeUserSessions(pool, "u4", "sid-keep");
-    expect(pool.query).toHaveBeenLastCalledWith(
-      expect.stringContaining("sid <> $2"),
-      ["u4", "sid-keep"],
-    );
+    expect(pool.query).toHaveBeenLastCalledWith(expect.stringContaining("sid <> $2"), [
+      "u4",
+      "sid-keep",
+    ]);
   });
 
   it("revokes only sessions in the affected company and can preserve one sid", async () => {
@@ -144,10 +144,11 @@ describe("credential version service behavior", () => {
     );
 
     await revokeUserCompanySessions(pool, "u-company", 42, "sid-keep");
-    expect(pool.query).toHaveBeenLastCalledWith(
-      expect.stringContaining("sid <> $3"),
-      ["u-company", "42", "sid-keep"],
-    );
+    expect(pool.query).toHaveBeenLastCalledWith(expect.stringContaining("sid <> $3"), [
+      "u-company",
+      "42",
+      "sid-keep",
+    ]);
   });
 
   it("rotates credentials transactionally and then revokes prior sessions", async () => {
@@ -166,9 +167,9 @@ describe("credential version service behavior", () => {
       }),
     ).resolves.toBe(3);
     expect(db.transaction).toHaveBeenCalledOnce();
-    expect(pool.query).toHaveBeenCalledWith(
-      expect.stringContaining("sid <> $2"),
-      ["u5", "current"],
-    );
+    expect(pool.query).toHaveBeenCalledWith(expect.stringContaining("sid <> $2"), [
+      "u5",
+      "current",
+    ]);
   });
 });
