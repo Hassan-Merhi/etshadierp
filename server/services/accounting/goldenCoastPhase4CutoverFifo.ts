@@ -89,15 +89,11 @@ export function buildGoldenCoastCutoverFifoPlan(input: {
     const quantity = decimal(row.quantity, `inventory ${inventoryId} quantity`);
     const rate = decimal(row.averageRate, `inventory ${inventoryId} averageRate`);
     if (quantity.isNegative() || rate.isNegative()) {
-      throw new GoldenCoastPhase4CutoverError(
-        `inventory ${inventoryId} quantity and average rate cannot be negative`
-      );
+      throw new GoldenCoastPhase4CutoverError(`inventory ${inventoryId} quantity and average rate cannot be negative`);
     }
     if (quantity.isZero()) continue;
     if (rate.isZero()) {
-      throw new GoldenCoastPhase4CutoverError(
-        `inventory ${inventoryId} has positive quantity with zero average rate`
-      );
+      throw new GoldenCoastPhase4CutoverError(`inventory ${inventoryId} has positive quantity with zero average rate`);
     }
 
     snapshotValue = snapshotValue.plus(quantity.times(rate));
