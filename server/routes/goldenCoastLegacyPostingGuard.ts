@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { requireAuth } from "../auth";
+import { releaseDebtEnglish } from "../i18n/finalCloseoutEnglish";
 
 /**
  * Phase 1 was an implementation scaffold, not the final Golden Coast accounting model.
@@ -13,8 +14,9 @@ export function registerGoldenCoastLegacyPostingGuard(app: Express): void {
     (_req: Request, res: Response) => {
       res.status(410).json({
         code: "GC_PHASE1_POSTING_RETIRED",
-        message:
-          "Golden Coast Phase 1 posting is retired. Use the canonical Supplier Partner cutover and post-cutover accounting flows.",
+        message: releaseDebtEnglish(
+          "Golden Coast Phase 1 posting is retired. Use the canonical Supplier Partner cutover and post-cutover accounting flows."
+        ),
       });
     }
   );
