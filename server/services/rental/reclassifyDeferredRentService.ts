@@ -1,6 +1,10 @@
 import { pool } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
+import {
+  getDatabaseScopeRuntimeContext,
+  runWithDatabaseMaintenanceScope,
+} from "../security/databaseScopeRuntimeContext";
 
 let inFlight: Promise<void> | null = null;
 let completed = false;
@@ -20,6 +24,10 @@ BEGIN
     FROM companies
     WHERE active = true
       AND company_type = 'properties'
+      AND CASE
+        WHEN erp_company_scope_maintenance_enabled() THEN true
+        ELSE id = erp_current_company_id()
+      END
     ORDER BY id
   LOOP
     PERFORM pg_advisory_xact_lock(734210000 + company_row.id);
@@ -187,15 +195,31 @@ $reclass$;
  * the existing Rental Income account. The SQL block is atomic and idempotent:
  * it locks each Properties company, journals only the current remaining balance,
  * hides the obsolete deferred account, and clears legacy landlord prepaid flags.
+ *
+ * Process-owned startup work receives an explicit maintenance scope so it may
+ * repair all Properties companies under fail-closed RLS. If the startup pass had
+ * to be retried from a tenant request, the SQL limits itself to that request's
+ * active company instead of attempting a maintenance elevation.
  */
 export function reclassifyLegacyDeferredRentForProperties(): Promise<void> {
   if (completed) return Promise.resolve();
 
   if (!inFlight) {
-    inFlight = pool
-      .query(RECLASSIFY_DEFERRED_RENT_SQL)
+    const scope = getDatabaseScopeRuntimeContext();
+    const runReclassification = () => pool.query(RECLASSIFY_DEFERRED_RENT_SQL).then(() => undefined);
+    const reclassificationPromise =
+      scope === undefined
+        ? runWithDatabaseMaintenanceScope("properties-deferred-rent-reclassification", runReclassification)
+        : runReclassification();
+
+    inFlight = reclassificationPromise
       .then(() => {
-        completed = true;
+        // A maintenance/unscoped run covers every Properties company. A tenant
+        // retry covers only its active company, so keep the process-level retry
+        // available for other tenants until a full maintenance pass succeeds.
+        if (scope?.kind !== "tenant") {
+          completed = true;
+        }
         logger.info("[RentalIncome] Properties deferred-rent reclassification completed");
       })
       .catch((error: unknown) => {
