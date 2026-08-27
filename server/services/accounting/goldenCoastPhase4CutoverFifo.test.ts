@@ -26,7 +26,11 @@ const rows = [
 
 describe("Golden Coast Phase 4 cutover FIFO planner", () => {
   it("creates company/location-scoped FIFO lots without changing accounting", () => {
-    const plan = buildGoldenCoastCutoverFifoPlan({ companyId: 7, stockInHandOpeningUsd: "350", inventory: rows });
+    const plan = buildGoldenCoastCutoverFifoPlan({
+      companyId: 7,
+      stockInHandOpeningUsd: "350",
+      inventory: rows,
+    });
     expect(plan.totalValueUsd).toBe("350.00");
     expect(plan.rowCount).toBe(2);
     expect(plan.movements).toEqual(
@@ -55,7 +59,11 @@ describe("Golden Coast Phase 4 cutover FIFO planner", () => {
 
   it("fails closed when ERP inventory value does not match Phase 3 Stock in Hand", () => {
     expect(() =>
-      buildGoldenCoastCutoverFifoPlan({ companyId: 7, stockInHandOpeningUsd: "349.99", inventory: rows })
+      buildGoldenCoastCutoverFifoPlan({
+        companyId: 7,
+        stockInHandOpeningUsd: "349.99",
+        inventory: rows,
+      })
     ).toThrow(/does not reconcile/);
   });
 
