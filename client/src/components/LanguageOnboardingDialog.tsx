@@ -22,6 +22,16 @@ const languageOptions: Array<{
   { value: "fr", label: "French", nativeLabel: "Français" },
 ];
 
+/**
+ * Deliberately trilingual, like the dialog title: this dialog is what a user
+ * sees before they have chosen a language, so its own chrome is shown in all
+ * three at once and is never translated. Hoisted out of the JSX because the
+ * untranslated-text audit only honours a `data-no-translate` marker that sits
+ * on the same source line as the literal, and Prettier wraps the element's
+ * attributes onto separate lines.
+ */
+const PREFERRED_LANGUAGE_GROUP_LABEL = "Preferred language / اللغة المفضلة / Langue préférée";
+
 function storageKey(userId: number | string) {
   return `application-language-onboarding:${ONBOARDING_VERSION}:${String(userId)}`;
 }
@@ -90,7 +100,12 @@ export function LanguageOnboardingDialog({ userId }: LanguageOnboardingDialogPro
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" data-no-translate aria-label="Preferred language / اللغة المفضلة / Langue préférée">
+        <div
+          className="grid gap-2 sm:grid-cols-3"
+          role="radiogroup"
+          data-no-translate
+          aria-label={PREFERRED_LANGUAGE_GROUP_LABEL}
+        >
           {languageOptions.map((option) => {
             const selected = selectedLanguage === option.value;
             return (
@@ -114,14 +129,30 @@ export function LanguageOnboardingDialog({ userId }: LanguageOnboardingDialogPro
           })}
         </div>
 
+        {/*
+          Never disabled while the preference save is in flight. This dialog is
+          deliberately undismissable — Escape and outside clicks are prevented
+          and there is no close control — so this button is the only way out.
+          Gating it on a background request trapped the user in a modal
+          whenever that request was slow or stalled, and it protected nothing:
+          the chosen language is already applied and persisted to localStorage
+          and the cookie before the request is sent, `complete` does not depend
+          on the response, and the language buttons above were never gated. Keep
+          the Continue action visible while showing the save state alongside it.
+        */}
         <Button
           type="button"
           className="w-full"
           onClick={complete}
-          disabled={isSaving}
+          aria-busy={isSaving}
           data-testid="language-onboarding-continue"
         >
-          {isSaving ? "Saving…" : "Continue · متابعة · Continuer"}
+          <span>Continue · متابعة · Continuer</span>
+          {isSaving && (
+            <span className="ml-2 text-xs opacity-80" aria-hidden="true">
+              Saving…
+            </span>
+          )}
         </Button>
       </DialogContent>
     </Dialog>
