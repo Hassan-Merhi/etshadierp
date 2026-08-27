@@ -24,7 +24,7 @@ import { requireSpCompany } from "./spHelpers";
 const phase4RequestBudget = privilegedRequestBudget({ maxBodyBytes: 8 * 1024, maxCollectionItems: 10 });
 const phase3VoucherNumber = (companyId: number) => `GC-CUTOVER-20260901-C${companyId}`;
 
-type DbLike = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type DbLike = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const RETIRED_GOLDEN_COAST_MUTATIONS: ReadonlyArray<{
   method: "POST" | "PATCH";
@@ -46,7 +46,12 @@ function isRetiredGoldenCoastMutation(req: Request): boolean {
   return RETIRED_GOLDEN_COAST_MUTATIONS.some(({ method, pattern }) => req.method === method && pattern.test(req.path));
 }
 
-async function isGoldenCoastCompany(conn: DbLike, companyId: number): Promise<boolean> {
+/**
+ * A Golden Coast company is identified by its canonical Phase 2 partner-capital
+ * roles, never by name. Phase 5 reuses this guard so both phases agree on which
+ * Supplier Partner companies the Golden Coast redesign applies to.
+ */
+export async function isGoldenCoastCompany(conn: DbLike, companyId: number): Promise<boolean> {
   const rows = await conn.execute(sql`
     SELECT sub_type
     FROM ledger_accounts
