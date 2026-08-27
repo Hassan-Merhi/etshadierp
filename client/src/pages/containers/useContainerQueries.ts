@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Container, Supplier } from "@shared/schema";
+import { companyQueryKey } from "@/lib/companyQueryScope";
 import type { SoldContainer } from "./types";
 
 interface SelectedCompany {
@@ -44,8 +45,10 @@ export function useContainerQueries(
     enabled: !!selectedCompany?.id && isSupplierPartner,
   });
 
+  const suppliersPath = isSupplierPartner ? "/api/suppliers" : "/api/suppliers?allowParentFallback=true";
   const { data: suppliers = [] } = useQuery<Supplier[]>({
-    queryKey: ["/api/suppliers"],
+    queryKey: companyQueryKey(suppliersPath, selectedCompany?.id),
+    enabled: !!selectedCompany?.id,
   });
 
   const { data: freightStatusMap = {} } = useQuery<
