@@ -1,5 +1,5 @@
 import type { Express, NextFunction, Request, Response } from "express";
-import { and, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { spStockMovements } from "@shared/schema";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
@@ -132,7 +132,7 @@ async function guardLegacyGoldenCoastMutation(req: Request, res: Response, next:
     res.status(410).json({
       code: "GC_LEGACY_POSTING_RETIRED",
       message:
-        "This Golden Coast legacy posting path is retired after the September 1 redesign. Use the current Golden Coast cutover/container/POS workflow instead.",
+        "This Golden Coast legacy mutation is retired by the September 1 redesign. Legacy records remain readable, but production changes must use the replacement Golden Coast workflow.",
     });
   } catch (error) {
     res.status(500).json({ message: getErrorMessage(error) });
@@ -140,13 +140,17 @@ async function guardLegacyGoldenCoastMutation(req: Request, res: Response, next:
 }
 
 export function registerSpGoldenCoastPhase4CutoverFifoRoutes(app: Express): void {
-  // Fail closed for the production mutation paths whose accounting is superseded.
-  // These guards are Golden-Coast-specific; other Supplier Partner companies keep their legacy behavior.
+  // Fail closed for all known legacy financial mutation paths until their replacement
+  // Golden Coast phases land. Other Supplier Partner companies keep legacy behavior.
   app.post("/api/sp/opening-stock", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
   app.post("/api/sp/sales", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
+  app.post("/api/sp/sales/:id/reverse", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
   app.post("/api/sp/offload", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
+  app.post("/api/sp/offload/:id/reverse", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
+  app.post("/api/sp/prepaid", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
   app.post("/api/sp/containers", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
   app.patch("/api/sp/containers/:id", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
+  app.post("/api/sp/containers/:id/cancel", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
 
   app.get("/api/sp/golden-coast/phase4/cutover-fifo/status", async (req: Request, res: Response) => {
     try {
