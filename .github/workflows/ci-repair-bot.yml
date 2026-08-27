@@ -254,9 +254,15 @@ jobs:
           set -euo pipefail
           echo 'pushed=false' >> "$GITHUB_OUTPUT"
           [[ -n "$CI_REPAIR_BOT_TOKEN" ]] || exit 0
-          GH_TOKEN="$CI_REPAIR_BOT_TOKEN" gh auth setup-git
+          # `gh auth setup-git` installs `gh auth git-credential` as the helper.
+          # git runs that helper as a subprocess during the push, so the token
+          # has to be exported for the whole step: a command-scoped assignment
+          # leaves the helper with no credential and git falls back to
+          # prompting for a username, which fails on a runner.
+          export GH_TOKEN="$CI_REPAIR_BOT_TOKEN"
+          gh auth setup-git
           git push origin "HEAD:refs/heads/$HEAD_BRANCH"
-          git config --unset-all credential.https://github.com.helper >/dev/null 2>&1 || true
+          git config --global --unset-all credential.https://github.com.helper >/dev/null 2>&1 || true
           echo 'pushed=true' >> "$GITHUB_OUTPUT"
 
       - name: Mark no sync push needed
@@ -537,9 +543,15 @@ jobs:
           set -euo pipefail
           echo 'pushed=false' >> "$GITHUB_OUTPUT"
           [[ -n "$CI_REPAIR_BOT_TOKEN" ]] || exit 0
-          GH_TOKEN="$CI_REPAIR_BOT_TOKEN" gh auth setup-git
+          # `gh auth setup-git` installs `gh auth git-credential` as the helper.
+          # git runs that helper as a subprocess during the push, so the token
+          # has to be exported for the whole step: a command-scoped assignment
+          # leaves the helper with no credential and git falls back to
+          # prompting for a username, which fails on a runner.
+          export GH_TOKEN="$CI_REPAIR_BOT_TOKEN"
+          gh auth setup-git
           git push origin "HEAD:refs/heads/$HEAD_BRANCH"
-          git config --unset-all credential.https://github.com.helper >/dev/null 2>&1 || true
+          git config --global --unset-all credential.https://github.com.helper >/dev/null 2>&1 || true
           echo 'pushed=true' >> "$GITHUB_OUTPUT"
 
   report:
