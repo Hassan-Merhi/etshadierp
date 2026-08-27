@@ -19,7 +19,9 @@
     "GET /api/sp/setup/golden-coast/status [<anonymous> > requireAuth > <anonymous>]",
     "GET /api/sp/golden-coast/phase3/status [<anonymous> > requireAuth > <anonymous> > <anonymous>]",
     "POST /api/sp/golden-coast/phase3/preview [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]",
-    "POST /api/sp/golden-coast/phase3/cutover [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]"
+    "POST /api/sp/golden-coast/phase3/cutover [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/sp/golden-coast/phase4/status [<anonymous> > requireAuth > <anonymous>]",
+    "POST /api/sp/golden-coast/phase4/opening-fifo [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/v5/stock-allocation [<anonymous>]",
@@ -30,9 +32,19 @@
     "USE /api/sp/migration [spMigrationRateLimit]",
     "USE /api/sp/migration [spMigrationRequestBudgetMiddleware]",
     "USE /api/golden-coast/accounting [<anonymous>]",
-    "USE /api/golden-coast/accounting/phase1/post [<anonymous>]"
+    "USE /api/golden-coast/accounting/phase1/post [<anonymous>]",
+    "USE /api/factory/location-inventory/:locationId [<anonymous>]",
+    "USE /api/factory/location-inventory/:locationId [requireAuth]",
+    "USE /api/factory/location-inventory/:locationId [authoritativeInventoryStockMiddleware]",
+    "USE /api/factory/customer-orders/:id/verification-summary [<anonymous>]",
+    "USE /api/factory/customer-orders/:id/verification-summary [requireAuth]",
+    "USE /api/factory/customer-orders/:id/verification-summary [authoritativeVerificationStockMiddleware]"
   ],
   "routeManifestReplacements": [
+    {
+      "expected": "POST /api/sp/opening-stock [requireAuth > <anonymous>]",
+      "actual": "POST /api/sp/opening-stock [<anonymous> > requireAuth > <anonymous>]"
+    },
     {
       "expected": "POST /api/locations/:locationId/import-cost-prices [requireAuth > <anonymous> > checkPOSLocation > <anonymous>]",
       "actual": "POST /api/locations/:locationId/import-cost-prices [requireAuth > <anonymous> > checkPOSLocation > <anonymous> > <anonymous> > <anonymous> > <anonymous>]"

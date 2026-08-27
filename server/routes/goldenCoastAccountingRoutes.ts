@@ -17,6 +17,10 @@ import {
 } from "../services/accounting/centralPostingEngine";
 import { createDatabasePostingDependencies } from "../services/accounting/databasePostingDependencies";
 import {
+  GOLDEN_COAST_LEGACY_RETIRED_CODE,
+  GOLDEN_COAST_LEGACY_RETIRED_MESSAGE,
+} from "../services/accounting/goldenCoastPhase4Cutover";
+import {
   GOLDEN_COAST_PHASE1_ACCOUNT_DEFS,
   GOLDEN_COAST_PHASE1_LEDGER_SUBTYPES,
   GoldenCoastPhase1InputError,
@@ -495,6 +499,10 @@ export function registerGoldenCoastAccountingRoutes(app: Express): void {
     phase1RequestBudget,
     requireAuth,
     requireNonPOS,
-    (req, res) => void handlePhase1Post(req, res)
+    (_req, res) =>
+      res.status(410).json({
+        code: GOLDEN_COAST_LEGACY_RETIRED_CODE,
+        message: GOLDEN_COAST_LEGACY_RETIRED_MESSAGE,
+      })
   );
 }

@@ -3,6 +3,9 @@ import Decimal from "decimal.js";
 export const GOLDEN_COAST_PHASE4_CUTOVER_DATE = "2026-09-01";
 export const GOLDEN_COAST_PHASE4_OPENING_SOURCE = "opening_cutover";
 export const GOLDEN_COAST_PHASE4_CONFIRMATION = "BUILD GC OPENING FIFO";
+export const GOLDEN_COAST_LEGACY_RETIRED_CODE = "GC_LEGACY_POSTING_RETIRED";
+export const GOLDEN_COAST_LEGACY_RETIRED_MESSAGE =
+  "This Golden Coast legacy posting path is retired. Use the September 1 cutover and canonical Supplier Partner flows.";
 
 export class GoldenCoastPhase4Error extends Error {
   constructor(message: string) {

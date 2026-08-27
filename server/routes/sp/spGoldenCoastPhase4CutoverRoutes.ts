@@ -25,10 +25,6 @@ import {
 import { requireSpCompany } from "./spHelpers";
 
 const requestBudget = privilegedRequestBudget({ maxBodyBytes: 8 * 1024, maxCollectionItems: 10 });
-const LEGACY_RETIRED_CODE = "GC_LEGACY_POSTING_RETIRED";
-const LEGACY_RETIRED_MESSAGE =
-  "This Golden Coast legacy posting path is retired. Use the September 1 cutover and canonical Supplier Partner flows.";
-
 type DatabaseExecutor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 function today(): string {
@@ -37,10 +33,6 @@ function today(): string {
 
 function phase3VoucherNumber(companyId: number): string {
   return `GC-CUTOVER-20260901-C${companyId}`;
-}
-
-function retiredLegacyWrite(_req: Request, res: Response): void {
-  res.status(410).json({ code: LEGACY_RETIRED_CODE, message: LEGACY_RETIRED_MESSAGE });
 }
 
 function postCutoverMutationDateGuard(req: Request, res: Response, next: NextFunction): void {
@@ -241,11 +233,6 @@ async function handleBuildOpeningFifo(req: Request, res: Response): Promise<void
 }
 
 export function registerSpGoldenCoastPhase4CutoverRoutes(app: Express): void {
-  // Register before the historical handlers. Express stops here after sending 410,
-  // making the superseded Phase 1 accounting/opening-stock mutation paths unreachable.
-  app.post("/api/golden-coast/accounting/phase1/post", privilegedMutationRateLimit, requireAuth, retiredLegacyWrite);
-  app.post("/api/sp/opening-stock", privilegedMutationRateLimit, requireAuth, retiredLegacyWrite);
-
   app.use("/api/sp", postCutoverMutationDateGuard);
 
   app.get(
