@@ -9,6 +9,7 @@ import { registerSpGoldenCoastPhase4CutoverFifoRoutes } from "./spGoldenCoastPha
 import { registerSpGoldenCoastPhase6PosSaleRoutes } from "./spGoldenCoastPhase6PosSaleRoutes";
 import { registerSpGoldenCoastPhase7HadiTransferRoutes } from "./spGoldenCoastPhase7HadiTransferRoutes";
 import { registerSpGoldenCoastPhase8ContainerOffloadRoutes } from "./spGoldenCoastPhase8ContainerOffloadRoutes";
+import { registerSpGoldenCoastPhase9HassanSavingsWithdrawalRoutes } from "./spGoldenCoastPhase9HassanSavingsWithdrawalRoutes";
 import { registerSpGoldenCoastPhase10SalesCashSettlementRoutes } from "./spGoldenCoastPhase10SalesCashSettlementRoutes";
 import { registerSpContainerRoutes } from "./spContainerRoutes";
 import { registerSpLifecycleGuards } from "./spLifecycleGuards";
@@ -76,6 +77,7 @@ export function registerSpRoutes(app: Express) {
   registerSpGoldenCoastPhase6PosSaleRoutes(app);
   registerSpGoldenCoastPhase7HadiTransferRoutes(app);
   registerSpGoldenCoastPhase8ContainerOffloadRoutes(app);
+  registerSpGoldenCoastPhase9HassanSavingsWithdrawalRoutes(app);
   registerSpGoldenCoastPhase10SalesCashSettlementRoutes(app);
   registerSpLifecycleGuards(app);
   registerSpContainerRoutes(app);
