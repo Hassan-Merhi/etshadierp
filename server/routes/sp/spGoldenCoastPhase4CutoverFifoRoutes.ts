@@ -218,6 +218,7 @@ async function handleCutover(req: Request, res: Response): Promise<void> {
     const companyId = await requireSpCompany(req, res);
     if (!companyId) return;
     const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase4-cutover:${companyId}`}))`);
       if (!(await isGoldenCoastCompany(tx, companyId))) {
         throw new GoldenCoastPhase4CutoverError("Golden Coast account setup is not configured");
       }
