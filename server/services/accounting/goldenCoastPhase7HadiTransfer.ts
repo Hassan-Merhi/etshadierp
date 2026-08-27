@@ -153,9 +153,21 @@ function optionalText(value: unknown, field: string, maxLength: number): string 
 
 function transferDate(value: unknown): string {
   const text = requiredText(value, "transferDate", 10);
-  if (!ISO_DATE_PATTERN.test(text) || Number.isNaN(Date.parse(`${text}T00:00:00Z`))) {
+  const match = ISO_DATE_PATTERN.exec(text);
+  if (!match) {
     throw new GoldenCoastPhase7TransferError("transferDate must be an ISO calendar date (YYYY-MM-DD)");
   }
+
+  const [year, month, day] = text.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    throw new GoldenCoastPhase7TransferError("transferDate must be an ISO calendar date (YYYY-MM-DD)");
+  }
+
   if (text < GOLDEN_COAST_CUTOVER_DATE) {
     throw new GoldenCoastPhase7TransferError(
       `transferDate cannot be earlier than the Golden Coast cutover date ${GOLDEN_COAST_CUTOVER_DATE}`,
@@ -292,6 +304,18 @@ export function goldenCoastPhase7TransferDigest(input: {
   accounts: GoldenCoastPhase7RoleAccounts;
 }): string {
   const { transfer, accounts } = input;
+  const canonicalAccounts: GoldenCoastPhase7RoleAccounts = {
+    gcSalesCashAccountId: positiveId(accounts.gcSalesCashAccountId, "gcSalesCashAccountId"),
+    goldenCoastHadiIntercompanyAccountId: positiveId(
+      accounts.goldenCoastHadiIntercompanyAccountId,
+      "goldenCoastHadiIntercompanyAccountId"
+    ),
+    hadiGoldenCoastIntercompanyAccountId: positiveId(
+      accounts.hadiGoldenCoastIntercompanyAccountId,
+      "hadiGoldenCoastIntercompanyAccountId"
+    ),
+  };
+
   return createHash("sha256")
     .update(
       JSON.stringify({
@@ -303,7 +327,7 @@ export function goldenCoastPhase7TransferDigest(input: {
         reference: transfer.reference,
         hadiCashAccount: transfer.hadiCashAccount,
         goldenCoastCashAccount: transfer.goldenCoastCashAccount,
-        accounts,
+        accounts: canonicalAccounts,
       })
     )
     .digest("hex")
