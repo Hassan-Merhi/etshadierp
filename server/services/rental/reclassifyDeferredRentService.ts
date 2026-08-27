@@ -6,8 +6,11 @@ import {
   runWithDatabaseMaintenanceScope,
 } from "../security/databaseScopeRuntimeContext";
 
+type DeferredRentReclassificationOrigin = "startup" | "request";
+
 let inFlight: Promise<void> | null = null;
 let completed = false;
+const completedTenantCompanies = new Set<number>();
 
 const RECLASSIFY_DEFERRED_RENT_SQL = `
 DO $reclass$
@@ -196,35 +199,47 @@ $reclass$;
  * it locks each Properties company, journals only the current remaining balance,
  * hides the obsolete deferred account, and clears legacy landlord prepaid flags.
  *
- * Process-owned startup work receives an explicit maintenance scope so it may
- * repair all Properties companies under fail-closed RLS. If the startup pass had
- * to be retried from a tenant request, the SQL limits itself to that request's
- * active company instead of attempting a maintenance elevation.
+ * Startup work is explicitly marked and may enter maintenance scope to repair all
+ * Properties companies. Request-triggered retries never elevate an unscoped HTTP
+ * request: they run only when tenant isolation has already established a verified
+ * tenant scope, and each successfully repaired tenant becomes a process no-op.
  */
-export function reclassifyLegacyDeferredRentForProperties(): Promise<void> {
+export function reclassifyLegacyDeferredRentForProperties(
+  origin: DeferredRentReclassificationOrigin = "startup"
+): Promise<void> {
+  const scope = getDatabaseScopeRuntimeContext();
   if (completed) return Promise.resolve();
 
+  if (origin === "request") {
+    if (scope?.kind !== "tenant") return Promise.resolve();
+    if (completedTenantCompanies.has(scope.companyId)) return Promise.resolve();
+  }
+
   if (!inFlight) {
-    const scope = getDatabaseScopeRuntimeContext();
+    const tenantCompanyId = origin === "request" && scope?.kind === "tenant" ? scope.companyId : null;
     const runReclassification = () => pool.query(RECLASSIFY_DEFERRED_RENT_SQL).then(() => undefined);
     const reclassificationPromise =
-      scope === undefined
+      origin === "startup"
         ? runWithDatabaseMaintenanceScope("properties-deferred-rent-reclassification", runReclassification)
         : runReclassification();
 
     inFlight = reclassificationPromise
       .then(() => {
-        // A maintenance/unscoped run covers every Properties company. A tenant
-        // retry covers only its active company, so keep the process-level retry
-        // available for other tenants until a full maintenance pass succeeds.
-        if (scope?.kind !== "tenant") {
+        if (origin === "startup") {
           completed = true;
+        } else if (tenantCompanyId !== null) {
+          completedTenantCompanies.add(tenantCompanyId);
         }
-        logger.info("[RentalIncome] Properties deferred-rent reclassification completed");
+        logger.info("[RentalIncome] Properties deferred-rent reclassification completed", {
+          origin,
+          tenantCompanyId,
+        });
       })
       .catch((error: unknown) => {
         logger.error("[RentalIncome] Properties deferred-rent reclassification failed", {
           error: getErrorMessage(error),
+          origin,
+          tenantCompanyId,
         });
         throw error;
       })
