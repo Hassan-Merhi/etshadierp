@@ -154,8 +154,8 @@ describe("credential version service behavior", () => {
     const upsert = insertBuilder([{ credentialVersion: 3 }]);
     const tx: any = { execute: vi.fn(), insert: vi.fn(() => upsert) };
     const db: any = {
-      transaction: vi.fn(async (callback: (inner: any) => Promise<number>) =>
-        callback(tx),
+      transaction: vi.fn(
+        async (callback: (inner: any) => Promise<number>) => callback(tx),
       ),
     };
     const pool = { query: vi.fn(async () => undefined) };
