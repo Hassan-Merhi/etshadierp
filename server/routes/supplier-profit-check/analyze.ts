@@ -18,6 +18,17 @@ export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: R
       const { supplierId, fromDate, toDate, sourceType, proformaId, containerIds, sellPriceSource, locationId } =
         req.body;
       if (!supplierId) return res.status(400).json({ message: "supplierId required" });
+
+      // Reject suppliers that are not valid inside the active company instead of
+      // falling back to every stock item when the scoped lookup returns no row.
+      const supplierScopeResult = await pool.query(
+        `SELECT id FROM suppliers WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
+        [supplierId, companyId]
+      );
+      if (supplierScopeResult.rows.length === 0) {
+        return res.status(404).json({ message: "Supplier not found in selected company" });
+      }
+
       const allTime = !fromDate || !toDate;
 
       // 1. Get stock items (all for company OR from proforma lines OR from OTW containers)
