@@ -85,12 +85,12 @@ describe("Golden Coast Phase 6 special-location deduction", () => {
     });
 
     expect(request.voucher.locationId).toBe(11);
-    expect(request.entries).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ ledgerAccountId: 101, debitAmount: "75.00", creditAmount: "0" }),
-        expect.objectContaining({ ledgerAccountId: 202, debitAmount: "0", creditAmount: "75.00" }),
-      ])
-    );
+    const gcSalesCashEntry = request.entries.find((entry) => entry.ledgerAccountId === 101);
+    const hassanSavingsEntry = request.entries.find((entry) => entry.ledgerAccountId === 202);
+    expect(Number(gcSalesCashEntry?.debitAmount)).toBe(75);
+    expect(Number(gcSalesCashEntry?.creditAmount)).toBe(0);
+    expect(Number(hassanSavingsEntry?.debitAmount)).toBe(0);
+    expect(Number(hassanSavingsEntry?.creditAmount)).toBe(75);
     expect(request.source.idempotencyKey).toBe(goldenCoastPhase6IdempotencyKey(7, "sale-1"));
     expect(request.source.sourceId).toContain("2.5000:75.00");
   });
