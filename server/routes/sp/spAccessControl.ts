@@ -114,7 +114,7 @@ function classifyPermission(req: Request): SpPermission {
     return "sp_reports";
   if (path.includes("/sales/") && path.endsWith("/reverse")) return "sp_sales_reverse";
   if (path.includes("offload") && path.endsWith("/reverse")) return "sp_offload_reverse";
-  if (path === "/offload" && method === "POST") return "sp_offload";
+  if ((path === "/offload" || path === "/golden-coast/phase8/offload") && method === "POST") return "sp_offload";
   if (path.includes("container") && method !== "GET") return "sp_container_manage";
   if ((path.includes("sales") || path.includes("sale")) && method !== "GET") return "sp_sales_create";
   return "sp_view";
@@ -244,8 +244,7 @@ async function enforceSpAccess(req: Request, res: Response, next: NextFunction):
           ${companyId}, ${userId}, ${req.session.username ?? null}, ${role}, ${permission},
           ${req.method === "GET" ? "READ" : "WRITE"}, ${req.method}, ${req.originalUrl},
           ${req.params?.id ?? req.body?.id ?? req.body?.containerId ?? req.body?.cutoverId ?? null}, ${reason || null},
-          ${confirmation || null}, ${idempotencyKey}, ${res.statusCode}, ${JSON.stringify(sanitizedBody(req.body))}::jsonb
-        )
+          ${confirmation || null}, ${idempotencyKey}, ${res.statusCode}, ${JSON.stringify(sanitizedBody(req.body))}::jsonb)
       `
         )
         .catch((error) => logger.error("SP audit event write failed", { error }));
