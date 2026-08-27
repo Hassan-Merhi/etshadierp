@@ -34,6 +34,7 @@
     "USE /api/golden-coast/accounting [<anonymous>]",
     "USE /api/golden-coast/accounting/phase1/post [<anonymous>]",
     "USE /api/golden-coast/accounting/phase1 [retireLegacyPhase1Mutations]",
+    "USE /api/sp [<anonymous>]",
     "USE /api/factory/location-inventory/:locationId [<anonymous>]",
     "USE /api/factory/location-inventory/:locationId [requireAuth]",
     "USE /api/factory/location-inventory/:locationId [authoritativeInventoryStockMiddleware]",
@@ -60,7 +61,7 @@
     },
     {
       "expected": "GET /api/sp/migration/runs [requireAuth > <anonymous> > <anonymous>]",
-      "actual": "GET /api/sp/migration/runs [requireAuth > <anonymous> > <anonymous> > <anonymous>]"
+      "actual": "GET /api/sp/migration/runs [requireAuth > <anonymous> > <anonymous> > <anonymous> > <anonymous>]"
     },
     {
       "expected": "POST /api/sp/migration/rehearsal [requireAuth > <anonymous> > <anonymous>]",
