@@ -122,11 +122,6 @@ function authorizeExplicitCompanyScope(req: Request, res: Response): boolean {
 
   const userId = req.session.userId;
   const role = req.session.currentRole;
-
-  if (role === "Developer") return true;
-
-  if (req.method === "GET" && ["Admin", "Owner", "Manager"].includes(role ?? "")) return true;
-
   const companyId = req.session.currentCompanyId ?? null;
 
   try {

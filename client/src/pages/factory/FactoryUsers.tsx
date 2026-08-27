@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAdminOverride } from "@/hooks/use-admin-override";
+import { usePasswordConfirmedAction } from "@/hooks/use-password-confirmed-action";
 import { Users, Plus, Pencil, Shield, Check, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,6 +56,7 @@ const PAGE_GROUPS = Array.from(new Set(ALL_FACTORY_PAGES.map((p) => p.group)));
 
 export default function FactoryUsers() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
+  const { requestPasswordConfirmation, PasswordConfirmationDialog } = usePasswordConfirmedAction();
   const [createOpen, setCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<FactoryUser | null>(null);
   const [deletingUser, setDeletingUser] = useState<FactoryUser | null>(null);
@@ -105,7 +107,22 @@ export default function FactoryUsers() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ userId, data }: { userId: string; data: { username: string | undefined; displayName: string; pageAccess: string[]; password: string | undefined; hasErpAccess: boolean; hasFactoryAccess: boolean; hiddenCostFields: string[]; hideAllCosts: boolean; } }) => {
+    mutationFn: async ({
+      userId,
+      data,
+    }: {
+      userId: string;
+      data: {
+        username: string | undefined;
+        displayName: string;
+        pageAccess: string[];
+        password: string | undefined;
+        hasErpAccess: boolean;
+        hasFactoryAccess: boolean;
+        hiddenCostFields: string[];
+        hideAllCosts: boolean;
+      };
+    }) => {
       const res = await factoryApiRequest("PUT", `/api/factory/users/${userId}`, data);
       if (!res.ok) {
         const err = await res.json();
@@ -126,7 +143,13 @@ export default function FactoryUsers() {
   });
 
   const resetForm = () => {
-    setFormData({ username: "", password: "", displayName: "", hasErpAccess: true, hasFactoryAccess: true });
+    setFormData({
+      username: "",
+      password: "",
+      displayName: "",
+      hasErpAccess: true,
+      hasFactoryAccess: true,
+    });
     setSelectedPages(new Set());
     setHiddenCostFields([]);
     setHideAllCosts(false);
@@ -205,34 +228,42 @@ export default function FactoryUsers() {
       const isPrivileged = isAdminOrOwner(editingUser);
       wrapAdminAction(
         () =>
-          updateMutation.mutate({
-            userId: editingUser.id,
-            data: {
-              username: formData.username !== editingUser.username ? formData.username : undefined,
-              displayName: formData.displayName,
-              pageAccess: Array.from(selectedPages),
-              password: formData.password || undefined,
-              hasErpAccess: isPrivileged ? true : formData.hasErpAccess,
-              hasFactoryAccess: isPrivileged ? true : formData.hasFactoryAccess,
-              hiddenCostFields: isPrivileged ? [] : hiddenCostFields,
-              hideAllCosts: isPrivileged ? false : hideAllCosts,
-            },
-          }),
+          requestPasswordConfirmation(
+            () =>
+              updateMutation.mutate({
+                userId: editingUser.id,
+                data: {
+                  username: formData.username !== editingUser.username ? formData.username : undefined,
+                  displayName: formData.displayName,
+                  pageAccess: Array.from(selectedPages),
+                  password: formData.password || undefined,
+                  hasErpAccess: isPrivileged ? true : formData.hasErpAccess,
+                  hasFactoryAccess: isPrivileged ? true : formData.hasFactoryAccess,
+                  hiddenCostFields: isPrivileged ? [] : hiddenCostFields,
+                  hideAllCosts: isPrivileged ? false : hideAllCosts,
+                },
+              }),
+            "Update User"
+          ),
         "Update User"
       );
     } else {
       wrapAdminAction(
         () =>
-          createMutation.mutate({
-            username: formData.username,
-            password: formData.password,
-            displayName: formData.displayName,
-            pageAccess: Array.from(selectedPages),
-            hasErpAccess: formData.hasErpAccess,
-            hasFactoryAccess: formData.hasFactoryAccess,
-            hiddenCostFields,
-            hideAllCosts,
-          }),
+          requestPasswordConfirmation(
+            () =>
+              createMutation.mutate({
+                username: formData.username,
+                password: formData.password,
+                displayName: formData.displayName,
+                pageAccess: Array.from(selectedPages),
+                hasErpAccess: formData.hasErpAccess,
+                hasFactoryAccess: formData.hasFactoryAccess,
+                hiddenCostFields,
+                hideAllCosts,
+              }),
+            "Create User"
+          ),
         "Create User"
       );
     }
@@ -324,10 +355,18 @@ export default function FactoryUsers() {
                           checked={isAdminOrOwner(user) ? true : (user.hasErpAccess ?? true)}
                           disabled={isAdminOrOwner(user) || toggleAccessMutation.isPending}
                           onCheckedChange={(checked) => {
-                            toggleAccessMutation.mutate({
-                              userId: user.id,
-                              data: { hasErpAccess: checked },
-                            });
+                            wrapAdminAction(
+                              () =>
+                                requestPasswordConfirmation(
+                                  () =>
+                                    toggleAccessMutation.mutate({
+                                      userId: user.id,
+                                      data: { hasErpAccess: checked },
+                                    }),
+                                  "Update User"
+                                ),
+                              "Update User"
+                            );
                           }}
                           data-testid={`switch-erp-access-${user.id}`}
                         />
@@ -337,10 +376,18 @@ export default function FactoryUsers() {
                           checked={isAdminOrOwner(user) ? true : (user.hasFactoryAccess ?? true)}
                           disabled={isAdminOrOwner(user) || toggleAccessMutation.isPending}
                           onCheckedChange={(checked) => {
-                            toggleAccessMutation.mutate({
-                              userId: user.id,
-                              data: { hasFactoryAccess: checked },
-                            });
+                            wrapAdminAction(
+                              () =>
+                                requestPasswordConfirmation(
+                                  () =>
+                                    toggleAccessMutation.mutate({
+                                      userId: user.id,
+                                      data: { hasFactoryAccess: checked },
+                                    }),
+                                  "Update User"
+                                ),
+                              "Update User"
+                            );
                           }}
                           data-testid={`switch-factory-access-${user.id}`}
                         />
@@ -462,7 +509,7 @@ export default function FactoryUsers() {
                   type="password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder={editingUser ? "Leave blank to keep" : "Min 4 characters"}
+                  placeholder={editingUser ? "Leave blank to keep" : "Min 6 characters"}
                   data-testid="input-factory-user-password"
                 />
               </div>
@@ -658,7 +705,14 @@ export default function FactoryUsers() {
             <Button
               variant="destructive"
               onClick={() =>
-                wrapAdminAction(() => deletingUser && deleteMutation.mutate(deletingUser.id), "Remove User")
+                wrapAdminAction(
+                  () =>
+                    requestPasswordConfirmation(
+                      () => deletingUser && deleteMutation.mutate(deletingUser.id),
+                      "Remove User"
+                    ),
+                  "Remove User"
+                )
               }
               disabled={deleteMutation.isPending}
               data-testid="button-confirm-delete-user"
@@ -668,6 +722,7 @@ export default function FactoryUsers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {PasswordConfirmationDialog}
       {AdminDialog}
     </div>
   );
