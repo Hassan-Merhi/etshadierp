@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import Decimal from "decimal.js";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import {
   inventory,
   ledgerAccounts,
@@ -227,14 +227,15 @@ async function buildState(tx: DatabaseTransaction | typeof db, companyId: number
   const legacyRows = await loadLegacyInventory(tx, companyId);
   const plan = planGoldenCoastCutoverStockBridge(legacyRows);
   assertGoldenCoastStockValueReconciles(plan.totalValueUsd, stockInHandOpeningUsd);
+  const zeroStockOpening = plan.lots.length === 0 && new Decimal(stockInHandOpeningUsd).eq(0);
   return {
     cutoverDate: GOLDEN_COAST_PHASE3_CUTOVER_DATE,
     plan,
     stockInHandOpeningUsd,
     existingLotCount: 0,
-    bridged: false,
+    bridged: zeroStockOpening,
     conflict: false,
-    canPost: businessDate() >= GOLDEN_COAST_PHASE3_CUTOVER_DATE,
+    canPost: !zeroStockOpening && businessDate() >= GOLDEN_COAST_PHASE3_CUTOVER_DATE,
   };
 }
 
@@ -289,6 +290,7 @@ export function registerSpGoldenCoastCutoverStockBridgeRoutes(app: Express): voi
           }
 
           const result = await db.transaction(async (tx) => {
+            await tx.execute(sql`SELECT pg_advisory_xact_lock(64177, ${companyId})`);
             const state = await buildState(tx, companyId);
             if (state.bridged) return { ...state, replayed: true };
 
