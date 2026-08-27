@@ -36,6 +36,7 @@ jobs:
       - name: Format Phase 4 files and print canonical contents
         run: |
           set -euo pipefail
+          # Read-only probe: the workflow never pushes its formatted output.
           files=(
             server/routes/goldenCoastLegacyPostingRetirement.ts
             server/routes/sp/spGoldenCoastPhase4CutoverFifoRoutes.test.ts
