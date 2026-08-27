@@ -1,11 +1,17 @@
 import type { Express, NextFunction, Request, Response } from "express";
 import { sql } from "drizzle-orm";
 import { spStockMovements } from "@shared/schema";
+import { requireAuth, requireRole } from "../../auth";
 import { db } from "../../db";
 import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { resultRows } from "../../lib/queryResult";
+import {
+  privilegedMutationRateLimit,
+  privilegedReadRateLimit,
+  privilegedRequestBudget,
+} from "../../middleware/privilegedEndpointSecurity";
 import {
   GOLDEN_COAST_CUTOVER_DATE,
   GOLDEN_COAST_CUTOVER_FIFO_SOURCE,
@@ -15,6 +21,7 @@ import {
 } from "../../services/accounting/goldenCoastPhase4CutoverFifo";
 import { requireSpCompany } from "./spHelpers";
 
+const phase4RequestBudget = privilegedRequestBudget({ maxBodyBytes: 8 * 1024, maxCollectionItems: 10 });
 const phase3VoucherNumber = (companyId: number) => `GC-CUTOVER-20260901-C${companyId}`;
 
 type DbLike = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -165,6 +172,59 @@ async function guardLegacyGoldenCoastMutation(
   }
 }
 
+async function handleStatus(req: Request, res: Response): Promise<void> {
+  try {
+    const companyId = await requireSpCompany(req, res);
+    if (!companyId) return;
+    if (!(await isGoldenCoastCompany(db, companyId))) {
+      res.status(409).json({
+        code: "GC_PHASE4_NOT_CONFIGURED",
+        message: releaseDebtEnglish("Golden Coast account setup is not configured."),
+      });
+      return;
+    }
+    res.json(await loadSnapshotState(db, companyId));
+  } catch (error) {
+    if (error instanceof GoldenCoastPhase4CutoverError) {
+      res.status(409).json({ code: "GC_PHASE4_CUTOVER_BLOCKED", message: error.message });
+      return;
+    }
+    logger.error("Golden Coast Phase 4 FIFO status failed", { error });
+    res.status(500).json({ message: getErrorMessage(error) });
+  }
+}
+
+async function handleCutover(req: Request, res: Response): Promise<void> {
+  try {
+    const companyId = await requireSpCompany(req, res);
+    if (!companyId) return;
+    const result = await db.transaction(async (tx) => {
+      if (!(await isGoldenCoastCompany(tx, companyId))) {
+        throw new GoldenCoastPhase4CutoverError("Golden Coast account setup is not configured");
+      }
+      const state = await loadSnapshotState(tx, companyId);
+      if (state.posted) return { ...state, replayed: true };
+      if (!state.canPost || !state.plan) {
+        throw new GoldenCoastPhase4CutoverError(state.blockers.join(" ") || "Cutover FIFO is not ready");
+      }
+      const inserted = [];
+      for (const movement of state.plan.movements) {
+        const [row] = await tx.insert(spStockMovements).values(movement).returning();
+        inserted.push(row);
+      }
+      return { ...(await loadSnapshotState(tx, companyId)), inserted, replayed: false };
+    });
+    res.json(result);
+  } catch (error) {
+    if (error instanceof GoldenCoastPhase4CutoverError) {
+      res.status(409).json({ code: "GC_PHASE4_CUTOVER_BLOCKED", message: error.message });
+      return;
+    }
+    logger.error("Golden Coast Phase 4 FIFO cutover failed", { error });
+    res.status(500).json({ message: getErrorMessage(error) });
+  }
+}
+
 export function registerSpGoldenCoastPhase4CutoverFifoRoutes(app: Express): void {
   // Fail closed for all known legacy financial mutation paths until their replacement
   // Golden Coast phases land. Other Supplier Partner companies keep legacy behavior.
@@ -180,55 +240,20 @@ export function registerSpGoldenCoastPhase4CutoverFifoRoutes(app: Express): void
     void guardLegacyGoldenCoastMutation(req, res, next)
   );
 
-  app.get("/api/sp/golden-coast/phase4/cutover-fifo/status", async (req: Request, res: Response) => {
-    try {
-      const companyId = await requireSpCompany(req, res);
-      if (!companyId) return;
-      if (!(await isGoldenCoastCompany(db, companyId))) {
-        return res.status(409).json({
-          code: "GC_PHASE4_NOT_CONFIGURED",
-          message: releaseDebtEnglish("Golden Coast account setup is not configured."),
-        });
-      }
-      res.json(await loadSnapshotState(db, companyId));
-    } catch (error) {
-      if (error instanceof GoldenCoastPhase4CutoverError) {
-        return res.status(409).json({ code: "GC_PHASE4_CUTOVER_BLOCKED", message: error.message });
-      }
-      logger.error("Golden Coast Phase 4 FIFO status failed", { error });
-      res.status(500).json({ message: getErrorMessage(error) });
-    }
-  });
-
-  app.post("/api/sp/golden-coast/phase4/cutover-fifo", async (req: Request, res: Response) => {
-    try {
-      const companyId = await requireSpCompany(req, res);
-      if (!companyId) return;
-      const result = await db.transaction(async (tx) => {
-        if (!(await isGoldenCoastCompany(tx, companyId))) {
-          throw new GoldenCoastPhase4CutoverError("Golden Coast account setup is not configured");
-        }
-        const state = await loadSnapshotState(tx, companyId);
-        if (state.posted) return { ...state, replayed: true };
-        if (!state.canPost || !state.plan) {
-          throw new GoldenCoastPhase4CutoverError(
-            state.blockers.join(" ") || "Cutover FIFO is not ready"
-          );
-        }
-        const inserted = [];
-        for (const movement of state.plan.movements) {
-          const [row] = await tx.insert(spStockMovements).values(movement).returning();
-          inserted.push(row);
-        }
-        return { ...(await loadSnapshotState(tx, companyId)), inserted, replayed: false };
-      });
-      res.json(result);
-    } catch (error) {
-      if (error instanceof GoldenCoastPhase4CutoverError) {
-        return res.status(409).json({ code: "GC_PHASE4_CUTOVER_BLOCKED", message: error.message });
-      }
-      logger.error("Golden Coast Phase 4 FIFO cutover failed", { error });
-      res.status(500).json({ message: getErrorMessage(error) });
-    }
-  });
+  app.get(
+    "/api/sp/golden-coast/phase4/cutover-fifo/status",
+    privilegedReadRateLimit,
+    requireAuth,
+    requireRole("Admin"),
+    (req, res) => void handleStatus(req, res)
+  );
+  // `cutover` activates SP migration confirmation, reason and idempotency-key enforcement.
+  app.post(
+    "/api/sp/golden-coast/phase4/cutover-fifo",
+    privilegedMutationRateLimit,
+    phase4RequestBudget,
+    requireAuth,
+    requireRole("Admin"),
+    (req, res) => void handleCutover(req, res)
+  );
 }
