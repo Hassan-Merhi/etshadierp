@@ -1,34 +1,117 @@
-import fs from "node:fs";
-import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const analyzePath = path.resolve(process.cwd(), "server/routes/supplier-profit-check/analyze.ts");
-const pagePath = path.resolve(process.cwd(), "client/src/pages/SupplierProfitCheck.tsx");
+const harness = vi.hoisted(() => ({
+  query: vi.fn(),
+}));
+
+vi.mock("../server/db", () => ({
+  pool: { query: harness.query },
+}));
+
+import { registerSupplierProfitAnalyzeRoutes } from "../server/routes/supplier-profit-check/analyze";
+
+type Handler = (req: any, res: any) => unknown;
+
+function routeHarness(): Handler {
+  let handler: Handler | undefined;
+  const app: any = {
+    post: (_path: string, ...handlers: Handler[]) => {
+      handler = handlers.at(-1);
+    },
+  };
+  registerSupplierProfitAnalyzeRoutes(app, ((_req: any, _res: any, next: any) => next()) as any);
+  if (!handler) throw new Error("analyze route was not registered");
+  return handler;
+}
+
+function req(body: Record<string, unknown>) {
+  return {
+    session: { currentCompanyId: 4 },
+    body,
+  } as any;
+}
+
+function resHarness() {
+  const res: any = {
+    statusCode: 200,
+    body: undefined,
+    status: vi.fn((code: number) => {
+      res.statusCode = code;
+      return res;
+    }),
+    json: vi.fn((body: unknown) => {
+      res.body = body;
+      return res;
+    }),
+  };
+  return res;
+}
+
+function result(rows: unknown[]) {
+  return Promise.resolve({ rows });
+}
 
 describe("supplier profit check company scope", () => {
-  it("returns at most one stock-item match for each proforma line", () => {
-    const source = fs.readFileSync(analyzePath, "utf8");
+  const analyze = routeHarness();
 
-    expect(source).toContain("SELECT DISTINCT ON (spl.id)");
-    expect(source).toContain("AND sp.company_id = $2");
-    expect(source).toContain("AND sp.supplier_id = $3");
-    expect(source).toContain("CASE WHEN lower(si.code) = lower(spl.barcode) THEN 0 ELSE 1 END");
-    expect(source).toContain("[proformaId, companyId, supplierId]");
+  beforeEach(() => {
+    vi.clearAllMocks();
+    harness.query.mockReset();
   });
 
-  it("keeps supplier stock-group lookup inside the active company", () => {
-    const source = fs.readFileSync(analyzePath, "utf8");
+  it("rejects a supplier outside the active company before loading profit data", async () => {
+    harness.query.mockReturnValueOnce(result([]));
+    const res = resHarness();
 
-    expect(source).toContain(
-      "SELECT stock_group_id FROM suppliers WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL"
-    );
-    expect(source).toContain("[supplierId, companyId]");
+    await analyze(req({ supplierId: 2, sourceType: "all" }), res);
+
+    expect(res.statusCode).toBe(404);
+    expect(harness.query).toHaveBeenCalledTimes(1);
   });
 
-  it("waits for company synchronization and remounts the model when company changes", () => {
-    const source = fs.readFileSync(pagePath, "utf8");
+  it("keeps a selected proforma scoped to company and supplier", async () => {
+    harness.query
+      .mockReturnValueOnce(result([{ id: 2 }]))
+      .mockReturnValueOnce(
+        result([
+          {
+            id: 7,
+            code: "SH-1",
+            name: "Shirts",
+            stock_group_id: 5,
+            stock_group_name: "Group A",
+            proforma_qty: "3",
+            proforma_price: "12",
+            proforma_barcode: "SH-1",
+          },
+        ])
+      )
+      .mockReturnValueOnce(result([]))
+      .mockReturnValueOnce(result([]))
+      .mockReturnValueOnce(result([]))
+      .mockReturnValueOnce(result([]))
+      .mockReturnValueOnce(result([]));
+    const res = resHarness();
 
-    expect(source).toContain("if (!selectedCompany) return null;");
-    expect(source).toContain("<SupplierProfitCheckForCompany key={selectedCompany.id} />");
+    await analyze(req({ supplierId: 2, sourceType: "proforma", proformaId: 31 }), res);
+
+    expect(harness.query.mock.calls[1]?.[1]).toEqual([31, 4, 2]);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].stockItemId).toBe(7);
+    expect(res.body[0].proformaQty).toBe(3);
+  });
+
+  it("uses the active company when resolving the supplier stock group", async () => {
+    harness.query
+      .mockReturnValueOnce(result([{ id: 2 }]))
+      .mockReturnValueOnce(result([{ stock_group_id: 5 }]))
+      .mockReturnValueOnce(result([]));
+    const res = resHarness();
+
+    await analyze(req({ supplierId: 2, sourceType: "all" }), res);
+
+    expect(harness.query.mock.calls[1]?.[1]).toEqual([2, 4]);
+    expect(harness.query.mock.calls[2]?.[1]).toEqual([4, 5]);
+    expect(res.body).toHaveLength(0);
   });
 });
