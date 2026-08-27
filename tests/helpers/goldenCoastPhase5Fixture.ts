@@ -14,6 +14,28 @@ import { pool, db } from "../../server/db";
 import * as schema from "../../shared/schema";
 import { seedTestData, cleanupTestData, type TestContext } from "../setup";
 
+/**
+ * `companies.code` and `locations.code` are both globally unique, so a fixture
+ * code derived from a truncated prefix would collide between two suites that
+ * share the first characters. This mirrors setup.ts's stableTestCompanyCode:
+ * the hash covers the whole prefix, so distinct prefixes get distinct codes
+ * even when a previous suite's teardown did not run.
+ */
+function stableFixtureCode(prefix: string, suffix: string): string {
+  let hash = 2166136261;
+  for (const char of prefix) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  const base = prefix
+    .replace(/[^a-z0-9]/gi, "")
+    .toUpperCase()
+    .slice(0, 4)
+    .padEnd(4, "X");
+  const digest = (hash >>> 0).toString(16).toUpperCase().padStart(8, "0").slice(-4);
+  return `${base}${digest}${suffix}`;
+}
+
 export const GOLDEN_COAST_PHASE5_SALE_URL = "/api/sp/golden-coast/phase5/pos-sale";
 /** On or after the September 1, 2026 cutover, which Phase 5 requires. */
 export const GOLDEN_COAST_PHASE5_SALE_DATE = "2026-09-05";
@@ -108,11 +130,11 @@ export async function setupGoldenCoastPhase5Fixture(prefix: string): Promise<Gol
     subType: "sp_cogs",
   });
 
-  const companyCode = String(prefix.slice(0, 4)).toUpperCase();
+  const plainCompanyCode = stableFixtureCode(prefix, "PLN");
   const [plainCompany] = await db
     .insert(schema.companies)
     .values({
-      code: `${companyCode}PLN1`,
+      code: plainCompanyCode,
       name: `${prefix}_PlainSupplierPartner`,
       companyType: "supplier_partner",
       baseCurrency: "USD",
@@ -127,12 +149,12 @@ export async function setupGoldenCoastPhase5Fixture(prefix: string): Promise<Gol
 
   const [plainLocation] = await db
     .insert(schema.locations)
-    .values({ companyId: plainCompany.id, code: `${plainCompany.code}-WH1`, name: `${prefix}_PlainWarehouse` })
+    .values({ companyId: plainCompany.id, code: `${plainCompanyCode}-WH1`, name: `${prefix}_PlainWarehouse` })
     .returning();
 
   const [plainStockGroup] = await db
     .insert(schema.stockGroups)
-    .values({ companyId: plainCompany.id, name: `${prefix}_PlainGroup`, code: `${companyCode}P` })
+    .values({ companyId: plainCompany.id, name: `${prefix}_PlainGroup`, code: "PLNG" })
     .returning();
   const [plainStockItem] = await db
     .insert(schema.stockItems)
