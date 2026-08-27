@@ -43,9 +43,7 @@ const RETIRED_GOLDEN_COAST_MUTATIONS: ReadonlyArray<{
 
 function isRetiredGoldenCoastMutation(req: Request): boolean {
   if (req.baseUrl !== "/api/sp") return false;
-  return RETIRED_GOLDEN_COAST_MUTATIONS.some(
-    ({ method, pattern }) => req.method === method && pattern.test(req.path)
-  );
+  return RETIRED_GOLDEN_COAST_MUTATIONS.some(({ method, pattern }) => req.method === method && pattern.test(req.path));
 }
 
 async function isGoldenCoastCompany(conn: DbLike, companyId: number): Promise<boolean> {
