@@ -7,6 +7,7 @@ import { registerSpGoldenCoastSetupRoutes } from "./spGoldenCoastSetupRoutes";
 import { registerSpGoldenCoastPhase3CutoverRoutes } from "./spGoldenCoastPhase3CutoverRoutes";
 import { registerSpGoldenCoastPhase4CutoverFifoRoutes } from "./spGoldenCoastPhase4CutoverFifoRoutes";
 import { registerSpGoldenCoastPhase6PosSaleRoutes } from "./spGoldenCoastPhase6PosSaleRoutes";
+import { registerSpGoldenCoastPhase7HadiTransferRoutes } from "./spGoldenCoastPhase7HadiTransferRoutes";
 import { registerSpContainerRoutes } from "./spContainerRoutes";
 import { registerSpLifecycleGuards } from "./spLifecycleGuards";
 import { registerSpReoffloadPreparationGuard } from "./spReoffloadPreparationGuard";
@@ -71,6 +72,7 @@ export function registerSpRoutes(app: Express) {
   // Hassan Savings deduction. The Phase 5 source remains in the repository for
   // history/tests, but its production route is intentionally no longer mounted.
   registerSpGoldenCoastPhase6PosSaleRoutes(app);
+  registerSpGoldenCoastPhase7HadiTransferRoutes(app);
   registerSpLifecycleGuards(app);
   registerSpContainerRoutes(app);
   registerSpReoffloadPreparationGuard(app);
