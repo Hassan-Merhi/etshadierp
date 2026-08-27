@@ -6,6 +6,7 @@ import { registerSpSetupRoutes } from "./spSetupRoutes";
 import { registerSpGoldenCoastSetupRoutes } from "./spGoldenCoastSetupRoutes";
 import { registerSpGoldenCoastPhase3CutoverRoutes } from "./spGoldenCoastPhase3CutoverRoutes";
 import { registerSpGoldenCoastPhase4CutoverFifoRoutes } from "./spGoldenCoastPhase4CutoverFifoRoutes";
+import { registerSpGoldenCoastPhase5PosSaleRoutes } from "./spGoldenCoastPhase5PosSaleRoutes";
 import { registerSpContainerRoutes } from "./spContainerRoutes";
 import { registerSpLifecycleGuards } from "./spLifecycleGuards";
 import { registerSpReoffloadPreparationGuard } from "./spReoffloadPreparationGuard";
@@ -65,6 +66,7 @@ export function registerSpRoutes(app: Express) {
   registerSpGoldenCoastSetupRoutes(app);
   registerSpGoldenCoastPhase3CutoverRoutes(app);
   registerSpGoldenCoastPhase4CutoverFifoRoutes(app);
+  registerSpGoldenCoastPhase5PosSaleRoutes(app);
   registerSpLifecycleGuards(app);
   registerSpContainerRoutes(app);
   registerSpReoffloadPreparationGuard(app);
