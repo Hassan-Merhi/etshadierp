@@ -16,7 +16,11 @@ const QUANTITY_SCALE = 4;
 const UNIT_RATE_SCALE = 4;
 
 export type GoldenCoastPhase8ErrorCode =
-  "GC_PHASE8_INPUT_INVALID" | "GC_PHASE8_PRE_CUTOVER_DATE" | "GC_PHASE8_RESERVE_EXCEEDED" | "GC_PHASE8_SCOPE_MISMATCH";
+  | "GC_PHASE8_INPUT_INVALID"
+  | "GC_PHASE8_PRE_CUTOVER_DATE"
+  | "GC_PHASE8_RESERVE_EXCEEDED"
+  | "GC_PHASE8_CHARGE_FUNDING_REQUIRED"
+  | "GC_PHASE8_SCOPE_MISMATCH";
 
 export class GoldenCoastPhase8Error extends Error {
   readonly code: GoldenCoastPhase8ErrorCode;
@@ -65,6 +69,12 @@ export interface GoldenCoastPhase8OffloadInput {
   locationId: number;
   offloadDate: string;
   charges: GoldenCoastPhase8ChargeInput[];
+  /**
+   * Where the actual charges are paid from. Phase 8-funded containers already
+   * hold a real reserve, so this is unused for them; a container carried
+   * through the cutover has no reserve, so its charges need a funding account.
+   */
+  chargeFundingAccount: GoldenCoastPhase8PostingAccount | null;
 }
 
 export interface GoldenCoastPhase8RoleAccounts {
@@ -83,9 +93,18 @@ export interface GoldenCoastPhase8FundingPlan {
   digest: string;
 }
 
+/**
+ * `phase8` containers were funded by this phase's own endpoint and carry a real
+ * container reserve. `cutover` containers were carried across the September 1
+ * cutover by the migration, which links a `GC-OTW-*` voucher and never funds a
+ * reserve — their charges settle against a funding account at offload instead.
+ */
+export type GoldenCoastPhase8ContainerOrigin = "phase8" | "cutover";
+
 export interface GoldenCoastPhase8FundedContainerState {
   containerId: number;
   companyId: number;
+  origin: GoldenCoastPhase8ContainerOrigin;
   fundingVoucherId: number;
   goodsCostUsd: string;
   reserveUsd: string;
@@ -379,6 +398,8 @@ export function parseGoldenCoastPhase8OffloadInput(input: {
     locationId: positiveId(raw.locationId, "locationId"),
     offloadDate: isoDate(raw.offloadDate, "offloadDate"),
     charges,
+    chargeFundingAccount:
+      raw.chargeFundingAccount == null ? null : postingAccount(raw.chargeFundingAccount, "chargeFundingAccount"),
   };
 }
 
@@ -396,13 +417,26 @@ export function planGoldenCoastPhase8Offload(input: {
   const goods = new Decimal(funded.goodsCostUsd);
   const reserve = new Decimal(funded.reserveUsd);
   const actual = offload.charges.reduce((sum, charge) => sum.plus(charge.amountUsd), new Decimal(0));
-  if (actual.gt(reserve)) {
+  // A cutover container never had a reserve funded for it, so there is no
+  // ceiling to exceed and nothing to sweep back: its charges settle straight
+  // against the funding account the operator names on the offload.
+  if (funded.origin === "cutover") {
+    if (!reserve.isZero()) {
+      throw new GoldenCoastPhase8Error("A cutover container cannot carry a funded reserve", "GC_PHASE8_SCOPE_MISMATCH");
+    }
+    if (actual.gt(0) && !offload.chargeFundingAccount) {
+      throw new GoldenCoastPhase8Error(
+        "chargeFundingAccount is required to offload a cutover container with charges",
+        "GC_PHASE8_CHARGE_FUNDING_REQUIRED"
+      );
+    }
+  } else if (actual.gt(reserve)) {
     throw new GoldenCoastPhase8Error(
       `Actual container charges ${money(actual)} exceed the funded reserve ${money(reserve)}`,
       "GC_PHASE8_RESERVE_EXCEEDED"
     );
   }
-  const unused = reserve.minus(actual);
+  const unused = funded.origin === "cutover" ? new Decimal(0) : reserve.minus(actual);
   const totalQty = funded.lines.reduce((sum, line) => sum.plus(line.qty), new Decimal(0));
   if (!totalQty.gt(0)) throw new GoldenCoastPhase8Error("Funded container has no positive quantity");
   const landedPerUnit = actual.div(totalQty);
@@ -433,6 +467,8 @@ export function planGoldenCoastPhase8Offload(input: {
       locationId: offload.locationId,
       offloadDate: offload.offloadDate,
       charges: offload.charges,
+      chargeFundingAccount: offload.chargeFundingAccount,
+      origin: funded.origin,
       fundingVoucherId: funded.fundingVoucherId,
       goodsCostUsd: funded.goodsCostUsd,
       reserveUsd: funded.reserveUsd,
@@ -465,35 +501,56 @@ export function buildGoldenCoastPhase8OffloadPosting(input: {
   ];
   const reserve = new Decimal(plan.reserveUsd);
   const unused = new Decimal(plan.unusedReserveUsd);
-  if (reserve.gt(0)) {
-    entries.push({
-      ledgerAccountId: accounts.containerReserveAccountId,
-      debitAmount: "0.00",
-      creditAmount: plan.reserveUsd,
-      narration: `Golden Coast container #${offload.containerId} clears funded reserve`,
-    });
-  }
-  if (unused.gt(0)) {
-    entries.push(
-      {
-        ...accountTarget(funded.fundingAccount),
-        debitAmount: plan.unusedReserveUsd,
-        creditAmount: "0.00",
-        narration: `Golden Coast container #${offload.containerId} unused reserve returned to funding account`,
-      },
-      {
-        ledgerAccountId: accounts.hassanEquityAccountId,
-        debitAmount: plan.unusedReserveUsd,
-        creditAmount: "0.00",
-        narration: `Golden Coast container #${offload.containerId} unused reserve reclassified from Hassan equity`,
-      },
-      {
-        ledgerAccountId: accounts.hassanSavingsAccountId,
-        debitAmount: "0.00",
-        creditAmount: plan.unusedReserveUsd,
-        narration: `Golden Coast container #${offload.containerId} unused reserve moved to Hassan Savings`,
+  // A cutover container has no reserve to clear and no unused remainder to
+  // sweep. Its actual charges are paid at offload, so they credit the funding
+  // account the operator named instead of a pre-funded reserve.
+  if (funded.origin === "cutover") {
+    const actual = new Decimal(plan.actualChargesUsd);
+    if (actual.gt(0)) {
+      if (!offload.chargeFundingAccount) {
+        throw new GoldenCoastPhase8Error(
+          "chargeFundingAccount is required to offload a cutover container with charges",
+          "GC_PHASE8_CHARGE_FUNDING_REQUIRED"
+        );
       }
-    );
+      entries.push({
+        ...accountTarget(offload.chargeFundingAccount),
+        debitAmount: "0.00",
+        creditAmount: plan.actualChargesUsd,
+        narration: `Golden Coast container #${offload.containerId} cutover charges paid at offload`,
+      });
+    }
+  } else {
+    if (reserve.gt(0)) {
+      entries.push({
+        ledgerAccountId: accounts.containerReserveAccountId,
+        debitAmount: "0.00",
+        creditAmount: plan.reserveUsd,
+        narration: `Golden Coast container #${offload.containerId} clears funded reserve`,
+      });
+    }
+    if (unused.gt(0)) {
+      entries.push(
+        {
+          ...accountTarget(funded.fundingAccount),
+          debitAmount: plan.unusedReserveUsd,
+          creditAmount: "0.00",
+          narration: `Golden Coast container #${offload.containerId} unused reserve returned to funding account`,
+        },
+        {
+          ledgerAccountId: accounts.hassanEquityAccountId,
+          debitAmount: plan.unusedReserveUsd,
+          creditAmount: "0.00",
+          narration: `Golden Coast container #${offload.containerId} unused reserve reclassified from Hassan equity`,
+        },
+        {
+          ledgerAccountId: accounts.hassanSavingsAccountId,
+          debitAmount: "0.00",
+          creditAmount: plan.unusedReserveUsd,
+          narration: `Golden Coast container #${offload.containerId} unused reserve moved to Hassan Savings`,
+        }
+      );
+    }
   }
 
   const built = buildGenericVoucherPostingRequest({

@@ -9,6 +9,11 @@ const phase4ServiceSource = readFileSync(
   new URL("../../services/accounting/goldenCoastPhase4CutoverFifo.ts", import.meta.url),
   "utf8"
 );
+const migrationReconcileSource = readFileSync(new URL("./spMigrationPhase4Reconcile.ts", import.meta.url), "utf8");
+const phase8ServiceSource = readFileSync(
+  new URL("../../services/accounting/goldenCoastPhase8ContainerOffload.ts", import.meta.url),
+  "utf8"
+);
 const phase5ServiceSource = readFileSync(
   new URL("../../services/accounting/goldenCoastPhase5PosSale.ts", import.meta.url),
   "utf8"
@@ -105,6 +110,38 @@ describe("Golden Coast Phase 8 container/offload route", () => {
     expect(routeSource).toContain("totalLandedCostUsd: plan.actualChargesUsd");
     expect(routeSource).toContain("totalFinalCostUsd: plan.totalFinalCostUsd");
     expect(routeSource).toContain("landedUnitCostUsd: line.landedUnitCostUsd");
+  });
+
+  it("bridges containers the migration carried across the cutover", () => {
+    // Phase 4 retires POST /api/sp/offload for Golden Coast companies, so a
+    // cutover container with no Phase 8 marker would otherwise have no offload
+    // path at all.
+    expect(phase4RouteSource).toContain('{ method: "POST", pattern: /^\\/offload\\/?$/ }');
+    expect(migrationReconcileSource).toContain("`GC-OTW-${targetId}-${sourceContainerId}`");
+    expect(routeSource).toContain("source_module = 'SP_MIGRATION'");
+    expect(routeSource).toContain('origin = "cutover"');
+    expect(routeSource).toContain("GC_PHASE8_CONTAINER_NOT_FUNDED");
+  });
+
+  it("keeps the cutover clearing credit out of the funding-account check", () => {
+    // The GC-OTW credit is the migration's OTW clearing account, not a
+    // Cash/Bank account, and nothing debits it back at offload.
+    expect(routeSource).toContain(
+      'if (origin === "phase8") {\n    await validateFundingAccount(tx, companyId, fundingAccount);'
+    );
+    expect(routeSource).toContain("A migration cutover container cannot carry a Phase 8 container reserve");
+  });
+
+  it("settles cutover charges against a validated caller-named funding account", () => {
+    expect(routeSource).toContain("GC_PHASE8_CHARGE_FUNDING_UNEXPECTED");
+    expect(routeSource).toContain(
+      "await validateFundingAccount(tx, selectedCompany, offloadInput.chargeFundingAccount)"
+    );
+    expect(phase8ServiceSource).toContain("GC_PHASE8_CHARGE_FUNDING_REQUIRED");
+    // The reserve ceiling and the Hassan Savings sweep are Phase 8-only.
+    expect(phase8ServiceSource).toContain(
+      'const unused = funded.origin === "cutover" ? new Decimal(0) : reserve.minus(actual);'
+    );
   });
 
   it("closes the container once it is offloaded", () => {

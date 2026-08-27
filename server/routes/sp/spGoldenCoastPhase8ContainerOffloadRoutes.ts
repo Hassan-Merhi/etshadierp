@@ -49,6 +49,7 @@ import {
   parseGoldenCoastPhase8OffloadInput,
   planGoldenCoastPhase8Funding,
   planGoldenCoastPhase8Offload,
+  type GoldenCoastPhase8ContainerOrigin,
   type GoldenCoastPhase8FundedContainerState,
   type GoldenCoastPhase8PostingAccount,
   type GoldenCoastPhase8RoleAccounts,
@@ -354,6 +355,12 @@ async function loadFundedContainer(
     );
   }
 
+  // A container reaches Phase 8 by one of two routes. Either this phase funded
+  // it (an accounting_posting_requests marker ending ":fund"), or the migration
+  // carried it across the cutover and linked a migration-owned `GC-OTW-*`
+  // voucher. Phase 4 retires the legacy offload route for Golden Coast
+  // companies, so rejecting the second kind would leave those containers with
+  // no offload path at all.
   const markerResult = await tx.execute(sql`
     SELECT source_id
     FROM accounting_posting_requests
@@ -363,12 +370,34 @@ async function loadFundedContainer(
     ORDER BY id
   `);
   const markers = resultRows(markerResult);
-  if (markers.length !== 1 || !String(markers[0].source_id ?? "").endsWith(":fund")) {
+  let origin: GoldenCoastPhase8ContainerOrigin;
+  if (markers.length === 1 && String(markers[0].source_id ?? "").endsWith(":fund")) {
+    origin = "phase8";
+  } else if (markers.length > 0) {
     throw new GoldenCoastPhase8RouteError(
       "Container funding voucher is not an unambiguous Golden Coast Phase 8 funding posting",
       "GC_PHASE8_CONTAINER_NOT_FUNDED",
       409
     );
+  } else {
+    const cutoverVoucher = await tx.execute(sql`
+      SELECT id
+      FROM vouchers
+      WHERE id = ${container.goodsOtwVoucherId}
+        AND company_id = ${companyId}
+        AND source_module = 'SP_MIGRATION'
+        AND voucher_number LIKE ${`GC-OTW-${companyId}-%`}
+        AND deleted_at IS NULL
+      LIMIT 1
+    `);
+    if (!resultRows(cutoverVoucher)[0]) {
+      throw new GoldenCoastPhase8RouteError(
+        "Container is neither Phase 8 funded nor linked to a migration-owned cutover Goods OTW voucher",
+        "GC_PHASE8_CONTAINER_NOT_FUNDED",
+        409
+      );
+    }
+    origin = "cutover";
   }
 
   const entries = await tx
@@ -384,7 +413,16 @@ async function loadFundedContainer(
   const creditEntries = entries.filter((entry) => Number(entry.creditAmount) > 0);
   if (stockEntry.length !== 1 || reserveEntry.length > 1 || creditEntries.length !== 1) {
     throw new GoldenCoastPhase8RouteError(
-      "Phase 8 funding voucher no longer has the expected Stock OTW / Container Reserve / funding shape",
+      origin === "cutover"
+        ? "Cutover Goods OTW voucher no longer has the expected single Stock OTW debit and single clearing credit"
+        : "Phase 8 funding voucher no longer has the expected Stock OTW / Container Reserve / funding shape",
+      "GC_PHASE8_FUNDING_CORRUPT",
+      409
+    );
+  }
+  if (origin === "cutover" && reserveEntry.length > 0) {
+    throw new GoldenCoastPhase8RouteError(
+      "A migration cutover container cannot carry a Phase 8 container reserve",
       "GC_PHASE8_FUNDING_CORRUPT",
       409
     );
@@ -401,7 +439,12 @@ async function loadFundedContainer(
             409
           );
         })();
-  await validateFundingAccount(tx, companyId, fundingAccount);
+  // The cutover credit is the migration's OTW clearing account, not a Cash/Bank
+  // funding account, so it must not be run through the funding-account check.
+  // Nothing debits it back either: a cutover container has no reserve to return.
+  if (origin === "phase8") {
+    await validateFundingAccount(tx, companyId, fundingAccount);
+  }
 
   const goodsCostUsd = Number(stockEntry[0].debitAmount).toFixed(2);
   const reserveUsd = reserveEntry.length === 1 ? Number(reserveEntry[0].debitAmount).toFixed(2) : "0.00";
@@ -446,6 +489,7 @@ async function loadFundedContainer(
   return {
     containerId,
     companyId,
+    origin,
     fundingVoucherId: Number(container.goodsOtwVoucherId),
     goodsCostUsd,
     reserveUsd,
@@ -460,7 +504,7 @@ function respondKnownError(res: Response, error: unknown): boolean {
     return true;
   }
   if (error instanceof GoldenCoastPhase8Error) {
-    const status = error.code === "GC_PHASE8_RESERVE_EXCEEDED" ? 409 : 400;
+    const status = error.code === "GC_PHASE8_RESERVE_EXCEEDED" || error.code === "GC_PHASE8_SCOPE_MISMATCH" ? 409 : 400;
     res.status(status).json({ code: error.code, message: error.message });
     return true;
   }
@@ -617,6 +661,15 @@ async function handleOffload(req: Request, res: Response): Promise<void> {
       const accounts = await resolveRoleAccounts(tx, selectedCompany);
       await validateLocation(tx, selectedCompany, offloadInput.locationId);
       const funded = await loadFundedContainer(tx, selectedCompany, offloadInput.containerId, accounts);
+      if (offloadInput.chargeFundingAccount) {
+        if (funded.origin !== "cutover") {
+          throw new GoldenCoastPhase8RouteError(
+            "chargeFundingAccount only applies to a cutover container; a Phase 8 container pays its charges from the funded reserve",
+            "GC_PHASE8_CHARGE_FUNDING_UNEXPECTED"
+          );
+        }
+        await validateFundingAccount(tx, selectedCompany, offloadInput.chargeFundingAccount);
+      }
       const plan = planGoldenCoastPhase8Offload({ offload: offloadInput, funded });
       const postingRequest = buildGoldenCoastPhase8OffloadPosting({
         offload: offloadInput,

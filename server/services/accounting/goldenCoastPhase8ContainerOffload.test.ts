@@ -40,10 +40,27 @@ function funded(): GoldenCoastPhase8FundedContainerState {
   return {
     containerId: 20,
     companyId: 7,
+    origin: "phase8",
     fundingVoucherId: 30,
     goodsCostUsd: "44000.00",
     reserveUsd: "22300.00",
     fundingAccount: c.fundingAccount,
+    lines: c.lines,
+  };
+}
+
+function cutoverFunded(): GoldenCoastPhase8FundedContainerState {
+  const c = container();
+  return {
+    containerId: 21,
+    companyId: 7,
+    origin: "cutover",
+    fundingVoucherId: 31,
+    goodsCostUsd: "44000.00",
+    // The migration never funds a reserve for a container it carries across.
+    reserveUsd: "0.00",
+    // The GC-OTW credit is the migration's OTW clearing account.
+    fundingAccount: { kind: "ledger", id: 55 },
     lines: c.lines,
   };
 }
@@ -122,6 +139,101 @@ describe("Golden Coast Phase 8 container/offload accounting", () => {
         },
       })
     ).toThrow(/cutover/i);
+  });
+
+  it("settles a cutover container's charges against the named funding account", () => {
+    const offload = parseGoldenCoastPhase8OffloadInput({
+      companyId: 7,
+      body: {
+        clientRequestId: "phase8-cutover-a",
+        containerId: 21,
+        locationId: 5,
+        offloadDate: "2026-09-06",
+        charges: [{ chargeType: "duty", amountUsd: "3000" }],
+        chargeFundingAccount: { kind: "bank", id: 77 },
+      },
+    });
+    const plan = planGoldenCoastPhase8Offload({ offload, funded: cutoverFunded() });
+    expect(plan.reserveUsd).toBe("0.00");
+    expect(plan.actualChargesUsd).toBe("3000.00");
+    // No reserve was ever funded, so there is nothing unused to sweep.
+    expect(plan.unusedReserveUsd).toBe("0.00");
+    expect(plan.totalFinalCostUsd).toBe("47000.00");
+    expect(plan.lines[0].landedUnitCostUsd).toBe("1.500000");
+
+    const posting = buildGoldenCoastPhase8OffloadPosting({
+      offload,
+      funded: cutoverFunded(),
+      plan,
+      accounts,
+    });
+    const debit = posting.entries.reduce((sum, entry) => sum + Number(entry.debitAmount), 0);
+    const credit = posting.entries.reduce((sum, entry) => sum + Number(entry.creditAmount), 0);
+    expect(debit).toBe(47000);
+    expect(credit).toBe(47000);
+    // The charges credit the named funding account, and neither the container
+    // reserve nor the Hassan accounts are touched.
+    expect(posting.entries.some((entry) => entry.bankAccountId === 77 && Number(entry.creditAmount) === 3000)).toBe(
+      true
+    );
+    for (const untouched of [
+      accounts.containerReserveAccountId,
+      accounts.hassanEquityAccountId,
+      accounts.hassanSavingsAccountId,
+    ]) {
+      expect(posting.entries.some((entry) => entry.ledgerAccountId === untouched)).toBe(false);
+    }
+  });
+
+  it("offloads a cutover container with no charges at all", () => {
+    const offload = parseGoldenCoastPhase8OffloadInput({
+      companyId: 7,
+      body: {
+        clientRequestId: "phase8-cutover-b",
+        containerId: 21,
+        locationId: 5,
+        offloadDate: "2026-09-06",
+      },
+    });
+    const plan = planGoldenCoastPhase8Offload({ offload, funded: cutoverFunded() });
+    expect(plan.actualChargesUsd).toBe("0.00");
+    expect(plan.totalFinalCostUsd).toBe("44000.00");
+    const posting = buildGoldenCoastPhase8OffloadPosting({ offload, funded: cutoverFunded(), plan, accounts });
+    expect(posting.entries).toHaveLength(2);
+  });
+
+  it("refuses a cutover container with charges but no funding account", () => {
+    const offload = parseGoldenCoastPhase8OffloadInput({
+      companyId: 7,
+      body: {
+        clientRequestId: "phase8-cutover-c",
+        containerId: 21,
+        locationId: 5,
+        offloadDate: "2026-09-06",
+        charges: [{ chargeType: "transport", amountUsd: "500" }],
+      },
+    });
+    expect(() => planGoldenCoastPhase8Offload({ offload, funded: cutoverFunded() })).toThrowError(
+      /chargeFundingAccount is required/
+    );
+  });
+
+  it("does not apply the reserve ceiling to a cutover container", () => {
+    // The same charges would be rejected against a Phase 8 container funded
+    // with a smaller reserve; a cutover container has no ceiling to exceed.
+    const offload = parseGoldenCoastPhase8OffloadInput({
+      companyId: 7,
+      body: {
+        clientRequestId: "phase8-cutover-d",
+        containerId: 21,
+        locationId: 5,
+        offloadDate: "2026-09-06",
+        charges: [{ chargeType: "other", amountUsd: "99000" }],
+        chargeFundingAccount: { kind: "ledger", id: 88 },
+      },
+    });
+    const plan = planGoldenCoastPhase8Offload({ offload, funded: cutoverFunded() });
+    expect(plan.actualChargesUsd).toBe("99000.00");
   });
 
   it("uses a distinct FIFO provenance for post-cutover offloads", () => {
