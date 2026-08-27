@@ -29,27 +29,12 @@ jobs:
 
           route = Path("server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.ts")
           text = route.read_text()
-          old = '''  if (matches.length !== 1) {
-            throw new GoldenCoastPhase6RouteError(
-              matches.length === 0
-                ? `Golden Coast role ${role} is missing; run Golden Coast account setup first`
-                : `Golden Coast role ${role} is ambiguous (${matches.length} active accounts share ${definition.subType})`,
-              "GC_PHASE6_ROLES_INVALID",
-              409
-            );
+
+          needle = '''  return matches[0];
           }
-          return matches[0];
-          '''
-          new = '''  if (matches.length !== 1) {
-            throw new GoldenCoastPhase6RouteError(
-              matches.length === 0
-                ? `Golden Coast role ${role} is missing; run Golden Coast account setup first`
-                : `Golden Coast role ${role} is ambiguous (${matches.length} active accounts share ${definition.subType})`,
-              "GC_PHASE6_ROLES_INVALID",
-              409
-            );
-          }
-          const account = matches[0];
+
+          async function activeSubTypeAccount'''
+          replacement = '''  const account = matches[0];
           if (!definition.acceptedAccountTypes.includes(account.accountType)) {
             throw new GoldenCoastPhase6RouteError(
               `Golden Coast role ${role} must use account type ${definition.acceptedAccountTypes.join(" or ")}; account "${account.name}" is ${account.accountType}`,
@@ -58,32 +43,34 @@ jobs:
             );
           }
           return account;
-          '''
-          if old not in text:
-            raise SystemExit("canonical role block not found")
-          text = text.replace(old, new, 1)
+          }
 
-          old = '''  const revenue = sale.lines.reduce(
+          async function activeSubTypeAccount'''
+          if needle not in text:
+            raise SystemExit("canonical role return anchor not found")
+          text = text.replace(needle, replacement, 1)
+
+          needle = '''  const revenue = sale.lines.reduce(
             (sum, line) => sum.plus(new Decimal(line.qty).times(new Decimal(line.unitPriceUsd))),
             new Decimal(0)
           );'''
-          new = '''  const revenue = sale.lines.reduce(
+          replacement = '''  const revenue = sale.lines.reduce(
             (sum, line) =>
               sum.plus(new Decimal(line.qty).times(new Decimal(line.unitPriceUsd)).toDecimalPlaces(2)),
             new Decimal(0)
           );'''
-          if old not in text:
+          if needle not in text:
             raise SystemExit("preflight revenue block not found")
-          route.write_text(text.replace(old, new, 1))
+          route.write_text(text.replace(needle, replacement, 1))
 
           fixture = Path("tests/helpers/goldenCoastPhase5Fixture.ts")
           text = fixture.read_text()
-          old = 'export const GOLDEN_COAST_PHASE5_SALE_URL = "/api/sp/golden-coast/phase5/pos-sale";'
-          new = 'export const GOLDEN_COAST_PHASE5_SALE_URL = "/api/sp/golden-coast/phase6/pos-sale";'
-          if old not in text:
+          old_url = 'export const GOLDEN_COAST_PHASE5_SALE_URL = "/api/sp/golden-coast/phase5/pos-sale";'
+          if old_url not in text:
             raise SystemExit("Phase 5 fixture URL not found")
-          text = text.replace(old, new, 1)
-          anchor = '''  const stockInHandAccountId = await insertLedgerAccount({
+          text = text.replace(old_url, 'export const GOLDEN_COAST_PHASE5_SALE_URL = "/api/sp/golden-coast/phase6/pos-sale";', 1)
+
+          stock_block = '''  const stockInHandAccountId = await insertLedgerAccount({
             companyId: ctx.companyId,
             code: "SP-STOCK",
             name: "Stock in Hand",
@@ -91,7 +78,7 @@ jobs:
             subType: "sp_stock",
           });
           '''
-          insertion = anchor + '''  await insertLedgerAccount({
+          hassan_block = '''  await insertLedgerAccount({
             companyId: ctx.companyId,
             code: "GC-HSAV",
             name: "Hassan Savings",
@@ -99,9 +86,11 @@ jobs:
             subType: "gc_hassan_savings",
           });
           '''
-          if anchor not in text:
-            raise SystemExit("Stock in Hand fixture anchor not found")
-          fixture.write_text(text.replace(anchor, insertion, 1))
+          if "subType: \"gc_hassan_savings\"" not in text:
+            if stock_block not in text:
+              raise SystemExit("Stock in Hand fixture anchor not found")
+            text = text.replace(stock_block, stock_block + hassan_block, 1)
+          fixture.write_text(text)
 
           test = Path("server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.test.ts")
           text = test.read_text()
@@ -111,24 +100,29 @@ jobs:
           });
           '''
           addition = marker + '''
-          it("fails readiness/posting when a canonical account has an incompatible type", () => {
+          it("fails closed when a canonical account has an incompatible account type", () => {
             expect(routeSource).toContain("definition.acceptedAccountTypes.includes(account.accountType)");
             expect(routeSource).toContain("GC_PHASE6_ROLES_INVALID");
           });
 
-          it("matches Phase 5 revenue by rounding each line to cents before summing", () => {
+          it("matches Phase 5 revenue by rounding each sale line to cents before summing", () => {
             expect(routeSource).toContain("times(new Decimal(line.unitPriceUsd)).toDecimalPlaces(2)");
           });
           '''
-          if marker not in text:
-            raise SystemExit("Phase 6 route test anchor not found")
-          test.write_text(text.replace(marker, addition, 1))
-      - name: Format reviewed files
+          if "matches Phase 5 revenue by rounding each sale line" not in text:
+            if marker not in text:
+              raise SystemExit("Phase 6 route test anchor not found")
+            text = text.replace(marker, addition, 1)
+          test.write_text(text)
+      - name: Format and verify reviewed files
         run: |
           node node_modules/prettier/bin/prettier.cjs --write \
             server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.ts \
             server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.test.ts \
             tests/helpers/goldenCoastPhase5Fixture.ts
+          npx vitest run \
+            server/services/accounting/goldenCoastPhase6SpecialLocationDeduction.test.ts \
+            server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.test.ts
           rm .github/workflows/gc-phase6-review-fixes-once.yml
       - name: Commit reviewed fixes and remove workflow
         run: |
