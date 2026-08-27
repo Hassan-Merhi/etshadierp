@@ -54,10 +54,12 @@ jobs:
           REPO_OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
-          echo "repair_pr=" >> "$GITHUB_OUTPUT"
-          echo "repair_ref=" >> "$GITHUB_OUTPUT"
-          echo "repair_sha=" >> "$GITHUB_OUTPUT"
-          echo "repair_runs=" >> "$GITHUB_OUTPUT"
+          {
+            echo "repair_pr="
+            echo "repair_ref="
+            echo "repair_sha="
+            echo "repair_runs="
+          } >> "$GITHUB_OUTPUT"
 
           gh label create manual-review --color d73a4a --description "Automation stopped; human decision required." --force >/dev/null
           gh label create no-auto-ship --color 6e7781 --description "Opt out of automated repair and auto-merge." --force >/dev/null
@@ -115,10 +117,12 @@ jobs:
               continue
             fi
 
-            echo "repair_pr=$pr" >> "$GITHUB_OUTPUT"
-            echo "repair_ref=$head_ref" >> "$GITHUB_OUTPUT"
-            echo "repair_sha=$head_sha" >> "$GITHUB_OUTPUT"
-            echo "repair_runs=$persistent" >> "$GITHUB_OUTPUT"
+            {
+              echo "repair_pr=$pr"
+              echo "repair_ref=$head_ref"
+              echo "repair_sha=$head_sha"
+              echo "repair_runs=$persistent"
+            } >> "$GITHUB_OUTPUT"
             candidate_found=true
           done < <(
             gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100" \
@@ -245,26 +249,34 @@ jobs:
           git diff --check
           changed="$(git diff --name-only)"
           if [[ -z "$changed" ]]; then
-            echo "has_patch=false" >> "$GITHUB_OUTPUT"
-            echo "repair_reason=no-change" >> "$GITHUB_OUTPUT"
+            {
+              echo "has_patch=false"
+              echo "repair_reason=no-change"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if printf '%s\n' "$changed" | grep -q '^\.github/workflows/'; then
             git reset --hard HEAD
-            echo "has_patch=false" >> "$GITHUB_OUTPUT"
-            echo "repair_reason=forbidden-workflow-change" >> "$GITHUB_OUTPUT"
+            {
+              echo "has_patch=false"
+              echo "repair_reason=forbidden-workflow-change"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if git diff -U0 | grep -E '^\+.*(continue-on-error:[[:space:]]*true|@ts-ignore|eslint-disable|describe\.skip|it\.skip|test\.skip|--passWithNoTests|\|\|[[:space:]]+true)' >/dev/null; then
             git reset --hard HEAD
-            echo "has_patch=false" >> "$GITHUB_OUTPUT"
-            echo "repair_reason=guardrail-rejected" >> "$GITHUB_OUTPUT"
+            {
+              echo "has_patch=false"
+              echo "repair_reason=guardrail-rejected"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git diff --binary > repair.patch
           test -s repair.patch
-          echo "has_patch=true" >> "$GITHUB_OUTPUT"
-          echo "repair_reason=patch-ready" >> "$GITHUB_OUTPUT"
+          {
+            echo "has_patch=true"
+            echo "repair_reason=patch-ready"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Upload repair patch
         if: steps.patch.outputs.has_patch == 'true'
