@@ -37,6 +37,7 @@ import { registerFiscalTransferRoutes } from "./fiscal-transfers";
 import { registerGitRoutes } from "./git";
 import { registerGlobalTransactionRoutes } from "./globalTransactionRoutes";
 import { registerGoldenCoastAccountingRoutes } from "./goldenCoastAccountingRoutes";
+import { registerGoldenCoastLegacyPostingGuard } from "./goldenCoastLegacyPostingGuard";
 import { registerImportCycleRoutes } from "./import-cycle";
 import { registerImportRoutes } from "./import";
 import { registerIntercompanyNotificationRoutes } from "./intercompanyNotificationRoutes";
@@ -131,6 +132,7 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerSupplierProformaRoutes(app, requireAuth);
   registerSupplierProfitCheckRoutes(app, requireAuth);
   registerGlobalTransactionRoutes(app, requireAuth);
+  registerGoldenCoastLegacyPostingGuard(app);
   registerGoldenCoastAccountingRoutes(app);
   registerPropertiesRentalRoutes(app);
   registerErpRentalRoutes(app);
