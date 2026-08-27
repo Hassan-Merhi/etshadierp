@@ -408,7 +408,12 @@ async function handleWithdrawal(req: Request, res: Response): Promise<void> {
       });
       const replayed = await findReplayedWithdrawal(tx, companyId, withdrawal, savingsAccount.id, withdrawalDigest);
       if (replayed) {
-        const currentBalance = await hassanSavingsCreditBalance(tx, companyId, savingsAccount.id, withdrawal.withdrawalDate);
+        const currentBalance = await hassanSavingsCreditBalance(
+          tx,
+          companyId,
+          savingsAccount.id,
+          withdrawal.withdrawalDate
+        );
         return {
           replayed: true as const,
           withdrawal,
