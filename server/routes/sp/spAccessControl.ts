@@ -124,7 +124,7 @@ function classifyPermission(req: Request): SpPermission {
     return "sp_reports";
   if (path.includes("/sales/") && path.endsWith("/reverse")) return "sp_sales_reverse";
   if (path.includes("offload") && path.endsWith("/reverse")) return "sp_offload_reverse";
-  if (path === "/offload" && method === "POST") return "sp_offload";
+  if ((path === "/offload" || path === "/golden-coast/phase8/offload") && method === "POST") return "sp_offload";
   if (path.includes("container") && method !== "GET") return "sp_container_manage";
   if ((path.includes("sales") || path.includes("sale")) && method !== "GET") return "sp_sales_create";
   return "sp_view";

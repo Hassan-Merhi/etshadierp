@@ -7,7 +7,10 @@ import { registerSpGoldenCoastSetupRoutes } from "./spGoldenCoastSetupRoutes";
 import { registerSpGoldenCoastPhase3CutoverRoutes } from "./spGoldenCoastPhase3CutoverRoutes";
 import { registerSpGoldenCoastPhase4CutoverFifoRoutes } from "./spGoldenCoastPhase4CutoverFifoRoutes";
 import { registerSpGoldenCoastPhase6PosSaleRoutes } from "./spGoldenCoastPhase6PosSaleRoutes";
-import { registerSpGoldenCoastPhase9HassanSavingsWithdrawalRoutes } from "./spGoldenCoastPhase9HassanSavingsWithdrawalRoutes";
+import { registerSpGoldenCoastPhase8ContainerOffloadRoutes } from "./spGoldenCoastPhase8ContainerOffloadRoutes";
+import {
+  registerSpGoldenCoastPhase9HassanSavingsWithdrawalRoutes,
+} from "./spGoldenCoastPhase9HassanSavingsWithdrawalRoutes";
 import { registerSpContainerRoutes } from "./spContainerRoutes";
 import { registerSpLifecycleGuards } from "./spLifecycleGuards";
 import { registerSpReoffloadPreparationGuard } from "./spReoffloadPreparationGuard";
@@ -72,10 +75,7 @@ export function registerSpRoutes(app: Express) {
   // Hassan Savings deduction. The Phase 5 source remains in the repository for
   // history/tests, but its production route is intentionally no longer mounted.
   registerSpGoldenCoastPhase6PosSaleRoutes(app);
-  // Phase 9 owns only payout of the withdrawable Hassan Savings loan balance.
-  // It deliberately does not depend on Phase 7 HADI transfer or Phase 8
-  // container/offload implementation files, so those phases can merge safely
-  // before this branch is synchronized with their shared registry additions.
+  registerSpGoldenCoastPhase8ContainerOffloadRoutes(app);
   registerSpGoldenCoastPhase9HassanSavingsWithdrawalRoutes(app);
   registerSpLifecycleGuards(app);
   registerSpContainerRoutes(app);

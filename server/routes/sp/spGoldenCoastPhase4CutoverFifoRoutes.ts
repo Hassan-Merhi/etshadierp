@@ -22,7 +22,12 @@ import {
 import { requireSpCompany } from "./spHelpers";
 
 const phase4RequestBudget = privilegedRequestBudget({ maxBodyBytes: 8 * 1024, maxCollectionItems: 10 });
-const phase3VoucherNumber = (companyId: number) => `GC-CUTOVER-20260901-C${companyId}`;
+/**
+ * The Phase 3 cutover voucher number is the durable "this company crossed the
+ * cutover" marker. Phase 8 reads it too, so both phases agree on one spelling.
+ */
+export const goldenCoastPhase3VoucherNumber = (companyId: number) => `GC-CUTOVER-20260901-C${companyId}`;
+const phase3VoucherNumber = goldenCoastPhase3VoucherNumber;
 
 export type DbLike = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
