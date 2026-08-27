@@ -160,11 +160,7 @@ function transferDate(value: unknown): string {
 
   const [year, month, day] = text.split("-").map(Number);
   const parsed = new Date(Date.UTC(year, month - 1, day));
-  if (
-    parsed.getUTCFullYear() !== year ||
-    parsed.getUTCMonth() !== month - 1 ||
-    parsed.getUTCDate() !== day
-  ) {
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
     throw new GoldenCoastPhase7TransferError("transferDate must be an ISO calendar date (YYYY-MM-DD)");
   }
 

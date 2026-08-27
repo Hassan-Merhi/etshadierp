@@ -81,6 +81,22 @@ describe("Golden Coast Phase 7 HADI transfer route surface", () => {
     expect(routeSource).toContain('inArray(ledgerAccounts.accountType, ["Cash", "Bank"])');
   });
 
+  it("requires the tenant boundary to have authorized HADI and never widens scope itself", () => {
+    expect(routeSource).toContain("function assertHadiCompanyAuthorized(pair: GoldenCoastPhase7CompanyPair)");
+    expect(routeSource).toContain("requestContext.authorizedCompanyIds?.includes(pair.hadiCompanyId)");
+    expect(routeSource).toContain("GC_PHASE7_HADI_SCOPE_UNAUTHORIZED");
+    // The route may only read the boundary's verified list; assigning to it
+    // would let Phase 7 grant itself a company the boundary never checked.
+    expect(routeSource).not.toContain("authorizedCompanyIds =");
+    expect(routeSource).not.toContain("authorizedCompanyIds.add");
+  });
+
+  it("scopes every cross-company read and write with assertTransactionCompanyScope", () => {
+    expect(routeSource).toContain("assertTransactionCompanyScope(tx, pair.hadiCompanyId)");
+    expect(routeSource).toContain("assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId)");
+    expect(routeSource).toContain("assertTransactionCompanyScope(tx, markerCompanyId)");
+  });
+
   it("posts both companies through the central posting engine rather than writing vouchers directly", () => {
     expect(routeSource).toContain("postBalancedVoucherTx");
     expect(routeSource).toContain("createDatabasePostingDependencies()");
@@ -119,7 +135,7 @@ describe("Golden Coast Phase 7 HADI transfer route surface", () => {
     expect(serviceSource).toContain("goldenCoastPhase7TransferDigest");
     expect(serviceSource).toContain("hadiCashAccount: transfer.hadiCashAccount");
     expect(serviceSource).toContain("goldenCoastCashAccount: transfer.goldenCoastCashAccount");
-    expect(serviceSource).toContain("accounts,");
+    expect(serviceSource).toContain("accounts: canonicalAccounts,");
     expect(serviceSource).toContain("GOLDEN_COAST_PHASE7_SOURCE_TYPE");
     expect(routeSource).toContain("goldenCoastPhase7SourceId(transfer.operation, transferDigest, item.role)");
   });

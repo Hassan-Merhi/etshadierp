@@ -44,6 +44,8 @@ import {
   type GoldenCoastPhase7RoleAccounts,
   type GoldenCoastPhase7TransferInput,
 } from "../../services/accounting/goldenCoastPhase7HadiTransfer";
+import { getCompanyRequestRuntimeContext } from "../../services/security/companyRequestRuntimeContext";
+import { assertTransactionCompanyScope } from "../../services/security/transactionCompanyScope";
 import { getCurrentExchangeRate } from "../helpers/exchangeRateHelpers";
 import { isGoldenCoastCompany } from "./spGoldenCoastPhase4CutoverFifoRoutes";
 import { loadGoldenCoastAccounts } from "./spGoldenCoastSetupRoutes";
@@ -79,6 +81,36 @@ interface ResolvedPhase7Accounts extends GoldenCoastPhase7RoleAccounts {
   gcSalesCashAccountName: string;
   goldenCoastHadiIntercompanyAccountName: string;
   hadiGoldenCoastIntercompanyAccountName: string;
+}
+
+/**
+ * Fail-closed gate for the HADI side of a Phase 7 settlement.
+ *
+ * The tenant request boundary is the only component allowed to widen a request
+ * past its active company: it membership-checks caller-supplied
+ * `targetCompanyId` values and records the verified ids on the request runtime
+ * context. Phase 7 never widens that scope itself. It only confirms the
+ * boundary already authorized the company persisted as Golden Coast's
+ * `parent_company_id`, so a caller can neither choose HADI nor reach it without
+ * membership. Requests that omit `targetCompanyId`, or that name a different
+ * company, are refused instead of being silently promoted.
+ */
+function assertHadiCompanyAuthorized(pair: GoldenCoastPhase7CompanyPair): void {
+  const requestContext = getCompanyRequestRuntimeContext();
+  if (!requestContext) {
+    throw new GoldenCoastPhase7RouteError(
+      "Company request context is unavailable for HADI company authorization",
+      "GC_PHASE7_HADI_SCOPE_UNAUTHORIZED",
+      403
+    );
+  }
+  if (!requestContext.authorizedCompanyIds?.includes(pair.hadiCompanyId)) {
+    throw new GoldenCoastPhase7RouteError(
+      `HADI company ${pair.hadiCompanyId} is not authorized for this request; send targetCompanyId=${pair.hadiCompanyId} so the tenant boundary verifies membership first`,
+      "GC_PHASE7_HADI_SCOPE_UNAUTHORIZED",
+      403
+    );
+  }
 }
 
 async function resolveCompanyPair(conn: DbLike, companyId: number): Promise<GoldenCoastPhase7CompanyPair> {
@@ -207,25 +239,30 @@ async function activeIntercompanyAccount(
 }
 
 async function resolvePhase7Accounts(
-  conn: DbLike,
+  tx: DatabaseTransaction,
   pair: GoldenCoastPhase7CompanyPair
 ): Promise<ResolvedPhase7Accounts> {
-  const goldenCoastAccounts = await loadGoldenCoastAccounts(conn, pair.goldenCoastCompanyId);
+  // Each side is read under its own PostgreSQL tenant scope, and the Golden
+  // Coast scope is restored before the caller continues. Sequential switching
+  // is required: the two sides cannot share one transaction-local scope.
+  await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
+  const goldenCoastAccounts = await loadGoldenCoastAccounts(tx, pair.goldenCoastCompanyId);
   const gcSalesCash = activeCanonicalGoldenCoastRole(goldenCoastAccounts, pair.goldenCoastCompanyId, "gc_sales_cash");
-  const [goldenCoastIntercompany, hadiIntercompany] = await Promise.all([
-    activeIntercompanyAccount(
-      conn,
-      pair.goldenCoastCompanyId,
-      "sp_hadi_intercompany",
-      "Golden Coast HADI intercompany account"
-    ),
-    activeIntercompanyAccount(
-      conn,
-      pair.hadiCompanyId,
-      "hadi_sp_intercompany",
-      "HADI Golden Coast intercompany account"
-    ),
-  ]);
+  const goldenCoastIntercompany = await activeIntercompanyAccount(
+    tx,
+    pair.goldenCoastCompanyId,
+    "sp_hadi_intercompany",
+    "Golden Coast HADI intercompany account"
+  );
+
+  await assertTransactionCompanyScope(tx, pair.hadiCompanyId);
+  const hadiIntercompany = await activeIntercompanyAccount(
+    tx,
+    pair.hadiCompanyId,
+    "hadi_sp_intercompany",
+    "HADI Golden Coast intercompany account"
+  );
+  await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
 
   return {
     gcSalesCashAccountId: gcSalesCash.id,
@@ -427,8 +464,14 @@ async function findReplayedTransfer(
     { role: "golden_coast", markerCompanyId: pair.goldenCoastCompanyId },
     { role: "hadi", markerCompanyId: pair.hadiCompanyId },
   ];
-  const found = await Promise.all(
-    roles.map(async ({ role, markerCompanyId }) => ({
+  const found: Array<{
+    role: GoldenCoastPhase7PostingRole;
+    markerCompanyId: number;
+    marker: Awaited<ReturnType<typeof findPostedVoucher>>;
+  }> = [];
+  for (const { role, markerCompanyId } of roles) {
+    await assertTransactionCompanyScope(tx, markerCompanyId);
+    found.push({
       role,
       markerCompanyId,
       marker: await findPostedVoucher(
@@ -436,8 +479,9 @@ async function findReplayedTransfer(
         markerCompanyId,
         goldenCoastPhase7IdempotencyKey(pair.goldenCoastCompanyId, transfer.clientRequestId, role)
       ),
-    }))
-  );
+    });
+  }
+  await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
   const posted = found.filter((item) => item.marker != null);
   if (posted.length === 0) return null;
   if (posted.length !== roles.length) {
@@ -512,18 +556,19 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
 
       try {
         pair = await resolveCompanyPair(tx, companyId);
+        assertHadiCompanyAuthorized(pair);
         accounts = await resolvePhase7Accounts(tx, pair);
-        [balances, hadiCashAccounts, goldenCoastCashAccounts] = await Promise.all([
-          Promise.all([
-            gcSalesCashDebitBalance(tx, companyId, accounts.gcSalesCashAccountId),
-            outstandingPhase7HadiCollections(tx, companyId),
-          ]).then(([gcSalesCashDebitBalanceUsd, outstandingHadiCollectionsUsd]) => ({
-            gcSalesCashDebitBalanceUsd,
-            outstandingHadiCollectionsUsd,
-          })),
-          listCashAccounts(tx, pair.hadiCompanyId),
-          listCashAccounts(tx, pair.goldenCoastCompanyId),
-        ]);
+
+        await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
+        balances = {
+          gcSalesCashDebitBalanceUsd: await gcSalesCashDebitBalance(tx, companyId, accounts.gcSalesCashAccountId),
+          outstandingHadiCollectionsUsd: await outstandingPhase7HadiCollections(tx, companyId),
+        };
+        goldenCoastCashAccounts = await listCashAccounts(tx, pair.goldenCoastCompanyId);
+
+        await assertTransactionCompanyScope(tx, pair.hadiCompanyId);
+        hadiCashAccounts = await listCashAccounts(tx, pair.hadiCompanyId);
+        await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
         if (hadiCashAccounts.length === 0)
           blockers.push("HADI has no active cash or bank account available for Phase 7.");
         if (goldenCoastCashAccounts.length === 0) {
@@ -570,6 +615,8 @@ async function handlePostTransfer(req: Request, res: Response): Promise<void> {
 
     const result = await db.transaction(async (tx) => {
       const pair = await resolveCompanyPair(tx, selectedCompany);
+      assertHadiCompanyAuthorized(pair);
+      await assertTransactionCompanyScope(tx, selectedCompany);
       const transfer = parseGoldenCoastPhase7TransferInput({
         companyId: selectedCompany,
         parentCompanyId: pair.hadiCompanyId,
@@ -593,7 +640,9 @@ async function handlePostTransfer(req: Request, res: Response): Promise<void> {
       }
 
       const accounts = await resolvePhase7Accounts(tx, pair);
+      await assertTransactionCompanyScope(tx, pair.hadiCompanyId);
       await validateCashAccount(tx, pair.hadiCompanyId, transfer.hadiCashAccount, "hadiCashAccount");
+      await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
       if (transfer.operation === "remit_from_hadi" && transfer.goldenCoastCashAccount) {
         await validateCashAccount(
           tx,
@@ -651,6 +700,9 @@ async function handlePostTransfer(req: Request, res: Response): Promise<void> {
         }
         postings.push({ role: item.role, voucher: posted.voucher, entries: posted.entries });
       }
+      // postBalancedVoucherTx leaves the transaction scoped to the company it
+      // just posted for; restore Golden Coast before leaving the boundary.
+      await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
 
       return { replayed: false as const, transfer, plan, postings };
     });
