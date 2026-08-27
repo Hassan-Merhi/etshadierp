@@ -179,7 +179,7 @@ function cashAccount(value: unknown, field: string): GoldenCoastPhase7CashAccoun
   }
   const input = value as Record<string, unknown>;
   if (input.kind !== "ledger" && input.kind !== "bank") {
-    throw new GoldenCoastPhase7TransferError(`${field}.kind must be \"ledger\" or \"bank\"`);
+    throw new GoldenCoastPhase7TransferError(`${field}.kind must be "ledger" or "bank"`);
   }
   return { kind: input.kind, id: positiveId(input.id, `${field}.id`) };
 }
@@ -207,9 +207,7 @@ export function parseGoldenCoastPhase7TransferInput(input: {
   }
   const raw = input.body as Record<string, unknown>;
   if (raw.operation !== "collect_via_hadi" && raw.operation !== "remit_from_hadi") {
-    throw new GoldenCoastPhase7TransferError(
-      'operation must be either "collect_via_hadi" or "remit_from_hadi"'
-    );
+    throw new GoldenCoastPhase7TransferError('operation must be either "collect_via_hadi" or "remit_from_hadi"');
   }
 
   const operation = raw.operation;
@@ -247,14 +245,8 @@ export function planGoldenCoastPhase7Transfer(input: {
   balances: GoldenCoastPhase7Balances;
 }): GoldenCoastPhase7TransferPlan {
   const amount = positiveMoney(input.transfer.amountUsd, "amountUsd");
-  const gcSalesCashBalance = balanceMoney(
-    input.balances.gcSalesCashDebitBalanceUsd,
-    "gcSalesCashDebitBalanceUsd"
-  );
-  const outstanding = balanceMoney(
-    input.balances.outstandingHadiCollectionsUsd,
-    "outstandingHadiCollectionsUsd"
-  );
+  const gcSalesCashBalance = balanceMoney(input.balances.gcSalesCashDebitBalanceUsd, "gcSalesCashDebitBalanceUsd");
+  const outstanding = balanceMoney(input.balances.outstandingHadiCollectionsUsd, "outstandingHadiCollectionsUsd");
   if (outstanding.lessThan(0)) {
     throw new GoldenCoastPhase7TransferError(
       "Phase 7 HADI collection history is inconsistent: remittances exceed collections",

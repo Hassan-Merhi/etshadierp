@@ -58,7 +58,7 @@
     },
     {
       "expected": "GET /api/debug/import-cycle [requireAuth > <anonymous> > <anonymous>]",
-      "actual": "GET /api/debug/import-cycle [requireAuth > <anonymous> > <anonymous> > <anonymous> > <anonymous> > <anonymous>]"
+      "actual": "GET /api/debug/import-cycle [requireAuth > <anonymous> > <anonymous> > <anonymous> > <anonymous>]"
     },
     {
       "expected": "GET /api/sp/migration/preview [requireAuth > <anonymous> > <anonymous>]",

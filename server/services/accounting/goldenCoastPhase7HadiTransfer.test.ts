@@ -83,9 +83,7 @@ describe("Golden Coast Phase 7 HADI transfer planner", () => {
   });
 
   it("rejects a Golden Coast cash account on collection because HADI physically holds that cash", () => {
-    expectTransferError(() =>
-      parsedCollect({ goldenCoastCashAccount: { kind: "ledger", id: 401 } })
-    );
+    expectTransferError(() => parsedCollect({ goldenCoastCashAccount: { kind: "ledger", id: 401 } }));
   });
 
   it("rejects an invalid operation", () => {
@@ -99,10 +97,7 @@ describe("Golden Coast Phase 7 HADI transfer planner", () => {
   });
 
   it("rejects pre-cutover transfer dates", () => {
-    expectTransferError(
-      () => parsedCollect({ transferDate: "2026-08-31" }),
-      "GC_PHASE7_PRE_CUTOVER_DATE"
-    );
+    expectTransferError(() => parsedCollect({ transferDate: "2026-08-31" }), "GC_PHASE7_PRE_CUTOVER_DATE");
   });
 
   it("rejects same-company parent routing", () => {
@@ -240,14 +235,14 @@ describe("Golden Coast Phase 7 HADI transfer planner", () => {
     expect(hadi?.voucher.totalAmount).toBe("600.00");
     expect(gc?.entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ ledgerAccountId: 102, debitAmount: "600.00", creditAmount: "0" }),
-        expect.objectContaining({ ledgerAccountId: 101, debitAmount: "0", creditAmount: "600.00" }),
+        expect.objectContaining({ ledgerAccountId: 102, debitAmount: "600", creditAmount: "0" }),
+        expect.objectContaining({ ledgerAccountId: 101, debitAmount: "0", creditAmount: "600" }),
       ])
     );
     expect(hadi?.entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ bankAccountId: 301, debitAmount: "600.00", creditAmount: "0" }),
-        expect.objectContaining({ ledgerAccountId: 201, debitAmount: "0", creditAmount: "600.00" }),
+        expect.objectContaining({ bankAccountId: 301, debitAmount: "600", creditAmount: "0" }),
+        expect.objectContaining({ ledgerAccountId: 201, debitAmount: "0", creditAmount: "600" }),
       ])
     );
   });
@@ -271,14 +266,14 @@ describe("Golden Coast Phase 7 HADI transfer planner", () => {
     const hadi = batch.postings.find((posting) => posting.role === "hadi")?.request;
     expect(gc?.entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ ledgerAccountId: 401, debitAmount: "250.00", creditAmount: "0" }),
-        expect.objectContaining({ ledgerAccountId: 102, debitAmount: "0", creditAmount: "250.00" }),
+        expect.objectContaining({ ledgerAccountId: 401, debitAmount: "250", creditAmount: "0" }),
+        expect.objectContaining({ ledgerAccountId: 102, debitAmount: "0", creditAmount: "250" }),
       ])
     );
     expect(hadi?.entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ ledgerAccountId: 201, debitAmount: "250.00", creditAmount: "0" }),
-        expect.objectContaining({ bankAccountId: 301, debitAmount: "0", creditAmount: "250.00" }),
+        expect.objectContaining({ ledgerAccountId: 201, debitAmount: "250", creditAmount: "0" }),
+        expect.objectContaining({ bankAccountId: 301, debitAmount: "0", creditAmount: "250" }),
       ])
     );
     expect(gc?.entries.some((entry) => entry.ledgerAccountId === 101)).toBe(false);
@@ -334,9 +329,7 @@ describe("Golden Coast Phase 7 HADI transfer planner", () => {
     expect(goldenCoastPhase7SourceId("collect_via_hadi", "abc123", "golden_coast")).toBe(
       "collect_via_hadi:abc123:golden_coast"
     );
-    expect(goldenCoastPhase7SourceId("remit_from_hadi", "abc123", "hadi")).toBe(
-      "remit_from_hadi:abc123:hadi"
-    );
+    expect(goldenCoastPhase7SourceId("remit_from_hadi", "abc123", "hadi")).toBe("remit_from_hadi:abc123:hadi");
   });
 
   it("refuses a collapsed GC Sales Cash/intercompany account mapping", () => {

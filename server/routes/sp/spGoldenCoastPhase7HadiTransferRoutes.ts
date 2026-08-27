@@ -211,11 +211,7 @@ async function resolvePhase7Accounts(
   pair: GoldenCoastPhase7CompanyPair
 ): Promise<ResolvedPhase7Accounts> {
   const goldenCoastAccounts = await loadGoldenCoastAccounts(conn, pair.goldenCoastCompanyId);
-  const gcSalesCash = activeCanonicalGoldenCoastRole(
-    goldenCoastAccounts,
-    pair.goldenCoastCompanyId,
-    "gc_sales_cash"
-  );
+  const gcSalesCash = activeCanonicalGoldenCoastRole(goldenCoastAccounts, pair.goldenCoastCompanyId, "gc_sales_cash");
   const [goldenCoastIntercompany, hadiIntercompany] = await Promise.all([
     activeIntercompanyAccount(
       conn,
@@ -309,26 +305,21 @@ async function listCashAccounts(conn: DbLike, companyId: number) {
     conn
       .select({ id: bankAccounts.id, name: bankAccounts.name })
       .from(bankAccounts)
-      .where(
-        and(
-          eq(bankAccounts.companyId, companyId),
-          eq(bankAccounts.active, true),
-          isNull(bankAccounts.deletedAt)
-        )
-      )
+      .where(and(eq(bankAccounts.companyId, companyId), eq(bankAccounts.active, true), isNull(bankAccounts.deletedAt)))
       .orderBy(asc(bankAccounts.name)),
   ]);
   return [
-    ...ledgerRows.map((row) => ({ kind: "ledger" as const, id: Number(row.id), name: row.name, type: row.accountType })),
+    ...ledgerRows.map((row) => ({
+      kind: "ledger" as const,
+      id: Number(row.id),
+      name: row.name,
+      type: row.accountType,
+    })),
     ...bankRows.map((row) => ({ kind: "bank" as const, id: Number(row.id), name: row.name, type: "Bank Account" })),
   ];
 }
 
-async function gcSalesCashDebitBalance(
-  conn: DbLike,
-  companyId: number,
-  accountId: number
-): Promise<string> {
+async function gcSalesCashDebitBalance(conn: DbLike, companyId: number, accountId: number): Promise<string> {
   const query = await conn.execute(sql`
     SELECT (
       CASE
@@ -491,7 +482,9 @@ function respondKnownError(res: Response, error: unknown): boolean {
     return true;
   }
   if (error instanceof PostingValidationError) {
-    res.status(error.code === "POSTING_IDEMPOTENCY_CORRUPT" ? 409 : 400).json({ code: error.code, message: error.message });
+    res
+      .status(error.code === "POSTING_IDEMPOTENCY_CORRUPT" ? 409 : 400)
+      .json({ code: error.code, message: error.message });
     return true;
   }
   return false;
@@ -531,7 +524,8 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
           listCashAccounts(tx, pair.hadiCompanyId),
           listCashAccounts(tx, pair.goldenCoastCompanyId),
         ]);
-        if (hadiCashAccounts.length === 0) blockers.push("HADI has no active cash or bank account available for Phase 7.");
+        if (hadiCashAccounts.length === 0)
+          blockers.push("HADI has no active cash or bank account available for Phase 7.");
         if (goldenCoastCashAccounts.length === 0) {
           blockers.push("Golden Coast has no active cash or bank account available for HADI remittance.");
         }
