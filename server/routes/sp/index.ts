@@ -6,6 +6,7 @@ import { registerSpSetupRoutes } from "./spSetupRoutes";
 import { registerSpGoldenCoastSetupRoutes } from "./spGoldenCoastSetupRoutes";
 import { registerSpGoldenCoastPhase3CutoverRoutes } from "./spGoldenCoastPhase3CutoverRoutes";
 import { registerSpGoldenCoastCutoverStockBridgeRoutes } from "./spGoldenCoastCutoverStockBridgeRoutes";
+import { registerSpGoldenCoastCutoverDateGuard } from "./spGoldenCoastCutoverDateGuard";
 import { registerSpContainerRoutes } from "./spContainerRoutes";
 import { registerSpLifecycleGuards } from "./spLifecycleGuards";
 import { registerSpReoffloadPreparationGuard } from "./spReoffloadPreparationGuard";
@@ -34,6 +35,7 @@ export function registerSpRoutes(app: Express) {
   // any migration, setup, lifecycle, report, or export handler is reachable.
   registerSpAccessControl(app);
   registerSpPermissionRoutes(app);
+  registerSpGoldenCoastCutoverDateGuard(app);
 
   installExplicitCompanyWriteGuard(app);
   registerSpMigrationPhase4Routes(app);
