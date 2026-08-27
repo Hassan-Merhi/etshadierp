@@ -1,24 +1,23 @@
 /**
  * The formatting gates agree on what they check.
  *
- * The canonical GitHub Actions and CircleCI jobs run Prettier over "the files
- * this change touched", each with its own copy of the file selection. They
- * drifted — CI covered client/src, server and shared while CircleCI also
- * covered tests and scripts — and three unformatted test files sailed through
- * CI because the job a developer watches had never looked at them.
+ * GitHub Actions is the canonical formatting gate. CircleCI is now only a
+ * fail-closed compatibility bridge for required legacy status contexts, so it
+ * intentionally does not run Prettier or maintain a second changed-file
+ * selection.
  *
  * A gate that only sometimes applies is worse than no gate: it teaches people
- * that green means formatted. These tests pin the three selections to each
- * other and to the local `npm run format:check:changed`, so widening one
- * without the others fails here rather than in somebody's pull request.
+ * that green means formatted. These tests pin the canonical workflow selection
+ * to the local `npm run format:check:changed` command, so widening one without
+ * the other fails here rather than in somebody's pull request.
  */
 import fs from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const WORKFLOW_FILES = [".github/workflows/ci.yml", ".circleci/config.yml"] as const;
-
+const WORKFLOW_FILES = [".github/workflows/ci.yml"] as const;
+const CIRCLECI_CONFIG = ".circleci/config.yml";
 const LOCAL_SCRIPT = "scripts/check-changed-file-formatting.mjs";
 
 function read(relativePath: string): string {
@@ -69,16 +68,21 @@ describe("formatting gate parity", () => {
 
   it("does not pass deleted files to Prettier", () => {
     const github = read(WORKFLOW_FILES[0]);
-    const circle = read(WORKFLOW_FILES[1]);
     const local = read(LOCAL_SCRIPT);
 
     const excludesRemovedGithubFiles = github.includes('select(.status != "removed")');
-    const filtersCircleDiffToPresentFiles = circle.includes("--diff-filter=ACMR");
     const filtersLocalDiffToPresentFiles = local.includes('"--diff-filter=ACMR"');
 
     expect(excludesRemovedGithubFiles).toBe(true);
-    expect(filtersCircleDiffToPresentFiles).toBe(true);
     expect(filtersLocalDiffToPresentFiles).toBe(true);
+  });
+
+  it("keeps CircleCI as a formatting-free compatibility bridge", () => {
+    const circle = read(CIRCLECI_CONFIG);
+
+    expect(circle).toContain("github-ci-gate");
+    expect(circle).not.toContain("--diff-filter=ACMR");
+    expect(circle).not.toContain("prettier");
   });
 
   it("gives developers a local check with the same selection", () => {
