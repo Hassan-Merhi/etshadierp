@@ -8,16 +8,12 @@ import { releaseDebtEnglish } from "../i18n/finalCloseoutEnglish";
  * posting mutation unreachable before later Golden Coast production flows are enabled.
  */
 export function registerGoldenCoastLegacyPostingGuard(app: Express): void {
-  app.post(
-    "/api/golden-coast/accounting/phase1/post",
-    requireAuth,
-    (_req: Request, res: Response) => {
-      res.status(410).json({
-        code: "GC_PHASE1_POSTING_RETIRED",
-        message: releaseDebtEnglish(
-          "Golden Coast Phase 1 posting is retired. Use the canonical Supplier Partner cutover and post-cutover accounting flows."
-        ),
-      });
-    }
-  );
+  app.post("/api/golden-coast/accounting/phase1/post", requireAuth, (_req: Request, res: Response) => {
+    res.status(410).json({
+      code: "GC_PHASE1_POSTING_RETIRED",
+      message: releaseDebtEnglish(
+        "Golden Coast Phase 1 posting is retired. Use the canonical Supplier Partner cutover and post-cutover accounting flows."
+      ),
+    });
+  });
 }
