@@ -14,7 +14,12 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
   const model = useContainerDetailModel({ id: idProp, forceErp });
   const { selectedCompany } = useCompany();
   const { data: containerSuppliers = [] } = useQuery<Supplier[]>({
-    queryKey: companyQueryKey("/api/suppliers?allowParentFallback=true", selectedCompany?.id),
+    queryKey: companyQueryKey("/api/suppliers", selectedCompany?.id, "allow-parent-fallback"),
+    queryFn: async () => {
+      const res = await fetch("/api/suppliers?allowParentFallback=true", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load suppliers");
+      return res.json();
+    },
     enabled: Boolean(selectedCompany?.id) && !model.isSupplierPartner,
   });
   const {
