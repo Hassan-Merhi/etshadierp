@@ -1,0 +1,108 @@
+name: CI Repair Sweep
+
+# Central, reusable "scan every trusted open PR for a current failure" logic.
+# It is the single place that decides whether the guarded CI Repair Bot should
+# be woken, so schedule, manual, and post-deployment wake-ups all apply exactly
+# the same trust boundaries.
+on:
+  workflow_call:
+    inputs:
+      reason:
+        description: Why this sweep was started, for run log readability.
+        required: false
+        type: string
+        default: unspecified
+    outputs:
+      dispatched:
+        description: Whether a CI Repair Bot run was dispatched by this sweep.
+        value: ${{ jobs.sweep.outputs.dispatched }}
+
+permissions: {}
+
+jobs:
+  sweep:
+    name: Sweep trusted open PRs for current failures
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      checks: read
+      contents: read
+      pull-requests: read
+      statuses: read
+    outputs:
+      dispatched: ${{ steps.sweep.outputs.dispatched }}
+    steps:
+      - name: Dispatch repair only when a trusted PR is currently red
+        id: sweep
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SWEEP_REASON: ${{ inputs.reason }}
+        run: |
+          set -euo pipefail
+          echo "dispatched=false" >> "$GITHUB_OUTPUT"
+          echo "Sweep reason: $SWEEP_REASON"
+
+          # Never queue a second repair run behind one that is already working.
+          active_runs="$(
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci-repair-bot.yml/runs?per_page=50" \
+              --jq '[.workflow_runs[] | select(
+                      .status == "queued" or
+                      .status == "in_progress" or
+                      .status == "waiting" or
+                      .status == "requested" or
+                      .status == "pending")] | length'
+          )"
+          if (( active_runs > 0 )); then
+            echo "A CI Repair Bot run is already queued or in progress; skipping dispatch."
+            exit 0
+          fi
+
+          while IFS= read -r encoded_pr; do
+            [[ -n "$encoded_pr" ]] || continue
+            pr_json="$(printf '%s' "$encoded_pr" | base64 --decode)"
+            pr_number="$(jq -r '.number' <<<"$pr_json")"
+            draft="$(jq -r '.draft' <<<"$pr_json")"
+            base_ref="$(jq -r '.base.ref' <<<"$pr_json")"
+            head_repo="$(jq -r '.head.repo.full_name // ""' <<<"$pr_json")"
+            head_sha="$(jq -r '.head.sha' <<<"$pr_json")"
+            author_login="$(jq -r '.user.login' <<<"$pr_json")"
+            author_association="$(jq -r '.author_association // ""' <<<"$pr_json")"
+            blocked="$(jq -r '[.labels[].name] | any(. == "ci-repair-blocked")' <<<"$pr_json")"
+
+            [[ "$draft" == false && "$base_ref" == main ]] || continue
+            [[ "$head_repo" == "$GITHUB_REPOSITORY" && "$blocked" == false ]] || continue
+            [[ "$author_login" != 'dependabot[bot]' && "$author_login" != 'renovate[bot]' ]] || continue
+            case "$author_association" in
+              OWNER|MEMBER|COLLABORATOR) ;;
+              *) continue ;;
+            esac
+
+            checks_json="$(gh api "repos/$GITHUB_REPOSITORY/commits/$head_sha/check-runs?per_page=100")"
+            statuses_json="$(gh api "repos/$GITHUB_REPOSITORY/commits/$head_sha/status")"
+            failed_checks="$(jq '[.check_runs[] | select(
+              .name != "Watch trusted PR checks for repair" and
+              .status == "completed" and
+              (.conclusion == "failure" or
+               .conclusion == "timed_out" or
+               .conclusion == "cancelled" or
+               .conclusion == "action_required" or
+               .conclusion == "startup_failure")
+            )] | length' <<<"$checks_json")"
+            failed_statuses="$(jq '[.statuses[] | select(.state == "failure" or .state == "error")] | length' <<<"$statuses_json")"
+
+            if (( failed_checks > 0 || failed_statuses > 0 )); then
+              echo "PR #$pr_number is red at $head_sha; waking the guarded CI Repair Bot."
+              gh api --method POST \
+                "repos/$GITHUB_REPOSITORY/actions/workflows/ci-repair-bot.yml/dispatches" \
+                -f ref=main
+              echo "dispatched=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done < <(
+            gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&sort=updated&direction=asc&per_page=100" \
+              --jq '.[] | @base64'
+          )
+
+          echo "No trusted open PR is currently red; no repair run dispatched."
