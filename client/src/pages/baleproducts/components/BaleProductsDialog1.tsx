@@ -50,7 +50,10 @@ export function BaleProductsDialog1({ model }: { model: Model }) {
       productionPrice: editForm.productionPrice,
       sellingPrice: editForm.sellingPrice,
       labelDesignColor: editForm.labelDesignColor || null,
-      grade: selectedGrade || undefined,
+      // The displayed grade may be inferred from the article-code prefix, but
+      // only an explicit selection is a grade mutation. This prevents a normal
+      // description/price edit from rewriting every historical bale grade.
+      grade: editForm.grade || undefined,
     };
     editProductMutation.mutate(payload);
   };
