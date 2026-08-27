@@ -78,8 +78,14 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement", () => {
 
   it("posts Dr selected bank / Cr GC Sales Cash through the central posting request", () => {
     const parsed = settlement({ amountUsd: "250.00" });
-    const plan = planGoldenCoastPhase10Settlement({ settlement: parsed, gcSalesCashDebitBalanceUsd: "1000.00" });
-    const digest = goldenCoastPhase10SettlementDigest({ settlement: parsed, gcSalesCashAccountId: 44 });
+    const plan = planGoldenCoastPhase10Settlement({
+      settlement: parsed,
+      gcSalesCashDebitBalanceUsd: "1000.00",
+    });
+    const digest = goldenCoastPhase10SettlementDigest({
+      settlement: parsed,
+      gcSalesCashAccountId: 44,
+    });
     const posting = buildGoldenCoastPhase10SettlementPosting({
       plan,
       gcSalesCashAccountId: 44,
@@ -106,8 +112,14 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement", () => {
 
   it("debits a selected Cash/Bank ledger account when the receipt target is a ledger", () => {
     const parsed = settlement({ amountUsd: "125.00", receiptAccount: { kind: "ledger", id: 55 } });
-    const plan = planGoldenCoastPhase10Settlement({ settlement: parsed, gcSalesCashDebitBalanceUsd: "1000.00" });
-    const digest = goldenCoastPhase10SettlementDigest({ settlement: parsed, gcSalesCashAccountId: 44 });
+    const plan = planGoldenCoastPhase10Settlement({
+      settlement: parsed,
+      gcSalesCashDebitBalanceUsd: "1000.00",
+    });
+    const digest = goldenCoastPhase10SettlementDigest({
+      settlement: parsed,
+      gcSalesCashAccountId: 44,
+    });
     const posting = buildGoldenCoastPhase10SettlementPosting({
       plan,
       gcSalesCashAccountId: 44,
