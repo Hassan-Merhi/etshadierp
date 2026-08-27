@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { useToast } from "@/hooks/use-toast";
+import { usePasswordConfirmedAction } from "@/hooks/use-password-confirmed-action";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import {
   AlertDialog,
@@ -29,6 +30,7 @@ interface UserManagementDrawerProps {
 
 export function UserManagementDrawer({ user, open, onClose, companies, onUserDeleted }: UserManagementDrawerProps) {
   const { toast } = useToast();
+  const { requestPasswordConfirmation, PasswordConfirmationDialog } = usePasswordConfirmedAction();
   const isPrivileged = ["admin", "owner", "developer"].includes(user?.role?.toLowerCase() ?? "");
   const isViewOnly = user?.role?.toLowerCase() === "view only";
 
@@ -141,7 +143,8 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
   const _togglePage = (key: string) => {
     setPageAccess((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
@@ -188,7 +191,8 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
   const toggleTabGroup = (group: string) => {
     setOpenTabGroups((prev) => {
       const next = new Set(prev);
-      if (next.has(group)) next.delete(group); else next.add(group);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
       return next;
     });
   };
@@ -238,11 +242,15 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
       payload.pageAccess = Array.from(pageAccess);
       payload.hiddenCostFields = hiddenCostFields;
     }
-    updateMutation.mutate(payload, {
-      onSuccess: () => {
-        if (!isPrivileged) saveErpRestrictionsMutation.mutate();
-      },
-    });
+    requestPasswordConfirmation(
+      () =>
+        updateMutation.mutate(payload, {
+          onSuccess: () => {
+            if (!isPrivileged) saveErpRestrictionsMutation.mutate();
+          },
+        }),
+      "Update User"
+    );
   };
 
   const handleDiscard = () => {
@@ -340,7 +348,6 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
             />
           </div>
 
-          {/* Sticky save bar — appears only when something has changed */}
           {isDirty && (
             <div className="shrink-0 border-t px-6 py-3 bg-background flex items-center justify-between gap-3 flex-wrap z-50">
               <p className="text-xs text-muted-foreground">
@@ -372,7 +379,6 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
         </SheetContent>
       </Sheet>
 
-      {/* Delete user confirmation */}
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -384,7 +390,10 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deleteMutation.mutate()}
+              onClick={() => {
+                setConfirmDelete(false);
+                requestPasswordConfirmation(() => deleteMutation.mutate(), "Remove User");
+              }}
               disabled={deleteMutation.isPending}
               className="bg-destructive text-destructive-foreground"
               data-testid="button-confirm-delete-user"
@@ -394,6 +403,7 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {PasswordConfirmationDialog}
     </>
   );
 }

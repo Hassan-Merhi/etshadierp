@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canAccessTargetUser,
+  canAssignCompany,
   canAssignRole,
   canMutateGlobalUserAccount,
   filterRolesForCompany,
@@ -17,16 +18,16 @@ const rows = [
 
 describe("company-scoped user administration policy", () => {
   it("shows only non-developer users assigned to the active company", () => {
-    expect([...visibleUserIdsForCompany(rows, 1)].sort()).toEqual([
-      "admin-a",
-      "shared",
-    ]);
+    expect([...visibleUserIdsForCompany(rows, 1)].sort()).toEqual(["admin-a", "shared"]);
   });
 
   it("filters a user's role response to the active company", () => {
-    expect(filterRolesForCompany(rows.filter((row) => row.userId === "shared"), 1)).toEqual([
-      { userId: "shared", companyId: 1, role: "Manager" },
-    ]);
+    expect(
+      filterRolesForCompany(
+        rows.filter((row) => row.userId === "shared"),
+        1
+      )
+    ).toEqual([{ userId: "shared", companyId: 1, role: "Manager" }]);
   });
 
   it("denies targets that are not assigned to the active company", () => {
@@ -48,5 +49,12 @@ describe("company-scoped user administration policy", () => {
     expect(canAssignRole("Admin", "Developer")).toBe(false);
     expect(canAssignRole("Developer", "Developer")).toBe(true);
     expect(canAssignRole("Admin", "Manager")).toBe(true);
+  });
+
+  it("binds tenant-admin role creation to the active company", () => {
+    expect(canAssignCompany("Admin", 1, 1)).toBe(true);
+    expect(canAssignCompany("Admin", 2, 1)).toBe(false);
+    expect(canAssignCompany("Admin", "2", 1)).toBe(false);
+    expect(canAssignCompany("Developer", 2, 1)).toBe(true);
   });
 });

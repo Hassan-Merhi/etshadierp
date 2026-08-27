@@ -117,6 +117,27 @@ export async function revokeUserSessions(pool: DatabasePool, userId: string, exc
   await pool.query(`DELETE FROM session WHERE sess->>'userId' = $1`, [userId]);
 }
 
+export async function revokeUserCompanySessions(
+  pool: DatabasePool,
+  userId: string,
+  companyId: number,
+  exceptSid?: string | null
+): Promise<void> {
+  const companyIdText = String(companyId);
+  if (exceptSid) {
+    await pool.query(
+      `DELETE FROM session WHERE sess->>'userId' = $1 AND sess->>'currentCompanyId' = $2 AND sid <> $3`,
+      [userId, companyIdText, exceptSid]
+    );
+    return;
+  }
+
+  await pool.query(`DELETE FROM session WHERE sess->>'userId' = $1 AND sess->>'currentCompanyId' = $2`, [
+    userId,
+    companyIdText,
+  ]);
+}
+
 export async function rotateCredentialsAndRevokeSessions(
   db: DatabaseOrTransaction,
   pool: DatabasePool,

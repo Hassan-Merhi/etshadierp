@@ -3,6 +3,10 @@ import type { Express } from "express";
 import { requireAuth, requireRole } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
+import {
+  advanceCurrentSessionAfterPasswordChange,
+  replacePasswordAndRevokeSessions,
+} from "../../services/security/userPasswordChangeService";
 import { storage } from "../../storage";
 import { insertUserCompanyRoleSchema, insertUserSchema, userCompanyRoles } from "@shared/schema";
 import { and, eq, sql } from "drizzle-orm";
@@ -48,8 +52,31 @@ export function registerUserAdministrationRoutes(app: Express) {
   app.patch("/api/users/:id", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       const updates = req.body;
-      if (updates.password) updates.password = await hashPassword(updates.password);
-      const user = await storage.updateUser(req.params.id, updates);
+      const requestedPassword = typeof updates.password === "string" ? updates.password : null;
+      delete updates.password;
+
+      let rotatedCredentialVersion: number | null = null;
+      if (requestedPassword) {
+        rotatedCredentialVersion = await replacePasswordAndRevokeSessions(
+          req.params.id,
+          await hashPassword(requestedPassword),
+          { exceptSid: req.params.id === req.session.userId ? req.sessionID : undefined }
+        );
+      }
+
+      const user =
+        Object.keys(updates).length > 0
+          ? await storage.updateUser(req.params.id, updates)
+          : await storage.getUser(req.params.id);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      if (rotatedCredentialVersion !== null && req.params.id === req.session.userId) {
+        advanceCurrentSessionAfterPasswordChange(req.session, rotatedCredentialVersion);
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((error: unknown) => (error ? reject(error) : resolve()));
+        });
+      }
+
       const { password, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
     } catch (error: unknown) {
@@ -71,6 +98,7 @@ export function registerUserAdministrationRoutes(app: Express) {
         }
       }
       await storage.deleteUser(id);
+      await invalidateUserSessions(id);
       res.json({ message: "User deleted successfully" });
     } catch (error: unknown) {
       res.status(400).json({ message: getErrorMessage(error) });
@@ -83,15 +111,22 @@ export function registerUserAdministrationRoutes(app: Express) {
       if (!currentPassword || !newPassword) {
         return res.status(400).json({ message: "Current password and new password are required" });
       }
-      if (newPassword.length < 4)
-        return res.status(400).json({ message: "New password must be at least 4 characters" });
+      if (newPassword.length < 6)
+        return res.status(400).json({ message: "New password must be at least 6 characters." });
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ message: "Not authenticated" });
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ message: "User not found" });
       const { valid } = await verifyPassword(currentPassword, user.password);
       if (!valid) return res.status(400).json({ message: "Current password is incorrect" });
-      await storage.updateUser(userId, { password: await hashPassword(newPassword) });
+
+      const credentialVersion = await replacePasswordAndRevokeSessions(userId, await hashPassword(newPassword), {
+        exceptSid: req.sessionID,
+      });
+      advanceCurrentSessionAfterPasswordChange(req.session, credentialVersion);
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((error: unknown) => (error ? reject(error) : resolve()));
+      });
       res.json({ message: "Password changed successfully" });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
@@ -103,10 +138,10 @@ export function registerUserAdministrationRoutes(app: Express) {
       const { userId } = req.params;
       const { newPassword } = req.body;
       if (!newPassword) return res.status(400).json({ message: "New password is required" });
-      if (newPassword.length < 4) return res.status(400).json({ message: "Password must be at least 4 characters" });
+      if (newPassword.length < 6) return res.status(400).json({ message: "Password must be at least 6 characters" });
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ message: "User not found" });
-      await storage.updateUser(userId, { password: await hashPassword(newPassword) });
+      await replacePasswordAndRevokeSessions(userId, await hashPassword(newPassword));
       res.json({ message: `Password reset successfully for user: ${user.username}` });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });

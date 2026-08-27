@@ -19,10 +19,11 @@ describe("WebSocket broadcast company scope", () => {
     expect(shouldDeliverBroadcast(7, undefined)).toBe(true);
   });
 
-  it("delivers to a socket whose company is not resolved yet", () => {
-    // Missing an invalidation leaves stale numbers on screen; one extra refetch
-    // does not. The unknown case stays on the safe side.
-    expect(shouldDeliverBroadcast(null, 7)).toBe(true);
-    expect(shouldDeliverBroadcast(undefined, 7)).toBe(true);
+  it("fails closed for a socket whose company is not resolved yet", () => {
+    // Tenant-scoped signals must not cross an unresolved trust boundary. Once
+    // the authenticated socket resolves its company, later invalidations are
+    // delivered normally.
+    expect(shouldDeliverBroadcast(null, 7)).toBe(false);
+    expect(shouldDeliverBroadcast(undefined, 7)).toBe(false);
   });
 });
