@@ -116,7 +116,15 @@ function activeCanonicalRoleAccount(
       409
     );
   }
-  return matches[0];
+  const account = matches[0];
+  if (!definition.acceptedAccountTypes.includes(account.accountType)) {
+    throw new GoldenCoastPhase6RouteError(
+      `Golden Coast role ${role} must use account type ${definition.acceptedAccountTypes.join(" or ")}; account "${account.name}" is ${account.accountType}`,
+      "GC_PHASE6_ROLES_INVALID",
+      409
+    );
+  }
+  return account;
 }
 
 async function activeSubTypeAccount(
@@ -418,7 +426,7 @@ async function loadVoucherEntries(tx: DatabaseTransaction, voucherId: number) {
 function preDeductionPlan(sale: GoldenCoastPhase5SaleInput, rate: string): GoldenCoastPhase6DeductionPlan | null {
   const totalQty = sale.lines.reduce((sum, line) => sum.plus(new Decimal(line.qty)), new Decimal(0));
   const revenue = sale.lines.reduce(
-    (sum, line) => sum.plus(new Decimal(line.qty).times(new Decimal(line.unitPriceUsd))),
+    (sum, line) => sum.plus(new Decimal(line.qty).times(new Decimal(line.unitPriceUsd)).toDecimalPlaces(2)),
     new Decimal(0)
   );
   const pseudoPlan: GoldenCoastPhase5SalePlan = {
@@ -532,12 +540,10 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
     const companyId = await requireSpCompany(req, res);
     if (!companyId) return;
     if (!(await isGoldenCoastCompany(db, companyId))) {
-      res
-        .status(409)
-        .json({
-          code: "GC_PHASE6_NOT_CONFIGURED",
-          message: releaseDebtEnglish("Golden Coast account setup is not configured."),
-        });
+      res.status(409).json({
+        code: "GC_PHASE6_NOT_CONFIGURED",
+        message: releaseDebtEnglish("Golden Coast account setup is not configured."),
+      });
       return;
     }
 
@@ -598,12 +604,10 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
     if (!companyId) return;
     const selectedCompany = companyId;
     if (!(await isGoldenCoastCompany(db, selectedCompany))) {
-      res
-        .status(409)
-        .json({
-          code: "GC_PHASE6_NOT_CONFIGURED",
-          message: releaseDebtEnglish("Golden Coast account setup is not configured."),
-        });
+      res.status(409).json({
+        code: "GC_PHASE6_NOT_CONFIGURED",
+        message: releaseDebtEnglish("Golden Coast account setup is not configured."),
+      });
       return;
     }
 
