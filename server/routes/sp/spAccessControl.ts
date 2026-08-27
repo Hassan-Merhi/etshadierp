@@ -244,7 +244,8 @@ async function enforceSpAccess(req: Request, res: Response, next: NextFunction):
           ${companyId}, ${userId}, ${req.session.username ?? null}, ${role}, ${permission},
           ${req.method === "GET" ? "READ" : "WRITE"}, ${req.method}, ${req.originalUrl},
           ${req.params?.id ?? req.body?.id ?? req.body?.containerId ?? req.body?.cutoverId ?? null}, ${reason || null},
-          ${confirmation || null}, ${idempotencyKey}, ${res.statusCode}, ${JSON.stringify(sanitizedBody(req.body))}::jsonb)
+          ${confirmation || null}, ${idempotencyKey}, ${res.statusCode}, ${JSON.stringify(sanitizedBody(req.body))}::jsonb
+        )
       `
         )
         .catch((error) => logger.error("SP audit event write failed", { error }));

@@ -11,6 +11,7 @@ import {
   spStockMovements,
   stockItems,
   voucherEntries,
+  vouchers,
 } from "@shared/schema";
 import { requireAuth } from "../../auth";
 import { db } from "../../db";
@@ -26,6 +27,7 @@ import {
 import {
   PostingValidationError,
   postBalancedVoucherTx,
+  type CentralPostingResult,
   type PostingActor,
 } from "../../services/accounting/centralPostingEngine";
 import { createDatabasePostingDependencies } from "../../services/accounting/databasePostingDependencies";
@@ -51,10 +53,7 @@ import {
   type GoldenCoastPhase8PostingAccount,
   type GoldenCoastPhase8RoleAccounts,
 } from "../../services/accounting/goldenCoastPhase8ContainerOffload";
-import {
-  adjustSpInventoryAtomic,
-  respondToSpInventoryIntegrityError,
-} from "../../services/sp/spInventoryIntegrity";
+import { adjustSpInventoryAtomic, respondToSpInventoryIntegrityError } from "../../services/sp/spInventoryIntegrity";
 import { isGoldenCoastCompany, type DbLike } from "./spGoldenCoastPhase4CutoverFifoRoutes";
 import { requireSpCompany } from "./spHelpers";
 
@@ -71,6 +70,8 @@ const PHASE8_ROLES = [
 ] as const satisfies readonly GoldenCoastAccountRole[];
 
 type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+type PersistedPostingResult = CentralPostingResult<typeof vouchers.$inferSelect, typeof voucherEntries.$inferSelect>;
 
 class GoldenCoastPhase8RouteError extends Error {
   readonly code: string;
@@ -294,7 +295,11 @@ async function loadFundedContainer(
     .limit(1)
     .for("update");
   if (!container) {
-    throw new GoldenCoastPhase8RouteError("Container was not found in this company", "GC_PHASE8_CONTAINER_NOT_FOUND", 404);
+    throw new GoldenCoastPhase8RouteError(
+      "Container was not found in this company",
+      "GC_PHASE8_CONTAINER_NOT_FOUND",
+      404
+    );
   }
   if (!container.goodsOtwVoucherId) {
     throw new GoldenCoastPhase8RouteError(
@@ -304,7 +309,11 @@ async function loadFundedContainer(
     );
   }
   if (container.status === "cancelled") {
-    throw new GoldenCoastPhase8RouteError("Cancelled containers cannot be offloaded", "GC_PHASE8_CONTAINER_CLOSED", 409);
+    throw new GoldenCoastPhase8RouteError(
+      "Cancelled containers cannot be offloaded",
+      "GC_PHASE8_CONTAINER_CLOSED",
+      409
+    );
   }
 
   const markerResult = await tx.execute(sql`
@@ -324,7 +333,10 @@ async function loadFundedContainer(
     );
   }
 
-  const entries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, container.goodsOtwVoucherId));
+  const entries = await tx
+    .select()
+    .from(voucherEntries)
+    .where(eq(voucherEntries.voucherId, container.goodsOtwVoucherId));
   const stockEntry = entries.filter(
     (entry) => Number(entry.ledgerAccountId) === accounts.stockOtwAccountId && Number(entry.debitAmount) > 0
   );
@@ -379,7 +391,11 @@ async function loadFundedContainer(
     qty: String(line.qty),
     unitRateUsd: String(line.unitRateUsd),
   }));
-  await validateStockItems(tx, companyId, lines.map((line) => line.stockItemId));
+  await validateStockItems(
+    tx,
+    companyId,
+    lines.map((line) => line.stockItemId)
+  );
   const lineValue = lines.reduce((sum, line) => sum + Number(line.qty) * Number(line.unitRateUsd), 0);
   if (Math.abs(lineValue - Number(goodsCostUsd)) > 0.01) {
     throw new GoldenCoastPhase8RouteError(
@@ -467,11 +483,15 @@ async function handleCreateContainer(req: Request, res: Response): Promise<void>
       await assertPhase8Ready(tx, selectedCompany);
       const accounts = await resolveRoleAccounts(tx, selectedCompany);
       await validateFundingAccount(tx, selectedCompany, containerInput.fundingAccount);
-      await validateStockItems(tx, selectedCompany, containerInput.lines.map((line) => line.stockItemId));
+      await validateStockItems(
+        tx,
+        selectedCompany,
+        containerInput.lines.map((line) => line.stockItemId)
+      );
       await validateSupplier(tx, selectedCompany, containerInput.supplierId);
 
       const postingRequest = buildGoldenCoastPhase8FundingPosting({ container: containerInput, plan, accounts, actor });
-      const posted = await postBalancedVoucherTx(tx, postingRequest, postingDependencies);
+      const posted = (await postBalancedVoucherTx(tx, postingRequest, postingDependencies)) as PersistedPostingResult;
       const [existing] = await tx
         .select()
         .from(spContainers)
@@ -599,12 +619,14 @@ async function handleOffload(req: Request, res: Response): Promise<void> {
         const movements = await tx
           .select()
           .from(spStockMovements)
-          .where(and(eq(spStockMovements.companyId, selectedCompany), eq(spStockMovements.offloadId, existingOffload.id)))
+          .where(
+            and(eq(spStockMovements.companyId, selectedCompany), eq(spStockMovements.offloadId, existingOffload.id))
+          )
           .orderBy(asc(spStockMovements.id));
         return { offload: existingOffload, movements, plan, replayed: true };
       }
 
-      const posted = await postBalancedVoucherTx(tx, postingRequest, postingDependencies);
+      const posted = (await postBalancedVoucherTx(tx, postingRequest, postingDependencies)) as PersistedPostingResult;
       if (posted.replayed) {
         throw new GoldenCoastPhase8RouteError(
           "Phase 8 offload replay exists without its offload source document",
@@ -620,7 +642,7 @@ async function handleOffload(req: Request, res: Response): Promise<void> {
           offloadDate: offloadInput.offloadDate,
           totalQty: plan.totalQty,
           totalBaseCostUsd: plan.goodsCostUsd,
-          totalLandedCostUsd: plan.totalFinalCostUsd,
+          totalLandedCostUsd: plan.actualChargesUsd,
           totalFinalCostUsd: plan.totalFinalCostUsd,
           voucherIdReversal: null,
           voucherIdStock: Number(posted.voucher.id),
@@ -642,7 +664,12 @@ async function handleOffload(req: Request, res: Response): Promise<void> {
       const lineRows = await tx
         .select()
         .from(spContainerLines)
-        .where(and(eq(spContainerLines.containerId, offloadInput.containerId), eq(spContainerLines.companyId, selectedCompany)))
+        .where(
+          and(
+            eq(spContainerLines.containerId, offloadInput.containerId),
+            eq(spContainerLines.companyId, selectedCompany)
+          )
+        )
         .orderBy(asc(spContainerLines.id));
       const lineIdByStock = new Map(lineRows.map((line) => [Number(line.stockItemId), Number(line.id)]));
       for (const line of plan.lines) {

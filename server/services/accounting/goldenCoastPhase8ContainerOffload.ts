@@ -16,10 +16,7 @@ const QUANTITY_SCALE = 4;
 const UNIT_RATE_SCALE = 4;
 
 export type GoldenCoastPhase8ErrorCode =
-  | "GC_PHASE8_INPUT_INVALID"
-  | "GC_PHASE8_PRE_CUTOVER_DATE"
-  | "GC_PHASE8_RESERVE_EXCEEDED"
-  | "GC_PHASE8_SCOPE_MISMATCH";
+  "GC_PHASE8_INPUT_INVALID" | "GC_PHASE8_PRE_CUTOVER_DATE" | "GC_PHASE8_RESERVE_EXCEEDED" | "GC_PHASE8_SCOPE_MISMATCH";
 
 export class GoldenCoastPhase8Error extends Error {
   readonly code: GoldenCoastPhase8ErrorCode;
@@ -31,9 +28,7 @@ export class GoldenCoastPhase8Error extends Error {
   }
 }
 
-export type GoldenCoastPhase8PostingAccount =
-  | { kind: "ledger"; id: number }
-  | { kind: "bank"; id: number };
+export type GoldenCoastPhase8PostingAccount = { kind: "ledger"; id: number } | { kind: "bank"; id: number };
 
 export interface GoldenCoastPhase8ContainerLineInput {
   stockItemId: number;
@@ -191,7 +186,7 @@ function requestId(value: unknown): string {
 function postingAccount(value: unknown, label: string): GoldenCoastPhase8PostingAccount {
   const raw = record(value, label);
   if (raw.kind !== "ledger" && raw.kind !== "bank") {
-    throw new GoldenCoastPhase8Error(`${label}.kind must be \"ledger\" or \"bank\"`);
+    throw new GoldenCoastPhase8Error(`${label}.kind must be "ledger" or "bank"`);
   }
   return { kind: raw.kind, id: positiveId(raw.id, `${label}.id`) };
 }
@@ -226,7 +221,9 @@ export function parseGoldenCoastPhase8ContainerInput(input: {
     const qty = decimal(line.qty, `lines[${index}].qty`);
     const unitRate = decimal(line.unitRateUsd, `lines[${index}].unitRateUsd`);
     if (!qty.gt(0) || qty.decimalPlaces() > QUANTITY_SCALE) {
-      throw new GoldenCoastPhase8Error(`lines[${index}].qty must be greater than zero with at most ${QUANTITY_SCALE} decimals`);
+      throw new GoldenCoastPhase8Error(
+        `lines[${index}].qty must be greater than zero with at most ${QUANTITY_SCALE} decimals`
+      );
     }
     if (!unitRate.gt(0) || unitRate.decimalPlaces() > UNIT_RATE_SCALE) {
       throw new GoldenCoastPhase8Error(
@@ -356,7 +353,8 @@ export function parseGoldenCoastPhase8OffloadInput(input: {
   const maxCharges = input.maxCharges ?? 50;
   const chargeRows = raw.charges == null ? [] : raw.charges;
   if (!Array.isArray(chargeRows)) throw new GoldenCoastPhase8Error("charges must be an array");
-  if (chargeRows.length > maxCharges) throw new GoldenCoastPhase8Error(`charges must contain at most ${maxCharges} items`);
+  if (chargeRows.length > maxCharges)
+    throw new GoldenCoastPhase8Error(`charges must contain at most ${maxCharges} items`);
   const charges = chargeRows.map((value, index): GoldenCoastPhase8ChargeInput => {
     const charge = record(value, `charges[${index}]`);
     if (charge.chargeType !== "duty" && charge.chargeType !== "transport" && charge.chargeType !== "other") {
@@ -364,7 +362,9 @@ export function parseGoldenCoastPhase8OffloadInput(input: {
     }
     const amount = decimal(charge.amountUsd, `charges[${index}].amountUsd`);
     if (!amount.gt(0) || amount.decimalPlaces() > MONEY_SCALE) {
-      throw new GoldenCoastPhase8Error(`charges[${index}].amountUsd must be greater than zero with at most ${MONEY_SCALE} decimals`);
+      throw new GoldenCoastPhase8Error(
+        `charges[${index}].amountUsd must be greater than zero with at most ${MONEY_SCALE} decimals`
+      );
     }
     return {
       chargeType: charge.chargeType,
@@ -388,7 +388,10 @@ export function planGoldenCoastPhase8Offload(input: {
 }): GoldenCoastPhase8OffloadPlan {
   const { offload, funded } = input;
   if (offload.companyId !== funded.companyId || offload.containerId !== funded.containerId) {
-    throw new GoldenCoastPhase8Error("Offload does not belong to the funded container company", "GC_PHASE8_SCOPE_MISMATCH");
+    throw new GoldenCoastPhase8Error(
+      "Offload does not belong to the funded container company",
+      "GC_PHASE8_SCOPE_MISMATCH"
+    );
   }
   const goods = new Decimal(funded.goodsCostUsd);
   const reserve = new Decimal(funded.reserveUsd);
@@ -408,8 +411,11 @@ export function planGoldenCoastPhase8Offload(input: {
     const final = base.plus(landedPerUnit);
     return {
       ...line,
+      // `landedUnitCostUsd` carries the per-unit charge allocation on its own,
+      // matching what the pre-Golden-Coast offload route writes to the same
+      // `sp_stock_movements` column; `finalUnitCostUsd` is base + allocation.
       baseUnitCostUsd: base.toDecimalPlaces(6).toFixed(6),
-      landedUnitCostUsd: final.toDecimalPlaces(6).toFixed(6),
+      landedUnitCostUsd: landedPerUnit.toDecimalPlaces(6).toFixed(6),
       finalUnitCostUsd: final.toDecimalPlaces(6).toFixed(6),
     };
   });

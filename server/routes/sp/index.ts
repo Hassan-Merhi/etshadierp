@@ -1,7 +1,5 @@
 import type { Express } from "express";
 import { logger } from "../../lib/logger";
-import { GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES } from "../../services/accounting/goldenCoastPhase5PosSale";
-import { GOLDEN_COAST_PHASE8_OFFLOAD_FIFO_SOURCE } from "../../services/accounting/goldenCoastPhase8ContainerOffload";
 import { registerSpAccessControl } from "./spAccessControl";
 import { registerSpPermissionRoutes } from "./spPermissionRoutes";
 import { registerSpSetupRoutes } from "./spSetupRoutes";
@@ -32,13 +30,6 @@ import { registerSpMigrationFinalVerificationRoutes } from "./spMigrationFinalVe
 import { registerSpMigrationPhase4Routes } from "./spMigrationPhase4Routes";
 import { ensureCutoverHardening, installExplicitCompanyWriteGuard } from "./spMigrationCutoverHardening";
 import { ensureSpSupplierVoucherSyncTrigger, repairSpSupplierVoucherLinks } from "./spSupplierVoucherSync";
-
-function registerGoldenCoastPhase8FifoSource(): void {
-  const sources = GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES as string[];
-  if (!sources.includes(GOLDEN_COAST_PHASE8_OFFLOAD_FIFO_SOURCE)) {
-    sources.push(GOLDEN_COAST_PHASE8_OFFLOAD_FIFO_SOURCE);
-  }
-}
 
 export function registerSpRoutes(app: Express) {
   registerSpAccessControl(app);
@@ -76,10 +67,6 @@ export function registerSpRoutes(app: Express) {
   registerSpGoldenCoastSetupRoutes(app);
   registerSpGoldenCoastPhase3CutoverRoutes(app);
   registerSpGoldenCoastPhase4CutoverFifoRoutes(app);
-  // Phase 8 writes its own auditable FIFO provenance. Register that provenance
-  // before the mounted Phase 6 sale surface begins serving requests, so sales
-  // can consume both the opening bridge and real post-cutover offloads.
-  registerGoldenCoastPhase8FifoSource();
   // Phase 6 supersedes the Phase 5 mutation surface: it keeps the same FIFO
   // revenue/COGS behavior and atomically adds the Golden Coast special-location
   // Hassan Savings deduction. The Phase 5 source remains in the repository for

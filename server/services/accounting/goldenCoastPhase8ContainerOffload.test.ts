@@ -81,6 +81,10 @@ describe("Golden Coast Phase 8 container/offload accounting", () => {
     expect(plan.actualChargesUsd).toBe("20700.00");
     expect(plan.unusedReserveUsd).toBe("1600.00");
     expect(plan.totalFinalCostUsd).toBe("64700.00");
+    expect(plan.lines[0].baseUnitCostUsd).toBe("22.000000");
+    // The landed column carries the charge allocation alone, exactly as the
+    // pre-Golden-Coast offload route writes it to sp_stock_movements.
+    expect(plan.lines[0].landedUnitCostUsd).toBe("10.350000");
     expect(plan.lines[0].finalUnitCostUsd).toBe("32.350000");
     const posting = buildGoldenCoastPhase8OffloadPosting({ offload, funded: funded(), plan, accounts });
     const debit = posting.entries.reduce((sum, entry) => sum + Number(entry.debitAmount), 0);
