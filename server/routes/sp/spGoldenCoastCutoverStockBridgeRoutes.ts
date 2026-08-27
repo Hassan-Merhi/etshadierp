@@ -1,16 +1,29 @@
 import type { Express, Request, Response } from "express";
+import Decimal from "decimal.js";
 import { and, eq, gt, isNull } from "drizzle-orm";
-import { inventory, ledgerAccounts, locations, spStockMovements, stockItems, voucherEntries, vouchers } from "@shared/schema";
+import {
+  inventory,
+  ledgerAccounts,
+  locations,
+  spStockMovements,
+  stockItems,
+  voucherEntries,
+  vouchers,
+} from "@shared/schema";
 import { requireAuth, requireRole } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { privilegedMutationRateLimit, privilegedReadRateLimit } from "../../middleware/privilegedEndpointSecurity";
+import {
+  privilegedMutationRateLimit,
+  privilegedReadRateLimit,
+} from "../../middleware/privilegedEndpointSecurity";
 import {
   GOLDEN_COAST_CUTOVER_STOCK_SOURCE,
   GoldenCoastCutoverStockBridgeError,
   assertGoldenCoastStockValueReconciles,
   planGoldenCoastCutoverStockBridge,
+  type GoldenCoastCutoverStockPlan,
 } from "../../services/accounting/goldenCoastCutoverStockBridge";
 import {
   GOLDEN_COAST_PHASE3_CUTOVER_DATE,
@@ -62,7 +75,7 @@ async function loadLegacyInventory(tx: DatabaseTransaction | typeof db, companyI
 }
 
 async function loadPhase3StockInHandOpening(tx: DatabaseTransaction | typeof db, companyId: number) {
-  const [stockAccount] = await tx
+  const stockAccounts = await tx
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
     .where(
@@ -74,19 +87,24 @@ async function loadPhase3StockInHandOpening(tx: DatabaseTransaction | typeof db,
       )
     )
     .limit(2);
-  if (!stockAccount) {
+  if (stockAccounts.length !== 1) {
     throw new GoldenCoastCutoverStockRouteError(
-      "Canonical Stock in Hand account is missing; run Golden Coast account setup first",
-      "GC_CUTOVER_STOCK_ACCOUNT_MISSING",
+      stockAccounts.length === 0
+        ? "Canonical Stock in Hand account is missing; run Golden Coast account setup first"
+        : "Canonical Stock in Hand account is ambiguous; repair duplicate sp_stock accounts before bridging opening FIFO lots",
+      "GC_CUTOVER_STOCK_ACCOUNT_INVALID",
       409
     );
   }
+  const stockAccount = stockAccounts[0];
 
   const voucherNumber = goldenCoastPhase3VoucherNumber(companyId);
   const [cutoverVoucher] = await tx
     .select({ id: vouchers.id })
     .from(vouchers)
-    .where(and(eq(vouchers.companyId, companyId), eq(vouchers.voucherNumber, voucherNumber), isNull(vouchers.deletedAt)))
+    .where(
+      and(eq(vouchers.companyId, companyId), eq(vouchers.voucherNumber, voucherNumber), isNull(vouchers.deletedAt))
+    )
     .limit(1);
   if (!cutoverVoucher) {
     throw new GoldenCoastCutoverStockRouteError(
@@ -110,7 +128,7 @@ async function loadPhase3StockInHandOpening(tx: DatabaseTransaction | typeof db,
       409
     );
   }
-  return (Number(entry.debitAmount ?? 0) - Number(entry.creditAmount ?? 0)).toFixed(2);
+  return new Decimal(entry.debitAmount ?? 0).minus(entry.creditAmount ?? 0).toFixed(2);
 }
 
 async function loadExistingBridgeLots(tx: DatabaseTransaction | typeof db, companyId: number) {
@@ -120,8 +138,11 @@ async function loadExistingBridgeLots(tx: DatabaseTransaction | typeof db, compa
       locationId: spStockMovements.locationId,
       stockItemId: spStockMovements.stockItemId,
       articleCode: spStockMovements.articleCode,
+      description: spStockMovements.description,
       qtyIn: spStockMovements.qtyIn,
       qtyRemaining: spStockMovements.qtyRemaining,
+      baseUnitCostUsd: spStockMovements.baseUnitCostUsd,
+      landedUnitCostUsd: spStockMovements.landedUnitCostUsd,
       finalUnitCostUsd: spStockMovements.finalUnitCostUsd,
     })
     .from(spStockMovements)
@@ -133,42 +154,87 @@ async function loadExistingBridgeLots(tx: DatabaseTransaction | typeof db, compa
     );
 }
 
-function existingLotsMatch(
-  expected: ReturnType<typeof planGoldenCoastCutoverStockBridge>["lots"],
+function planFromExistingLots(
   existing: Awaited<ReturnType<typeof loadExistingBridgeLots>>
-): boolean {
-  if (expected.length !== existing.length) return false;
-  const byKey = new Map(existing.map((row) => [`${row.locationId}:${row.stockItemId}`, row]));
-  return expected.every((lot) => {
-    const row = byKey.get(`${lot.locationId}:${lot.stockItemId}`);
-    return (
-      !!row &&
-      row.articleCode === lot.articleCode &&
-      Number(row.qtyIn).toFixed(4) === Number(lot.qtyIn).toFixed(4) &&
-      Number(row.qtyRemaining).toFixed(4) === Number(lot.qtyRemaining).toFixed(4) &&
-      Number(row.finalUnitCostUsd).toFixed(6) === Number(lot.finalUnitCostUsd).toFixed(6)
-    );
+): GoldenCoastCutoverStockPlan {
+  const seen = new Set<string>();
+  let totalQuantity = new Decimal(0);
+  let totalValue = new Decimal(0);
+  const lots = existing.map((row) => {
+    if (!row.locationId || !row.stockItemId) {
+      throw new GoldenCoastCutoverStockBridgeError("Existing cutover FIFO lot is missing its location or stock item link");
+    }
+    const key = `${row.locationId}:${row.stockItemId}`;
+    if (seen.has(key)) {
+      throw new GoldenCoastCutoverStockBridgeError(`Duplicate existing cutover FIFO lot for ${key}`);
+    }
+    seen.add(key);
+
+    const qtyIn = new Decimal(row.qtyIn ?? 0);
+    const qtyRemaining = new Decimal(row.qtyRemaining ?? 0);
+    const finalUnitCost = new Decimal(row.finalUnitCostUsd ?? 0);
+    if (qtyIn.lte(0) || finalUnitCost.lte(0) || qtyRemaining.lt(0) || qtyRemaining.gt(qtyIn)) {
+      throw new GoldenCoastCutoverStockBridgeError(`Existing cutover FIFO lot ${row.id} has invalid quantity or cost state`);
+    }
+    totalQuantity = totalQuantity.plus(qtyIn);
+    totalValue = totalValue.plus(qtyIn.times(finalUnitCost));
+
+    return {
+      locationId: row.locationId,
+      stockItemId: row.stockItemId,
+      articleCode: row.articleCode,
+      description: row.description,
+      qtyIn: qtyIn.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toFixed(4),
+      qtyRemaining: qtyRemaining.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toFixed(4),
+      baseUnitCostUsd: new Decimal(row.baseUnitCostUsd ?? 0).toDecimalPlaces(6, Decimal.ROUND_HALF_UP).toFixed(6),
+      landedUnitCostUsd: new Decimal(row.landedUnitCostUsd ?? 0)
+        .toDecimalPlaces(6, Decimal.ROUND_HALF_UP)
+        .toFixed(6),
+      finalUnitCostUsd: finalUnitCost.toDecimalPlaces(6, Decimal.ROUND_HALF_UP).toFixed(6),
+    };
   });
+
+  lots.sort((a, b) => a.locationId - b.locationId || a.stockItemId - b.stockItemId);
+  return {
+    cutoverDate: GOLDEN_COAST_PHASE3_CUTOVER_DATE,
+    sourceType: GOLDEN_COAST_CUTOVER_STOCK_SOURCE,
+    lots,
+    totalQuantity: totalQuantity.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toFixed(4),
+    totalValueUsd: totalValue.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2),
+  };
 }
 
 async function buildState(tx: DatabaseTransaction | typeof db, companyId: number) {
-  const [legacyRows, existingLots, stockInHandOpeningUsd] = await Promise.all([
-    loadLegacyInventory(tx, companyId),
+  const [existingLots, stockInHandOpeningUsd] = await Promise.all([
     loadExistingBridgeLots(tx, companyId),
     loadPhase3StockInHandOpening(tx, companyId),
   ]);
+
+  if (existingLots.length > 0) {
+    const plan = planFromExistingLots(existingLots);
+    assertGoldenCoastStockValueReconciles(plan.totalValueUsd, stockInHandOpeningUsd);
+    return {
+      cutoverDate: GOLDEN_COAST_PHASE3_CUTOVER_DATE,
+      plan,
+      stockInHandOpeningUsd,
+      existingLotCount: existingLots.length,
+      bridged: true,
+      conflict: false,
+      canPost: false,
+    };
+  }
+
+  const legacyRows = await loadLegacyInventory(tx, companyId);
   const plan = planGoldenCoastCutoverStockBridge(legacyRows);
   assertGoldenCoastStockValueReconciles(plan.totalValueUsd, stockInHandOpeningUsd);
-  const replayed = existingLots.length > 0 && existingLotsMatch(plan.lots, existingLots);
-  const conflict = existingLots.length > 0 && !replayed;
   return {
     cutoverDate: GOLDEN_COAST_PHASE3_CUTOVER_DATE,
     plan,
     stockInHandOpeningUsd,
-    existingLotCount: existingLots.length,
-    bridged: replayed,
-    conflict,
-    canPost: !conflict && !replayed && businessDate() >= GOLDEN_COAST_PHASE3_CUTOVER_DATE,
+    existingLotCount: 0,
+    bridged: false,
+    conflict: false,
+    canPost: businessDate() >= GOLDEN_COAST_PHASE3_CUTOVER_DATE,
   };
 }
 
@@ -224,13 +290,6 @@ export function registerSpGoldenCoastCutoverStockBridgeRoutes(app: Express): voi
 
           const result = await db.transaction(async (tx) => {
             const state = await buildState(tx, companyId);
-            if (state.conflict) {
-              throw new GoldenCoastCutoverStockRouteError(
-                "Existing Golden Coast cutover FIFO lots are partial or do not match legacy ERP inventory; reconcile them before retrying",
-                "GC_CUTOVER_STOCK_CONFLICT",
-                409
-              );
-            }
             if (state.bridged) return { ...state, replayed: true };
 
             if (state.plan.lots.length > 0) {
