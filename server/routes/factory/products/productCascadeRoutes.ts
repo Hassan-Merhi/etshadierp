@@ -85,12 +85,22 @@ export function registerFactoryProductCascadeRoutes(app: Express) {
         const targetPrefix = GRADE_TO_PREFIX[grade];
         const gradeChanged = grade !== existingGrade;
         const articleCodeWasManuallyChanged = articleCode !== undefined && articleCode !== existing.articleCode;
-        const needsGeneratedArticleCode =
-          gradeChanged && (!articleCodeWasManuallyChanged || !String(articleCode).startsWith(targetPrefix));
 
-        // A grade change with an untouched or mismatched article code gets a
-        // fresh unique code in the new grade range. This keeps grade durable
-        // because the product grade is encoded in its article-code prefix.
+        // An explicitly supplied grade is a contract for the article-code
+        // range too. Never accept a manually entered code whose prefix belongs
+        // to another grade, even when the user selected the product's original
+        // grade again.
+        if (articleCodeWasManuallyChanged && !String(articleCode).startsWith(targetPrefix)) {
+          return res.status(400).json({
+            message: `Article code for grade ${grade} must start with ${targetPrefix}`,
+          });
+        }
+
+        const needsGeneratedArticleCode = gradeChanged && !articleCodeWasManuallyChanged;
+
+        // A grade change with an untouched article code gets a fresh unique
+        // code in the new grade range. This keeps grade durable because the
+        // product grade is encoded in its article-code prefix.
         if (needsGeneratedArticleCode) {
           const [maxResult] = await db
             .select({
@@ -203,7 +213,7 @@ export function registerFactoryProductCascadeRoutes(app: Express) {
         baleUpdate.weightKg = weightPerBaleKg;
       if (nextArticleCode !== undefined && nextArticleCode !== existing.articleCode)
         baleUpdate.articleCode = nextArticleCode;
-      if (grade !== undefined) baleUpdate.grade = grade;
+      if (grade !== undefined && grade !== existingGrade) baleUpdate.grade = grade;
 
       let balesUpdated = 0;
       if (Object.keys(baleUpdate).length > 0) {
