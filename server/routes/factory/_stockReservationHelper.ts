@@ -3,7 +3,7 @@ import { db } from "../../db";
 import { customerProformas, customerProformaLines, proformaStockReservations, companies } from "@shared/schema";
 import { firstRow, resultRows } from "../../lib/queryResult";
 
-type DbOrTx = typeof db;
+type DbOrTx = Pick<typeof db, "select" | "insert" | "update" | "delete" | "execute">;
 
 /**
  * syncProformaReservations — backend single source of truth for stock reservation state.
