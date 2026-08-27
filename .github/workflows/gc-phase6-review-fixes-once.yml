@@ -1,0 +1,142 @@
+name: GC Phase 6 Review Fixes Once
+
+on:
+  push:
+    branches:
+      - agent/golden-coast-special-location-deduction
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: agent/golden-coast-special-location-deduction
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24.19.0"
+          cache: npm
+      - run: npm ci --no-audit
+      - name: Apply exact reviewed fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          route = Path("server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.ts")
+          text = route.read_text()
+          old = '''  if (matches.length !== 1) {
+            throw new GoldenCoastPhase6RouteError(
+              matches.length === 0
+                ? `Golden Coast role ${role} is missing; run Golden Coast account setup first`
+                : `Golden Coast role ${role} is ambiguous (${matches.length} active accounts share ${definition.subType})`,
+              "GC_PHASE6_ROLES_INVALID",
+              409
+            );
+          }
+          return matches[0];
+          '''
+          new = '''  if (matches.length !== 1) {
+            throw new GoldenCoastPhase6RouteError(
+              matches.length === 0
+                ? `Golden Coast role ${role} is missing; run Golden Coast account setup first`
+                : `Golden Coast role ${role} is ambiguous (${matches.length} active accounts share ${definition.subType})`,
+              "GC_PHASE6_ROLES_INVALID",
+              409
+            );
+          }
+          const account = matches[0];
+          if (!definition.acceptedAccountTypes.includes(account.accountType)) {
+            throw new GoldenCoastPhase6RouteError(
+              `Golden Coast role ${role} must use account type ${definition.acceptedAccountTypes.join(" or ")}; account "${account.name}" is ${account.accountType}`,
+              "GC_PHASE6_ROLES_INVALID",
+              409
+            );
+          }
+          return account;
+          '''
+          if old not in text:
+            raise SystemExit("canonical role block not found")
+          text = text.replace(old, new, 1)
+
+          old = '''  const revenue = sale.lines.reduce(
+            (sum, line) => sum.plus(new Decimal(line.qty).times(new Decimal(line.unitPriceUsd))),
+            new Decimal(0)
+          );'''
+          new = '''  const revenue = sale.lines.reduce(
+            (sum, line) =>
+              sum.plus(new Decimal(line.qty).times(new Decimal(line.unitPriceUsd)).toDecimalPlaces(2)),
+            new Decimal(0)
+          );'''
+          if old not in text:
+            raise SystemExit("preflight revenue block not found")
+          route.write_text(text.replace(old, new, 1))
+
+          fixture = Path("tests/helpers/goldenCoastPhase5Fixture.ts")
+          text = fixture.read_text()
+          old = 'export const GOLDEN_COAST_PHASE5_SALE_URL = "/api/sp/golden-coast/phase5/pos-sale";'
+          new = 'export const GOLDEN_COAST_PHASE5_SALE_URL = "/api/sp/golden-coast/phase6/pos-sale";'
+          if old not in text:
+            raise SystemExit("Phase 5 fixture URL not found")
+          text = text.replace(old, new, 1)
+          anchor = '''  const stockInHandAccountId = await insertLedgerAccount({
+            companyId: ctx.companyId,
+            code: "SP-STOCK",
+            name: "Stock in Hand",
+            accountType: "Asset",
+            subType: "sp_stock",
+          });
+          '''
+          insertion = anchor + '''  await insertLedgerAccount({
+            companyId: ctx.companyId,
+            code: "GC-HSAV",
+            name: "Hassan Savings",
+            accountType: "Loans",
+            subType: "gc_hassan_savings",
+          });
+          '''
+          if anchor not in text:
+            raise SystemExit("Stock in Hand fixture anchor not found")
+          fixture.write_text(text.replace(anchor, insertion, 1))
+
+          test = Path("server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.test.ts")
+          text = test.read_text()
+          marker = '''  it("allows only one active positive-deduction location", () => {
+            expect(routeSource).toContain("CAST(${locations.supplierPartnerPayableDeductionPerQty} AS numeric) > 0");
+            expect(routeSource).toContain("Golden Coast allows exactly one special deduction location");
+          });
+          '''
+          addition = marker + '''
+          it("fails readiness/posting when a canonical account has an incompatible type", () => {
+            expect(routeSource).toContain("definition.acceptedAccountTypes.includes(account.accountType)");
+            expect(routeSource).toContain("GC_PHASE6_ROLES_INVALID");
+          });
+
+          it("matches Phase 5 revenue by rounding each line to cents before summing", () => {
+            expect(routeSource).toContain("times(new Decimal(line.unitPriceUsd)).toDecimalPlaces(2)");
+          });
+          '''
+          if marker not in text:
+            raise SystemExit("Phase 6 route test anchor not found")
+          test.write_text(text.replace(marker, addition, 1))
+      - name: Format reviewed files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.ts \
+            server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.test.ts \
+            tests/helpers/goldenCoastPhase5Fixture.ts
+          rm .github/workflows/gc-phase6-review-fixes-once.yml
+      - name: Commit reviewed fixes and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.ts \
+            server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.test.ts \
+            tests/helpers/goldenCoastPhase5Fixture.ts \
+            .github/workflows/gc-phase6-review-fixes-once.yml
+          git commit -m "fix(gc): address Phase 6 review findings"
+          git push origin HEAD:agent/golden-coast-special-location-deduction
