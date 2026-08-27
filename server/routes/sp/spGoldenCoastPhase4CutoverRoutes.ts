@@ -1,5 +1,5 @@
 import type { Express, NextFunction, Request, Response } from "express";
-import { and, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { spStockMovements } from "@shared/schema";
 import { requireAuth, requireRole } from "../../auth";
 import { db } from "../../db";
@@ -24,6 +24,8 @@ import { requireSpCompany } from "./spHelpers";
 
 const requestBudget = privilegedRequestBudget({ maxBodyBytes: 8 * 1024, maxCollectionItems: 10 });
 const LEGACY_RETIRED_CODE = "GC_LEGACY_POSTING_RETIRED";
+const LEGACY_RETIRED_MESSAGE =
+  "This Golden Coast legacy posting path is retired. Use the September 1 cutover and canonical Supplier Partner flows.";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -34,11 +36,7 @@ function phase3VoucherNumber(companyId: number): string {
 }
 
 function retiredLegacyWrite(_req: Request, res: Response): void {
-  res.status(410).json({
-    code: LEGACY_RETIRED_CODE,
-    message:
-      "This Golden Coast legacy posting path is retired. Use the September 1 cutover and canonical Supplier Partner flows.",
-  });
+  res.status(410).json({ code: LEGACY_RETIRED_CODE, message: LEGACY_RETIRED_MESSAGE });
 }
 
 function postCutoverMutationDateGuard(req: Request, res: Response, next: NextFunction): void {
@@ -190,10 +188,8 @@ async function handleBuildOpeningFifo(req: Request, res: Response): Promise<void
     if (!companyId) return;
     validateMutationIntent(req);
     if (today() < GOLDEN_COAST_PHASE4_CUTOVER_DATE) {
-      res.status(409).json({
-        code: "GC_PHASE4_CUTOVER_NOT_OPEN",
-        message: `Opening FIFO cannot be built before ${GOLDEN_COAST_PHASE4_CUTOVER_DATE}`,
-      });
+      const cutoverNotOpenMessage = `Opening FIFO cannot be built before ${GOLDEN_COAST_PHASE4_CUTOVER_DATE}`;
+      res.status(409).json({ code: "GC_PHASE4_CUTOVER_NOT_OPEN", message: cutoverNotOpenMessage });
       return;
     }
 
@@ -216,12 +212,13 @@ async function handleBuildOpeningFifo(req: Request, res: Response): Promise<void
       }
 
       if (status.snapshot.length > 0) {
+        const openingLotDescription = `Golden Coast ${GOLDEN_COAST_PHASE4_CUTOVER_DATE} opening FIFO bridge`;
         await tx.insert(spStockMovements).values(
           status.snapshot.map((row) => ({
             companyId: selectedCompanyId,
             sourceType: GOLDEN_COAST_PHASE4_OPENING_SOURCE,
             articleCode: row.articleCode,
-            description: `Golden Coast ${GOLDEN_COAST_PHASE4_CUTOVER_DATE} opening FIFO bridge`,
+            description: openingLotDescription,
             stockItemId: row.stockItemId,
             locationId: row.locationId,
             qtyIn: String(row.quantity),
