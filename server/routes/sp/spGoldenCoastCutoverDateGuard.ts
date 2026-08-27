@@ -1,10 +1,13 @@
 import type { Express, NextFunction, Request, Response } from "express";
-import { and, eq } from "drizzle-orm";
-import { spContainers, spOffloads, spPrepaidCharges, spSales } from "@shared/schema";
+import { and, eq, isNull } from "drizzle-orm";
+import { spContainers, spOffloads, spPrepaidCharges, spSales, vouchers } from "@shared/schema";
 import { db } from "../../db";
 import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import { getErrorMessage } from "../../lib/httpHandlers";
-import { GOLDEN_COAST_PHASE3_CUTOVER_DATE } from "../../services/accounting/goldenCoastPhase3Cutover";
+import {
+  GOLDEN_COAST_PHASE3_CUTOVER_DATE,
+  goldenCoastPhase3VoucherNumber,
+} from "../../services/accounting/goldenCoastPhase3Cutover";
 
 const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const BUSINESS_DATE_FIELDS = [
@@ -31,6 +34,21 @@ function rejectPreCutover(res: Response, recordDate: string, source: string): vo
       `${source} dated ${recordDate} is before the Golden Coast cutover ${GOLDEN_COAST_PHASE3_CUTOVER_DATE} and is read-only.`
     ),
   });
+}
+
+async function hasPostedGoldenCoastCutover(companyId: number): Promise<boolean> {
+  const [row] = await db
+    .select({ id: vouchers.id })
+    .from(vouchers)
+    .where(
+      and(
+        eq(vouchers.companyId, companyId),
+        eq(vouchers.voucherNumber, goldenCoastPhase3VoucherNumber(companyId)),
+        isNull(vouchers.deletedAt)
+      )
+    )
+    .limit(1);
+  return !!row;
 }
 
 async function existingRecordDate(req: Request, companyId: number): Promise<{ date: string; source: string } | null> {
@@ -85,6 +103,22 @@ async function enforceCutoverDate(req: Request, res: Response, next: NextFunctio
       return;
     }
 
+    const companyId = Number(req.session.currentCompanyId);
+    if (!Number.isInteger(companyId) || companyId <= 0 || !(await hasPostedGoldenCoastCutover(companyId))) {
+      next();
+      return;
+    }
+
+    if (req.path === "/opening-stock" && req.method.toUpperCase() === "POST") {
+      res.status(410).json({
+        code: "GC_LEGACY_OPENING_STOCK_RETIRED",
+        message: releaseDebtEnglish(
+          "Manual Supplier Partner opening stock is retired after the Golden Coast cutover. Use the cutover stock bridge for opening FIFO lots."
+        ),
+      });
+      return;
+    }
+
     for (const field of BUSINESS_DATE_FIELDS) {
       const value = dateOnly(req.body?.[field]);
       if (value && value < GOLDEN_COAST_PHASE3_CUTOVER_DATE) {
@@ -93,13 +127,10 @@ async function enforceCutoverDate(req: Request, res: Response, next: NextFunctio
       }
     }
 
-    const companyId = Number(req.session.currentCompanyId);
-    if (Number.isInteger(companyId) && companyId > 0) {
-      const existing = await existingRecordDate(req, companyId);
-      if (existing && existing.date < GOLDEN_COAST_PHASE3_CUTOVER_DATE) {
-        rejectPreCutover(res, existing.date, existing.source);
-        return;
-      }
+    const existing = await existingRecordDate(req, companyId);
+    if (existing && existing.date < GOLDEN_COAST_PHASE3_CUTOVER_DATE) {
+      rejectPreCutover(res, existing.date, existing.source);
+      return;
     }
 
     next();
