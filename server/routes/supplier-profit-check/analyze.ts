@@ -26,7 +26,7 @@ export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: R
         [supplierId, companyId]
       );
       if (supplierScopeResult.rows.length === 0) {
-        return res.status(404).json({ message: "Supplier not found in selected company" });
+        return res.status(404).json({ message: "Supplier not found" });
       }
 
       const allTime = !fromDate || !toDate;
@@ -375,7 +375,7 @@ export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: R
       res.json(rows);
     } catch (err: unknown) {
       logger.error("[supplier-profit-check/analyze]", { error: getErrorMessage(err) });
-      res.status(500).json({ message: getErrorMessage(err) });
+      res.status(500).json({ message: "Failed to analyze supplier profit" });
     }
   });
 }
