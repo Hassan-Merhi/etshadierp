@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/phase15-final-certification.yml"
-      - "docs/ci/phase15-final-certification.md"
   workflow_dispatch:
 
 permissions:
@@ -100,14 +99,13 @@ jobs:
           npm run audit:write-routes
           npm run audit:write-evidence
           npm run audit:company-scope
-          npm run audit:coverage-ratchet
-          npm run audit:lint-ratchet
           npm run audit:inventory-contracts
-          npm run audit:query-risks:validate
+          npm run audit:query-risks
           npm run audit:platform
           npm run test:platform
           npm run format:check:changed -- --base HEAD^
           npm run lint
+          npm run audit:lint-ratchet
           npm run check
           npm run build
           npm run verify:server-bundle
@@ -174,9 +172,15 @@ jobs:
           npm run test:frontend
           npm run test:frontend:coverage
 
+      - name: Coverage ratchet certification
+        id: coverage
+        if: always() && steps.backend.outcome == 'success' && steps.frontend.outcome == 'success'
+        continue-on-error: true
+        run: npm run audit:coverage-ratchet
+
       - name: Final security certification
         id: security
-        if: always() && steps.install.outcome == 'success'
+        if: always() && steps.schema.outcome == 'success'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -251,12 +255,13 @@ jobs:
           SCHEMA: ${{ steps.schema.outcome }}
           BACKEND: ${{ steps.backend.outcome }}
           FRONTEND: ${{ steps.frontend.outcome }}
+          COVERAGE: ${{ steps.coverage.outcome }}
           SECURITY: ${{ steps.security.outcome }}
           RESILIENCE: ${{ steps.resilience.outcome }}
         run: |
           set -euo pipefail
           state=success
-          for result in "$INSTALL" "$STATIC" "$SCHEMA" "$BACKEND" "$FRONTEND" "$SECURITY" "$RESILIENCE"; do
+          for result in "$INSTALL" "$STATIC" "$SCHEMA" "$BACKEND" "$FRONTEND" "$COVERAGE" "$SECURITY" "$RESILIENCE"; do
             if [ "$result" != "success" ]; then state=failure; fi
           done
           description="Phase 15 final 100/100 certification passed"
@@ -268,6 +273,6 @@ jobs:
             --header "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${CERT_SHA}" \
             --data "$payload"
-          printf 'install=%s\nstatic=%s\nschema=%s\nbackend=%s\nfrontend=%s\nsecurity=%s\nresilience=%s\n' \
-            "$INSTALL" "$STATIC" "$SCHEMA" "$BACKEND" "$FRONTEND" "$SECURITY" "$RESILIENCE"
+          printf 'install=%s\nstatic=%s\nschema=%s\nbackend=%s\nfrontend=%s\ncoverage=%s\nsecurity=%s\nresilience=%s\n' \
+            "$INSTALL" "$STATIC" "$SCHEMA" "$BACKEND" "$FRONTEND" "$COVERAGE" "$SECURITY" "$RESILIENCE"
           test "$state" = "success"
