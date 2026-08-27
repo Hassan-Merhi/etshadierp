@@ -9,7 +9,7 @@ import type { resolveDatabaseSsl as ResolveDatabaseSsl } from "./databaseSsl.mjs
 // scope, so each test re-imports it fresh to get a clean flag and a clean env.
 async function loadResolver(env: Record<string, string | undefined>): Promise<typeof ResolveDatabaseSsl> {
   vi.resetModules();
-  for (const key of ["PGHOST", "PGSSLMODE", "PGSSLROOTCERT", "PGSSL_REJECT_UNAUTHORIZED"]) {
+  for (const key of ["PGHOST", "PGSSLMODE", "PGSSLROOTCERT", "PGSSL_REJECT_UNAUTHORIZED", "RENDER"]) {
     delete process.env[key];
   }
   Object.assign(process.env, env);
@@ -42,6 +42,26 @@ describe("resolveDatabaseSsl", () => {
   it("disables TLS when the connection string points at helium", async () => {
     const resolve = await loadResolver({});
     expect(resolve("postgresql://user:pass@helium:5432/erp")).toBe(false);
+  });
+
+  it("disables TLS for Render's private same-region Postgres hostname", async () => {
+    const resolve = await loadResolver({ RENDER: "true" });
+    expect(resolve("postgresql://user:pass@dpg-cabc1234-a:5432/erp")).toBe(false);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("keeps TLS enabled for Render's external Postgres hostname", async () => {
+    const resolve = await loadResolver({ RENDER: "true" });
+    expect(resolve("postgresql://user:pass@dpg-cabc1234-a.oregon-postgres.render.com:5432/erp")).toEqual({
+      rejectUnauthorized: false,
+    });
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("honors an explicit SSL mode on a Render private hostname", async () => {
+    const resolve = await loadResolver({ RENDER: "true", PGSSLMODE: "require" });
+    expect(resolve("postgresql://user:pass@dpg-cabc1234-a:5432/erp")).toEqual({ rejectUnauthorized: false });
+    expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 
   it("defaults to unverified TLS and warns exactly once", async () => {
