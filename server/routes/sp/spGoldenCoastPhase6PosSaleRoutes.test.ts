@@ -1,0 +1,77 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+
+const routeSource = readFileSync(new URL("./spGoldenCoastPhase6PosSaleRoutes.ts", import.meta.url), "utf8");
+const spIndexSource = readFileSync(new URL("./index.ts", import.meta.url), "utf8");
+const phase5RouteSource = readFileSync(new URL("./spGoldenCoastPhase5PosSaleRoutes.ts", import.meta.url), "utf8");
+const phase6ServiceSource = readFileSync(
+  new URL("../../services/accounting/goldenCoastPhase6SpecialLocationDeduction.ts", import.meta.url),
+  "utf8"
+);
+
+describe("Golden Coast Phase 6 POS sale route", () => {
+  it("is the canonical mounted Golden Coast sale surface", () => {
+    expect(spIndexSource).toContain("registerSpGoldenCoastPhase6PosSaleRoutes(app);");
+    expect(spIndexSource).not.toContain("registerSpGoldenCoastPhase5PosSaleRoutes(app);");
+    expect(routeSource).toContain('"/api/sp/golden-coast/phase6/pos-sale"');
+    expect(phase5RouteSource).toContain('"/api/sp/golden-coast/phase5/pos-sale"');
+  });
+
+  it("keeps FIFO revenue and COGS posting inside one transaction", () => {
+    expect(routeSource).toContain("db.transaction(async (tx) =>");
+    expect(routeSource).toContain("pg_advisory_xact_lock");
+    expect(routeSource).toContain("planGoldenCoastPhase5Sale");
+    expect(routeSource).toContain("buildGoldenCoastPhase5SalePostings");
+    expect(routeSource).toContain("adjustSpInventoryAtomic");
+    expect(routeSource).toContain("postBalancedVoucherTx");
+  });
+
+  it("uses the existing location-level per-unit deduction configuration", () => {
+    expect(routeSource).toContain("supplierPartnerPayableDeductionPerQty");
+    expect(routeSource).toContain("GC_PHASE6_SPECIAL_LOCATION_AMBIGUOUS");
+    expect(routeSource).toContain("configured.length > 1");
+  });
+
+  it("allows only one active positive-deduction location", () => {
+    expect(routeSource).toContain("CAST(${locations.supplierPartnerPayableDeductionPerQty} AS numeric) > 0");
+    expect(routeSource).toContain("Golden Coast allows exactly one special deduction location");
+  });
+
+  it("credits the deduction to canonical Hassan Savings and debits GC Sales Cash", () => {
+    expect(routeSource).toContain('"gc_sales_cash", "stock_in_hand", "hassan_savings"');
+    expect(routeSource).toContain("gcSalesCashAccountId: saleSide.id");
+    expect(routeSource).toContain("hassanSavingsAccountId: hassanSavings.id");
+    expect(phase6ServiceSource).toContain("ledgerAccountId: gcSalesCashAccountId");
+    expect(phase6ServiceSource).toContain("debitAmount: plan.deductionUsd");
+    expect(phase6ServiceSource).toContain("ledgerAccountId: hassanSavingsAccountId");
+    expect(phase6ServiceSource).toContain("creditAmount: plan.deductionUsd");
+  });
+
+  it("keeps the special deduction in the same transaction as the sale", () => {
+    const txIndex = routeSource.indexOf("db.transaction(async (tx) =>");
+    const deductionIndex = routeSource.indexOf("buildGoldenCoastPhase6SpecialLocationDeductionPosting");
+    const returnIndex = routeSource.indexOf("return { replayed: false as const");
+    expect(txIndex).toBeGreaterThan(-1);
+    expect(deductionIndex).toBeGreaterThan(txIndex);
+    expect(deductionIndex).toBeLessThan(returnIndex);
+  });
+
+  it("binds deduction replay to the originating sale and deduction configuration", () => {
+    expect(routeSource).toContain("goldenCoastPhase6IdempotencyKey");
+    expect(routeSource).toContain("goldenCoastPhase6SourceId");
+    expect(routeSource).toContain("GC_PHASE6_IDEMPOTENCY_CONFLICT");
+    expect(routeSource).toContain("GC_PHASE6_IDEMPOTENCY_INCONSISTENT");
+  });
+
+  it("does not mutate partner equity", () => {
+    expect(routeSource).not.toContain("fresh_start_equity");
+    expect(routeSource).not.toContain("hassan_equity");
+    expect(phase6ServiceSource).not.toContain("gc_partner_capital");
+    expect(phase6ServiceSource).not.toContain("gc_owner_capital");
+  });
+
+  it("keeps old Phase 5 code present for history while making it unreachable", () => {
+    expect(phase5RouteSource).toContain("registerSpGoldenCoastPhase5PosSaleRoutes");
+    expect(spIndexSource).not.toContain('from "./spGoldenCoastPhase5PosSaleRoutes"');
+  });
+});
