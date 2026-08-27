@@ -46,10 +46,13 @@ describe("Golden Coast Phase 4 cutover hardening route surface", () => {
     expect(routeSource).not.toContain('app.post("/api/sp/containers"');
   });
 
-  it("retires top-level Phase 1 posting before the old route registrar", () => {
-    expect(legacyRetirementSource).toContain('"/api/golden-coast/accounting/phase1/setup-accounts"');
-    expect(legacyRetirementSource).toContain('"/api/golden-coast/accounting/phase1/post"');
+  it("retires top-level Phase 1 posting before the old route registrar without duplicate app.post routes", () => {
+    expect(legacyRetirementSource).toContain('app.use("/api/golden-coast/accounting/phase1"');
+    expect(legacyRetirementSource).toContain('req.path === "/setup-accounts"');
+    expect(legacyRetirementSource).toContain('req.path === "/post"');
+    expect(legacyRetirementSource).toContain("privilegedMutationRateLimit");
     expect(legacyRetirementSource).toContain("GC_PHASE1_POSTING_RETIRED");
+    expect(legacyRetirementSource).not.toContain("app.post(");
     expect(applicationRoutesSource.indexOf("registerGoldenCoastLegacyPostingRetirement(app);")).toBeLessThan(
       applicationRoutesSource.indexOf("registerGoldenCoastAccountingRoutes(app);")
     );
