@@ -85,26 +85,23 @@ export function registerFactoryProductCascadeRoutes(app: Express) {
         const targetPrefix = GRADE_TO_PREFIX[grade];
         const gradeChanged = grade !== existingGrade;
         const articleCodeWasManuallyChanged = articleCode !== undefined && articleCode !== existing.articleCode;
+        const needsGeneratedArticleCode =
+          gradeChanged && (!articleCodeWasManuallyChanged || !String(articleCode).startsWith(targetPrefix));
 
-        if (gradeChanged && articleCodeWasManuallyChanged && !String(articleCode).startsWith(targetPrefix)) {
-          return res.status(400).json({ message: `Article code for grade ${grade} must start with ${targetPrefix}` });
-        }
-
-        // A grade change with an untouched article code gets a fresh unique code
-        // in the new grade range. This keeps the grade durable because grade is
-        // encoded in the product article-code prefix.
-        if (gradeChanged && !articleCodeWasManuallyChanged) {
-          const prefixLen = targetPrefix.length;
+        // A grade change with an untouched or mismatched article code gets a
+        // fresh unique code in the new grade range. This keeps grade durable
+        // because the product grade is encoded in its article-code prefix.
+        if (needsGeneratedArticleCode) {
           const [maxResult] = await db
             .select({
-              maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) AS INTEGER)), 0)`,
+              maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${factoryBaleProducts.articleCode} FROM 6) AS INTEGER)), 0)`,
             })
             .from(factoryBaleProducts)
             .where(
               and(
                 eq(factoryBaleProducts.companyId, companyId),
                 sql`${factoryBaleProducts.articleCode} LIKE ${targetPrefix + "%"}`,
-                sql`SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) ~ '^[0-9]+$'`
+                sql`SUBSTRING(${factoryBaleProducts.articleCode} FROM 6) ~ '^[0-9]+$'`
               )
             );
 
@@ -146,7 +143,7 @@ export function registerFactoryProductCascadeRoutes(app: Express) {
           }
 
           if (!generatedArticleCode) {
-            return res.status(409).json({ message: `Could not generate a unique article code for grade ${grade}` });
+            return res.status(409).json({ message: "A product with this article code already exists" });
           }
         }
       }
@@ -164,7 +161,7 @@ export function registerFactoryProductCascadeRoutes(app: Express) {
             )
           );
         if (conflict) {
-          return res.status(400).json({ message: `Article code "${nextArticleCode}" is already used by another product` });
+          return res.status(400).json({ message: "A product with this article code already exists" });
         }
       }
 
@@ -204,7 +201,8 @@ export function registerFactoryProductCascadeRoutes(app: Express) {
       if (name !== undefined && name !== existing.name) baleUpdate.productName = name;
       if (weightPerBaleKg !== undefined && weightPerBaleKg !== existing.weightPerBaleKg)
         baleUpdate.weightKg = weightPerBaleKg;
-      if (nextArticleCode !== undefined && nextArticleCode !== existing.articleCode) baleUpdate.articleCode = nextArticleCode;
+      if (nextArticleCode !== undefined && nextArticleCode !== existing.articleCode)
+        baleUpdate.articleCode = nextArticleCode;
       if (grade !== undefined) baleUpdate.grade = grade;
 
       let balesUpdated = 0;
