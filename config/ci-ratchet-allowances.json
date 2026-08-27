@@ -22,8 +22,8 @@
     "POST /api/sp/golden-coast/phase3/cutover [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]",
     "GET /api/sp/golden-coast/phase4/cutover-fifo/status [<anonymous> > requireAuth > <anonymous> > <anonymous>]",
     "POST /api/sp/golden-coast/phase4/cutover-fifo [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]",
-    "GET /api/sp/golden-coast/phase5/pos-sale/readiness [<anonymous> > requireAuth > <anonymous>]",
-    "POST /api/sp/golden-coast/phase5/pos-sale [<anonymous> > <anonymous> > requireAuth > <anonymous>]"
+    "GET /api/sp/golden-coast/phase6/pos-sale/readiness [<anonymous> > requireAuth > <anonymous>]",
+    "POST /api/sp/golden-coast/phase6/pos-sale [<anonymous> > <anonymous> > requireAuth > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/v5/stock-allocation [<anonymous>]",
