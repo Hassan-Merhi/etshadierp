@@ -5,6 +5,7 @@ import { registerSpPermissionRoutes } from "./spPermissionRoutes";
 import { registerSpSetupRoutes } from "./spSetupRoutes";
 import { registerSpGoldenCoastSetupRoutes } from "./spGoldenCoastSetupRoutes";
 import { registerSpGoldenCoastPhase3CutoverRoutes } from "./spGoldenCoastPhase3CutoverRoutes";
+import { registerSpGoldenCoastPhase4CutoverRoutes } from "./spGoldenCoastPhase4CutoverRoutes";
 import { registerSpContainerRoutes } from "./spContainerRoutes";
 import { registerSpLifecycleGuards } from "./spLifecycleGuards";
 import { registerSpReoffloadPreparationGuard } from "./spReoffloadPreparationGuard";
@@ -33,6 +34,10 @@ export function registerSpRoutes(app: Express) {
   // any migration, setup, lifecycle, report, or export handler is reachable.
   registerSpAccessControl(app);
   registerSpPermissionRoutes(app);
+
+  // Golden Coast Phase 4 must be installed before historical SP handlers so its
+  // retired-route interceptors and post-cutover date guard execute first.
+  registerSpGoldenCoastPhase4CutoverRoutes(app);
 
   installExplicitCompanyWriteGuard(app);
   registerSpMigrationPhase4Routes(app);
