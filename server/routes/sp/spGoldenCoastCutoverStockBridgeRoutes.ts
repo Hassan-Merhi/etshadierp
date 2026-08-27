@@ -162,7 +162,9 @@ function planFromExistingLots(
   let totalValue = new Decimal(0);
   const lots = existing.map((row) => {
     if (!row.locationId || !row.stockItemId) {
-      throw new GoldenCoastCutoverStockBridgeError("Existing cutover FIFO lot is missing its location or stock item link");
+      throw new GoldenCoastCutoverStockBridgeError(
+        "Existing cutover FIFO lot is missing its location or stock item link"
+      );
     }
     const key = `${row.locationId}:${row.stockItemId}`;
     if (seen.has(key)) {
@@ -174,7 +176,9 @@ function planFromExistingLots(
     const qtyRemaining = new Decimal(row.qtyRemaining ?? 0);
     const finalUnitCost = new Decimal(row.finalUnitCostUsd ?? 0);
     if (qtyIn.lte(0) || finalUnitCost.lte(0) || qtyRemaining.lt(0) || qtyRemaining.gt(qtyIn)) {
-      throw new GoldenCoastCutoverStockBridgeError(`Existing cutover FIFO lot ${row.id} has invalid quantity or cost state`);
+      throw new GoldenCoastCutoverStockBridgeError(
+        `Existing cutover FIFO lot ${row.id} has invalid quantity or cost state`
+      );
     }
     totalQuantity = totalQuantity.plus(qtyIn);
     totalValue = totalValue.plus(qtyIn.times(finalUnitCost));
@@ -186,7 +190,9 @@ function planFromExistingLots(
       description: row.description,
       qtyIn: qtyIn.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toFixed(4),
       qtyRemaining: qtyRemaining.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toFixed(4),
-      baseUnitCostUsd: new Decimal(row.baseUnitCostUsd ?? 0).toDecimalPlaces(6, Decimal.ROUND_HALF_UP).toFixed(6),
+      baseUnitCostUsd: new Decimal(row.baseUnitCostUsd ?? 0)
+        .toDecimalPlaces(6, Decimal.ROUND_HALF_UP)
+        .toFixed(6),
       landedUnitCostUsd: new Decimal(row.landedUnitCostUsd ?? 0)
         .toDecimalPlaces(6, Decimal.ROUND_HALF_UP)
         .toFixed(6),
