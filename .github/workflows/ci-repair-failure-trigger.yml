@@ -16,12 +16,13 @@ on:
       - GitHub Actions Quality
       - Security Readiness Parity
     types: [completed]
+  status:
   workflow_dispatch:
 
 permissions: {}
 
 concurrency:
-  group: ci-repair-failure-trigger-${{ github.event.workflow_run.id || github.run_id }}
+  group: ci-repair-failure-trigger-${{ github.event.workflow_run.id || github.event.sha || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -29,7 +30,9 @@ jobs:
     name: Wake guarded CI repair bot
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.event == 'pull_request' &&
+      (github.event_name == 'status' && github.event.state == 'failure') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.event == 'pull_request' &&
        (github.event.workflow_run.conclusion == 'failure' ||
         github.event.workflow_run.conclusion == 'timed_out' ||
         github.event.workflow_run.conclusion == 'cancelled' ||
