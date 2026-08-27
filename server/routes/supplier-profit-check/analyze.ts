@@ -18,6 +18,17 @@ export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: R
       const { supplierId, fromDate, toDate, sourceType, proformaId, containerIds, sellPriceSource, locationId } =
         req.body;
       if (!supplierId) return res.status(400).json({ message: "supplierId required" });
+
+      // Reject suppliers that are not valid inside the active company instead of
+      // falling back to every stock item when the scoped lookup returns no row.
+      const supplierScopeResult = await pool.query(
+        `SELECT id FROM suppliers WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
+        [supplierId, companyId]
+      );
+      if (supplierScopeResult.rows.length === 0) {
+        return res.status(404).json({ message: "Supplier not found" });
+      }
+
       const allTime = !fromDate || !toDate;
 
       // 1. Get stock items (all for company OR from proforma lines OR from OTW containers)
@@ -25,7 +36,8 @@ export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: R
       if (sourceType === "proforma" && proformaId) {
         itemsResult = await pool.query(
           `
-          SELECT si.id, si.code, si.name, si.stock_group_id,
+          SELECT DISTINCT ON (spl.id)
+            si.id, si.code, si.name, si.stock_group_id,
             sg.name as stock_group_name,
             spl.qty as proforma_qty,
             spl.price_per_bale as proforma_price,
@@ -44,11 +56,14 @@ export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: R
           LEFT JOIN stock_groups sg ON sg.id = si.stock_group_id
           WHERE sp.id = $1
             AND sp.company_id = $2
+            AND sp.supplier_id = $3
             AND si.company_id = $2
             AND si.deleted_at IS NULL
-          ORDER BY si.code
+          ORDER BY spl.id,
+            CASE WHEN lower(si.code) = lower(spl.barcode) THEN 0 ELSE 1 END,
+            si.id
         `,
-          [proformaId, companyId]
+          [proformaId, companyId, supplierId]
         );
       } else if (sourceType === "otw_containers" && Array.isArray(containerIds) && containerIds.length > 0) {
         itemsResult = await pool.query(
@@ -77,8 +92,11 @@ export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: R
           [containerIds]
         );
       } else {
-        // Look up the supplier's linked stock group (if any)
-        const supplierRow = await pool.query(`SELECT stock_group_id FROM suppliers WHERE id = $1`, [supplierId]);
+        // Look up the supplier's linked stock group only inside the active company.
+        const supplierRow = await pool.query(
+          `SELECT stock_group_id FROM suppliers WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
+          [supplierId, companyId]
+        );
         const linkedStockGroupId = supplierRow.rows[0]?.stock_group_id ?? null;
 
         if (linkedStockGroupId) {
