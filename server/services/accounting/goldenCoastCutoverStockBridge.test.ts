@@ -68,26 +68,40 @@ describe("Golden Coast cutover stock bridge", () => {
   it("requires a positive average cost for every positive opening quantity", () => {
     expect(() =>
       planGoldenCoastCutoverStockBridge([
-        { locationId: 1, stockItemId: 2, stockItemCode: "BAD", quantity: "1", averageRate: "0", totalValue: "0" },
+        {
+          locationId: 1,
+          stockItemId: 2,
+          stockItemCode: "BAD",
+          quantity: "1",
+          averageRate: "0",
+          totalValue: "0",
+        },
       ])
     ).toThrow(/must have a positive average rate/);
   });
 
   it("rejects duplicate item/location rows so the bridge cannot create duplicate opening lots", () => {
-    expect(() => planGoldenCoastCutoverStockBridge([rows[0], rows[0]])).toThrow(/Duplicate legacy inventory row/);
+    expect(() => planGoldenCoastCutoverStockBridge([rows[0], rows[0]])).toThrow(
+      /Duplicate legacy inventory row/
+    );
   });
 
   it("rejects legacy value drift beyond the accounting tolerance", () => {
-    expect(() =>
-      planGoldenCoastCutoverStockBridge([
-        { ...rows[0], totalValue: "249.90" },
-      ])
-    ).toThrow(GoldenCoastCutoverStockBridgeError);
+    expect(() => planGoldenCoastCutoverStockBridge([{ ...rows[0], totalValue: "249.90" }])).toThrow(
+      GoldenCoastCutoverStockBridgeError
+    );
   });
 
   it("accepts harmless cent-level storage rounding", () => {
     const plan = planGoldenCoastCutoverStockBridge([
-      { locationId: 1, stockItemId: 2, stockItemCode: "ROUND", quantity: "3", averageRate: "1.333333", totalValue: "4.00" },
+      {
+        locationId: 1,
+        stockItemId: 2,
+        stockItemCode: "ROUND",
+        quantity: "3",
+        averageRate: "1.333333",
+        totalValue: "4.00",
+      },
     ]);
     expect(plan.totalValueUsd).toBe("4.00");
   });
@@ -102,8 +116,22 @@ describe("Golden Coast cutover stock bridge", () => {
 
   it("keeps item/location identity independent across companies by requiring the route to supply one company snapshot", () => {
     const plan = planGoldenCoastCutoverStockBridge([
-      { locationId: 1, stockItemId: 1, stockItemCode: "A", quantity: "2", averageRate: "3", totalValue: "6" },
-      { locationId: 2, stockItemId: 1, stockItemCode: "A", quantity: "4", averageRate: "3", totalValue: "12" },
+      {
+        locationId: 1,
+        stockItemId: 1,
+        stockItemCode: "A",
+        quantity: "2",
+        averageRate: "3",
+        totalValue: "6",
+      },
+      {
+        locationId: 2,
+        stockItemId: 1,
+        stockItemCode: "A",
+        quantity: "4",
+        averageRate: "3",
+        totalValue: "12",
+      },
     ]);
     expect(plan.lots.map((lot) => `${lot.locationId}:${lot.stockItemId}`)).toEqual(["1:1", "2:1"]);
     expect(plan.totalValueUsd).toBe("18.00");
