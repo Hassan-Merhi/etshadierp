@@ -26,6 +26,28 @@ const phase3VoucherNumber = (companyId: number) => `GC-CUTOVER-20260901-C${compa
 
 type DbLike = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+const RETIRED_GOLDEN_COAST_MUTATIONS: ReadonlyArray<{
+  method: "POST" | "PATCH";
+  pattern: RegExp;
+}> = [
+  { method: "POST", pattern: /^\/opening-stock\/?$/ },
+  { method: "POST", pattern: /^\/sales\/?$/ },
+  { method: "POST", pattern: /^\/sales\/[^/]+\/reverse\/?$/ },
+  { method: "POST", pattern: /^\/offload\/?$/ },
+  { method: "POST", pattern: /^\/offload\/[^/]+\/reverse\/?$/ },
+  { method: "POST", pattern: /^\/prepaid\/?$/ },
+  { method: "POST", pattern: /^\/containers\/?$/ },
+  { method: "PATCH", pattern: /^\/containers\/[^/]+\/?$/ },
+  { method: "POST", pattern: /^\/containers\/[^/]+\/cancel\/?$/ },
+];
+
+function isRetiredGoldenCoastMutation(req: Request): boolean {
+  if (req.baseUrl !== "/api/sp") return false;
+  return RETIRED_GOLDEN_COAST_MUTATIONS.some(
+    ({ method, pattern }) => req.method === method && pattern.test(req.path)
+  );
+}
+
 async function isGoldenCoastCompany(conn: DbLike, companyId: number): Promise<boolean> {
   const rows = await conn.execute(sql`
     SELECT sub_type
@@ -148,6 +170,11 @@ async function loadSnapshotState(conn: DbLike, companyId: number) {
 }
 
 async function guardLegacyGoldenCoastMutation(req: Request, res: Response, next: NextFunction): Promise<void> {
+  if (!isRetiredGoldenCoastMutation(req)) {
+    next();
+    return;
+  }
+
   try {
     const companyId = await requireSpCompany(req, res);
     if (!companyId) return;
@@ -220,17 +247,10 @@ async function handleCutover(req: Request, res: Response): Promise<void> {
 }
 
 export function registerSpGoldenCoastPhase4CutoverFifoRoutes(app: Express): void {
-  // Fail closed for all known legacy financial mutation paths until their replacement
-  // Golden Coast phases land. Other Supplier Partner companies keep legacy behavior.
-  app.post("/api/sp/opening-stock", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
-  app.post("/api/sp/sales", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
-  app.post("/api/sp/sales/:id/reverse", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
-  app.post("/api/sp/offload", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
-  app.post("/api/sp/offload/:id/reverse", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
-  app.post("/api/sp/prepaid", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
-  app.post("/api/sp/containers", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
-  app.patch("/api/sp/containers/:id", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
-  app.post("/api/sp/containers/:id/cancel", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
+  // The SP access-control middleware is registered before this module. Intercept the
+  // exact superseded Golden Coast mutation shapes without registering shadow routes,
+  // so non-Golden-Coast Supplier Partner companies retain their existing handlers.
+  app.use("/api/sp", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
 
   app.get(
     "/api/sp/golden-coast/phase4/cutover-fifo/status",
