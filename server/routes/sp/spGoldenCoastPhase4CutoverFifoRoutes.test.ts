@@ -23,22 +23,27 @@ describe("Golden Coast Phase 4 cutover hardening route surface", () => {
     expect(phase4Index).toBeLessThan(openingIndex);
   });
 
-  it("retires superseded Golden Coast financial mutation paths", () => {
-    for (const path of [
-      '"/api/sp/opening-stock"',
-      '"/api/sp/sales"',
-      '"/api/sp/sales/:id/reverse"',
-      '"/api/sp/offload"',
-      '"/api/sp/offload/:id/reverse"',
-      '"/api/sp/prepaid"',
-      '"/api/sp/containers"',
-      '"/api/sp/containers/:id/cancel"',
+  it("retires superseded Golden Coast financial mutation paths without shadow route registrations", () => {
+    for (const pattern of [
+      "/^\\/opening-stock\\/?$/",
+      "/^\\/sales\\/?$/",
+      "/^\\/sales\\/[^/]+\\/reverse\\/?$/",
+      "/^\\/offload\\/?$/",
+      "/^\\/offload\\/[^/]+\\/reverse\\/?$/",
+      "/^\\/prepaid\\/?$/",
+      "/^\\/containers\\/?$/",
+      "/^\\/containers\\/[^/]+\\/?$/",
+      "/^\\/containers\\/[^/]+\\/cancel\\/?$/",
     ]) {
-      expect(routeSource).toContain(path);
+      expect(routeSource).toContain(pattern);
     }
+    expect(routeSource).toContain('app.use("/api/sp"');
     expect(routeSource).toContain("GC_LEGACY_POSTING_RETIRED");
     expect(routeSource).toContain("isGoldenCoastCompany");
     expect(routeSource).toContain("next();");
+    expect(routeSource).not.toContain('app.post("/api/sp/sales"');
+    expect(routeSource).not.toContain('app.post("/api/sp/offload"');
+    expect(routeSource).not.toContain('app.post("/api/sp/containers"');
   });
 
   it("retires top-level Phase 1 posting before the old route registrar", () => {
