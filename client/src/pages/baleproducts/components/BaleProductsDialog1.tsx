@@ -149,10 +149,7 @@ export function BaleProductsDialog1({ model }: { model: Model }) {
           </div>
           <div className="space-y-2">
             <Label>Grade</Label>
-            <Select
-              value={selectedGrade}
-              onValueChange={(val) => setEditForm({ ...editForm, grade: val })}
-            >
+            <Select value={selectedGrade} onValueChange={(val) => setEditForm({ ...editForm, grade: val })}>
               <SelectTrigger data-testid="select-edit-product-grade">
                 <SelectValue placeholder="Select grade" />
               </SelectTrigger>
@@ -164,9 +161,6 @@ export function BaleProductsDialog1({ model }: { model: Model }) {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              Changing grade will assign a new article code in that grade range and update existing bales.
-            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="edit-description">Description</Label>
@@ -218,9 +212,7 @@ export function BaleProductsDialog1({ model }: { model: Model }) {
           </div>
           <div className="flex items-start gap-2 p-3 rounded-md bg-muted text-sm text-muted-foreground">
             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-            <span>
-              Changes to name, weight, article code, and grade will also update all existing bales using this product.
-            </span>
+            <span>Changes to name, weight, and article code will also update all existing bales using this product.</span>
           </div>
           <div className="flex justify-between gap-2">
             <Button
