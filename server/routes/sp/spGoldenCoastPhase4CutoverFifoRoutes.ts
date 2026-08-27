@@ -104,9 +104,7 @@ async function loadSnapshotState(conn: DbLike, companyId: number) {
     blockers.push(releaseDebtEnglish("Phase 3 cutover voucher has not been posted yet."));
   }
   if (new Date().toISOString().slice(0, 10) < GOLDEN_COAST_CUTOVER_DATE) {
-    blockers.push(
-      releaseDebtEnglish(`Opening FIFO cutover cannot be posted before ${GOLDEN_COAST_CUTOVER_DATE}.`)
-    );
+    blockers.push(releaseDebtEnglish(`Opening FIFO cutover cannot be posted before ${GOLDEN_COAST_CUTOVER_DATE}.`));
   }
 
   let plan: ReturnType<typeof buildGoldenCoastCutoverFifoPlan> | null = null;
@@ -149,11 +147,7 @@ async function loadSnapshotState(conn: DbLike, companyId: number) {
   };
 }
 
-async function guardLegacyGoldenCoastMutation(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
+async function guardLegacyGoldenCoastMutation(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const companyId = await requireSpCompany(req, res);
     if (!companyId) return;
@@ -236,9 +230,7 @@ export function registerSpGoldenCoastPhase4CutoverFifoRoutes(app: Express): void
   app.post("/api/sp/prepaid", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
   app.post("/api/sp/containers", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
   app.patch("/api/sp/containers/:id", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
-  app.post("/api/sp/containers/:id/cancel", (req, res, next) =>
-    void guardLegacyGoldenCoastMutation(req, res, next)
-  );
+  app.post("/api/sp/containers/:id/cancel", (req, res, next) => void guardLegacyGoldenCoastMutation(req, res, next));
 
   app.get(
     "/api/sp/golden-coast/phase4/cutover-fifo/status",
