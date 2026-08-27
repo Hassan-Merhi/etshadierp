@@ -554,6 +554,27 @@ jobs:
           git config --global --unset-all credential.https://github.com.helper >/dev/null 2>&1 || true
           echo 'pushed=true' >> "$GITHUB_OUTPUT"
 
+  continue-sweep:
+    name: Re-sweep for remaining red PRs
+    needs: [inspect, sync-main, diagnose, retry-failed, push-repair, report]
+    # The bot repairs one PR per run, so a single wake-up only ever clears one
+    # failure and nothing re-examined the rest once the run ended: PR and
+    # status wakes are dropped while a repair is already in flight, and GitHub
+    # cron has never fired for this repository. Re-running the shared sweep as
+    # the last step of every repair run makes the loop self-continuing until
+    # no trusted PR is red, without adding a privileged trigger.
+    if: always()
+    permissions:
+      actions: write
+      checks: read
+      contents: read
+      pull-requests: read
+      statuses: read
+    uses: ./.github/workflows/ci-repair-sweep.yml
+    with:
+      reason: continuing after a repair run
+      ignore_run_id: ${{ github.run_id }}
+
   report:
     name: Report meaningful repair state
     needs: [inspect, sync-main, diagnose, retry-failed, push-repair]
