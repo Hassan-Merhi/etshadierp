@@ -274,7 +274,9 @@ async function handlePhase1Preview(req: Request, res: Response): Promise<void> {
   }
 }
 
-async function handlePhase1Post(req: Request, res: Response): Promise<void> {
+// Retained as exported historical implementation for audit/reconciliation only.
+// No production route invokes this function after the Phase 4 cutover hardening.
+export async function handlePhase1Post(req: Request, res: Response): Promise<void> {
   const startedAt = Date.now();
   let companyId: number | null = null;
   const userId = req.session.userId;
