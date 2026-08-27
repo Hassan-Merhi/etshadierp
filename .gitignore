@@ -44,6 +44,11 @@ artifacts/bandwidth-smoke/
 artifacts/lint/
 .artifacts/
 
+# CI repair scratch directory: keep the directory addressable so the repair
+# workflow's explicit exclude pathspec does not fail, but ignore all contents.
+!.ci-repair/
+.ci-repair/**
+
 # User-uploaded content (runtime data, not source)
 uploads/
 
