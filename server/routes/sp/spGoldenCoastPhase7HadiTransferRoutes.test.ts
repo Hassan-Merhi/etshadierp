@@ -10,13 +10,15 @@ const serviceSource = readFileSync(
 );
 
 describe("Golden Coast Phase 7 HADI transfer route surface", () => {
-  it("registers after Phase 5 and before the legacy Supplier Partner sales route", () => {
-    const phase5Index = spIndexSource.indexOf("registerSpGoldenCoastPhase5PosSaleRoutes(app);");
+  it("registers after the mounted POS-sale route and before the legacy Supplier Partner sales route", () => {
+    // Phase 6 supersedes Phase 5 as the mounted POS-sale route; Phase 7 must
+    // settle cash only after a sale has been posted.
+    const posSaleIndex = spIndexSource.indexOf("registerSpGoldenCoastPhase6PosSaleRoutes(app);");
     const phase7Index = spIndexSource.indexOf("registerSpGoldenCoastPhase7HadiTransferRoutes(app);");
     const legacySalesIndex = spIndexSource.indexOf("registerSpSalesRoutes(app);");
 
-    expect(phase5Index).toBeGreaterThan(-1);
-    expect(phase7Index).toBeGreaterThan(phase5Index);
+    expect(posSaleIndex).toBeGreaterThan(-1);
+    expect(phase7Index).toBeGreaterThan(posSaleIndex);
     expect(phase7Index).toBeLessThan(legacySalesIndex);
   });
 
