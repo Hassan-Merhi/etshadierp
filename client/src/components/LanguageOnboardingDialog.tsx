@@ -137,8 +137,8 @@ export function LanguageOnboardingDialog({ userId }: LanguageOnboardingDialogPro
           whenever that request was slow or stalled, and it protected nothing:
           the chosen language is already applied and persisted to localStorage
           and the cookie before the request is sent, `complete` does not depend
-          on the response, and the language buttons above were never gated. The
-          save remains visible through the label and aria-busy.
+          on the response, and the language buttons above were never gated. Keep
+          the Continue action visible while showing the save state alongside it.
         */}
         <Button
           type="button"
@@ -147,7 +147,12 @@ export function LanguageOnboardingDialog({ userId }: LanguageOnboardingDialogPro
           aria-busy={isSaving}
           data-testid="language-onboarding-continue"
         >
-          {isSaving ? "Saving…" : "Continue · متابعة · Continuer"}
+          <span>Continue · متابعة · Continuer</span>
+          {isSaving && (
+            <span className="ml-2 text-xs opacity-80" aria-hidden="true">
+              Saving…
+            </span>
+          )}
         </Button>
       </DialogContent>
     </Dialog>
