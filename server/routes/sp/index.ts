@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { logger } from "../../lib/logger";
+import { runWithDatabaseMaintenanceScope } from "../../services/security/databaseScopeRuntimeContext";
 import { registerSpAccessControl } from "./spAccessControl";
 import { registerSpPermissionRoutes } from "./spPermissionRoutes";
 import { registerSpSetupRoutes } from "./spSetupRoutes";
@@ -50,13 +51,13 @@ export function registerSpRoutes(app: Express) {
     });
   });
 
-  void (async () => {
+  void runWithDatabaseMaintenanceScope("sp-supplier-voucher-startup-sync", async () => {
     await ensureSpSupplierVoucherSyncTrigger();
     const repairedCount = await repairSpSupplierVoucherLinks();
     if (repairedCount > 0) {
       logger.info("[SP] Repaired Goods-OTW voucher supplier links", { repairedCount });
     }
-  })().catch((error) => {
+  }).catch((error) => {
     logger.warn("[SP] Supplier voucher synchronization deferred until Setup", {
       error: error instanceof Error ? error.message : String(error),
     });
