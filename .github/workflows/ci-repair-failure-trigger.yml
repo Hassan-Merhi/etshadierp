@@ -1,0 +1,52 @@
+name: CI Repair Failure Trigger
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+      - CodeQL
+      - Semgrep
+      - Security
+      - Dependency Review
+      - Browser E2E
+      - Mobile Responsiveness
+      - RTL and Accessibility
+      - I18n Audit
+      - Performance & Database Safety
+      - GitHub Actions Quality
+      - Security Readiness Parity
+    types: [completed]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ci-repair-failure-trigger-${{ github.event.workflow_run.id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  dispatch-repair:
+    name: Wake guarded CI repair bot
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'pull_request' &&
+       (github.event.workflow_run.conclusion == 'failure' ||
+        github.event.workflow_run.conclusion == 'timed_out' ||
+        github.event.workflow_run.conclusion == 'cancelled' ||
+        github.event.workflow_run.conclusion == 'action_required' ||
+        github.event.workflow_run.conclusion == 'startup_failure'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch CI Repair Bot immediately
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/ci-repair-bot.yml/dispatches" \
+            -f ref=main
