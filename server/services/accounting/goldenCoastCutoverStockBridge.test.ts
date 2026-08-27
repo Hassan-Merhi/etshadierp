@@ -114,26 +114,29 @@ describe("Golden Coast cutover stock bridge", () => {
     );
   });
 
-  it("keeps item/location identity independent across companies by requiring the route to supply one company snapshot", () => {
-    const plan = planGoldenCoastCutoverStockBridge([
-      {
-        locationId: 1,
-        stockItemId: 1,
-        stockItemCode: "A",
-        quantity: "2",
-        averageRate: "3",
-        totalValue: "6",
-      },
-      {
-        locationId: 2,
-        stockItemId: 1,
-        stockItemCode: "A",
-        quantity: "4",
-        averageRate: "3",
-        totalValue: "12",
-      },
-    ]);
-    expect(plan.lots.map((lot) => `${lot.locationId}:${lot.stockItemId}`)).toEqual(["1:1", "2:1"]);
-    expect(plan.totalValueUsd).toBe("18.00");
-  });
+  it(
+    "keeps item/location identity independent across companies by requiring the route to supply one company snapshot",
+    () => {
+      const plan = planGoldenCoastCutoverStockBridge([
+        {
+          locationId: 1,
+          stockItemId: 1,
+          stockItemCode: "A",
+          quantity: "2",
+          averageRate: "3",
+          totalValue: "6",
+        },
+        {
+          locationId: 2,
+          stockItemId: 1,
+          stockItemCode: "A",
+          quantity: "4",
+          averageRate: "3",
+          totalValue: "12",
+        },
+      ]);
+      expect(plan.lots.map((lot) => `${lot.locationId}:${lot.stockItemId}`)).toEqual(["1:1", "2:1"]);
+      expect(plan.totalValueUsd).toBe("18.00");
+    }
+  );
 });
