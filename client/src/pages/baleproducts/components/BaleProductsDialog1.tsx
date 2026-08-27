@@ -8,6 +8,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { useBaleProductsModel } from "../useBaleProductsModel";
 
 type Model = ReturnType<typeof useBaleProductsModel>;
+
+const GRADE_OPTIONS = [
+  { value: "CREAM", label: "CREAM", prefix: "HMD10" },
+  { value: "#1", label: "#1", prefix: "HMD11" },
+  { value: "#2", label: "#2", prefix: "HMD12" },
+  { value: "#3", label: "#3", prefix: "HMD13" },
+  { value: "#4", label: "#4", prefix: "HMD14" },
+  { value: "Garbage", label: "Garbage", prefix: "HMD16" },
+] as const;
+
+function inferGradeFromArticleCode(articleCode: string): string {
+  return GRADE_OPTIONS.find((option) => articleCode.startsWith(option.prefix))?.value ?? "";
+}
+
 export function BaleProductsDialog1({ model }: { model: Model }) {
   const {
     designColors,
@@ -21,8 +35,29 @@ export function BaleProductsDialog1({ model }: { model: Model }) {
     categories,
     editProductMutation,
     deleteProductMutation,
-    handleEditSubmit,
   } = model;
+
+  const selectedGrade = editForm.grade || inferGradeFromArticleCode(editForm.articleCode);
+
+  const handleSave = () => {
+    if (!editForm.name.trim()) return;
+    const payload = {
+      name: editForm.name.trim(),
+      articleCode: editForm.articleCode.trim(),
+      weightPerBaleKg: editForm.weightPerBaleKg ? parseFloat(editForm.weightPerBaleKg) : null,
+      categoryId: editForm.categoryId ? parseInt(editForm.categoryId) : null,
+      description: editForm.description.trim(),
+      productionPrice: editForm.productionPrice,
+      sellingPrice: editForm.sellingPrice,
+      labelDesignColor: editForm.labelDesignColor || null,
+      // The displayed grade may be inferred from the article-code prefix, but
+      // only an explicit selection is a grade mutation. This prevents a normal
+      // description/price edit from rewriting every historical bale grade.
+      grade: editForm.grade || undefined,
+    };
+    editProductMutation.mutate(payload);
+  };
+
   return (
     <Dialog
       open={!!editingProduct}
@@ -116,6 +151,21 @@ export function BaleProductsDialog1({ model }: { model: Model }) {
             </Select>
           </div>
           <div className="space-y-2">
+            <Label>Grade</Label>
+            <Select value={selectedGrade} onValueChange={(val) => setEditForm({ ...editForm, grade: val })}>
+              <SelectTrigger data-testid="select-edit-product-grade">
+                <SelectValue placeholder="Select grade" />
+              </SelectTrigger>
+              <SelectContent>
+                {GRADE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="edit-description">Description</Label>
             <Textarea
               id="edit-description"
@@ -190,7 +240,7 @@ export function BaleProductsDialog1({ model }: { model: Model }) {
                 Cancel
               </Button>
               <Button
-                onClick={handleEditSubmit}
+                onClick={handleSave}
                 disabled={!editForm.name.trim() || editProductMutation.isPending}
                 data-testid="button-save-edit-product"
               >
