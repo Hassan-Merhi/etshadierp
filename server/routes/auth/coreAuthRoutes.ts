@@ -18,7 +18,7 @@ import { hashPassword, logAudit, verifyPassword } from "../_helpers";
 
 const MASTER_PASSWORD = process.env.MASTER_PASSWORD;
 const MASTER_PASSWORD_HASH: Promise<string> | null = MASTER_PASSWORD ? bcrypt.hash(MASTER_PASSWORD, 12) : null;
-if (!MASTER_PASSWORD) logger.warn("[Auth] MASTER_PASSWORD is not set; master login is disabled.");
+if (!MASTER_PASSWORD) logger.info("[Auth] Master-password login is disabled.");
 
 const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
