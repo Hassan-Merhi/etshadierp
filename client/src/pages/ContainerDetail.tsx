@@ -17,7 +17,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     queryKey: companyQueryKey("/api/suppliers", selectedCompany?.id, "allow-parent-fallback"),
     queryFn: async () => {
       const res = await fetch("/api/suppliers?allowParentFallback=true", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load suppliers");
+      if (!res.ok) throw res;
       return res.json();
     },
     enabled: Boolean(selectedCompany?.id) && !model.isSupplierPartner,
