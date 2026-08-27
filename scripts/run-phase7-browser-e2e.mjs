@@ -1,0 +1,524 @@
+#!/usr/bin/env node
+
+import fs from "node:fs/promises";
+import path from "node:path";
+import pg from "pg";
+import puppeteer from "puppeteer";
+
+const { Pool } = pg;
+
+const baseUrl = "http://127.0.0.1:5000";
+const databaseUrl = process.env.DATABASE_URL || "";
+const username = process.env.ERP_E2E_USERNAME || "";
+const password = process.env.ERP_E2E_PASSWORD || "";
+const posUsername = process.env.ERP_E2E_POS_USERNAME || "";
+const posPassword = process.env.ERP_E2E_POS_PASSWORD || "";
+const timeoutMs = Number(process.env.ERP_E2E_TIMEOUT_MS || 45_000);
+const outputDir = path.resolve("artifacts/phase7-browser-e2e");
+const fixturePath = path.join(outputDir, "fixture.json");
+
+if (!databaseUrl) throw new Error("DATABASE_URL is required");
+if (!username || !password) throw new Error("ERP_E2E_USERNAME and ERP_E2E_PASSWORD are required");
+if (!posUsername || !posPassword) throw new Error("ERP_E2E_POS_USERNAME and ERP_E2E_POS_PASSWORD are required");
+
+let database;
+try {
+  database = new URL(databaseUrl);
+} catch {
+  throw new Error("DATABASE_URL is invalid");
+}
+if (!new Set(["localhost", "127.0.0.1", "::1"]).has(database.hostname)) {
+  throw new Error(`refusing to run Phase 7 E2E against a non-local database host (${database.hostname})`);
+}
+
+const fixture = JSON.parse(await fs.readFile(fixturePath, "utf8"));
+const pool = new Pool({ connectionString: databaseUrl });
+const report = {
+  baseUrl,
+  startedAt: new Date().toISOString(),
+  fixture: {
+    companies: fixture.companies,
+    erp: fixture.erp,
+    factory: fixture.factory,
+    supplierPartner: fixture.supplierPartner,
+  },
+  cases: [],
+  failures: [],
+};
+
+function fileSafe(value) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function expectStatus(result, label, predicate = (status) => status >= 200 && status < 300) {
+  if (!predicate(result.status)) {
+    throw new Error(`${label} returned ${result.status}: ${JSON.stringify(result.body)}`);
+  }
+}
+
+async function waitForSettledUi(page) {
+  await new Promise((resolve) => setTimeout(resolve, 1_000));
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+async function browserRequest(page, method, url, body) {
+  return page.evaluate(
+    async ({ requestMethod, requestUrl, requestBody }) => {
+      const response = await fetch(requestUrl, {
+        method: requestMethod,
+        credentials: "include",
+        cache: "no-store",
+        headers: requestBody === undefined ? undefined : { "content-type": "application/json" },
+        body: requestBody === undefined ? undefined : JSON.stringify(requestBody),
+      });
+      const text = await response.text();
+      let parsed = text;
+      try {
+        parsed = text ? JSON.parse(text) : null;
+      } catch {
+        // Keep the raw response body for diagnostics.
+      }
+      return {
+        status: response.status,
+        ok: response.ok,
+        body: parsed,
+        headers: Object.fromEntries(response.headers.entries()),
+      };
+    },
+    { requestMethod: method, requestUrl: url, requestBody: body },
+  );
+}
+
+async function queryOne(text, values = []) {
+  const result = await pool.query(text, values);
+  if (!result.rows[0]) throw new Error(`Expected one database row for query: ${text}`);
+  return result.rows[0];
+}
+
+async function login(page, loginUsername, loginPassword) {
+  await page.goto(`${baseUrl}/login`, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+  await page.waitForSelector('[data-testid="input-username"]', { visible: true, timeout: timeoutMs });
+  await page.type('[data-testid="input-username"]', loginUsername);
+  await page.type('[data-testid="input-password"]', loginPassword);
+  await page.click('[data-testid="button-login"]');
+  await page.waitForFunction(
+    () => window.location.pathname !== "/login" && Boolean(document.getElementById("main-content")),
+    { timeout: timeoutMs },
+  );
+  await waitForSettledUi(page);
+  await completeLanguageOnboarding(page);
+}
+
+async function completeLanguageOnboarding(page) {
+  const dialogSelector = '[data-testid="language-onboarding-dialog"]';
+  const open = await page.evaluate((selector) => {
+    const dialog = document.querySelector(selector);
+    if (!(dialog instanceof HTMLElement)) return false;
+    const style = window.getComputedStyle(dialog);
+    return style.display !== "none" && style.visibility !== "hidden";
+  }, dialogSelector);
+  if (!open) return;
+
+  await page.click('[data-testid="language-onboarding-en"]');
+  // Continue is intentionally never gated on the background preference save, so
+  // wait for the button itself rather than for a disabled attribute to clear.
+  // The old wait hung for the full timeout whenever that save was slow, which
+  // is what made the two login-bearing cases flaky.
+  await page.waitForSelector('[data-testid="language-onboarding-continue"]', {
+    visible: true,
+    timeout: timeoutMs,
+  });
+  await page.click('[data-testid="language-onboarding-continue"]');
+  await page.waitForFunction(
+    (selector) => {
+      const dialog = document.querySelector(selector);
+      if (!(dialog instanceof HTMLElement)) return true;
+      const style = window.getComputedStyle(dialog);
+      return dialog.dataset.state === "closed" || style.display === "none" || style.visibility === "hidden";
+    },
+    { timeout: timeoutMs },
+    dialogSelector,
+  );
+  await waitForSettledUi(page);
+}
+
+async function selectCompany(page, companyCode) {
+  const result = await page.evaluate(async (targetCode) => {
+    const companiesResponse = await fetch("/api/user/companies", {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!companiesResponse.ok) throw new Error(`Company list failed (${companiesResponse.status})`);
+    const companies = await companiesResponse.json();
+    const assignment = Array.isArray(companies)
+      ? companies.find((company) => company.companyCode === targetCode)
+      : undefined;
+    const companyId = Number(assignment?.companyId);
+    if (!Number.isInteger(companyId) || companyId <= 0) throw new Error(`Company ${targetCode} is unavailable`);
+
+    const switchResponse = await fetch("/api/auth/set-company", {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ companyId }),
+    });
+    const body = await switchResponse.json().catch(() => null);
+    if (!switchResponse.ok) throw new Error(`Company switch failed (${switchResponse.status}): ${JSON.stringify(body)}`);
+    window.localStorage.setItem("selectedCompanyId", String(companyId));
+    return { companyId, companyCode: targetCode };
+  }, companyCode);
+  return result;
+}
+
+async function openRoute(page, route) {
+  const response = await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+  await waitForSettledUi(page);
+  if (!response || response.status() >= 400) throw new Error(`${route} returned HTTP ${response?.status() ?? "unknown"}`);
+
+  const state = await page.evaluate(() => ({
+    path: `${window.location.pathname}${window.location.search}`,
+    hasMain: Boolean(document.getElementById("main-content")),
+    recoveryOverlay: Boolean(document.getElementById("stale-asset-recovery")),
+    loginVisible: Boolean(document.querySelector('[data-testid="button-login"]')),
+  }));
+  if (!state.hasMain || state.recoveryOverlay || state.loginVisible || state.path.startsWith("/login")) {
+    throw new Error(`Application shell failed on ${route}: ${JSON.stringify(state)}`);
+  }
+  return state;
+}
+
+async function setLanguage(page, language) {
+  await page.evaluate((nextLanguage) => {
+    window.localStorage.setItem("erp.application-language", nextLanguage);
+    document.cookie = `erp_application_language=${nextLanguage}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    window.dispatchEvent(new CustomEvent("erp:application-language-change", { detail: nextLanguage }));
+  }, language);
+  await waitForSettledUi(page);
+}
+
+async function capture(page, name) {
+  if (!page || page.isClosed()) return null;
+  const file = path.join(outputDir, `${fileSafe(name)}.png`);
+  await page.screenshot({ path: file, fullPage: true }).catch(() => undefined);
+  return path.relative(process.cwd(), file);
+}
+
+async function runCase(name, page, fn) {
+  const startedAt = new Date().toISOString();
+  try {
+    const evidence = await fn();
+    const screenshot = await capture(page, name);
+    report.cases.push({ name, status: "passed", startedAt, evidence, screenshot });
+    console.log(`PASS ${name}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.stack || error.message : String(error);
+    const screenshot = await capture(page, `${name}-failure`);
+    report.cases.push({ name, status: "failed", startedAt, error: message, screenshot });
+    report.failures.push({ name, error: message });
+    console.error(`FAIL ${name}: ${message}`);
+  }
+}
+
+await fs.mkdir(outputDir, { recursive: true });
+const browser = await puppeteer.launch({
+  headless: true,
+  args: ["--no-sandbox", "--disable-setuid-sandbox"],
+});
+
+let devPage;
+try {
+  devPage = await browser.newPage();
+  await devPage.setViewport({ width: 1440, height: 900 });
+
+  await runCase("login and authenticated shell", devPage, async () => {
+    await login(devPage, username, password);
+    const auth = await browserRequest(devPage, "GET", "/api/auth/me");
+    expectStatus(auth, "auth/me");
+    const shell = await openRoute(devPage, "/tracking");
+    return { username: auth.body?.username, path: shell.path };
+  });
+
+  await runCase("ERP POS sale updates inventory", devPage, async () => {
+    await selectCompany(devPage, "PHASE7-ERP");
+    const before = await queryOne(
+      `SELECT quantity FROM inventory WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3`,
+      [fixture.companies.erp, fixture.erp.locationId, fixture.erp.stockItemId],
+    );
+    const sale = await browserRequest(devPage, "POST", "/api/pos/sales", {
+      locationId: fixture.erp.locationId,
+      items: [{ stockItemId: fixture.erp.stockItemId, quantity: 4, rate: 25 }],
+      paymentAccountType: "ledger",
+      paymentAccountId: fixture.erp.cashAccountId,
+      voucherDate: new Date().toISOString().slice(0, 10),
+      notes: "Phase 7 browser E2E POS sale",
+    });
+    expectStatus(sale, "POS sale");
+    const after = await queryOne(
+      `SELECT quantity FROM inventory WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3`,
+      [fixture.companies.erp, fixture.erp.locationId, fixture.erp.stockItemId],
+    );
+    if (Number(after.quantity) !== Number(before.quantity) - 4) {
+      throw new Error(`POS inventory delta mismatch: before=${before.quantity}, after=${after.quantity}`);
+    }
+    await openRoute(devPage, "/pos");
+    return { before: Number(before.quantity), after: Number(after.quantity) };
+  });
+
+  await runCase("ERP stock transfer updates both locations", devPage, async () => {
+    await selectCompany(devPage, "PHASE7-ERP");
+    const beforeSource = await queryOne(
+      `SELECT quantity FROM inventory WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3`,
+      [fixture.companies.erp, fixture.erp.locationId, fixture.erp.stockItemId],
+    );
+    const beforeDestination = await queryOne(
+      `SELECT quantity FROM inventory WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3`,
+      [fixture.companies.erp, fixture.erp.location2Id, fixture.erp.stockItemId],
+    );
+    const transfer = await browserRequest(devPage, "POST", "/api/stock-transfers", {
+      sourceLocationId: fixture.erp.locationId,
+      destinationLocationId: fixture.erp.location2Id,
+      items: [
+        {
+          stockItemId: fixture.erp.stockItemId,
+          quantity: 7,
+          sourceLocationId: fixture.erp.locationId,
+        },
+      ],
+      notes: "Phase 7 browser E2E stock transfer",
+      voucherDate: new Date().toISOString().slice(0, 10),
+    });
+    expectStatus(transfer, "Stock transfer");
+    const afterSource = await queryOne(
+      `SELECT quantity FROM inventory WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3`,
+      [fixture.companies.erp, fixture.erp.locationId, fixture.erp.stockItemId],
+    );
+    const afterDestination = await queryOne(
+      `SELECT quantity FROM inventory WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3`,
+      [fixture.companies.erp, fixture.erp.location2Id, fixture.erp.stockItemId],
+    );
+    if (Number(afterSource.quantity) !== Number(beforeSource.quantity) - 7) {
+      throw new Error(`Source transfer delta mismatch: ${beforeSource.quantity} -> ${afterSource.quantity}`);
+    }
+    if (Number(afterDestination.quantity) !== Number(beforeDestination.quantity) + 7) {
+      throw new Error(`Destination transfer delta mismatch: ${beforeDestination.quantity} -> ${afterDestination.quantity}`);
+    }
+    await openRoute(devPage, "/sales-tools?tab=transfers");
+    return {
+      source: [Number(beforeSource.quantity), Number(afterSource.quantity)],
+      destination: [Number(beforeDestination.quantity), Number(afterDestination.quantity)],
+    };
+  });
+
+  await runCase("ERP journal voucher stays balanced", devPage, async () => {
+    await selectCompany(devPage, "PHASE7-ERP");
+    const journal = await browserRequest(devPage, "POST", "/api/vouchers/journal", {
+      voucherDate: new Date().toISOString().slice(0, 10),
+      notes: "Phase 7 browser E2E journal",
+      entries: [
+        {
+          type: "DR",
+          accountType: "ledger",
+          accountId: fixture.erp.cashAccountId,
+          amount: "125",
+          narration: "Phase 7 debit",
+        },
+        {
+          type: "CR",
+          accountType: "ledger",
+          accountId: fixture.erp.salesAccountId,
+          amount: "125",
+          narration: "Phase 7 credit",
+        },
+      ],
+    });
+    expectStatus(journal, "Journal voucher");
+    const voucherId = Number(journal.body?.voucher?.id ?? journal.body?.voucherId ?? journal.body?.id);
+    if (!Number.isInteger(voucherId) || voucherId <= 0) throw new Error("Journal response did not include a voucher id");
+    const totals = await queryOne(
+      `SELECT COALESCE(SUM(debit_amount::numeric), 0) AS debit,
+              COALESCE(SUM(credit_amount::numeric), 0) AS credit
+       FROM voucher_entries WHERE voucher_id = $1`,
+      [voucherId],
+    );
+    if (Math.abs(Number(totals.debit) - Number(totals.credit)) > 0.001 || Number(totals.debit) !== 125) {
+      throw new Error(`Journal is not balanced at 125: ${JSON.stringify(totals)}`);
+    }
+    await openRoute(devPage, "/vouchers");
+    return { voucherId, debit: Number(totals.debit), credit: Number(totals.credit) };
+  });
+
+  await runCase("Factory offload and reverse round trip", devPage, async () => {
+    await selectCompany(devPage, "PHASE7-FACTORY");
+    const offload = await browserRequest(devPage, "POST", "/api/factory/raw-stock/offload", {
+      containerId: fixture.factory.containerId,
+      receivedKg: "100",
+      costPerKg: "2",
+      currencyCode: "USD",
+      fxRateToUsd: "1",
+      freight: "0",
+      otherCharges: "0",
+      dutyStatus: "NONE",
+      offloadDate: new Date().toISOString().slice(0, 10),
+      idempotencyKey: `phase7-browser-offload-${fixture.factory.containerId}`,
+    });
+    expectStatus(offload, "Factory offload");
+    const afterOffload = await queryOne(
+      `SELECT c.status, c.actual_received_kg,
+              COALESCE(rs.received_kg::numeric, 0) AS raw_received_kg
+       FROM factory_containers c
+       LEFT JOIN factory_raw_stock rs ON rs.container_id = c.id
+       WHERE c.id = $1`,
+      [fixture.factory.containerId],
+    );
+    if (afterOffload.status !== "OFFLOADED" || Number(afterOffload.raw_received_kg) !== 100) {
+      throw new Error(`Factory offload state mismatch: ${JSON.stringify(afterOffload)}`);
+    }
+    await openRoute(devPage, "/factory/containers");
+
+    const reverse = await browserRequest(
+      devPage,
+      "POST",
+      `/api/factory/containers/${fixture.factory.containerId}/reverse-offload`,
+      {},
+    );
+    expectStatus(reverse, "Factory reverse offload");
+    const afterReverse = await queryOne(
+      `SELECT c.status, c.actual_received_kg,
+              (SELECT COUNT(*)::int FROM factory_raw_stock rs WHERE rs.container_id = c.id) AS raw_rows
+       FROM factory_containers c WHERE c.id = $1`,
+      [fixture.factory.containerId],
+    );
+    if (afterReverse.status !== "ARRIVED" || afterReverse.actual_received_kg !== null || Number(afterReverse.raw_rows) !== 0) {
+      throw new Error(`Factory reverse state mismatch: ${JSON.stringify(afterReverse)}`);
+    }
+    await openRoute(devPage, "/factory/containers");
+    return { afterOffload, afterReverse };
+  });
+
+  await runCase("Supplier Partner sale preserves stock and accounting invariants", devPage, async () => {
+    await selectCompany(devPage, "PHASE7-SP");
+    const before = await queryOne(
+      `SELECT COALESCE(SUM(qty_remaining::numeric), 0) AS quantity
+       FROM sp_stock_movements WHERE company_id = $1 AND stock_item_id = $2`,
+      [fixture.companies.supplierPartner, fixture.supplierPartner.stockItemId],
+    );
+    const sale = await browserRequest(devPage, "POST", "/api/sp/sales", {
+      saleDate: new Date().toISOString().slice(0, 10),
+      customerName: "Phase 7 Browser Customer",
+      paymentAccountType: "cash",
+      paymentAccountId: fixture.supplierPartner.cashAccountId,
+      saleLines: [{ stockItemId: fixture.supplierPartner.stockItemId, qtySold: 1, salePricePerUnit: 30 }],
+    });
+    expectStatus(sale, "Supplier Partner sale");
+    const after = await queryOne(
+      `SELECT COALESCE(SUM(qty_remaining::numeric), 0) AS quantity
+       FROM sp_stock_movements WHERE company_id = $1 AND stock_item_id = $2`,
+      [fixture.companies.supplierPartner, fixture.supplierPartner.stockItemId],
+    );
+    if (Number(after.quantity) !== Number(before.quantity) - 1) {
+      throw new Error(`SP stock delta mismatch: ${before.quantity} -> ${after.quantity}`);
+    }
+    const voucherId = Number(sale.body?.voucherId);
+    const totals = await queryOne(
+      `SELECT COUNT(*)::int AS entries,
+              COALESCE(SUM(debit_amount::numeric), 0) AS debit,
+              COALESCE(SUM(credit_amount::numeric), 0) AS credit
+       FROM voucher_entries WHERE voucher_id = $1`,
+      [voucherId],
+    );
+    if (Number(totals.entries) !== 2 || Number(totals.debit) !== 30 || Number(totals.credit) !== 30) {
+      throw new Error(`SP accounting mismatch: ${JSON.stringify(totals)}`);
+    }
+    await openRoute(devPage, "/sp");
+    return {
+      saleId: sale.body?.id,
+      voucherId,
+      stock: [Number(before.quantity), Number(after.quantity)],
+      debit: Number(totals.debit),
+      credit: Number(totals.credit),
+    };
+  });
+
+  await runCase("POS role is blocked from accounting and foreign companies", devPage, async () => {
+    const restrictedContext = await browser.createBrowserContext();
+    const restrictedPage = await restrictedContext.newPage();
+    await restrictedPage.setViewport({ width: 1280, height: 800 });
+    try {
+      await login(restrictedPage, posUsername, posPassword);
+      await selectCompany(restrictedPage, "PHASE7-ERP");
+      const journal = await browserRequest(restrictedPage, "POST", "/api/vouchers/journal", {
+        voucherDate: new Date().toISOString().slice(0, 10),
+        notes: "Phase 7 restricted attempt",
+        entries: [
+          {
+            type: "DR",
+            accountType: "ledger",
+            accountId: fixture.erp.cashAccountId,
+            amount: "10",
+            narration: "restricted debit",
+          },
+          {
+            type: "CR",
+            accountType: "ledger",
+            accountId: fixture.erp.salesAccountId,
+            amount: "10",
+            narration: "restricted credit",
+          },
+        ],
+      });
+      if (journal.status < 400) throw new Error(`POS role unexpectedly created a journal (${journal.status})`);
+
+      const foreignSwitch = await browserRequest(restrictedPage, "POST", "/api/auth/set-company", {
+        companyId: fixture.companies.factory,
+      });
+      if (foreignSwitch.status < 400) {
+        throw new Error(`POS role unexpectedly switched to an unassigned company (${foreignSwitch.status})`);
+      }
+      await openRoute(restrictedPage, "/pos");
+      await capture(restrictedPage, "POS role permissions");
+      return { journalStatus: journal.status, foreignCompanyStatus: foreignSwitch.status };
+    } finally {
+      await restrictedContext.close();
+    }
+  });
+
+  await runCase("English French Arabic runtime directions", devPage, async () => {
+    await selectCompany(devPage, "PHASE7-ERP");
+    const observed = [];
+    for (const language of [
+      { code: "en", direction: "ltr" },
+      { code: "fr", direction: "ltr" },
+      { code: "ar", direction: "rtl" },
+    ]) {
+      await openRoute(devPage, "/tracking");
+      await setLanguage(devPage, language.code);
+      const state = await devPage.evaluate(() => ({
+        language: document.documentElement.lang,
+        direction: document.documentElement.dir,
+        bodyDirection: document.body.dir,
+      }));
+      if (
+        state.language !== language.code ||
+        state.direction !== language.direction ||
+        state.bodyDirection !== language.direction
+      ) {
+        throw new Error(`${language.code} runtime state mismatch: ${JSON.stringify(state)}`);
+      }
+      observed.push(state);
+    }
+    return observed;
+  });
+} finally {
+  report.finishedAt = new Date().toISOString();
+  await fs.writeFile(path.join(outputDir, "report.json"), `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  if (devPage && !devPage.isClosed()) await devPage.close().catch(() => undefined);
+  await browser.close().catch(() => undefined);
+  await pool.end().catch(() => undefined);
+}
+
+if (report.failures.length > 0) {
+  console.error(JSON.stringify({ status: "phase7-browser-e2e-failed", failures: report.failures }, null, 2));
+  process.exit(1);
+}
+
+console.log(JSON.stringify({ status: "phase7-browser-e2e-passed", cases: report.cases.length }, null, 2));

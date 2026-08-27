@@ -4,17 +4,34 @@ on:
   pull_request:
     paths:
       - ".github/workflows/resilience-rehearsal.yml"
-      - "scripts/verify-database-backup.mjs"
-      - "scripts/verify-final-production-readiness.mjs"
-      - "server/services/scheduler/**"
-      - "tests/scheduler-tick-guard.test.ts"
+      - ".github/workflows/exact-main-certification.yml"
+      - "client/src/lib/clientObservability.ts"
       - "docs/operations/database-backup-rollback-recovery.md"
+      - "docs/operations/external-alerting-checklist.md"
       - "drizzle.config.ts"
-      - "shared/schema/**"
+      - "migrations/**"
       - "package.json"
       - "package-lock.json"
+      - "scripts/verify-database-backup.mjs"
+      - "scripts/verify-final-production-readiness.mjs"
+      - "scripts/verify-migration-registry.mjs"
+      - "scripts/verify-phase11-12-observability-disaster-recovery.mjs"
+      - "scripts/verify-phase11-operational-monitoring.mjs"
+      - "scripts/verify-program1-observability-foundation.mjs"
+      - "server/lib/observabilityBootstrap.ts"
+      - "server/lib/operationalAlerts.ts"
+      - "server/lib/operationalAlertRuntime.ts"
+      - "server/lib/schedulerObservability.ts"
+      - "server/routes/admin/operationalMonitoringRoutes.ts"
+      - "server/runtimeObservability.mjs"
+      - "server/services/operations/operationalHealthService.ts"
+      - "server/services/scheduler/**"
+      - "shared/schema/**"
+      - "tests/scheduler-tick-guard.test.ts"
   push:
     branches: [main]
+  schedule:
+    - cron: "17 3 * * 0"
   workflow_dispatch:
 
 permissions:
@@ -47,6 +64,7 @@ jobs:
       SESSION_SECRET: resilience-rehearsal-session-secret
       CSRF_ENFORCE: "0"
       ENABLE_SCHEDULERS: "false"
+      DR_REHEARSAL_RTO_SECONDS: "300"
       PGHOST: localhost
       PGPORT: "5432"
       PGUSER: postgres
@@ -73,8 +91,11 @@ jobs:
           SKIP_GIT_HOOKS: "1"
         run: npm ci --no-audit --bin-links=true
 
-      - name: Verify resilience contracts
-        run: npm run verify:final-production-readiness
+      - name: Verify resilience and observability contracts
+        run: |
+          npm run verify:observability
+          npm run verify:final-production-readiness
+          node scripts/verify-phase11-12-observability-disaster-recovery.mjs
 
       - name: Prepare source database schema
         run: node node_modules/drizzle-kit/bin.cjs push --force
@@ -93,43 +114,122 @@ jobs:
           VALUES (1, 'backup-restore-rehearsal');
           SQL
 
+      - name: Capture source critical-row fingerprint
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -At -F $'\t' <<'SQL' > "$RUNNER_TEMP/source-critical-counts.tsv"
+          SELECT 'companies', COUNT(*)::bigint FROM companies
+          UNION ALL SELECT 'inventory', COUNT(*)::bigint FROM inventory
+          UNION ALL SELECT 'ledger_accounts', COUNT(*)::bigint FROM ledger_accounts
+          UNION ALL SELECT 'voucher_entries', COUNT(*)::bigint FROM voucher_entries
+          UNION ALL SELECT 'vouchers', COUNT(*)::bigint FROM vouchers
+          ORDER BY 1;
+          SQL
+          cat "$RUNNER_TEMP/source-critical-counts.tsv"
+
       - name: Create and verify backup
         run: |
           BACKUP_FILE="$RUNNER_TEMP/erp-resilience.dump"
+          started_at=$(date +%s)
           pg_dump \
             --format=custom \
             --no-owner \
             --no-acl \
             --file="$BACKUP_FILE" \
             "$DATABASE_URL"
+          backup_seconds=$(( $(date +%s) - started_at ))
+          echo "BACKUP_SECONDS=$backup_seconds" >> "$GITHUB_ENV"
           pg_restore --list "$BACKUP_FILE" > "$RUNNER_TEMP/erp-resilience.toc.txt"
           test -s "$RUNNER_TEMP/erp-resilience.toc.txt"
-          node scripts/verify-database-backup.mjs "$BACKUP_FILE" --max-age-hours=1 --json
+          node scripts/verify-database-backup.mjs "$BACKUP_FILE" --max-age-hours=1 --json > "$RUNNER_TEMP/backup-verification.json"
+          cat "$RUNNER_TEMP/backup-verification.json"
 
       - name: Restore into fresh disposable database
         run: |
+          RESTORE_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/heliumdb_restore
           dropdb --if-exists -h localhost -U postgres heliumdb_restore
           createdb -h localhost -U postgres heliumdb_restore
+          started_at=$(date +%s)
           pg_restore \
             --exit-on-error \
             --no-owner \
             --no-acl \
-            --dbname=postgresql://postgres:postgres@localhost:5432/heliumdb_restore \
+            --dbname="$RESTORE_DATABASE_URL" \
             "$RUNNER_TEMP/erp-resilience.dump"
+          restore_seconds=$(( $(date +%s) - started_at ))
+          echo "RESTORE_SECONDS=$restore_seconds" >> "$GITHUB_ENV"
+          echo "RESTORE_DATABASE_URL=$RESTORE_DATABASE_URL" >> "$GITHUB_ENV"
+          if [ "$restore_seconds" -gt "$DR_REHEARSAL_RTO_SECONDS" ]; then
+            echo "Restore took ${restore_seconds}s, exceeding the ${DR_REHEARSAL_RTO_SECONDS}s rehearsal recovery-time budget."
+            exit 1
+          fi
 
-      - name: Verify restored database
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb_restore
+      - name: Verify restored database and critical-row fingerprint
         run: |
+          export DATABASE_URL="$RESTORE_DATABASE_URL"
           test "$(psql "$DATABASE_URL" -Atqc "SELECT marker FROM resilience_rehearsal_sentinel WHERE id = 1")" = "backup-restore-rehearsal"
           node scripts/verify-ci-disposable-schema.mjs
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -At -F $'\t' <<'SQL' > "$RUNNER_TEMP/restore-critical-counts.tsv"
+          SELECT 'companies', COUNT(*)::bigint FROM companies
+          UNION ALL SELECT 'inventory', COUNT(*)::bigint FROM inventory
+          UNION ALL SELECT 'ledger_accounts', COUNT(*)::bigint FROM ledger_accounts
+          UNION ALL SELECT 'voucher_entries', COUNT(*)::bigint FROM voucher_entries
+          UNION ALL SELECT 'vouchers', COUNT(*)::bigint FROM vouchers
+          ORDER BY 1;
+          SQL
+          diff -u "$RUNNER_TEMP/source-critical-counts.tsv" "$RUNNER_TEMP/restore-critical-counts.tsv"
 
       - name: Prove scheduler failure and overlap isolation
         run: node node_modules/vitest/vitest.mjs run tests/scheduler-tick-guard.test.ts --maxWorkers=1 --no-file-parallelism
 
-      - name: Emit rehearsal evidence
+      - name: Emit structured resilience evidence
+        if: always()
+        run: |
+          backup_sha="unavailable"
+          source_counts_sha="unavailable"
+          restore_counts_sha="unavailable"
+          if [ -f "$RUNNER_TEMP/erp-resilience.dump" ]; then
+            backup_sha=$(sha256sum "$RUNNER_TEMP/erp-resilience.dump" | awk '{print $1}')
+          fi
+          if [ -f "$RUNNER_TEMP/source-critical-counts.tsv" ]; then
+            source_counts_sha=$(sha256sum "$RUNNER_TEMP/source-critical-counts.tsv" | awk '{print $1}')
+          fi
+          if [ -f "$RUNNER_TEMP/restore-critical-counts.tsv" ]; then
+            restore_counts_sha=$(sha256sum "$RUNNER_TEMP/restore-critical-counts.tsv" | awk '{print $1}')
+          fi
+          printf '{\n  "schemaVersion": 1,\n  "commit": "%s",\n  "workflowRunId": "%s",\n  "workflowRunAttempt": "%s",\n  "backupSha256": "%s",\n  "sourceCriticalCountsSha256": "%s",\n  "restoreCriticalCountsSha256": "%s",\n  "backupSeconds": %s,\n  "restoreSeconds": %s,\n  "rehearsalRtoBudgetSeconds": %s\n}\n' \
+            "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$backup_sha" "$source_counts_sha" "$restore_counts_sha" \
+            "${BACKUP_SECONDS:-null}" "${RESTORE_SECONDS:-null}" "$DR_REHEARSAL_RTO_SECONDS" \
+            > "$RUNNER_TEMP/resilience-evidence.json"
+          cat "$RUNNER_TEMP/resilience-evidence.json"
+          {
+            echo "## Resilience rehearsal evidence"
+            echo
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Backup duration: ${BACKUP_SECONDS:-unavailable}s"
+            echo "- Restore duration: ${RESTORE_SECONDS:-unavailable}s"
+            echo "- Rehearsal recovery-time budget: ${DR_REHEARSAL_RTO_SECONDS}s"
+            echo "- Critical-row fingerprint source SHA-256: \`$source_counts_sha\`"
+            echo "- Critical-row fingerprint restore SHA-256: \`$restore_counts_sha\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload resilience evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: resilience-rehearsal-evidence-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/resilience-evidence.json
+            ${{ runner.temp }}/backup-verification.json
+            ${{ runner.temp }}/source-critical-counts.tsv
+            ${{ runner.temp }}/restore-critical-counts.tsv
+            ${{ runner.temp }}/erp-resilience.toc.txt
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Emit rehearsal completion summary
+        if: success()
         run: |
           echo "Resilience rehearsal completed successfully."
           echo "Source and restore databases were disposable CI databases."
           echo "Schedulers remained disabled for the entire rehearsal."
-          echo "Backup format, catalog readability, restore, schema verification, sentinel preservation, and scheduler isolation all passed."
+          echo "Backup format, catalog readability, restore, schema verification, sentinel preservation, critical-row fingerprint parity, recovery-time budget, and scheduler isolation all passed."

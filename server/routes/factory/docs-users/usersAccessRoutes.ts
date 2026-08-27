@@ -7,11 +7,37 @@
 import type { Express } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
-import { db } from "../../../db";
-import { requireAuth } from "../../../auth";
+import { db, pool } from "../../../db";
+import { requireAuth, requirePasswordConfirmation } from "../../../auth";
+import { privilegedMutationRateLimit } from "../../../middleware/privilegedEndpointSecurity";
 import { users, companies, userCompanyRoles, factoryUserProfiles, factoryUserPageAccess } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "../../_helpers";
+import {
+  bumpCredentialVersion,
+  revokeUserCompanySessions,
+  revokeUserSessions,
+} from "../../../services/security/credentialVersionService";
+
+function requesterIsDeveloper(currentRole: unknown, requestRole: unknown): boolean {
+  return currentRole === "Developer" || requestRole === "Developer";
+}
+
+function canManageFactoryUsers(currentRole: unknown, requestRole: unknown): boolean {
+  return (
+    ["Admin", "Owner", "Developer"].includes(String(currentRole ?? "")) ||
+    ["Admin", "Developer"].includes(String(requestRole ?? ""))
+  );
+}
+
+async function loadCompanyMembership(userId: string, companyId: number) {
+  const [membership] = await db
+    .select({ role: userCompanyRoles.role })
+    .from(userCompanyRoles)
+    .where(and(eq(userCompanyRoles.userId, userId), eq(userCompanyRoles.companyId, companyId)))
+    .limit(1);
+  return membership ?? null;
+}
 
 export function registerFactoryUsersAccessRoutes(app: Express) {
   // ───────────────────────────────────────────────
@@ -20,128 +46,132 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
 
   app.get("/api/factory/users", requireAuth, async (req: any, res: import("express").Response) => {
     try {
-      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
+      // Factory user management is tenant scoped. Never use a cached/pinned
+      // company different from the authenticated request company here; Phase 3
+      // RLS and the application boundary must agree on the same tenant.
+      const companyId = req.session.currentCompanyId;
       const currentRole = req.session.currentRole;
-      const globalRole = req.user?.role;
+      const requestRole = req.user?.role;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const isAllowed =
-        ["Admin", "Owner", "Developer"].includes(currentRole) || ["Admin", "Developer"].includes(globalRole);
-      if (!isAllowed) return res.status(403).json({ message: "Only Admin or Owner can manage users" });
+      if (!canManageFactoryUsers(currentRole, requestRole)) {
+        return res.status(403).json({ message: "Only Admin or Owner can manage users" });
+      }
 
-      const allUsers = await db
+      const companyUsers = await db
         .select({
           id: users.id,
           username: users.username,
           active: users.active,
           createdAt: users.createdAt,
+          companyRole: userCompanyRoles.role,
         })
-        .from(users);
+        .from(users)
+        .innerJoin(
+          userCompanyRoles,
+          and(eq(userCompanyRoles.userId, users.id), eq(userCompanyRoles.companyId, companyId))
+        );
 
-      // Collect user IDs that have the Developer role in ANY company.
-      // Match the ERP user-list behaviour: Developer accounts are globally
-      // invisible to non-developers, regardless of which company is active.
-      const devRoles = await db
-        .select({ userId: userCompanyRoles.userId })
-        .from(userCompanyRoles)
-        .where(eq(userCompanyRoles.role, "Developer"));
-      const devUserIds = new Set(devRoles.map((r) => r.userId));
-      const requesterIsDeveloper = currentRole === "Developer" || globalRole === "Developer";
-
-      const visibleUsers = allUsers.filter((u) => requesterIsDeveloper || !devUserIds.has(u.id));
+      const isDeveloper = requesterIsDeveloper(currentRole, requestRole);
+      const visibleUsers = companyUsers.filter((user) => isDeveloper || user.companyRole !== "Developer");
 
       const profiles = await db.select().from(factoryUserProfiles).where(eq(factoryUserProfiles.companyId, companyId));
-
       const access = await db
         .select()
         .from(factoryUserPageAccess)
         .where(eq(factoryUserPageAccess.companyId, companyId));
 
-      const profileMap = new Map(profiles.map((p) => [p.userId, p]));
+      const profileMap = new Map(profiles.map((profile) => [profile.userId, profile]));
       const accessMap = new Map<string, string[]>();
-      access.forEach((a) => {
-        if (!accessMap.has(a.userId)) accessMap.set(a.userId, []);
-        accessMap.get(a.userId)!.push(a.pageKey);
+      access.forEach((entry) => {
+        if (!accessMap.has(entry.userId)) accessMap.set(entry.userId, []);
+        accessMap.get(entry.userId)!.push(entry.pageKey);
       });
 
-      const result = visibleUsers.map((u) => {
-        const profile = profileMap.get(u.id);
+      const result = visibleUsers.map(({ companyRole: _companyRole, ...user }) => {
+        const profile = profileMap.get(user.id);
         return {
-          ...u,
+          ...user,
           displayName: profile?.displayName || null,
           hasErpAccess: profile?.hasErpAccess ?? true,
           hasFactoryAccess: profile?.hasFactoryAccess ?? true,
           hiddenCostFields: profile?.hiddenCostFields ?? [],
           hideAllCosts: profile?.hideAllCosts ?? false,
-          pageAccess: accessMap.get(u.id) || [],
+          pageAccess: accessMap.get(user.id) || [],
         };
       });
 
       res.json(result);
     } catch (error: unknown) {
-      logger.error("Error fetching factory users:", { error: error });
+      logger.error("Error fetching factory users:", { error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
-  app.post("/api/factory/users", requireAuth, async (req: any, res: import("express").Response) => {
-    try {
-      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
-      const currentRole = req.session.currentRole;
-      const globalRole = req.user?.role;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const isAllowed = ["Admin", "Owner"].includes(currentRole) || ["Admin", "Developer"].includes(globalRole);
-      if (!isAllowed) return res.status(403).json({ message: "Only Admin or Owner can manage users" });
-
-      const { username, password, displayName, pageAccess, hasErpAccess, hasFactoryAccess } = req.body;
-
-      if (!username || !password) {
-        return res.status(400).json({ message: "Username and password are required" });
-      }
-      if (password.length < 4) {
-        return res.status(400).json({ message: "Password must be at least 4 characters" });
-      }
-
-      const existing = await db.select().from(users).where(eq(users.username, username));
-      if (existing.length > 0) {
-        return res.status(400).json({ message: "Username already exists" });
-      }
-
-      await db.transaction(async (tx) => {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const [newUser] = await tx
-          .insert(users)
-          .values({
-            username,
-            password: hashedPassword,
-            active: true,
-          })
-          .returning();
-
-        await tx.insert(userCompanyRoles).values({
-          userId: newUser.id,
-          companyId,
-          role: "User",
-        });
-
-        await tx.insert(factoryUserProfiles).values({
-          companyId,
-          userId: newUser.id,
-          displayName: displayName || username,
-          hasErpAccess: hasErpAccess ?? true,
-          hasFactoryAccess: hasFactoryAccess ?? true,
-        });
-
-        if (Array.isArray(pageAccess) && pageAccess.length > 0) {
-          await tx.insert(factoryUserPageAccess).values(
-            pageAccess.map((pk: string) => ({
-              companyId,
-              userId: newUser.id,
-              pageKey: pk,
-            }))
-          );
+  app.post(
+    "/api/factory/users",
+    requireAuth,
+    privilegedMutationRateLimit,
+    requirePasswordConfirmation,
+    async (req: any, res: import("express").Response) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        const currentRole = req.session.currentRole;
+        const requestRole = req.user?.role;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        if (!canManageFactoryUsers(currentRole, requestRole)) {
+          return res.status(403).json({ message: "Only Admin or Owner can manage users" });
         }
 
-        const { password: _, ...userWithoutPassword } = newUser;
+        const { username, password, displayName, pageAccess, hasErpAccess, hasFactoryAccess } = req.body;
+        if (!username || !password) {
+          return res.status(400).json({ message: "Username and password are required" });
+        }
+        if (password.length < 6) {
+          return res.status(400).json({ message: "Password must be at least 6 characters" });
+        }
+
+        const existing = await db.select({ id: users.id }).from(users).where(eq(users.username, username)).limit(1);
+        if (existing.length > 0) {
+          return res.status(400).json({ message: "Username already exists" });
+        }
+
+        const newUser = await db.transaction(async (tx) => {
+          const [created] = await tx
+            .insert(users)
+            .values({
+              username,
+              password: await hashPassword(password),
+              active: true,
+            })
+            .returning();
+
+          await tx.insert(userCompanyRoles).values({
+            userId: created.id,
+            companyId,
+            role: "User",
+          });
+
+          await tx.insert(factoryUserProfiles).values({
+            companyId,
+            userId: created.id,
+            displayName: displayName || username,
+            hasErpAccess: hasErpAccess ?? true,
+            hasFactoryAccess: hasFactoryAccess ?? true,
+          });
+
+          if (Array.isArray(pageAccess) && pageAccess.length > 0) {
+            await tx.insert(factoryUserPageAccess).values(
+              pageAccess.map((pageKey: string) => ({
+                companyId,
+                userId: created.id,
+                pageKey,
+              }))
+            );
+          }
+          return created;
+        });
+
+        const { password: _password, ...userWithoutPassword } = newUser;
         res.status(201).json({
           ...userWithoutPassword,
           displayName: displayName || username,
@@ -149,131 +179,195 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
           hasFactoryAccess: hasFactoryAccess ?? true,
           pageAccess: pageAccess || [],
         });
-      });
-    } catch (error: unknown) {
-      logger.error("Error creating factory user:", { error: error });
-      res.status(400).json({ message: getErrorMessage(error) });
+      } catch (error: unknown) {
+        logger.error("Error creating factory user:", { error });
+        res.status(400).json({ message: getErrorMessage(error) });
+      }
     }
-  });
+  );
 
-  app.put("/api/factory/users/:userId", requireAuth, async (req: any, res: import("express").Response) => {
-    try {
-      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
-      const currentRole = req.session.currentRole;
-      const globalRole = req.user?.role;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const isAllowed = ["Admin", "Owner"].includes(currentRole) || ["Admin", "Developer"].includes(globalRole);
-      if (!isAllowed) return res.status(403).json({ message: "Only Admin or Owner can manage users" });
-
-      const { userId } = req.params;
-      const {
-        displayName,
-        pageAccess,
-        password,
-        hasErpAccess,
-        hasFactoryAccess,
-        hiddenCostFields,
-        hideAllCosts,
-        username,
-      } = req.body;
-
-      await db.transaction(async (tx) => {
-        const userUpdates: any = {};
-        if (password && password.length >= 4) {
-          userUpdates.password = await bcrypt.hash(password, 10);
+  app.put(
+    "/api/factory/users/:userId",
+    requireAuth,
+    privilegedMutationRateLimit,
+    requirePasswordConfirmation,
+    async (req: any, res: import("express").Response) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        const currentRole = req.session.currentRole;
+        const requestRole = req.user?.role;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        if (!canManageFactoryUsers(currentRole, requestRole)) {
+          return res.status(403).json({ message: "Only Admin or Owner can manage users" });
         }
-        if (username && username.trim()) {
-          const existingWithUsername = await tx
-            .select({ id: users.id })
-            .from(users)
-            .where(eq(users.username, username.trim()));
-          if (existingWithUsername.length > 0 && existingWithUsername[0].id !== userId) {
-            throw new Error("Username already taken");
+
+        const { userId } = req.params;
+        const membership = await loadCompanyMembership(userId, companyId);
+        if (!membership) return res.status(404).json({ message: "User not found in this company" });
+
+        const isDeveloper = requesterIsDeveloper(currentRole, requestRole);
+        if (membership.role === "Developer" && !isDeveloper) {
+          return res.status(403).json({ message: "Cannot modify this account" });
+        }
+
+        const {
+          displayName,
+          pageAccess,
+          password,
+          hasErpAccess,
+          hasFactoryAccess,
+          hiddenCostFields,
+          hideAllCosts,
+          username,
+        } = req.body;
+
+        // Username/password live on the global identity record, not on a tenant
+        // membership. A tenant Admin/Owner must not be able to mutate credentials
+        // that may also authorize the same identity in another company.
+        if (!isDeveloper && (password !== undefined || username !== undefined)) {
+          return res.status(403).json({ message: "Only Developer can change global user credentials" });
+        }
+        if (password !== undefined && password && password.length < 6) {
+          return res.status(400).json({ message: "Password must be at least 6 characters" });
+        }
+
+        const credentialChanged = Boolean(password || (typeof username === "string" && username.trim()));
+        const newCredentialVersion = await db.transaction(async (tx) => {
+          let credentialVersion: number | null = null;
+          const userUpdates: Record<string, unknown> = {};
+          if (password) userUpdates.password = await hashPassword(password);
+          if (typeof username === "string" && username.trim()) {
+            const normalizedUsername = username.trim();
+            const existingWithUsername = await tx
+              .select({ id: users.id })
+              .from(users)
+              .where(eq(users.username, normalizedUsername))
+              .limit(1);
+            if (existingWithUsername.length > 0 && existingWithUsername[0].id !== userId) {
+              throw new Error("Username already taken");
+            }
+            userUpdates.username = normalizedUsername;
           }
-          userUpdates.username = username.trim();
-        }
-        if (Object.keys(userUpdates).length > 0) {
-          await tx.update(users).set(userUpdates).where(eq(users.id, userId));
-        }
+          if (Object.keys(userUpdates).length > 0) {
+            await tx.update(users).set(userUpdates).where(eq(users.id, userId));
+            credentialVersion = await bumpCredentialVersion(tx, userId);
+          }
 
-        const profileUpdates: any = { updatedAt: new Date() };
-        if (displayName !== undefined) profileUpdates.displayName = displayName;
-        if (hasErpAccess !== undefined) profileUpdates.hasErpAccess = hasErpAccess;
-        if (hasFactoryAccess !== undefined) profileUpdates.hasFactoryAccess = hasFactoryAccess;
-        if (Array.isArray(hiddenCostFields)) profileUpdates.hiddenCostFields = hiddenCostFields;
-        if (hideAllCosts !== undefined) profileUpdates.hideAllCosts = !!hideAllCosts;
+          const profileUpdates: Record<string, unknown> = { updatedAt: new Date() };
+          if (displayName !== undefined) profileUpdates.displayName = displayName;
+          if (hasErpAccess !== undefined) profileUpdates.hasErpAccess = hasErpAccess;
+          if (hasFactoryAccess !== undefined) profileUpdates.hasFactoryAccess = hasFactoryAccess;
+          if (Array.isArray(hiddenCostFields)) profileUpdates.hiddenCostFields = hiddenCostFields;
+          if (hideAllCosts !== undefined) profileUpdates.hideAllCosts = !!hideAllCosts;
 
-        const existingProfile = await tx
-          .select()
-          .from(factoryUserProfiles)
-          .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
+          const existingProfile = await tx
+            .select({ userId: factoryUserProfiles.userId })
+            .from(factoryUserProfiles)
+            .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)))
+            .limit(1);
 
-        if (existingProfile.length > 0) {
-          await tx
-            .update(factoryUserProfiles)
-            .set(profileUpdates)
-            .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
+          if (existingProfile.length > 0) {
+            await tx
+              .update(factoryUserProfiles)
+              .set(profileUpdates)
+              .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
+          } else {
+            await tx.insert(factoryUserProfiles).values({
+              companyId,
+              userId,
+              displayName: displayName || "User",
+              hasErpAccess: hasErpAccess ?? true,
+              hasFactoryAccess: hasFactoryAccess ?? true,
+              hiddenCostFields: Array.isArray(hiddenCostFields) ? hiddenCostFields : [],
+              hideAllCosts: !!hideAllCosts,
+            });
+          }
+
+          if (Array.isArray(pageAccess)) {
+            await tx
+              .delete(factoryUserPageAccess)
+              .where(and(eq(factoryUserPageAccess.companyId, companyId), eq(factoryUserPageAccess.userId, userId)));
+
+            if (pageAccess.length > 0) {
+              await tx.insert(factoryUserPageAccess).values(
+                pageAccess.map((pageKey: string) => ({
+                  companyId,
+                  userId,
+                  pageKey,
+                }))
+              );
+            }
+          }
+
+          return credentialVersion;
+        });
+
+        // Global credential rotation invalidates every session for the shared
+        // identity. Tenant-only profile/access changes revoke only sessions that
+        // are operating inside the affected company.
+        if (newCredentialVersion != null) {
+          await revokeUserSessions(pool, userId);
         } else {
-          await tx.insert(factoryUserProfiles).values({
-            companyId,
-            userId,
-            displayName: displayName || "User",
-            hasErpAccess: hasErpAccess ?? true,
-            hasFactoryAccess: hasFactoryAccess ?? true,
-            hiddenCostFields: Array.isArray(hiddenCostFields) ? hiddenCostFields : [],
-            hideAllCosts: !!hideAllCosts,
-          });
+          await revokeUserCompanySessions(pool, userId, companyId);
+        }
+        res.json({
+          message: credentialChanged || newCredentialVersion != null ? "User updated" : "User access updated",
+        });
+      } catch (error: unknown) {
+        logger.error("Error updating factory user:", { error });
+        res.status(500).json({ message: getErrorMessage(error) });
+      }
+    }
+  );
+
+  app.delete(
+    "/api/factory/users/:userId",
+    requireAuth,
+    privilegedMutationRateLimit,
+    requirePasswordConfirmation,
+    async (req: any, res: import("express").Response) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        const currentRole = req.session.currentRole;
+        const requestRole = req.user?.role;
+        const sessionUserId = req.session.userId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        if (!canManageFactoryUsers(currentRole, requestRole)) {
+          return res.status(403).json({ message: "Only Admin or Owner can manage users" });
         }
 
-        if (Array.isArray(pageAccess)) {
+        const { userId } = req.params;
+        if (userId === sessionUserId) {
+          return res.status(400).json({ message: "You cannot remove your own account" });
+        }
+
+        const membership = await loadCompanyMembership(userId, companyId);
+        if (!membership) return res.status(404).json({ message: "User not found in this company" });
+        if (membership.role === "Developer" && !requesterIsDeveloper(currentRole, requestRole)) {
+          return res.status(403).json({ message: "Cannot remove this account" });
+        }
+
+        // Removing a user from one tenant must never delete their global identity
+        // or memberships in other tenants. Only current-company rows are removed.
+        await db.transaction(async (tx) => {
           await tx
             .delete(factoryUserPageAccess)
             .where(and(eq(factoryUserPageAccess.companyId, companyId), eq(factoryUserPageAccess.userId, userId)));
-
-          if (pageAccess.length > 0) {
-            await tx.insert(factoryUserPageAccess).values(
-              pageAccess.map((pk: string) => ({
-                companyId,
-                userId,
-                pageKey: pk,
-              }))
-            );
-          }
-        }
-      });
-
-      res.json({ message: "User updated" });
-    } catch (error: unknown) {
-      logger.error("Error updating factory user:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
-    }
-  });
-
-  app.delete("/api/factory/users/:userId", requireAuth, async (req: any, res: import("express").Response) => {
-    try {
-      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
-      const currentRole = req.session.currentRole;
-      const globalRole = req.user?.role;
-      const sessionUserId = req.session.userId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const isAllowed = ["Admin", "Owner"].includes(currentRole) || ["Admin", "Developer"].includes(globalRole);
-      if (!isAllowed) return res.status(403).json({ message: "Only Admin or Owner can manage users" });
-      const { userId } = req.params;
-      if (userId === sessionUserId) {
-        return res.status(400).json({ message: "You cannot delete your own account" });
+          await tx
+            .delete(factoryUserProfiles)
+            .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
+          await tx
+            .delete(userCompanyRoles)
+            .where(and(eq(userCompanyRoles.companyId, companyId), eq(userCompanyRoles.userId, userId)));
+        });
+        await revokeUserCompanySessions(pool, userId, companyId);
+        res.json({ message: "User access removed from this company" });
+      } catch (error: unknown) {
+        logger.error("Error removing factory user:", { error });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
-      await db.transaction(async (tx) => {
-        await tx.delete(factoryUserPageAccess).where(eq(factoryUserPageAccess.userId, userId));
-        await tx.delete(factoryUserProfiles).where(eq(factoryUserProfiles.userId, userId));
-        await tx.delete(userCompanyRoles).where(eq(userCompanyRoles.userId, userId));
-        await tx.delete(users).where(eq(users.id, userId));
-      });
-      res.json({ message: "User removed successfully" });
-    } catch (error: unknown) {
-      logger.error("Error deleting factory user:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
     }
-  });
+  );
 
   app.get("/api/factory/my-access", requireAuth, async (req: any, res: import("express").Response) => {
     try {
@@ -283,14 +377,14 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
       const cachedFactoryName = req.session.factoryCompanyName as string | undefined;
       const role = req.session.currentRole;
 
-      // Fast-path: if the session already has the resolved factory company AND the role
-      // is admin/owner/developer (full access, no per-user DB lookup needed), return
-      // immediately without touching the database. This fires on every page navigation
-      // (staleTime=30s), so eliminating the DB round-trip matters a lot.
+      if (!currentCompanyId || !userId) return res.status(400).json({ message: "No company or user" });
+
+      // A pinned factory company is only a cache hint. It can never widen the
+      // authenticated tenant context. Cross-company fallback to the first active
+      // factory used to let a normal session discover/use another tenant.
       if (
-        pinnedFactoryId &&
+        pinnedFactoryId === currentCompanyId &&
         cachedFactoryName &&
-        userId &&
         (role === "Admin" || role === "Owner" || role === "Developer")
       ) {
         res.set("Cache-Control", "private, max-age=120");
@@ -301,70 +395,27 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
           hasFactoryAccess: true,
           hiddenCostFields: [],
           hideAllCosts: false,
-          companyId: pinnedFactoryId,
+          companyId: currentCompanyId,
           companyName: cachedFactoryName,
         });
       }
 
-      // Resolve the factory company ID:
-      // Priority 1: already-pinned factoryCompanyId — verify it is factory type
-      // Priority 2: currentCompanyId if it is factory type
-      // Priority 3: first active factory-type company in the DB
-      // Priority 4: fall back to currentCompanyId (legacy / single-company setups)
-      let companyId: number | null = null;
-      let companyName: string = "";
+      const [current] = await db
+        .select({ id: companies.id, name: companies.name, companyType: companies.companyType })
+        .from(companies)
+        .where(eq(companies.id, currentCompanyId))
+        .limit(1);
+      if (!current) return res.status(404).json({ message: "Company not found" });
 
-      if (pinnedFactoryId) {
-        const [pinned] = await db
-          .select({ id: companies.id, name: companies.name, companyType: companies.companyType })
-          .from(companies)
-          .where(eq(companies.id, pinnedFactoryId));
-        if (pinned?.companyType === "factory") {
-          companyId = pinned.id;
-          companyName = pinned.name;
-        }
+      const companyId = current.id;
+      const companyName = current.name;
+      if (current.companyType === "factory") {
+        req.session.factoryCompanyId = companyId;
+        req.session.factoryCompanyName = companyName;
+      } else {
+        delete req.session.factoryCompanyId;
+        delete req.session.factoryCompanyName;
       }
-
-      if (!companyId && currentCompanyId) {
-        const [current] = await db
-          .select({ id: companies.id, name: companies.name, companyType: companies.companyType })
-          .from(companies)
-          .where(eq(companies.id, currentCompanyId));
-        if (current?.companyType === "factory") {
-          companyId = current.id;
-          companyName = current.name;
-        }
-      }
-
-      if (!companyId) {
-        const [factoryComp] = await db
-          .select({ id: companies.id, name: companies.name })
-          .from(companies)
-          .where(and(eq(companies.companyType, "factory"), eq(companies.active, true)))
-          .limit(1);
-        if (factoryComp) {
-          companyId = factoryComp.id;
-          companyName = factoryComp.name;
-        }
-      }
-
-      if (!companyId) {
-        // Last resort: use currentCompanyId (single-company or legacy setups)
-        companyId = currentCompanyId;
-        if (currentCompanyId) {
-          const [c] = await db
-            .select({ name: companies.name })
-            .from(companies)
-            .where(eq(companies.id, currentCompanyId));
-          companyName = c?.name ?? "";
-        }
-      }
-
-      if (!companyId || !userId) return res.status(400).json({ message: "No company or user" });
-
-      // Pin both the ID and name into the session — subsequent calls use the fast-path above.
-      req.session.factoryCompanyId = companyId;
-      req.session.factoryCompanyName = companyName;
 
       if (role === "Admin" || role === "Owner" || role === "Developer") {
         res.set("Cache-Control", "private, max-age=120");
@@ -393,7 +444,6 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
       const hasErpAccess = profile ? profile.hasErpAccess : true;
       const hasFactoryAccess = profile ? profile.hasFactoryAccess : true;
       const hideAllCosts = profile?.hideAllCosts ?? false;
-      // When hideAllCosts is set, treat all cost field keys as hidden
       const ALL_COST_KEYS = [
         "inventory_avg_rate",
         "inventory_total_value",
@@ -427,7 +477,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
 
       res.json({
         fullAccess: false,
-        pageKeys: access.map((a) => a.pageKey),
+        pageKeys: access.map((entry) => entry.pageKey),
         hasErpAccess,
         hasFactoryAccess,
         hiddenCostFields,
@@ -436,7 +486,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
         companyName,
       });
     } catch (error: unknown) {
-      logger.error("Error fetching my access:", { error: error });
+      logger.error("Error fetching my access:", { error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });

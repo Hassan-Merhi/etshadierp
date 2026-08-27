@@ -77,7 +77,7 @@ export function SilentTransferDialog({ model }: Props) {
                     <SelectValue placeholder="From location..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {(locations as any[]).map((location) => (
+                    {locations.map((location) => (
                       <SelectItem key={location.id} value={String(location.id)}>
                         {location.name}
                       </SelectItem>
@@ -92,7 +92,7 @@ export function SilentTransferDialog({ model }: Props) {
                     <SelectValue placeholder="To location..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {(locations as any[])
+                    {locations
                       .filter((location) => String(location.id) !== silentSrcId)
                       .map((location) => (
                         <SelectItem key={location.id} value={String(location.id)}>

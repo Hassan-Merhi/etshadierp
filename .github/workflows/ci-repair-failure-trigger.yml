@@ -1,0 +1,225 @@
+name: CI Repair Failure Trigger
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+  status:
+  schedule:
+    - cron: "2,7,12,17,22,27,32,37,42,47,52,57 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ci-repair-pr-watch-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  watch-pr:
+    name: Watch trusted PR checks for repair
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    permissions:
+      actions: write
+      checks: read
+      contents: read
+      pull-requests: read
+      statuses: read
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+      BASE_REF: ${{ github.event.pull_request.base.ref }}
+      AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
+      IS_DRAFT: ${{ github.event.pull_request.draft }}
+    steps:
+      - name: Watch exact trusted PR head
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          [[ "$IS_DRAFT" == false && "$BASE_REF" == main ]] || exit 0
+          [[ "$HEAD_REPOSITORY" == "$GITHUB_REPOSITORY" ]] || exit 0
+          case "$AUTHOR_ASSOCIATION" in
+            OWNER|MEMBER|COLLABORATOR) ;;
+            *) exit 0 ;;
+          esac
+
+          blocked="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+            --jq '[.labels[].name] | any(. == "ci-repair-blocked")')"
+          [[ "$blocked" == false ]] || exit 0
+
+          # Give all normal PR workflows and external status providers time to
+          # register before deciding that the head is already settled.
+          sleep 20
+
+          for iteration in $(seq 1 210); do
+            current_head="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '.head.sha')"
+            [[ "$current_head" == "$EXPECTED_HEAD_SHA" ]] || exit 0
+
+            checks_json="$(gh api "repos/$GITHUB_REPOSITORY/commits/$EXPECTED_HEAD_SHA/check-runs?per_page=100")"
+            statuses_json="$(gh api "repos/$GITHUB_REPOSITORY/commits/$EXPECTED_HEAD_SHA/status")"
+
+            failed_checks="$(jq '[.check_runs[] | select(
+              .name != "Watch trusted PR checks for repair" and
+              .status == "completed" and
+              (.conclusion == "failure" or
+               .conclusion == "timed_out" or
+               .conclusion == "cancelled" or
+               .conclusion == "action_required" or
+               .conclusion == "startup_failure")
+            )] | length' <<<"$checks_json")"
+            failed_statuses="$(jq '[.statuses[] | select(.state == "failure" or .state == "error")] | length' <<<"$statuses_json")"
+
+            if (( failed_checks > 0 || failed_statuses > 0 )); then
+              gh api --method POST \
+                "repos/$GITHUB_REPOSITORY/actions/workflows/ci-repair-bot.yml/dispatches" \
+                -f ref=main
+              exit 0
+            fi
+
+            active_checks="$(jq '[.check_runs[] | select(
+              .name != "Watch trusted PR checks for repair" and
+              (.status == "queued" or .status == "in_progress" or .status == "waiting" or .status == "pending")
+            )] | length' <<<"$checks_json")"
+            pending_statuses="$(jq '[.statuses[] | select(.state == "pending")] | length' <<<"$statuses_json")"
+            observed_checks="$(jq '[.check_runs[] | select(.name != "Watch trusted PR checks for repair")] | length' <<<"$checks_json")"
+            observed_statuses="$(jq '.statuses | length' <<<"$statuses_json")"
+
+            # After a short registration window, a head with observed checks and
+            # no remaining work is settled and needs no repair wake-up.
+            if (( iteration >= 3 && observed_checks + observed_statuses > 0 && active_checks == 0 && pending_statuses == 0 )); then
+              exit 0
+            fi
+
+            sleep 20
+          done
+
+  external-status-wake:
+    name: Wake on failed external commit status
+    if: >-
+      github.event_name == 'status' &&
+      (github.event.state == 'failure' || github.event.state == 'error')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    env:
+      STATUS_SHA: ${{ github.event.sha }}
+    steps:
+      - name: Validate failed status belongs to a trusted open PR
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          encoded_pr="$(
+            gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100" \
+              --jq ".[] | select(.head.sha == \"$STATUS_SHA\") | @base64" \
+              | head -n1
+          )"
+          [[ -n "$encoded_pr" ]] || exit 0
+
+          pr_json="$(printf '%s' "$encoded_pr" | base64 --decode)"
+          draft="$(jq -r '.draft' <<<"$pr_json")"
+          head_repo="$(jq -r '.head.repo.full_name // ""' <<<"$pr_json")"
+          author_login="$(jq -r '.user.login' <<<"$pr_json")"
+          author_association="$(jq -r '.author_association // ""' <<<"$pr_json")"
+          blocked="$(jq -r '[.labels[].name] | any(. == "ci-repair-blocked")' <<<"$pr_json")"
+
+          [[ "$draft" == false && "$head_repo" == "$GITHUB_REPOSITORY" && "$blocked" == false ]] || exit 0
+          [[ "$author_login" != 'dependabot[bot]' && "$author_login" != 'renovate[bot]' ]] || exit 0
+          case "$author_association" in
+            OWNER|MEMBER|COLLABORATOR) ;;
+            *) exit 0 ;;
+          esac
+
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/ci-repair-bot.yml/dispatches" \
+            -f ref=main
+
+  watchdog-wake:
+    name: Five-minute fallback scan for red PRs
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      checks: read
+      contents: read
+      pull-requests: read
+      statuses: read
+    steps:
+      - name: Dispatch repair only when a trusted PR is currently red
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          while IFS= read -r encoded_pr; do
+            [[ -n "$encoded_pr" ]] || continue
+            pr_json="$(printf '%s' "$encoded_pr" | base64 --decode)"
+            draft="$(jq -r '.draft' <<<"$pr_json")"
+            head_repo="$(jq -r '.head.repo.full_name // ""' <<<"$pr_json")"
+            head_sha="$(jq -r '.head.sha' <<<"$pr_json")"
+            author_login="$(jq -r '.user.login' <<<"$pr_json")"
+            author_association="$(jq -r '.author_association // ""' <<<"$pr_json")"
+            blocked="$(jq -r '[.labels[].name] | any(. == "ci-repair-blocked")' <<<"$pr_json")"
+
+            [[ "$draft" == false && "$head_repo" == "$GITHUB_REPOSITORY" && "$blocked" == false ]] || continue
+            [[ "$author_login" != 'dependabot[bot]' && "$author_login" != 'renovate[bot]' ]] || continue
+            case "$author_association" in
+              OWNER|MEMBER|COLLABORATOR) ;;
+              *) continue ;;
+            esac
+
+            checks_json="$(gh api "repos/$GITHUB_REPOSITORY/commits/$head_sha/check-runs?per_page=100")"
+            statuses_json="$(gh api "repos/$GITHUB_REPOSITORY/commits/$head_sha/status")"
+            failed_checks="$(jq '[.check_runs[] | select(
+              .name != "Watch trusted PR checks for repair" and
+              .status == "completed" and
+              (.conclusion == "failure" or
+               .conclusion == "timed_out" or
+               .conclusion == "cancelled" or
+               .conclusion == "action_required" or
+               .conclusion == "startup_failure")
+            )] | length' <<<"$checks_json")"
+            failed_statuses="$(jq '[.statuses[] | select(.state == "failure" or .state == "error")] | length' <<<"$statuses_json")"
+
+            if (( failed_checks > 0 || failed_statuses > 0 )); then
+              gh api --method POST \
+                "repos/$GITHUB_REPOSITORY/actions/workflows/ci-repair-bot.yml/dispatches" \
+                -f ref=main
+              exit 0
+            fi
+          done < <(
+            gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&sort=updated&direction=asc&per_page=100" \
+              --jq '.[] | @base64'
+          )
+
+  manual-wake:
+    name: Manually wake guarded CI repair bot
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch CI Repair Bot
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/ci-repair-bot.yml/dispatches" \
+            -f ref=main

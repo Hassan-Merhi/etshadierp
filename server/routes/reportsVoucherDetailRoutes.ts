@@ -44,123 +44,98 @@ export function registerReportsVoucherDetailRoutes(app: Express) {
         if (!ownedShift) return res.status(403).json({ message: "Access denied" });
       }
 
-      let partyName: string | null = null;
-      const supplierEntry = await db
-        .select({ supplierId: voucherEntries.supplierId })
-        .from(voucherEntries)
-        .where(and(eq(voucherEntries.voucherId, voucherId), isNotNull(voucherEntries.supplierId)))
-        .execute()
-        .then((rows) => rows[0]);
-      if (supplierEntry?.supplierId) {
-        const supplier = await db
-          .select({ legalName: suppliers.legalName })
-          .from(suppliers)
-          .where(eq(suppliers.id, supplierEntry.supplierId))
-          .execute()
-          .then((rows) => rows[0]);
-        partyName = supplier?.legalName || null;
-      }
-
-      const purchaseEntry = await db
-        .select({ name: ledgerAccounts.name })
-        .from(voucherEntries)
-        .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
-        .where(
-          and(
-            eq(voucherEntries.voucherId, voucherId),
-            or(eq(ledgerAccounts.code, "PURCHASES"), sql`${ledgerAccounts.code} LIKE 'PURCHASES-%'`)
+      // All detail reads below depend only on the already-authorized voucher ID.
+      // Run them in parallel and resolve display names with joins so this endpoint
+      // has a fixed query count instead of one query per item/account row.
+      const [supplierEntry, purchaseEntry, salesItemsData, poItemsData, entriesData] = await Promise.all([
+        db
+          .select({ supplierName: suppliers.legalName })
+          .from(voucherEntries)
+          .leftJoin(suppliers, eq(voucherEntries.supplierId, suppliers.id))
+          .where(and(eq(voucherEntries.voucherId, voucherId), isNotNull(voucherEntries.supplierId)))
+          .limit(1)
+          .then((rows) => rows[0]),
+        db
+          .select({ name: ledgerAccounts.name })
+          .from(voucherEntries)
+          .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
+          .where(
+            and(
+              eq(voucherEntries.voucherId, voucherId),
+              or(eq(ledgerAccounts.code, "PURCHASES"), sql`${ledgerAccounts.code} LIKE 'PURCHASES-%'`)
+            )
           )
-        )
-        .execute()
-        .then((rows) => rows[0]);
+          .limit(1)
+          .then((rows) => rows[0]),
+        db
+          .select({
+            id: salesItems.id,
+            stockItemId: salesItems.stockItemId,
+            stockItemName: stockItems.name,
+            stockItemCode: stockItems.code,
+            stockItemUom: stockItems.uom,
+            quantity: salesItems.quantity,
+            rate: salesItems.sellingPrice,
+            total: salesItems.totalSales,
+          })
+          .from(salesItems)
+          .leftJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
+          .where(eq(salesItems.voucherId, voucherId)),
+        db
+          .select({
+            id: poLineItems.id,
+            stockItemId: poLineItems.stockItemId,
+            stockItemName: stockItems.name,
+            stockItemCode: stockItems.code,
+            stockItemUom: stockItems.uom,
+            quantity: poLineItems.quantity,
+            rate: poLineItems.rate,
+            total: poLineItems.lineTotal,
+          })
+          .from(poLineItems)
+          .innerJoin(purchaseOrders, eq(poLineItems.poId, purchaseOrders.id))
+          .leftJoin(stockItems, eq(poLineItems.stockItemId, stockItems.id))
+          .where(eq(purchaseOrders.voucherId, voucherId)),
+        db
+          .select({
+            id: voucherEntries.id,
+            ledgerAccountId: voucherEntries.ledgerAccountId,
+            ledgerAccountName: ledgerAccounts.name,
+            debitAmount: voucherEntries.debitAmount,
+            creditAmount: voucherEntries.creditAmount,
+            narration: voucherEntries.narration,
+          })
+          .from(voucherEntries)
+          .leftJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
+          .where(eq(voucherEntries.voucherId, voucherId)),
+      ]);
 
-      const salesItemsData = await db
-        .select({
-          id: salesItems.id,
-          stockItemId: salesItems.stockItemId,
-          quantity: salesItems.quantity,
-          rate: salesItems.sellingPrice,
-          total: salesItems.totalSales,
-        })
-        .from(salesItems)
-        .where(eq(salesItems.voucherId, voucherId))
-        .execute();
+      const items = [...salesItemsData, ...poItemsData].map((item) => ({
+        id: item.id,
+        stockItemId: item.stockItemId,
+        stockItemName: item.stockItemName || "Unknown Item",
+        stockItemCode: item.stockItemCode || "",
+        quantity: parseFloat(item.quantity || "0"),
+        unit: item.stockItemUom || "BL",
+        rate: parseFloat(item.rate || "0"),
+        amount: parseFloat(item.total || "0"),
+      }));
 
-      const poItemsData = await db
-        .select({
-          id: poLineItems.id,
-          stockItemId: poLineItems.stockItemId,
-          quantity: poLineItems.quantity,
-          rate: poLineItems.rate,
-          total: poLineItems.lineTotal,
-        })
-        .from(poLineItems)
-        .innerJoin(purchaseOrders, eq(poLineItems.poId, purchaseOrders.id))
-        .where(eq(purchaseOrders.voucherId, voucherId))
-        .execute();
-
-      const items = await Promise.all(
-        [...salesItemsData, ...poItemsData].map(async (item) => {
-          const stockItem = item.stockItemId
-            ? await db
-                .select({ name: stockItems.name, code: stockItems.code, uom: stockItems.uom })
-                .from(stockItems)
-                .where(eq(stockItems.id, item.stockItemId))
-                .execute()
-                .then((rows) => rows[0])
-            : null;
-          return {
-            id: item.id,
-            stockItemId: item.stockItemId,
-            stockItemName: stockItem?.name || "Unknown Item",
-            stockItemCode: stockItem?.code || "",
-            quantity: parseFloat(item.quantity || "0"),
-            unit: stockItem?.uom || "BL",
-            rate: parseFloat(item.rate || "0"),
-            amount: parseFloat(item.total || "0"),
-          };
-        })
-      );
-
-      const entriesData = await db
-        .select({
-          id: voucherEntries.id,
-          ledgerAccountId: voucherEntries.ledgerAccountId,
-          debitAmount: voucherEntries.debitAmount,
-          creditAmount: voucherEntries.creditAmount,
-          narration: voucherEntries.narration,
-        })
-        .from(voucherEntries)
-        .where(eq(voucherEntries.voucherId, voucherId))
-        .execute();
-
-      const entries = await Promise.all(
-        entriesData.map(async (entry) => {
-          const ledger = entry.ledgerAccountId
-            ? await db
-                .select({ name: ledgerAccounts.name })
-                .from(ledgerAccounts)
-                .where(eq(ledgerAccounts.id, entry.ledgerAccountId))
-                .execute()
-                .then((rows) => rows[0])
-            : null;
-          return {
-            id: entry.id,
-            ledgerAccountId: entry.ledgerAccountId || 0,
-            ledgerAccountName: ledger?.name || "Unknown Account",
-            debitAmount: parseFloat(entry.debitAmount || "0"),
-            creditAmount: parseFloat(entry.creditAmount || "0"),
-            narration: entry.narration,
-          };
-        })
-      );
+      const entries = entriesData.map((entry) => ({
+        id: entry.id,
+        ledgerAccountId: entry.ledgerAccountId || 0,
+        ledgerAccountName: entry.ledgerAccountName || "Unknown Account",
+        debitAmount: parseFloat(entry.debitAmount || "0"),
+        creditAmount: parseFloat(entry.creditAmount || "0"),
+        narration: entry.narration,
+      }));
 
       res.json({
         id: voucher.id,
         voucherNumber: voucher.voucherNumber,
         voucherType: voucher.voucherType,
         date: voucher.voucherDate,
-        partyName,
+        partyName: supplierEntry?.supplierName || null,
         purchaseLedger: purchaseEntry?.name || null,
         locationName: voucher.locationName || null,
         narration: voucher.description,

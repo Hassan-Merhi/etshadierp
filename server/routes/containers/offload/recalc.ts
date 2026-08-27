@@ -14,6 +14,10 @@ import { requireAuth, requireRole } from "../../../auth";
 import { containers, containerOffloads, containerOffloadItems, vouchers, voucherEntries } from "@shared/schema";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { reverseInventoryByExactValue } from "../../../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../../services/inventory/stockMovementIntegrityService";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerContainerOffloadRecalcRoutes(app: Express) {
   // Reverse container offload — ERP only (Admin, Owner, or Manager)
@@ -25,102 +29,95 @@ export function registerContainerOffloadRecalcRoutes(app: Express) {
     async (req, res) => {
       try {
         const containerId = parseId(req.params.id);
-        if (containerId === null) return res.status(400).json({ message: "Invalid id" });
-        if (isNaN(containerId)) {
+        if (containerId === null || isNaN(containerId))
           return res.status(400).json({ message: "Invalid container ID" });
-        }
 
-        // Get container
         const container = await storage.getContainerByIdForCompany(containerId, req.session.currentCompanyId!);
-        if (!container) {
-          return res.status(404).json({ message: "Container not found" });
-        }
-
-        // Verify container belongs to current company
+        if (!container) return res.status(404).json({ message: "Container not found" });
         if (container.companyId !== req.session.currentCompanyId) {
-          return res.status(403).json({
-            message: "Access denied: Container belongs to a different company",
-          });
+          return res.status(403).json({ message: "Access denied: Container belongs to a different company" });
         }
-
-        // Check if container is offloaded
         if (container.status !== "OFFLOADED") {
           return res.status(400).json({ message: "Container is not offloaded" });
         }
 
-        // Get offload record (may not exist for old offloads)
         const [offloadRecord] = await db
           .select()
           .from(containerOffloads)
           .where(eq(containerOffloads.containerId, containerId))
           .limit(1);
 
-        // If no offload record exists, just change status back and return
         if (!offloadRecord) {
           await db.update(containers).set({ status: "OTW" }).where(eq(containers.id, containerId));
-
-          return res.json({
-            message: "Container status reversed to OTW (no offload record to clean up)",
-          });
+          return res.json({ message: "Container status reversed to OTW (no offload record to clean up)" });
         }
 
         await db.transaction(async (tx) => {
-          // Try to get stored offload items first (new approach - exact values)
           const storedOffloadItems = await tx
             .select()
             .from(containerOffloadItems)
             .where(eq(containerOffloadItems.offloadId, offloadRecord.id));
+          const occurredAt = new Date().toISOString();
+          const actor = {
+            userId: req.session.userId,
+            username: req.session.username,
+            reason: `Reverse offload for container ${container.containerNumber}`,
+          };
 
-          // Use stored offload items if available (lossless reversal)
           if (storedOffloadItems.length > 0) {
             for (const offloadItem of storedOffloadItems) {
+              const quantity = parseFloat(offloadItem.quantity);
+              const totalValue = parseFloat(offloadItem.totalValue);
               await reverseInventoryByExactValue(
                 tx,
                 offloadRecord.locationId,
                 offloadItem.stockItemId,
-                parseFloat(offloadItem.quantity),
-                parseFloat(offloadItem.totalValue)
+                quantity,
+                totalValue
+              );
+              await postStockMovementTx(
+                tx,
+                {
+                  companyId: container.companyId,
+                  stockItemId: offloadItem.stockItemId,
+                  kind: "adjustment",
+                  quantity: String(Math.abs(quantity)),
+                  unitCost: String(quantity !== 0 ? Math.max(totalValue / quantity, 0) : 0),
+                  fromLocationId: offloadRecord.locationId,
+                  occurredAt,
+                  source: {
+                    sourceType: "container-reverse-offload",
+                    sourceId: String(offloadRecord.id),
+                    idempotencyKey: `container-reverse-offload:${container.companyId}:${offloadRecord.id}:${offloadItem.id}`,
+                  },
+                  actor,
+                  allowNegativeStock: true,
+                },
+                canonicalStockMovementAdapter
               );
             }
-
-            // Delete stored offload items
             await tx.delete(containerOffloadItems).where(eq(containerOffloadItems.offloadId, offloadRecord.id));
           } else {
-            // Fallback for old offloads without stored items (legacy approach)
-            const pos = await storage.getPurchaseOrdersByContainerForCompany(containerId, req.session.currentCompanyId!);
+            const pos = await storage.getPurchaseOrdersByContainerForCompany(
+              containerId,
+              req.session.currentCompanyId!
+            );
             const allLineItems = [];
-            for (const po of pos) {
-              const items = await storage.getLineItemsByPO(po.id);
-              allLineItems.push(...items);
-            }
+            for (const po of pos) allLineItems.push(...(await storage.getLineItemsByPO(po.id)));
 
             const additionalCostPerBale = parseFloat(offloadRecord.additionalCostPerBale || "0");
-            const itemsMap = new Map<
-              number,
-              {
-                stockItemId: number;
-                totalQuantity: number;
-                weightedRateSum: number;
-              }
-            >();
-
+            const itemsMap = new Map<number, { stockItemId: number; totalQuantity: number; weightedRateSum: number }>();
             for (const item of allLineItems) {
               const stockItemId = item.stockItemId;
               if (!stockItemId || stockItemId === 0) continue;
-
               const quantity = parseFloat(item.quantity);
               const rate = parseFloat(item.rate);
-
-              if (itemsMap.has(stockItemId)) {
-                const existing = itemsMap.get(stockItemId)!;
+              const existing = itemsMap.get(stockItemId);
+              if (existing) {
                 existing.totalQuantity += quantity;
                 existing.weightedRateSum += rate * quantity;
               } else {
-                itemsMap.set(stockItemId, {
-                  stockItemId,
-                  totalQuantity: quantity,
-                  weightedRateSum: rate * quantity,
-                });
+                itemsMap.set(stockItemId, { stockItemId, totalQuantity: quantity, weightedRateSum: rate * quantity });
               }
             }
 
@@ -133,15 +130,29 @@ export function registerContainerOffloadRecalcRoutes(app: Express) {
                 data.totalQuantity,
                 estimatedValue
               );
+              await postStockMovementTx(
+                tx,
+                {
+                  companyId: container.companyId,
+                  stockItemId,
+                  kind: "adjustment",
+                  quantity: String(Math.abs(data.totalQuantity)),
+                  unitCost: String(data.totalQuantity !== 0 ? Math.max(estimatedValue / data.totalQuantity, 0) : 0),
+                  fromLocationId: offloadRecord.locationId,
+                  occurredAt,
+                  source: {
+                    sourceType: "container-reverse-offload-legacy",
+                    sourceId: String(offloadRecord.id),
+                    idempotencyKey: `container-reverse-offload:legacy:${container.companyId}:${offloadRecord.id}:${stockItemId}`,
+                  },
+                  actor,
+                  allowNegativeStock: true,
+                },
+                canonicalStockMovementAdapter
+              );
             }
           }
 
-          // Reverse OFFLOAD-related vouchers only (DUTY-, OFFICE-, TRANS-, CHG-, XFER- prefixes).
-          // Keep the voucher row as a soft-deleted audit shell instead of physically deleting it:
-          // other tables may legitimately retain voucher_id FKs, and PostgreSQL correctly blocks
-          // physical deletion while those references exist. Removing the entries neutralizes the
-          // accounting effect; deleted_at keeps the voucher out of active ERP queries while
-          // preserving referential integrity and history.
           const containerVouchers = await tx
             .select()
             .from(vouchers)
@@ -173,8 +184,6 @@ export function registerContainerOffloadRecalcRoutes(app: Express) {
             await tx.update(vouchers).set({ deletedAt: reversedAt }).where(eq(vouchers.id, voucher.id));
           }
 
-          // Also reverse the HADI L'SHI side SP agent journal (companyId=1).
-          // Use the same FK-safe soft-delete strategy so linked audit records remain valid.
           const hadiSpVouchers = await tx
             .select()
             .from(vouchers)
@@ -190,21 +199,13 @@ export function registerContainerOffloadRecalcRoutes(app: Express) {
             await tx.update(vouchers).set({ deletedAt: reversedAt }).where(eq(vouchers.id, v.id));
           }
 
-          // Delete the offload record
           await tx.delete(containerOffloads).where(eq(containerOffloads.id, offloadRecord.id));
-
-          // Update container status back to OTW
-          // The import cycle balance uses container.status to filter which containers to include
-          // When status changes to OTW, the container's grandTotal is counted in Stock OTW
           await tx.update(containers).set({ status: "OTW" }).where(eq(containers.id, containerId));
         });
 
-        res.json({
-          success: true,
-          message: "Container offload reversed successfully",
-        });
+        res.json({ success: true, message: "Container offload reversed successfully" });
       } catch (error: unknown) {
-        logger.error("Reverse offload error:", { error: error });
+        logger.error("Reverse offload error:", { error });
         res.status(500).json({ message: getErrorMessage(error) });
       }
     }

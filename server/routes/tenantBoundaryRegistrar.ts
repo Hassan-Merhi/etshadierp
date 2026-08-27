@@ -1,6 +1,7 @@
 import type { Express } from "express";
 
 import { tenantCompanyParamBoundary, tenantIsolationBoundary } from "../middleware/tenantIsolationBoundary";
+import { browserMutationFailClosedBoundary } from "../security/browserMutationBoundary";
 import { securityHeadersMiddleware } from "../security/securityHeaders";
 
 /**
@@ -14,6 +15,7 @@ import { securityHeadersMiddleware } from "../security/securityHeaders";
  */
 export function registerTenantIsolationBoundary(app: Express): void {
   app.use(securityHeadersMiddleware());
+  app.use(browserMutationFailClosedBoundary);
   app.use(tenantIsolationBoundary);
   app.param("companyId", tenantCompanyParamBoundary);
 }

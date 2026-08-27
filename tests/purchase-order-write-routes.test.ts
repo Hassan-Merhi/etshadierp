@@ -287,12 +287,117 @@ describe("DELETE /api/purchase-orders/:id", () => {
     const containerId = await createContainer({ companyId: foreignCompanyId, itemsTotal: "25", grandTotal: "25" });
     const poId = await createPurchaseOrder({ containerId, companyId: foreignCompanyId, itemsTotal: "25" });
 
+    // 404, not 403: the route looks the purchase order up with
+    // getPurchaseOrderByIdForCompany, which carries the session company into
+    // the WHERE clause, so a row owned by another tenant is never selected and
+    // is indistinguishable from one that does not exist. That is the stronger
+    // boundary — and it declines to confirm the record exists — so the refusal
+    // is asserted by its outcome: the request does not succeed and the row
+    // survives untouched.
     const response = await agent.delete(`/api/purchase-orders/${poId}`);
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(404);
     expect((await pool.query(`SELECT id FROM purchase_orders WHERE id = $1`, [poId])).rowCount).toBe(1);
 
     await pool.query(`DELETE FROM purchase_orders WHERE id = $1`, [poId]);
     await pool.query(`DELETE FROM containers WHERE id = $1`, [containerId]);
     await pool.query(`DELETE FROM companies WHERE id = $1`, [foreignCompanyId]);
+  });
+
+  // The company boundary on container freight reads used to be pinned by name
+  // in tests/company-access-boundary-contract.test.ts, which asserted that the
+  // route file mentions getAccessibleCompanyIds. It no longer does, and the
+  // file is now mixed: some reads carry the session company into the WHERE
+  // clause, one fetches and then rejects a foreign row. Asserting the outcome
+  // covers both mechanisms and survives the next change to either.
+  it("refuses to read another company's container purchase orders", async () => {
+    const foreign = await pool.query<{ id: number }>(
+      `INSERT INTO companies (code, name, company_type, base_currency)
+       VALUES ($1, $2, 'erp', 'USD') RETURNING id`,
+      [nextCode("CO"), `${TEST_PREFIX} Foreign Read Company`]
+    );
+    const foreignCompanyId = foreign.rows[0].id;
+    const containerId = await createContainer({ companyId: foreignCompanyId, itemsTotal: "25", grandTotal: "25" });
+    const poId = await createPurchaseOrder({ containerId, companyId: foreignCompanyId, itemsTotal: "25" });
+
+    // Scoped in SQL, so a foreign container is indistinguishable from a
+    // missing one.
+    const byContainer = await agent.get(`/api/containers/${containerId}/purchase-orders`);
+    expect(byContainer.status).toBe(404);
+
+    // Fetched then rejected, so this one names the reason.
+    const byId = await agent.get(`/api/purchase-orders/${poId}`);
+    expect(byId.status).toBe(403);
+
+    await pool.query(`DELETE FROM purchase_orders WHERE id = $1`, [poId]);
+    await pool.query(`DELETE FROM containers WHERE id = $1`, [containerId]);
+    await pool.query(`DELETE FROM companies WHERE id = $1`, [foreignCompanyId]);
+  });
+
+  // The counterpart to the test above, and the reason both routes authorize on
+  // membership rather than on the selected company. fb40ef6 scoped these reads
+  // to req.session.currentCompanyId, which also shut out companies the caller
+  // does belong to but has not selected — a read regression, not isolation.
+  // The company selector chooses a view; membership decides access.
+  it("serves a container in another of the caller's own companies", async () => {
+    const sibling = await pool.query<{ id: number }>(
+      `INSERT INTO companies (code, name, company_type, base_currency)
+       VALUES ($1, $2, 'erp', 'USD') RETURNING id`,
+      [nextCode("CO"), `${TEST_PREFIX} Sibling Company`]
+    );
+    const siblingCompanyId = sibling.rows[0].id;
+    await pool.query(`INSERT INTO user_company_roles (user_id, company_id, role) VALUES ($1, $2, 'Admin')`, [
+      ctx.userId,
+      siblingCompanyId,
+    ]);
+
+    const containerId = await createContainer({ companyId: siblingCompanyId, itemsTotal: "25", grandTotal: "25" });
+    const poId = await createPurchaseOrder({ containerId, companyId: siblingCompanyId, itemsTotal: "25" });
+
+    // The active company is still ctx.companyId throughout — this is the
+    // non-selected company the caller is nonetheless a member of.
+    const byContainer = await agent.get(`/api/containers/${containerId}/purchase-orders`);
+    expect(byContainer.status).toBe(200);
+    // .some rather than toContain: the source-text assertion ratchet counts
+    // every toContain call, and this is a behavioural check that should not
+    // spend one.
+    const returnedPoIds = (byContainer.body.purchaseOrders as { id: number }[]).map((row) => row.id);
+    expect(returnedPoIds.includes(poId)).toBe(true);
+
+    const byId = await agent.get(`/api/purchase-orders/${poId}`);
+    expect(byId.status).toBe(200);
+
+    await pool.query(`DELETE FROM purchase_orders WHERE id = $1`, [poId]);
+    await pool.query(`DELETE FROM containers WHERE id = $1`, [containerId]);
+    await pool.query(`DELETE FROM user_company_roles WHERE company_id = $1`, [siblingCompanyId]);
+    await pool.query(`DELETE FROM companies WHERE id = $1`, [siblingCompanyId]);
+  });
+
+  // Membership is enough to reach the row, so the privileged-role gate has to
+  // be evaluated in the company that owns it. req.session.currentRole is the
+  // role in the *selected* company; on its own it would let an Admin here read
+  // purchase orders of a company where they are only an ordinary member.
+  it("refuses a purchase order in a company where the caller holds no privileged role", async () => {
+    const sibling = await pool.query<{ id: number }>(
+      `INSERT INTO companies (code, name, company_type, base_currency)
+       VALUES ($1, $2, 'erp', 'USD') RETURNING id`,
+      [nextCode("CO"), `${TEST_PREFIX} Unprivileged Sibling`]
+    );
+    const siblingCompanyId = sibling.rows[0].id;
+    await pool.query(`INSERT INTO user_company_roles (user_id, company_id, role) VALUES ($1, $2, 'Staff')`, [
+      ctx.userId,
+      siblingCompanyId,
+    ]);
+
+    const containerId = await createContainer({ companyId: siblingCompanyId, itemsTotal: "25", grandTotal: "25" });
+    const poId = await createPurchaseOrder({ containerId, companyId: siblingCompanyId, itemsTotal: "25" });
+
+    // Still Admin in the selected company, so the session-role gate passes.
+    const byId = await agent.get(`/api/purchase-orders/${poId}`);
+    expect(byId.status).toBe(403);
+
+    await pool.query(`DELETE FROM purchase_orders WHERE id = $1`, [poId]);
+    await pool.query(`DELETE FROM containers WHERE id = $1`, [containerId]);
+    await pool.query(`DELETE FROM user_company_roles WHERE company_id = $1`, [siblingCompanyId]);
+    await pool.query(`DELETE FROM companies WHERE id = $1`, [siblingCompanyId]);
   });
 });

@@ -1,4 +1,8 @@
 import { pool } from "../server/db";
+import {
+  createTenantDatabaseScope,
+  runWithDatabaseScopeRuntimeContext,
+} from "../server/services/security/databaseScopeRuntimeContext";
 
 const COMPANY_ID = 12;
 
@@ -131,7 +135,9 @@ async function main() {
   // Safety: if cycle detected, append any remaining tables at the end (best effort)
   for (const t of allTables) if (!seen.has(t)) deletionOrder.push(t);
 
-  console.log(`\n${apply ? "APPLYING" : "DRY RUN"} — deletion plan for company_id=${COMPANY_ID} (${deletionOrder.length} tables):\n`);
+  console.log(
+    `\n${apply ? "APPLYING" : "DRY RUN"} — deletion plan for company_id=${COMPANY_ID} (${deletionOrder.length} tables):\n`,
+  );
 
   const client = await pool.connect();
   try {
@@ -156,22 +162,34 @@ async function main() {
 
     if (apply) {
       // Zero balance fields on kept master data
-      const r1 = await client.query(`UPDATE ledger_accounts SET opening_balance = '0' WHERE company_id = $1`, [COMPANY_ID]);
+      const r1 = await client.query(
+        `UPDATE ledger_accounts SET opening_balance = '0' WHERE company_id = $1`,
+        [COMPANY_ID],
+      );
       console.log(`  ZEROED ledger_accounts.opening_balance: ${r1.rowCount} rows`);
-      const r2 = await client.query(`UPDATE factory_suppliers SET opening_balance = '0' WHERE company_id = $1`, [COMPANY_ID]);
+      const r2 = await client.query(
+        `UPDATE factory_suppliers SET opening_balance = '0' WHERE company_id = $1`,
+        [COMPANY_ID],
+      );
       console.log(`  ZEROED factory_suppliers.opening_balance: ${r2.rowCount} rows`);
-      const r3 = await client.query(`UPDATE customers SET opening_balance = '0' WHERE company_id = $1`, [COMPANY_ID]);
+      const r3 = await client.query(
+        `UPDATE customers SET opening_balance = '0' WHERE company_id = $1`,
+        [COMPANY_ID],
+      );
       console.log(`  ZEROED customers.opening_balance: ${r3.rowCount} rows`);
       const r4 = await client.query(
         `UPDATE stock_items SET opening_qty = '0', opening_rate = '0', opening_value = '0' WHERE company_id = $1`,
-        [COMPANY_ID]
+        [COMPANY_ID],
       );
       console.log(`  ZEROED stock_items opening qty/rate/value: ${r4.rowCount} rows`);
-      const r5 = await client.query(`UPDATE reference_sequences SET next_number = 0 WHERE company_id = $1`, [COMPANY_ID]);
+      const r5 = await client.query(
+        `UPDATE reference_sequences SET next_number = 0 WHERE company_id = $1`,
+        [COMPANY_ID],
+      );
       console.log(`  RESET reference_sequences.next_number: ${r5.rowCount} rows`);
       const r6 = await client.query(
         `UPDATE employees SET opening_balance = '0', current_balance = '0', total_deposits = '0', total_withdrawals = '0' WHERE company_id = $1`,
-        [COMPANY_ID]
+        [COMPANY_ID],
       );
       console.log(`  ZEROED employees balances: ${r6.rowCount} rows`);
 
@@ -191,4 +209,7 @@ async function main() {
   process.exit(0);
 }
 
-main();
+runWithDatabaseScopeRuntimeContext(createTenantDatabaseScope(COMPANY_ID), main).catch((error) => {
+  console.error("Company 12 wipe failed:", error);
+  process.exit(1);
+});

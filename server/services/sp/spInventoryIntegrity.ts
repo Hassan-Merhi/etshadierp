@@ -1,8 +1,14 @@
+import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
+import type { DbTransaction } from "../../db";
 import { adjustInventory, type AdjustInventoryResult } from "../../inventoryHelper";
 import { getErrorMessage } from "../../lib/httpHandlers";
+import { createDatabaseStockMovementAdapter } from "../inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../inventory/stockMovementIntegrityService";
 
-type SpInventoryExecutor = Parameters<typeof adjustInventory>[0];
+type SpInventoryExecutor = DbTransaction;
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export class SpInventoryIntegrityError extends Error {
   readonly code: "SP_INVENTORY_LINK_REQUIRED" | "SP_INVENTORY_POST_FAILED";
@@ -102,7 +108,7 @@ export async function adjustSpInventoryAtomic(
   const mapping = await requireSpInventoryMapping(tx, params);
 
   try {
-    return await adjustInventory(
+    const result = await adjustInventory(
       tx,
       mapping.locationId,
       mapping.stockItemId,
@@ -112,6 +118,37 @@ export async function adjustSpInventoryAtomic(
       params.sourceVoucherType,
       params.sourceVoucherId
     );
+
+    if (Number.isFinite(params.deltaQty) && params.deltaQty !== 0) {
+      const operationId = randomUUID();
+      const unitCost =
+        params.deltaQty > 0 && params.incomingRate != null
+          ? Math.max(Number(params.incomingRate) || 0, 0)
+          : Math.max(result.averageRate || 0, 0);
+      await postStockMovementTx(
+        tx,
+        {
+          companyId: params.companyId,
+          stockItemId: mapping.stockItemId,
+          kind: "adjustment",
+          quantity: String(Math.abs(params.deltaQty)),
+          unitCost: String(unitCost),
+          fromLocationId: params.deltaQty < 0 ? mapping.locationId : undefined,
+          toLocationId: params.deltaQty > 0 ? mapping.locationId : undefined,
+          occurredAt: new Date().toISOString(),
+          source: {
+            sourceType: params.sourceVoucherType || "sp_inventory_adjustment",
+            sourceId: params.sourceVoucherId ? String(params.sourceVoucherId) : operationId,
+            idempotencyKey: `sp-inventory:${params.companyId}:${operationId}`,
+          },
+          actor: { reason: params.context },
+          allowNegativeStock: true,
+        },
+        canonicalStockMovementAdapter
+      );
+    }
+
+    return result;
   } catch (error: unknown) {
     if (error instanceof SpInventoryIntegrityError) throw error;
     throw new SpInventoryIntegrityError(

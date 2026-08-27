@@ -7,8 +7,8 @@ import {
 
 describe("Phase 7 backend-message translations", () => {
   it("covers every reviewed backend phrase exactly once", () => {
-    expect(backendMessagesPhase7Translations).toHaveLength(605);
-    expect(new Set(backendMessagesPhase7Translations.map((entry) => entry.en)).size).toBe(605);
+    expect(backendMessagesPhase7Translations).toHaveLength(613);
+    expect(new Set(backendMessagesPhase7Translations.map((entry) => entry.en)).size).toBe(613);
 
     for (const entry of backendMessagesPhase7Translations) {
       expect(entry.en.trim()).not.toBe("");

@@ -10,11 +10,70 @@
     "client/src/pages/vouchers/StockTransferForm.tsx": 2388
   },
   "routeManifestAdditions": [
-    "POST /api/stock-transfers/:transferId/revisions [requireAuth > requireNonPOS > <anonymous>]"
+    "POST /api/stock-transfers/:transferId/revisions [requireAuth > bypassAdminCompatibilityForPendingRevision > requireNonPOS > <anonymous>]",
+    "POST /api/golden-coast/accounting/phase1/setup-accounts [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/golden-coast/accounting/phase1/accounts [<anonymous> > requireAuth > requireNonPOS > <anonymous>]",
+    "POST /api/golden-coast/accounting/phase1/preview [<anonymous> > <anonymous> > requireAuth > requireNonPOS > <anonymous>]",
+    "POST /api/golden-coast/accounting/phase1/post [<anonymous> > <anonymous> > requireAuth > requireNonPOS > <anonymous>]",
+    "POST /api/sp/setup/golden-coast [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/sp/setup/golden-coast/status [<anonymous> > requireAuth > <anonymous>]",
+    "GET /api/sp/golden-coast/phase3/status [<anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "POST /api/sp/golden-coast/phase3/preview [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "POST /api/sp/golden-coast/phase3/cutover [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/sp/golden-coast/phase4/cutover-fifo/status [<anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "POST /api/sp/golden-coast/phase4/cutover-fifo [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/sp/golden-coast/phase6/pos-sale/readiness [<anonymous> > requireAuth > <anonymous>]",
+    "POST /api/sp/golden-coast/phase6/pos-sale [<anonymous> > <anonymous> > requireAuth > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/v5/stock-allocation [<anonymous>]",
-    "USE / [helmetMiddleware]"
+    "USE / [helmetMiddleware]",
+    "USE /api/admin/repair-balances [balanceRepairRateLimit]",
+    "USE /api/admin/repair-balances [balanceRepairBudgetMiddleware]",
+    "USE /api/admin/repair-balances [balanceRepairConcurrencyMiddleware]",
+    "USE /api/sp/migration [spMigrationRateLimit]",
+    "USE /api/sp/migration [spMigrationRequestBudgetMiddleware]",
+    "USE /api/golden-coast/accounting [<anonymous>]",
+    "USE /api/golden-coast/accounting/phase1/post [<anonymous>]",
+    "USE /api/golden-coast/accounting/phase1 [retireLegacyPhase1Mutations]",
+    "USE /api/sp [<anonymous>]",
+    "USE /api/factory/location-inventory/:locationId [<anonymous>]",
+    "USE /api/factory/location-inventory/:locationId [requireAuth]",
+    "USE /api/factory/location-inventory/:locationId [authoritativeInventoryStockMiddleware]",
+    "USE /api/factory/customer-orders/:id/verification-summary [<anonymous>]",
+    "USE /api/factory/customer-orders/:id/verification-summary [requireAuth]",
+    "USE /api/factory/customer-orders/:id/verification-summary [authoritativeVerificationStockMiddleware]",
+    "USE / [browserMutationFailClosedBoundary]"
+  ],
+  "routeManifestReplacements": [
+    {
+      "expected": "POST /api/locations/:locationId/import-cost-prices [requireAuth > <anonymous> > checkPOSLocation > <anonymous>]",
+      "actual": "POST /api/locations/:locationId/import-cost-prices [requireAuth > <anonymous> > checkPOSLocation > <anonymous> > <anonymous> > <anonymous> > <anonymous>]"
+    },
+    {
+      "expected": "POST /api/locations/:locationId/import-inventory [requireAuth > checkPOSLocation > <anonymous>]",
+      "actual": "POST /api/locations/:locationId/import-inventory [requireAuth > checkPOSLocation > <anonymous> > <anonymous> > <anonymous> > <anonymous>]"
+    },
+    {
+      "expected": "GET /api/debug/import-cycle [requireAuth > <anonymous> > <anonymous>]",
+      "actual": "GET /api/debug/import-cycle [requireAuth > <anonymous> > <anonymous> > <anonymous> > <anonymous>]"
+    },
+    {
+      "expected": "GET /api/sp/migration/preview [requireAuth > <anonymous> > <anonymous>]",
+      "actual": "GET /api/sp/migration/preview [requireAuth > <anonymous> > <anonymous> > <anonymous> > <anonymous>]"
+    },
+    {
+      "expected": "GET /api/sp/migration/runs [requireAuth > <anonymous> > <anonymous>]",
+      "actual": "GET /api/sp/migration/runs [requireAuth > <anonymous> > <anonymous> > <anonymous>]"
+    },
+    {
+      "expected": "POST /api/sp/migration/rehearsal [requireAuth > <anonymous> > <anonymous>]",
+      "actual": "POST /api/sp/migration/rehearsal [requireAuth > <anonymous> > <anonymous> > <anonymous>]"
+    },
+    {
+      "expected": "POST /api/sp/migration/rollback [requireAuth > <anonymous> > <anonymous>]",
+      "actual": "POST /api/sp/migration/rollback [requireAuth > <anonymous> > <anonymous> > <anonymous> > <anonymous> > <anonymous>]"
+    }
   ],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [
@@ -56,8 +115,9 @@
       "tests/ui/remote-support-fast-viewer.test.ts",
       "tests/stock-item-name-update-by-code.test.ts",
       "server/lib/reportPrecision.test.ts",
-      "tests/remote-support-phase4-hardening.test.ts"
+      "tests/remote-support-phase4-hardening.test.ts",
+      "tests/formatting-gate-parity.test.ts"
     ],
-    "maxAdditionalTextAssertions": 620
+    "maxAdditionalTextAssertions": 626
   }
 }

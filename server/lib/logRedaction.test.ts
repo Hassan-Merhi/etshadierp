@@ -14,11 +14,21 @@ describe("log redaction", () => {
 
   it("removes signed query values and private file URLs", () => {
     expect(redactLogString("https://example.com/file.pdf?token=abc&signature=xyz")).toContain("REDACTED");
-    expect(redactLogString("https://storage.example.com/private/invoice-1.pdf?token=abc", "fileUrl")).toBe("[PRIVATE_URL:invoice-1.pdf]");
+    expect(redactLogString("https://storage.example.com/private/invoice-1.pdf?token=abc", "fileUrl")).toBe(
+      "[PRIVATE_URL:invoice-1.pdf]"
+    );
   });
 
   it("masks phone and email fields", () => {
     expect(redactLogString("+243900005252", "customerPhone")).toBe("contact …5252");
     expect(redactLogString("adam@example.com", "email")).toBe("a***@example.com");
+  });
+
+  it("redacts inline CSRF token fragments from legacy warning strings", () => {
+    const redacted = redactLogString("CSRF: BLOCKED POST /api/example expected=abcdef12… got=1234abcd…");
+    expect(redacted).toContain("expected=[REDACTED]");
+    expect(redacted).toContain("got=[REDACTED]");
+    expect(redacted).not.toContain("abcdef12");
+    expect(redacted).not.toContain("1234abcd");
   });
 });

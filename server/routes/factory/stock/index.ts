@@ -8,6 +8,7 @@
 import type { Express } from "express";
 import { registerFactoryStockEntryRoutes } from "./stockEntryRoutes";
 import { registerFactoryStockRemovalRoutes } from "./stockRemovalRoutes";
+import { registerAuthoritativeInventoryStockMiddleware } from "./authoritativeInventoryStockMiddleware";
 import { registerFactoryLocationInventoryRoutes } from "./locationInventoryRoutes";
 import { registerFactoryLocationInventoryExportRoutes } from "./locationInventoryExportRoutes";
 import { registerFactoryStockQueryRoutes } from "./stockQueryRoutes";
@@ -15,6 +16,7 @@ import { registerFactoryStockQueryRoutes } from "./stockQueryRoutes";
 export function registerFactoryStockRoutes(app: Express) {
   registerFactoryStockEntryRoutes(app);
   registerFactoryStockRemovalRoutes(app);
+  registerAuthoritativeInventoryStockMiddleware(app);
   registerFactoryLocationInventoryRoutes(app);
   registerFactoryLocationInventoryExportRoutes(app);
   registerFactoryStockQueryRoutes(app);

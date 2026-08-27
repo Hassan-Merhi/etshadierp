@@ -42,13 +42,13 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
             eq(factoryBales.companyId, companyId),
             eq(factoryBales.erpLocationId, locationId),
             eq(factoryBales.status, "IN_STOCK"),
-            // Exclude bales that are on a finalized/dispatched/sold order but whose
-            // DB status was never updated (stale IN_STOCK after order finalization).
+            // Exclude bales already assigned to active or completed outbound orders,
+            // even when their stored DB status is still IN_STOCK.
             sql`NOT EXISTS (
               SELECT 1 FROM customer_order_bales cob
               INNER JOIN customer_orders co ON co.id = cob.order_id
               WHERE cob.bale_id = ${factoryBales.id}
-                AND co.status IN ('FINALIZED','DISPATCHED','SOLD')
+                AND co.status IN ('LOADING','PENDING_VERIFICATION','VERIFIED','FINALIZED','DISPATCHED','SOLD')
                 AND co.company_id = ${companyId}
             )`
           )
@@ -196,12 +196,12 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
             eq(factoryBales.companyId, companyId),
             eq(factoryBales.erpLocationId, locationId),
             eq(factoryBales.status, "IN_STOCK"),
-            // Exclude bales on finalized orders whose DB status was never updated
+            // Exclude bales already assigned to active or completed outbound orders
             sql`NOT EXISTS (
               SELECT 1 FROM customer_order_bales cob
               INNER JOIN customer_orders co ON co.id = cob.order_id
               WHERE cob.bale_id = ${factoryBales.id}
-                AND co.status IN ('FINALIZED','DISPATCHED','SOLD')
+                AND co.status IN ('LOADING','PENDING_VERIFICATION','VERIFIED','FINALIZED','DISPATCHED','SOLD')
                 AND co.company_id = ${companyId}
             )`
           )

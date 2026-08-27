@@ -12,7 +12,9 @@ const commands = [
       "run",
       "tests/named-permission-service.test.ts",
       "tests/credential-version-service.test.ts",
+      "tests/company-user-admin-scope-policy.test.ts",
       "tests/company-context-enforcement.test.ts",
+      "tests/phase3-tenant-isolation-boundary.test.ts",
       "tests/legacy-privileged-write-guard.test.ts",
       "tests/raw-stock-sensitive-input-guard.test.ts",
       "tests/stored-file-protected-access.test.ts",
@@ -21,8 +23,12 @@ const commands = [
       "tests/protected-asset-download-adapter.test.ts",
       "tests/security-audit-runtime.test.ts",
       "tests/security-headers-csp.test.ts",
+      "tests/browser-mutation-security-boundary.test.ts",
+      "tests/ws-broadcast-company-scope.test.ts",
+      "server/lib/logRedaction.test.ts",
       "tests/transaction-company-scope-request-binding.test.ts",
       "tests/phase4-tenant-surface-regression.test.ts",
+      "tests/database-scope-pool-binding.test.ts",
       "--maxWorkers=1",
       "--no-file-parallelism",
     ],
@@ -30,9 +36,7 @@ const commands = [
 ];
 
 if (skipTypeScript) {
-  console.log(
-    "Skipping duplicate TypeScript compilation; the CI static-build job already completed it.",
-  );
+  console.log("Skipping duplicate TypeScript compilation; the CI static-build job already completed it.");
 }
 
 for (const [command, args] of commands) {
@@ -50,4 +54,4 @@ for (const [command, args] of commands) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-console.log("\nProgram 6 + Phase 4 focused security checks passed.");
+console.log("\nProgram 6 + Phase 14 final security re-audit checks passed.");

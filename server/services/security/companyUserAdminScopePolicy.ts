@@ -4,19 +4,12 @@ export interface CompanyUserRoleRow {
   role: string;
 }
 
-export function visibleUserIdsForCompany(
-  rows: readonly CompanyUserRoleRow[],
-  activeCompanyId: number
-): Set<string> {
-  const developerUserIds = new Set(
-    rows.filter((row) => row.role === "Developer").map((row) => row.userId)
-  );
+export function visibleUserIdsForCompany(rows: readonly CompanyUserRoleRow[], activeCompanyId: number): Set<string> {
+  const developerUserIds = new Set(rows.filter((row) => row.role === "Developer").map((row) => row.userId));
 
   return new Set(
     rows
-      .filter(
-        (row) => row.companyId === activeCompanyId && !developerUserIds.has(row.userId)
-      )
+      .filter((row) => row.companyId === activeCompanyId && !developerUserIds.has(row.userId))
       .map((row) => row.userId)
   );
 }
@@ -28,13 +21,8 @@ export function filterRolesForCompany<T extends { companyId: number }>(
   return rows.filter((row) => row.companyId === activeCompanyId);
 }
 
-export function isDeveloperTarget(
-  rows: readonly CompanyUserRoleRow[],
-  targetUserId: string
-): boolean {
-  return rows.some(
-    (row) => row.userId === targetUserId && row.role === "Developer"
-  );
+export function isDeveloperTarget(rows: readonly CompanyUserRoleRow[], targetUserId: string): boolean {
+  return rows.some((row) => row.userId === targetUserId && row.role === "Developer");
 }
 
 export function canAccessTargetUser(
@@ -74,4 +62,10 @@ export function canAssignExistingTargetUser(
 
 export function canAssignRole(actorRole: string, requestedRole: unknown): boolean {
   return requestedRole !== "Developer" || actorRole === "Developer";
+}
+
+export function canAssignCompany(actorRole: string, requestedCompanyId: unknown, activeCompanyId: number): boolean {
+  if (actorRole === "Developer") return true;
+  const parsedCompanyId = Number(requestedCompanyId);
+  return Number.isInteger(parsedCompanyId) && parsedCompanyId > 0 && parsedCompanyId === activeCompanyId;
 }

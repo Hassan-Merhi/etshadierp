@@ -68,7 +68,7 @@ export function OpeningStockImport() {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        complete: (results) => parse((results.data)),
+        complete: (results) => parse(results.data),
       });
     } else if (ext === "xlsx" || ext === "xls") {
       const reader = new FileReader();
@@ -76,7 +76,7 @@ export function OpeningStockImport() {
         const XLSX = await import("@/lib/excelHelper");
         const wb = await XLSX.read(evt.target?.result, { type: "binary" });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        parse(XLSX.utils.sheet_to_json(ws) as any[]);
+        parse(XLSX.utils.sheet_to_json(ws));
       };
       reader.readAsBinaryString(file);
     }

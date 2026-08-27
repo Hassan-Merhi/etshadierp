@@ -1,5 +1,5 @@
 // Safely extract a primitive value from an ExcelJS cell (which can return rich objects)
-export const cellVal = (value: any): any => {
+export const cellVal = (value: any) => {
   if (value === null || value === undefined) return "";
   if (typeof value !== "object") return value;
   if (value instanceof Date) return value;

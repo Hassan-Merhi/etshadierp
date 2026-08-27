@@ -75,7 +75,7 @@ export function StockTransferSidebars({ model }: { model: StockTransferFormModel
               ) : filteredTransferInventory.length === 0 ? (
                 <div className="text-center py-8 text-sm text-muted-foreground">No items found</div>
               ) : (
-                filteredTransferInventory.map((item: any, index: number) => {
+                filteredTransferInventory.map((item, index: number) => {
                   const stock = parseFloat(item.quantity || "0");
                   const isHighlighted = index === transferHighlightedIndex && activeTransferRow !== null;
                   return (

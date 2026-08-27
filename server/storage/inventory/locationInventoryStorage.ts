@@ -1,7 +1,12 @@
+import { randomUUID } from "node:crypto";
 import { eq, and, isNull, asc, sql } from "drizzle-orm";
 import { logger } from "../../lib/logger";
 import { db, pool } from "../../db";
 import * as schema from "@shared/schema";
+import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 // ---------------------------------------------------------------------------
 // Locations
@@ -232,13 +237,49 @@ export async function updateInventory(
       .where(eq(schema.locations.id, locationId));
     resolvedCompanyId = loc?.companyId ?? 0;
   }
-  await db
-    .insert(schema.inventory)
-    .values({ locationId, stockItemId, quantity, averageRate, totalValue, companyId: resolvedCompanyId })
-    .onConflictDoUpdate({
-      target: [schema.inventory.locationId, schema.inventory.stockItemId],
-      set: { quantity, averageRate, totalValue, lastUpdated: sql`now()` },
-    });
+
+  const operationId = randomUUID();
+  await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select({ quantity: schema.inventory.quantity })
+      .from(schema.inventory)
+      .where(and(eq(schema.inventory.locationId, locationId), eq(schema.inventory.stockItemId, stockItemId)))
+      .limit(1);
+    const previousQuantity = existing ? Number.parseFloat(existing.quantity || "0") : 0;
+    const nextQuantity = Number.parseFloat(quantity || "0");
+    const delta = nextQuantity - previousQuantity;
+
+    await tx
+      .insert(schema.inventory)
+      .values({ locationId, stockItemId, quantity, averageRate, totalValue, companyId: resolvedCompanyId })
+      .onConflictDoUpdate({
+        target: [schema.inventory.locationId, schema.inventory.stockItemId],
+        set: { quantity, averageRate, totalValue, lastUpdated: sql`now()` },
+      });
+
+    if (Number.isFinite(delta) && delta !== 0) {
+      await postStockMovementTx(
+        tx,
+        {
+          companyId: resolvedCompanyId!,
+          stockItemId,
+          kind: "adjustment",
+          quantity: String(Math.abs(delta)),
+          unitCost: averageRate,
+          fromLocationId: delta < 0 ? locationId : undefined,
+          toLocationId: delta > 0 ? locationId : undefined,
+          occurredAt: new Date().toISOString(),
+          source: {
+            sourceType: "location_inventory_update",
+            sourceId: operationId,
+            idempotencyKey: `location-inventory-update:${resolvedCompanyId}:${operationId}`,
+          },
+          allowNegativeStock: true,
+        },
+        canonicalStockMovementAdapter
+      );
+    }
+  });
 }
 
 export async function getTotalInventoryValue(companyId: number): Promise<number> {

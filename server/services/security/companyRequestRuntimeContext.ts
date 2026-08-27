@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 export interface CompanyRequestRuntimeContext {
   userId: string;
   companyId: number;
+  authorizedCompanyIds?: readonly number[];
   role: string;
   method: string;
   path: string;

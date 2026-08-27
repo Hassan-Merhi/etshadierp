@@ -1,5 +1,5 @@
 import type { ClientErrorLike } from "@/lib/clientError";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
@@ -235,16 +235,19 @@ export default function POImport() {
   const hasValidationErrors = Boolean(validationResult?.errors?.length);
   const isValidated = validationResult !== null;
 
-  const buildPayload = () => ({
-    fileHash: preview.fileHash,
-    fileName: preview.fileName,
-    containerNumber,
-    supplierId: Number.parseInt(selectedSupplier, 10),
-    importDate,
-    preview: preview.preview,
-    freightPaidBy,
-    freightParentAccountId: freightParentAccountId ? Number.parseInt(freightParentAccountId, 10) : null,
-  });
+  const buildPayload = useCallback(
+    () => ({
+      fileHash: preview.fileHash,
+      fileName: preview.fileName,
+      containerNumber,
+      supplierId: Number.parseInt(selectedSupplier, 10),
+      importDate,
+      preview: preview.preview,
+      freightPaidBy,
+      freightParentAccountId: freightParentAccountId ? Number.parseInt(freightParentAccountId, 10) : null,
+    }),
+    [preview, containerNumber, selectedSupplier, importDate, freightPaidBy, freightParentAccountId]
+  );
 
   useEffect(() => {
     if (
@@ -259,7 +262,7 @@ export default function POImport() {
 
     setValidatedAgainstStockItemsAt(stockItemsUpdatedAt);
     validateMutation.mutate(buildPayload());
-  }, [preview, validationResult, stockItemsUpdatedAt, validatedAgainstStockItemsAt, validateMutation.isPending]);
+  }, [preview, validationResult, stockItemsUpdatedAt, validatedAgainstStockItemsAt, validateMutation, buildPayload]);
 
   const checkRequiredFields = () => {
     if (!selectedCompany?.id) {

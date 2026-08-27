@@ -162,4 +162,44 @@ export const backendMessagesPhase7TranslationsPart11: readonly Phase7BackendMess
     ar: "فشل إنشاء مراجعة تحويل المخزون",
     fr: "Échec de la création de la révision du transfert de stock",
   },
+  {
+    en: "Password must be at least 6 characters",
+    ar: "يجب ألا تقل كلمة المرور عن 6 أحرف",
+    fr: "Le mot de passe doit comporter au moins 6 caractères",
+  },
+  {
+    en: "User not found in this company",
+    ar: "لم يتم العثور على المستخدم في هذه الشركة",
+    fr: "Utilisateur introuvable dans cette société",
+  },
+  {
+    en: "Cannot modify this account",
+    ar: "لا يمكن تعديل هذا الحساب",
+    fr: "Impossible de modifier ce compte",
+  },
+  {
+    en: "Only Developer can change global user credentials",
+    ar: "يمكن للمطور فقط تغيير بيانات اعتماد المستخدم العامة",
+    fr: "Seul le Développeur peut modifier les identifiants globaux de l’utilisateur",
+  },
+  {
+    en: "You cannot remove your own account",
+    ar: "لا يمكنك إزالة حسابك الخاص",
+    fr: "Vous ne pouvez pas supprimer votre propre compte",
+  },
+  {
+    en: "Cannot remove this account",
+    ar: "لا يمكن إزالة هذا الحساب",
+    fr: "Impossible de supprimer ce compte",
+  },
+  {
+    en: "User access removed from this company",
+    ar: "تمت إزالة وصول المستخدم من هذه الشركة",
+    fr: "L’accès de l’utilisateur a été supprimé de cette société",
+  },
+  {
+    en: "Browser mutation request contained an invalid Origin or Referer.",
+    ar: "احتوى طلب تعديل المتصفح على قيمة Origin أو Referer غير صالحة.",
+    fr: "La requête de modification du navigateur contenait un en-tête Origin ou Referer non valide.",
+  },
 ];

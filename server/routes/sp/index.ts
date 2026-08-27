@@ -3,6 +3,10 @@ import { logger } from "../../lib/logger";
 import { registerSpAccessControl } from "./spAccessControl";
 import { registerSpPermissionRoutes } from "./spPermissionRoutes";
 import { registerSpSetupRoutes } from "./spSetupRoutes";
+import { registerSpGoldenCoastSetupRoutes } from "./spGoldenCoastSetupRoutes";
+import { registerSpGoldenCoastPhase3CutoverRoutes } from "./spGoldenCoastPhase3CutoverRoutes";
+import { registerSpGoldenCoastPhase4CutoverFifoRoutes } from "./spGoldenCoastPhase4CutoverFifoRoutes";
+import { registerSpGoldenCoastPhase6PosSaleRoutes } from "./spGoldenCoastPhase6PosSaleRoutes";
 import { registerSpContainerRoutes } from "./spContainerRoutes";
 import { registerSpLifecycleGuards } from "./spLifecycleGuards";
 import { registerSpReoffloadPreparationGuard } from "./spReoffloadPreparationGuard";
@@ -27,8 +31,6 @@ import { ensureCutoverHardening, installExplicitCompanyWriteGuard } from "./spMi
 import { ensureSpSupplierVoucherSyncTrigger, repairSpSupplierVoucherLinks } from "./spSupplierVoucherSync";
 
 export function registerSpRoutes(app: Express) {
-  // Phase 7: authenticate and authorize every Supplier Partner request before
-  // any migration, setup, lifecycle, report, or export handler is reachable.
   registerSpAccessControl(app);
   registerSpPermissionRoutes(app);
 
@@ -61,6 +63,14 @@ export function registerSpRoutes(app: Express) {
   });
 
   registerSpSetupRoutes(app);
+  registerSpGoldenCoastSetupRoutes(app);
+  registerSpGoldenCoastPhase3CutoverRoutes(app);
+  registerSpGoldenCoastPhase4CutoverFifoRoutes(app);
+  // Phase 6 supersedes the Phase 5 mutation surface: it keeps the same FIFO
+  // revenue/COGS behavior and atomically adds the Golden Coast special-location
+  // Hassan Savings deduction. The Phase 5 source remains in the repository for
+  // history/tests, but its production route is intentionally no longer mounted.
+  registerSpGoldenCoastPhase6PosSaleRoutes(app);
   registerSpLifecycleGuards(app);
   registerSpContainerRoutes(app);
   registerSpReoffloadPreparationGuard(app);

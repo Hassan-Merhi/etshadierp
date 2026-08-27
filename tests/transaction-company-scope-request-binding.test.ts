@@ -7,14 +7,15 @@ import {
 } from "../server/services/security/transactionCompanyScope";
 import { runWithCompanyRequestRuntimeContext } from "../server/services/security/companyRequestRuntimeContext";
 
-function requestContext(companyId: number) {
+function requestContext(companyId: number, authorizedCompanyIds: readonly number[] = []) {
   return {
-    userId: "phase-4-user",
+    userId: "phase-3-rls-user",
     companyId,
+    authorizedCompanyIds,
     role: "Admin",
     developerBypass: false,
     method: "POST",
-    path: "/api/phase-4-test",
+    path: "/api/phase-3-rls-test",
   };
 }
 
@@ -32,6 +33,17 @@ describe("transaction company scope request binding", () => {
     );
 
     expect(companyId).toBe(101);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows a secondary company only after the request boundary verified it", async () => {
+    const { tx, execute } = transactionStub();
+
+    const companyId = await runWithCompanyRequestRuntimeContext(requestContext(101, [202]), () =>
+      assertTransactionCompanyScope(tx, 202)
+    );
+
+    expect(companyId).toBe(202);
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
