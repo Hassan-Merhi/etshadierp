@@ -29,7 +29,6 @@ jobs:
 
           route = Path("server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.ts")
           text = route.read_text()
-
           needle = '''  return matches[0];
           }
 
@@ -89,34 +88,10 @@ jobs:
           });'''
             text = text[:stock_end] + hassan_block + text[stock_end:]
           fixture.write_text(text)
-
-          test = Path("server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.test.ts")
-          text = test.read_text()
-          marker = '''  it("allows only one active positive-deduction location", () => {
-            expect(routeSource).toContain("CAST(${locations.supplierPartnerPayableDeductionPerQty} AS numeric) > 0");
-            expect(routeSource).toContain("Golden Coast allows exactly one special deduction location");
-          });
-          '''
-          addition = marker + '''
-          it("fails closed when a canonical account has an incompatible account type", () => {
-            expect(routeSource).toContain("definition.acceptedAccountTypes.includes(account.accountType)");
-            expect(routeSource).toContain("GC_PHASE6_ROLES_INVALID");
-          });
-
-          it("matches Phase 5 revenue by rounding each sale line to cents before summing", () => {
-            expect(routeSource).toContain("times(new Decimal(line.unitPriceUsd)).toDecimalPlaces(2)");
-          });
-          '''
-          if "matches Phase 5 revenue by rounding each sale line" not in text:
-            if marker not in text:
-              raise SystemExit("Phase 6 route test anchor not found")
-            text = text.replace(marker, addition, 1)
-          test.write_text(text)
       - name: Format and verify reviewed files
         run: |
           node node_modules/prettier/bin/prettier.cjs --write \
             server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.ts \
-            server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.test.ts \
             tests/helpers/goldenCoastPhase5Fixture.ts
           npx vitest run \
             server/services/accounting/goldenCoastPhase6SpecialLocationDeduction.test.ts \
@@ -127,7 +102,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.ts \
-            server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.test.ts \
             tests/helpers/goldenCoastPhase5Fixture.ts \
             .github/workflows/gc-phase6-review-fixes-once.yml
           git commit -m "fix(gc): address Phase 6 review findings"
