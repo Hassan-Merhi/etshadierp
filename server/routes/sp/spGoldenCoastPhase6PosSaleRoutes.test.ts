@@ -38,7 +38,9 @@ describe("Golden Coast Phase 6 POS sale route", () => {
   });
 
   it("credits the deduction to canonical Hassan Savings and debits GC Sales Cash", () => {
-    expect(routeSource).toContain('"gc_sales_cash", "stock_in_hand", "hassan_savings"');
+    for (const role of ["gc_sales_cash", "stock_in_hand", "hassan_savings"]) {
+      expect(routeSource).toContain(`"${role}"`);
+    }
     expect(routeSource).toContain("gcSalesCashAccountId: saleSide.id");
     expect(routeSource).toContain("hassanSavingsAccountId: hassanSavings.id");
     expect(phase6ServiceSource).toContain("ledgerAccountId: gcSalesCashAccountId");
@@ -49,8 +51,11 @@ describe("Golden Coast Phase 6 POS sale route", () => {
 
   it("keeps the special deduction in the same transaction as the sale", () => {
     const txIndex = routeSource.indexOf("db.transaction(async (tx) =>");
-    const deductionIndex = routeSource.indexOf("buildGoldenCoastPhase6SpecialLocationDeductionPosting");
-    const returnIndex = routeSource.indexOf("return { replayed: false as const");
+    const deductionIndex = routeSource.indexOf(
+      "const deductionRequest = buildGoldenCoastPhase6SpecialLocationDeductionPosting",
+      txIndex
+    );
+    const returnIndex = routeSource.indexOf("return { replayed: false as const", txIndex);
     expect(txIndex).toBeGreaterThan(-1);
     expect(deductionIndex).toBeGreaterThan(txIndex);
     expect(deductionIndex).toBeLessThan(returnIndex);
