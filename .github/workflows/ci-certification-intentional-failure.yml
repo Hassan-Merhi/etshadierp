@@ -1,0 +1,10 @@
+name: CI Certification Intentional Security Failure
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
