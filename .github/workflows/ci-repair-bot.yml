@@ -138,6 +138,11 @@ jobs:
             head_repo="$(jq -r '.head.repo.full_name // ""' <<<"$pr_json")"
             author_login="$(jq -r '.user.login' <<<"$pr_json")"
             author_association="$(jq -r '.author_association // ""' <<<"$pr_json")"
+            blocked="$(jq -r '[.labels[].name] | any(. == "ci-repair-blocked")' <<<"$pr_json")"
+            if [[ "$blocked" == true ]]; then
+              gh pr merge "$pr_number" --repo "$GITHUB_REPOSITORY" --disable-auto >/dev/null 2>&1 || true
+              continue
+            fi
             [[ "$draft" == false && "$head_repo" == "$GITHUB_REPOSITORY" ]] || continue
             [[ "$author_login" != 'dependabot[bot]' && "$author_login" != 'renovate[bot]' ]] || continue
             case "$author_association" in
@@ -353,7 +358,8 @@ jobs:
           status="$(jq -r '.status // "blocked"' .ci-repair/result.json)"
           summary="$(jq -r '.summary // "No summary returned."' .ci-repair/result.json)"
           tests="$(jq -r '.tests // "No verification reported."' .ci-repair/result.json)"
-          git diff --binary -- . ':(exclude).ci-repair/**' > .ci-repair/repair.patch
+          git add -A -- . ':(exclude).ci-repair'
+          git diff --cached --binary -- . ':(exclude).ci-repair' > .ci-repair/repair.patch
           changed=false
           patch_b64=''
           if [[ -s .ci-repair/repair.patch ]]; then
@@ -437,8 +443,10 @@ jobs:
         run: |
           set -euo pipefail
           echo 'stale=false' >> "$GITHUB_OUTPUT"
-          remote_sha="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '.head.sha')"
-          if [[ "$remote_sha" != "$EXPECTED_HEAD_SHA" ]]; then
+          pr_json="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          remote_sha="$(jq -r '.head.sha' <<<"$pr_json")"
+          blocked="$(jq -r '[.labels[].name] | any(. == "ci-repair-blocked")' <<<"$pr_json")"
+          if [[ "$remote_sha" != "$EXPECTED_HEAD_SHA" || "$blocked" == true ]]; then
             echo 'stale=true' >> "$GITHUB_OUTPUT"
           fi
 
