@@ -63,10 +63,16 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement", () => {
 
   it("treats a zero or credit GC Sales Cash balance as having nothing collectible", () => {
     expect(() =>
-      planGoldenCoastPhase10Settlement({ settlement: settlement({ amountUsd: "1.00" }), gcSalesCashDebitBalanceUsd: "0" })
+      planGoldenCoastPhase10Settlement({
+        settlement: settlement({ amountUsd: "1.00" }),
+        gcSalesCashDebitBalanceUsd: "0",
+      })
     ).toThrow(/balance 0.00/);
     expect(() =>
-      planGoldenCoastPhase10Settlement({ settlement: settlement({ amountUsd: "1.00" }), gcSalesCashDebitBalanceUsd: "-50" })
+      planGoldenCoastPhase10Settlement({
+        settlement: settlement({ amountUsd: "1.00" }),
+        gcSalesCashDebitBalanceUsd: "-50",
+      })
     ).toThrow(/balance 0.00/);
   });
 
@@ -102,7 +108,11 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement", () => {
     const parsed = settlement({ amountUsd: "125.00", receiptAccount: { kind: "ledger", id: 55 } });
     const plan = planGoldenCoastPhase10Settlement({ settlement: parsed, gcSalesCashDebitBalanceUsd: "1000.00" });
     const digest = goldenCoastPhase10SettlementDigest({ settlement: parsed, gcSalesCashAccountId: 44 });
-    const posting = buildGoldenCoastPhase10SettlementPosting({ plan, gcSalesCashAccountId: 44, settlementDigest: digest });
+    const posting = buildGoldenCoastPhase10SettlementPosting({
+      plan,
+      gcSalesCashAccountId: 44,
+      settlementDigest: digest,
+    });
 
     expect(posting.entries[0]).toMatchObject({
       ledgerAccountId: 55,
@@ -118,8 +128,12 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement", () => {
     const differentBank = settlement({ receiptAccount: { kind: "bank", id: 92 } });
     const differentReference = settlement({ reference: "Different collection" });
 
-    expect(goldenCoastPhase10SettlementDigest({ settlement: differentBank, gcSalesCashAccountId: 44 })).not.toBe(digest);
-    expect(goldenCoastPhase10SettlementDigest({ settlement: differentReference, gcSalesCashAccountId: 44 })).not.toBe(digest);
+    expect(
+      goldenCoastPhase10SettlementDigest({ settlement: differentBank, gcSalesCashAccountId: 44 })
+    ).not.toBe(digest);
+    expect(
+      goldenCoastPhase10SettlementDigest({ settlement: differentReference, gcSalesCashAccountId: 44 })
+    ).not.toBe(digest);
     expect(goldenCoastPhase10SettlementDigest({ settlement: base, gcSalesCashAccountId: 45 })).not.toBe(digest);
     expect(goldenCoastPhase10IdempotencyKey(7, base.clientRequestId)).toContain(base.clientRequestId);
   });
