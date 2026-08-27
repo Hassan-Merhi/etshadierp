@@ -175,7 +175,12 @@ async function listReceiptAccounts(conn: DbLike, companyId: number) {
       .orderBy(asc(bankAccounts.name)),
   ]);
   return [
-    ...ledgerRows.map((row) => ({ kind: "ledger" as const, id: Number(row.id), name: row.name, type: row.accountType })),
+    ...ledgerRows.map((row) => ({
+      kind: "ledger" as const,
+      id: Number(row.id),
+      name: row.name,
+      type: row.accountType,
+    })),
     ...bankRows.map((row) => ({ kind: "bank" as const, id: Number(row.id), name: row.name, type: "Bank Account" })),
   ];
 }
@@ -266,7 +271,13 @@ async function findReplayedSettlement(
   const [voucher] = await tx
     .select()
     .from(vouchers)
-    .where(and(eq(vouchers.id, Number(marker.voucherId)), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt)))
+    .where(
+      and(
+        eq(vouchers.id, Number(marker.voucherId)),
+        eq(vouchers.companyId, companyId),
+        isNull(vouchers.deletedAt)
+      )
+    )
     .limit(1);
   if (!voucher) {
     throw new GoldenCoastPhase10RouteError(
@@ -295,7 +306,11 @@ async function findReplayedSettlement(
       settlement.receiptAccount.kind === "bank"
         ? Number(entry.bankAccountId ?? 0) === settlement.receiptAccount.id
         : Number(entry.ledgerAccountId ?? 0) === settlement.receiptAccount.id;
-    return targetMatches && amountEquals(entry.debitAmount, settlement.amountUsd) && amountEquals(entry.creditAmount, "0");
+    return (
+      targetMatches &&
+      amountEquals(entry.debitAmount, settlement.amountUsd) &&
+      amountEquals(entry.creditAmount, "0")
+    );
   });
   if (!salesCashCredit || !receiptDebit) {
     throw new GoldenCoastPhase10RouteError(
@@ -401,7 +416,12 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
         settlementDigest
       );
       if (replayed) {
-        const currentBalance = await gcSalesCashDebitBalance(tx, companyId, gcSalesCashAccount.id, settlement.settlementDate);
+        const currentBalance = await gcSalesCashDebitBalance(
+          tx,
+          companyId,
+          gcSalesCashAccount.id,
+          settlement.settlementDate
+        );
         return {
           replayed: true as const,
           settlement,
