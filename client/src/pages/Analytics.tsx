@@ -94,7 +94,7 @@ export default function Analytics() {
       cleanupRef.current?.();
       cleanupRef.current = null;
     },
-    [],
+    []
   );
 
   return <AnalyticsLegacy />;
