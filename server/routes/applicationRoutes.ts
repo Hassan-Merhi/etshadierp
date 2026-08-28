@@ -106,7 +106,6 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerWriteInvalidationSignal(app);
   registerPermissionBoundaryRoutes(app);
   registerWhatsAppFastSendRoutes(app);
-
   registerBandwidthPhase3FactoryReads(app);
   registerFactoryRoutes(app, requireAuth, db);
   registerFactoryWorkerRoutes(app, requireAuth, db);
@@ -137,7 +136,6 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerInsuranceHistoricalRepairRoutes(app);
   registerAttributionHistoricalRepairRoutes(app);
   registerFactorySheetsAndSacksRoutes(app);
-
   registerLegacyHealthRoutes(app);
   registerAuthRoutes(app);
   registerPasskeyRoutes(app);
@@ -156,7 +154,6 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerIntercompanyPosConfigRoutes(app);
   registerErpWorkerDocumentRoutes(app);
   registerSalaryAdvanceRoutes(app);
-
   registerStockRoutes(app);
   registerBankAssetRoutes(app);
   registerContainerRoutes(app);
@@ -175,14 +172,11 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerAdminRoutes(app);
   registerBalanceRepairRoutes(app);
   registerStockSummaryRoutes(app);
-
   await registerLazyRouteModule(app, {
-    prefixes: ["/api/chatbot"],
+    prefixes: ["/api/chatbot", "/api/users"],
     load: async () => (await import("./chatbot")).registerChatbotRoutes,
   });
-
   registerCreditNoteRoutes(app);
-
   await registerLazyRouteModule(app, {
     prefixes: ["/api/reports/net-profit-excel"],
     load: async () => (await import("./netProfitExcelRoute")).registerNetProfitExcelRoute,
@@ -191,20 +185,16 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
     prefixes: ["/api/reports/net-position-monthly-excel"],
     load: async () => (await import("./netPositionMonthlyExcelRoute")).registerNetPositionMonthlyExcelRoute,
   });
-
   registerWhatsAppRoutes(app);
-
   await registerLazyRouteModule(app, {
     prefixes: ["/api/export"],
     load: async () => (await import("./exportRoutes")).registerExportRoutes,
   });
-
   registerGitRoutes(app);
   registerContainerTrackingRoutes(app);
   registerUserNotesRoutes(app);
   registerSpRoutes(app);
   registerSpMigrationRoutes(app);
-
   await registerLazyRouteModule(app, {
     prefixes: ["/api/ai-import"],
     load: async () => (await import("./ai-import")).registerAiImportRoutes,
@@ -217,7 +207,6 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
     prefixes: ["/api/ai-agent"],
     load: async () => (await import("./aiAgentRoutes")).registerAiAgentRoutes,
   });
-
   registerApprovalRoutes(app);
   registerBusinessAlertRoutes(app);
   registerIntercompanyNotificationRoutes(app);

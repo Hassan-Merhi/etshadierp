@@ -12,43 +12,43 @@ const targets = [
   {
     modulePath: "./chatbot",
     registrar: "registerChatbotRoutes",
-    prefix: "/api/chatbot",
+    prefixes: ["/api/chatbot", "/api/users"],
     source: "server/routes/chatbot",
   },
   {
     modulePath: "./netProfitExcelRoute",
     registrar: "registerNetProfitExcelRoute",
-    prefix: "/api/reports/net-profit-excel",
+    prefixes: ["/api/reports/net-profit-excel"],
     source: "server/routes/netProfitExcelRoute.ts",
   },
   {
     modulePath: "./netPositionMonthlyExcelRoute",
     registrar: "registerNetPositionMonthlyExcelRoute",
-    prefix: "/api/reports/net-position-monthly-excel",
+    prefixes: ["/api/reports/net-position-monthly-excel"],
     source: "server/routes/netPositionMonthlyExcelRoute.ts",
   },
   {
     modulePath: "./exportRoutes",
     registrar: "registerExportRoutes",
-    prefix: "/api/export",
+    prefixes: ["/api/export"],
     source: "server/routes/exportRoutes.ts",
   },
   {
     modulePath: "./ai-import",
     registrar: "registerAiImportRoutes",
-    prefix: "/api/ai-import",
+    prefixes: ["/api/ai-import"],
     source: "server/routes/ai-import",
   },
   {
     modulePath: "./aiValidationRoutes",
     registrar: "registerAiValidationRoutes",
-    prefix: "/api/ai-validation",
+    prefixes: ["/api/ai-validation"],
     source: "server/routes/aiValidationRoutes.ts",
   },
   {
     modulePath: "./aiAgentRoutes",
     registrar: "registerAiAgentRoutes",
-    prefix: "/api/ai-agent",
+    prefixes: ["/api/ai-agent"],
     source: "server/routes/aiAgentRoutes.ts",
   },
 ];
@@ -124,9 +124,11 @@ for (const target of targets) {
     applicationRoutes.includes(`import("${target.modulePath}")`),
     `${target.modulePath} must be loaded through dynamic import()`
   );
+
+  const prefixesSource = `prefixes: [${target.prefixes.map((prefix) => `"${prefix}"`).join(", ")}]`;
   assert(
-    applicationRoutes.includes(`prefixes: ["${target.prefix}"]`),
-    `${target.modulePath} must keep the reviewed lazy prefix ${target.prefix}`
+    applicationRoutes.includes(prefixesSource),
+    `${target.modulePath} must keep the reviewed lazy prefixes ${target.prefixes.join(", ")}`
   );
   assert(
     !applicationRoutes.includes(`${target.registrar}(app);`),
@@ -137,8 +139,10 @@ for (const target of targets) {
   assert(declaredRoutes.length > 0, `${target.source} must expose at least one statically discoverable route`);
   for (const declared of declaredRoutes) {
     assert(
-      declared.route === target.prefix || declared.route.startsWith(`${target.prefix}/`),
-      `${declared.file} declares ${declared.route}, which escapes lazy prefix ${target.prefix}`
+      target.prefixes.some(
+        (prefix) => declared.route === prefix || declared.route.startsWith(`${prefix}/`)
+      ),
+      `${declared.file} declares ${declared.route}, which escapes lazy prefixes ${target.prefixes.join(", ")}`
     );
   }
 }
