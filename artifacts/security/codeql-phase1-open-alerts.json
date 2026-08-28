@@ -3,7 +3,7 @@
   "summary": {
     "generatedAt": "2026-08-28T18:19:08.352Z",
     "repository": "Hassan-Merhi/etshadierp",
-    "mainSha": "00880735f4cb13a8895ff520b50e35a025094708",
+    "mainSha": "2fb9747d2a8713ecc4dbe7b43dfe0421f20da74d",
     "pagesFetched": 17,
     "openCodeScanningAlerts": 1610,
     "uniqueAlertNumbers": 1610,
@@ -29,7 +29,9 @@
       "phase4High": 1539,
       "phase5Medium": 10,
       "phase6LowAndNonSecurity": 0
-    }
+    },
+    "repositoryMainShaAtCollection": "00880735f4cb13a8895ff520b50e35a025094708",
+    "codeqlAnalyzedMainSha": "2fb9747d2a8713ecc4dbe7b43dfe0421f20da74d"
   },
   "counts": {
     "allBySeverity": {
