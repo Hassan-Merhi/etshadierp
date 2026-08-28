@@ -163,6 +163,37 @@ function fundedContainer(): GoldenCoastPhase8FundedContainerState {
   };
 }
 
+function phase8Offload() {
+  const offload = parseGoldenCoastPhase8OffloadInput({
+    companyId: COMPANY_ID,
+    body: {
+      clientRequestId: "phase14-offload",
+      containerId: 700,
+      locationId: LOCATION_ID,
+      offloadDate: "2026-09-06",
+      charges: [
+        { chargeType: "duty", amountUsd: "8500" },
+        { chargeType: "transport", amountUsd: "12200" },
+      ],
+    },
+  });
+  const funded = fundedContainer();
+  const plan = planGoldenCoastPhase8Offload({ offload, funded });
+  const posting = buildGoldenCoastPhase8OffloadPosting({
+    offload,
+    funded,
+    plan,
+    accounts: {
+      stockOtwAccountId: account.stockOtw,
+      stockInHandAccountId: account.stockInHand,
+      containerReserveAccountId: account.containerReserve,
+      hassanEquityAccountId: account.hassanEquity,
+      hassanSavingsAccountId: account.hassanSavings,
+    },
+  });
+  return { plan, posting };
+}
+
 function salePlan() {
   const sale = parseGoldenCoastPhase5SaleInput({
     companyId: COMPANY_ID,
@@ -174,6 +205,7 @@ function salePlan() {
       lines: [{ stockItemId: STOCK_ITEM_ID, qty: "30", unitPriceUsd: "60" }],
     },
   });
+  const offload = phase8Offload();
   const lot: GoldenCoastFifoLot = {
     id: 800,
     companyId: COMPANY_ID,
@@ -183,7 +215,7 @@ function salePlan() {
     description: "Golden Coast bag",
     sourceType: "golden_coast_phase8_offload",
     qtyRemaining: "2000",
-    finalUnitCostUsd: "22",
+    finalUnitCostUsd: offload.plan.lines[0].finalUnitCostUsd,
     createdAt: "2026-09-06T00:00:00.000Z",
   };
   return { sale, plan: planGoldenCoastPhase5Sale({ sale, lots: [lot] }) };
@@ -225,37 +257,15 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
     expectBalanced(funding.entries);
   });
 
-  it("carries an unused reserve into Hassan Savings without contaminating the sale P&L", () => {
-    const offload = parseGoldenCoastPhase8OffloadInput({
-      companyId: COMPANY_ID,
-      body: {
-        clientRequestId: "phase14-offload",
-        containerId: 700,
-        locationId: LOCATION_ID,
-        offloadDate: "2026-09-06",
-        charges: [
-          { chargeType: "duty", amountUsd: "8500" },
-          { chargeType: "transport", amountUsd: "12200" },
-        ],
-      },
-    });
-    const offloadPlan = planGoldenCoastPhase8Offload({ offload, funded: fundedContainer() });
-    const posting = buildGoldenCoastPhase8OffloadPosting({
-      offload,
-      funded: fundedContainer(),
-      plan: offloadPlan,
-      accounts: {
-        stockOtwAccountId: account.stockOtw,
-        stockInHandAccountId: account.stockInHand,
-        containerReserveAccountId: account.containerReserve,
-        hassanEquityAccountId: account.hassanEquity,
-        hassanSavingsAccountId: account.hassanSavings,
-      },
-    });
+  it("carries an unused reserve into Hassan Savings and produces landed FIFO cost", () => {
+    const { plan, posting } = phase8Offload();
 
-    expect(offloadPlan.actualChargesUsd).toBe("20700.00");
-    expect(offloadPlan.unusedReserveUsd).toBe("1600.00");
-    expect(offloadPlan.totalFinalCostUsd).toBe("64700.00");
+    expect(plan.actualChargesUsd).toBe("20700.00");
+    expect(plan.unusedReserveUsd).toBe("1600.00");
+    expect(plan.totalFinalCostUsd).toBe("64700.00");
+    expect(plan.lines[0].baseUnitCostUsd).toBe("22.000000");
+    expect(plan.lines[0].landedUnitCostUsd).toBe("10.350000");
+    expect(plan.lines[0].finalUnitCostUsd).toBe("32.350000");
     expect(ledgerNetDebit(posting.entries, account.stockInHand)).toBe(64700);
     expect(ledgerNetDebit(posting.entries, account.stockOtw)).toBe(-44000);
     expect(ledgerNetDebit(posting.entries, account.containerReserve)).toBe(-22300);
@@ -267,11 +277,11 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
     expectBalanced(posting.entries);
   });
 
-  it("runs one sale through deduction, HADI collection, direct settlement, remittance and savings withdrawal", () => {
+  it("runs landed-cost sale value through deduction, collection, remittance and savings withdrawal", () => {
     const { sale, plan } = salePlan();
     expect(plan.revenueUsd).toBe("1800.00");
-    expect(plan.cogsUsd).toBe("660.00");
-    expect(plan.grossProfitUsd).toBe("1140.00");
+    expect(plan.cogsUsd).toBe("970.50");
+    expect(plan.grossProfitUsd).toBe("829.50");
 
     const saleSideAccount = { kind: "ledger", id: account.gcSalesCash } as const;
     const saleDigest = goldenCoastPhase5SaleDigest({ sale, saleSideAccount });
@@ -290,8 +300,8 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
     const saleEntries = saleBatch.postings.flatMap((posting) => posting.request.entries);
     expect(ledgerNetDebit(saleEntries, account.gcSalesCash)).toBe(1800);
     expect(ledgerNetDebit(saleEntries, account.sales)).toBe(-1800);
-    expect(ledgerNetDebit(saleEntries, account.cogs)).toBe(660);
-    expect(ledgerNetDebit(saleEntries, account.stockInHand)).toBe(-660);
+    expect(ledgerNetDebit(saleEntries, account.cogs)).toBe(970.5);
+    expect(ledgerNetDebit(saleEntries, account.stockInHand)).toBe(-970.5);
     for (const posting of saleBatch.postings) expectBalanced(posting.request.entries);
 
     const deductionPlan = planGoldenCoastPhase6SpecialLocationDeduction({
@@ -310,7 +320,6 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
     expect(ledgerNetDebit(deduction.entries, account.hassanSavings)).toBe(-75);
     expectBalanced(deduction.entries);
 
-    const collectibleAfterSaleAndDeduction = "1875.00";
     const collection = parseGoldenCoastPhase7TransferInput({
       companyId: COMPANY_ID,
       parentCompanyId: HADI_COMPANY_ID,
@@ -326,7 +335,7 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
     const collectionPlan = planGoldenCoastPhase7Transfer({
       transfer: collection,
       balances: {
-        gcSalesCashDebitBalanceUsd: collectibleAfterSaleAndDeduction,
+        gcSalesCashDebitBalanceUsd: "1875.00",
         outstandingHadiCollectionsUsd: "0.00",
       },
     });
@@ -423,7 +432,6 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
     expectBalanced(gcRemittance!.entries);
     expectBalanced(hadiRemittance!.entries);
 
-    const savingsBeforeWithdrawal = "79375.00";
     const withdrawal = parseGoldenCoastPhase9WithdrawalInput({
       companyId: COMPANY_ID,
       body: {
@@ -436,7 +444,7 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
         confirmation: GOLDEN_COAST_PHASE9_CONFIRMATION,
       },
     });
-    const withdrawalPlan = planGoldenCoastPhase9Withdrawal({ withdrawal, savingsBalanceUsd: savingsBeforeWithdrawal });
+    const withdrawalPlan = planGoldenCoastPhase9Withdrawal({ withdrawal, savingsBalanceUsd: "79375.00" });
     expect(withdrawalPlan.savingsBalanceAfterUsd).toBe("77700.00");
     const withdrawalDigest = goldenCoastPhase9WithdrawalDigest({
       withdrawal,
@@ -452,7 +460,7 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
     expectBalanced(withdrawalPosting.entries);
   });
 
-  it("closes the sale profit 50/50 without reusing settlement, savings, inventory or HADI balances", () => {
+  it("closes landed-cost profit 50/50 without reusing settlement, savings, inventory or HADI balances", () => {
     const close = parseGoldenCoastPhase11CloseInput({
       companyId: COMPANY_ID,
       body: {
@@ -464,12 +472,12 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
     const closePlan = planGoldenCoastPhase11MonthlyClose({
       close,
       totalRevenueUsd: "1800.00",
-      totalCogsUsd: "660.00",
+      totalCogsUsd: "970.50",
       totalSharedChargesUsd: "0.00",
     });
-    expect(closePlan.netProfitLossUsd).toBe("1140.00");
-    expect(closePlan.freshStartShareUsd).toBe("570.00");
-    expect(closePlan.hassanShareUsd).toBe("570.00");
+    expect(closePlan.netProfitLossUsd).toBe("829.50");
+    expect(closePlan.freshStartShareUsd).toBe("414.75");
+    expect(closePlan.hassanShareUsd).toBe("414.75");
 
     const closeAccounts = {
       salesAccountId: account.sales,
@@ -482,8 +490,8 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
     const digest = goldenCoastPhase11CloseDigest({ plan: closePlan, accounts: closeAccounts });
     const posting = buildGoldenCoastPhase11MonthlyClosePosting({ plan: closePlan, accounts: closeAccounts, digest });
 
-    expect(ledgerNetDebit(posting.entries, account.freshStartEquity)).toBe(-570);
-    expect(ledgerNetDebit(posting.entries, account.hassanEquity)).toBe(-570);
+    expect(ledgerNetDebit(posting.entries, account.freshStartEquity)).toBe(-414.75);
+    expect(ledgerNetDebit(posting.entries, account.hassanEquity)).toBe(-414.75);
     expect(ledgerNetDebit(posting.entries, account.profitPendingDistribution)).toBe(0);
     for (const untouchedAccountId of [
       account.hassanSavings,
