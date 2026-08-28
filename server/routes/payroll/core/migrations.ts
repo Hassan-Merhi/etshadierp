@@ -222,14 +222,27 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
       `);
 
       let bonusesRecorded = 0;
+      const bonusWorkerGroup = await findOrCreateLedger(companyId, "Bonus Expense - Workers", "Expense", {
+        subType: "Group",
+      });
+      await db.execute(sql`
+        UPDATE ledger_accounts SET sub_type = 'Group'
+        WHERE id = ${bonusWorkerGroup.id} AND (sub_type IS NULL OR sub_type <> 'Group')
+      `);
+
       for (const wb of paidBonuses.rows) {
         const amt = parseFloat(wb.amount || "0");
         if (amt <= 0) continue;
-        const city = (wb.city as string | null)?.trim() || "";
-        const capCity = city ? city.charAt(0).toUpperCase() + city.slice(1).toLowerCase() : "";
-        const expAccId = city ? (bonusAccByCity.get(city) ?? legacyAcc.id) : legacyAcc.id;
+        const workerName = (wb.full_name as string | null)?.trim() || `Worker #${wb.worker_id}`;
+        const expAcc = await findOrCreateLedger(companyId, `Bonus Expense - ${workerName}`, "Expense", {
+          parentId: bonusWorkerGroup.id,
+        });
+        await db.execute(sql`
+          UPDATE ledger_accounts SET parent_id = ${bonusWorkerGroup.id}
+          WHERE id = ${expAcc.id} AND (parent_id IS NULL OR parent_id <> ${bonusWorkerGroup.id})
+        `);
         const paidDate = wb.paid_date || wb.bonus_date;
-        const narration = wb.notes || `Bonus for ${wb.full_name}`;
+        const narration = wb.notes || `Bonus for ${workerName}`;
 
         const [bVoucher] = await db
           .insert(vouchers)
@@ -248,9 +261,9 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
         await db.insert(voucherEntries).values([
           {
             voucherId: bVoucher.id,
-            ledgerAccountId: expAccId,
+            ledgerAccountId: expAcc.id,
             ...normUsd(amt.toFixed(2), "0"),
-            narration: city ? `Bonus expense - ${capCity}: ${narration}` : narration,
+            narration: `Bonus - ${workerName}: ${narration}`,
           },
           {
             voucherId: bVoucher.id,
@@ -269,8 +282,8 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
   });
 
   // POST /api/factory/payroll/migrate-worker-names
-  // Migration: replaces city-based expense entries in PAYROLL-GEN-* vouchers with
-  // per-worker named entries ("Salary Expense - Ahmad Hassan" instead of "Salary Expense - Beirut").
+  // Migration: replaces city-based expense entries in PAYROLL-GEN-* and WBONUS-* vouchers with
+  // per-worker named entries ("Salary Expense - Ahmad Hassan" / "Bonus Expense - Ahmad Hassan").
   // Safe to run multiple times (idempotent per voucher).
   app.post("/api/factory/payroll/migrate-worker-names", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -383,7 +396,55 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
         vouchersUpdated++;
       }
 
-      // ── Step 2: delete orphaned Salary/Bonus Expense accounts (no entries left) ──
+      // ── Step 2: retarget historical paid-bonus vouchers to worker-named accounts ──
+      const paidBonusGroup = await findOrCreateLedger(companyId, "Bonus Expense - Workers", "Expense", {
+        subType: "Group",
+      });
+      await db.execute(sql`
+        UPDATE ledger_accounts SET sub_type = 'Group'
+        WHERE id = ${paidBonusGroup.id} AND (sub_type IS NULL OR sub_type <> 'Group')
+      `);
+
+      const paidBonusVouchers = await db.execute(sql`
+        SELECT wb.id AS bonus_id, wb.worker_id, fw.full_name, v.id AS voucher_id
+        FROM worker_bonuses wb
+        JOIN factory_workers fw
+          ON fw.id = wb.worker_id
+         AND fw.company_id = wb.company_id
+        JOIN vouchers v
+          ON v.company_id = wb.company_id
+         AND v.voucher_number LIKE ('WBONUS-' || wb.id || '-%')
+        WHERE wb.company_id = ${companyId}
+          AND wb.status = 'paid'
+        ORDER BY wb.id, v.id
+      `);
+
+      let bonusVouchersUpdated = 0;
+      for (const row of paidBonusVouchers.rows as {
+        bonus_id: number;
+        worker_id: number;
+        full_name: string | null;
+        voucher_id: number;
+      }[]) {
+        const workerName = row.full_name?.trim() || `Worker #${row.worker_id}`;
+        const bonusAcc = await findOrCreateLedger(companyId, `Bonus Expense - ${workerName}`, "Expense", {
+          parentId: paidBonusGroup.id,
+        });
+        await db.execute(sql`
+          UPDATE ledger_accounts SET parent_id = ${paidBonusGroup.id}
+          WHERE id = ${bonusAcc.id} AND (parent_id IS NULL OR parent_id <> ${paidBonusGroup.id})
+        `);
+        const updateResult = await db.execute(sql`
+          UPDATE voucher_entries
+          SET ledger_account_id = ${bonusAcc.id},
+              narration = ${`Bonus - ${workerName}`}
+          WHERE voucher_id = ${row.voucher_id}
+            AND CAST(debit_amount AS numeric) > 0
+        `);
+        if ((updateResult.rowCount ?? 0) > 0) bonusVouchersUpdated++;
+      }
+
+      // ── Step 3: delete orphaned Salary/Bonus Expense accounts (no entries left) ──
       // These are the old city-based accounts created by migrate-city-split.
       // Now that all voucher entries point to per-worker accounts, city accounts are empty.
       const orphanedAccounts = await db.execute(sql`
@@ -406,7 +467,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
         accountsDeleted = orphanIds.length;
       }
 
-      // ── Step 3: ensure group headers exist and re-parent all worker accounts ──
+      // ── Step 4: ensure group headers exist and re-parent all worker accounts ──
       const salaryGroup = await findOrCreateLedger(companyId, "Salary Expense - Workers", "Expense", {
         subType: "Group",
       });
@@ -431,6 +492,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
       res.json({
         message: "Payroll accounts fixed",
         vouchersUpdated,
+        bonusVouchersUpdated,
         accountsDeleted,
         salaryAccountsReparented: salReparent.rowCount ?? 0,
         bonusAccountsReparented: bonReparent.rowCount ?? 0,
