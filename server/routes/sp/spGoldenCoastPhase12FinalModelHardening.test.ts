@@ -11,14 +11,19 @@ const phase10RouteSource = readFileSync(
   new URL("./spGoldenCoastPhase10SalesCashSettlementRoutes.ts", import.meta.url),
   "utf8"
 );
-const phase11RouteSource = readFileSync(new URL("./spGoldenCoastPhase11MonthlyCloseRoutes.ts", import.meta.url), "utf8");
+const phase11RouteSource = readFileSync(
+  new URL("./spGoldenCoastPhase11MonthlyCloseRoutes.ts", import.meta.url),
+  "utf8"
+);
 const spIndexSource = readFileSync(new URL("./index.ts", import.meta.url), "utf8");
 
 describe("Golden Coast Phase 12 final accounting-model hardening", () => {
   it("forces every production Golden Coast sale through canonical GC Sales Cash", () => {
     expect(phase6RouteSource).toContain("GC_PHASE6_SALE_SIDE_OVERRIDE_RETIRED");
     expect(phase6RouteSource).toContain("saleSideAccount overrides are retired for Golden Coast");
-    expect(phase6RouteSource).toContain('const saleSideAccount = { kind: "ledger" as const, id: accounts.gcSalesCashAccountId };');
+    expect(phase6RouteSource).toContain(
+      'const saleSideAccount = { kind: "ledger" as const, id: accounts.gcSalesCashAccountId };'
+    );
   });
 
   it("keeps physical cash collection on the existing HADI cash-only intercompany path", () => {
