@@ -6,10 +6,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   ArrowLeftRight,
   Boxes,
+  Calculator,
   Database,
   Edit,
   FileSpreadsheet,
   Package,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   Upload,
@@ -18,6 +20,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "wouter";
 import { MergeStockItemsLauncher } from "./components/MergeStockItemsLauncher";
+import { ReconcileOTWNamesCard } from "./components/ReconcileOTWNamesCard";
 import { LocationCostPriceOverride } from "./components/LocationCostPriceOverride";
 import { DataToolsImportDialogs } from "./DataToolsImportDialogs";
 import { SilentProductionDialog } from "./SilentProductionDialog";
@@ -112,6 +115,7 @@ export function DataToolsView({ model }: Props) {
     setSilentImportPreview,
     setSilentProdOpen,
     setBulkRenameOpen,
+    recalculateCostsMutation,
   } = model;
 
   if (!selectedCompany) {
@@ -245,7 +249,7 @@ export function DataToolsView({ model }: Props) {
 
           <ToolCard
             icon={ArrowLeftRight}
-            title="Silent stock transfer"
+            title="Silent Stock Transfer"
             description="Move stock between locations through an Excel upload without creating a daybook entry."
             action={
               <Button
@@ -283,7 +287,7 @@ export function DataToolsView({ model }: Props) {
           {isDeveloperWorkspace && (
             <ToolCard
               icon={Package}
-              title="Silent production / consumption"
+              title="Silent Production / Consumption"
               description="Directly adjust inventory up or down without creating a daybook entry."
               accent="blue"
               action={
@@ -329,6 +333,31 @@ export function DataToolsView({ model }: Props) {
           )}
 
           {appMode !== "factory" && canManageData && <MergeStockItemsLauncher />}
+
+          {appMode !== "factory" && canManageData && <ReconcileOTWNamesCard />}
+
+          {isDeveloperWorkspace && (
+            <ToolCard
+              icon={Calculator}
+              title="Fix Cost Prices"
+              description="Recalculate sales cost prices based on inventory records."
+              accent="amber"
+              action={
+                <Button
+                  variant="outline"
+                  className="h-10 w-full"
+                  onClick={() => recalculateCostsMutation.mutate()}
+                  disabled={recalculateCostsMutation.isPending}
+                  data-testid="button-fix-cost-prices"
+                >
+                  <RefreshCw
+                    className={`mr-2 h-4 w-4 ${recalculateCostsMutation.isPending ? "animate-spin" : ""}`}
+                  />
+                  {recalculateCostsMutation.isPending ? "Updating..." : "Fix Cost Prices"}
+                </Button>
+              }
+            />
+          )}
 
           {appMode === "factory" && canManageData && (
             <ToolCard
