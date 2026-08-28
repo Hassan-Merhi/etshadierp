@@ -100,22 +100,11 @@ async function runDailyRentalAccrual() {
           // Repair those fully-prepaid legacy months before the normal idempotent
           // accrual/recognition engine runs.
           if (module === "ERP" || module === "FACTORY") {
-            const { repaired } = await repairLegacyFullyPrepaidRentRecognition(
-              companyId,
-              module,
-              expense,
-              asOfDate
-            );
+            const { repaired } = await repairLegacyFullyPrepaidRentRecognition(companyId, module, expense, asOfDate);
             totalRepaired += repaired;
           }
 
-          const { accrued } = await postRentAccrualForCompany(
-            companyId,
-            expense,
-            module,
-            income,
-            asOfDate
-          );
+          const { accrued } = await postRentAccrualForCompany(companyId, expense, module, income, asOfDate);
           totalAccrued += accrued;
         } catch (err: unknown) {
           logger.error(`[RentalAccrual] company=${companyId} module=${module}: ${getErrorMessage(err)}`);
