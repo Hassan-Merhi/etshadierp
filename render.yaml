@@ -13,6 +13,26 @@ services:
         value: production
       - key: NODE_VERSION
         value: 24.19.0
+      # Starter is a 512 MB service. Keep the JS heap below the container
+      # ceiling so native buffers, compression, sockets, and exports retain
+      # headroom instead of letting Render be the first OOM protection layer.
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=320"
+      - key: MEMORY_SOFT_RSS_MB
+        value: "384"
+      - key: MEMORY_HARD_RSS_MB
+        value: "448"
+      # Release idle PostgreSQL clients aggressively on the 256 MB database.
+      # Peak capacity remains adequate for the existing endpoint concurrency
+      # guards while steady-state connection memory drops after traffic bursts.
+      - key: PG_POOL_MAX
+        value: "8"
+      - key: PG_POOL_MIN
+        value: "0"
+      - key: PG_IDLE_TIMEOUT_MS
+        value: "30000"
+      - key: PG_SESSION_POOL_MAX
+        value: "2"
       - key: DATABASE_URL
         fromDatabase:
           name: erp-database
