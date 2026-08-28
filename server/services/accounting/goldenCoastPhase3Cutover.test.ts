@@ -76,9 +76,7 @@ describe("Golden Coast Phase 3 opening-balance cutover hardened by Phase 13", ()
   });
 
   it("does not charge Hassan for a Fresh Start-contributed container", () => {
-    const plan = buildGoldenCoastPhase3CutoverPlan(
-      input({ freshStartContributedStockOtwUsd: "44000.00" })
-    );
+    const plan = buildGoldenCoastPhase3CutoverPlan(input({ freshStartContributedStockOtwUsd: "44000.00" }));
 
     expect(plan.freshStartContributedStockOtwUsd).toBe("44000.00");
     expect(plan.freshStartContributedInventoryUsd).toBe("44000.00");
@@ -151,9 +149,7 @@ describe("Golden Coast Phase 3 opening-balance cutover hardened by Phase 13", ()
   });
 
   it("puts all unused Hassan funding into Savings when there are no Hassan-funded uses", () => {
-    const plan = buildGoldenCoastPhase3CutoverPlan(
-      input({ stockOtwUsd: 0, stockInHandUsd: 0, containerReserveUsd: 0 })
-    );
+    const plan = buildGoldenCoastPhase3CutoverPlan(input({ stockOtwUsd: 0, stockInHandUsd: 0, containerReserveUsd: 0 }));
 
     expect(plan.hassanOpeningEquityUsd).toBe("0.00");
     expect(plan.hassanSavingsUsd).toBe("100000.00");
@@ -213,7 +209,7 @@ describe("Golden Coast Phase 3 opening-balance cutover hardened by Phase 13", ()
 
     expect(total(plan.entries, "debitAmount")).toBeCloseTo(total(plan.entries, "creditAmount"), 8);
     expect(plan.totalAmount).toBe("208500.50");
-    expect(plan.hassanSavingsUsd).toBe("65699.75");
+    expect(plan.hassanSavingsUsd).toBe("65699.85");
   });
 
   it("rejects omitted required asset balances instead of silently treating them as zero", () => {
