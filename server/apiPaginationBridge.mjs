@@ -206,7 +206,10 @@ if (!globalThis[INSTALL_KEY]) {
     if (!body || typeof body !== "object" || !Array.isArray(body.accounts)) return body;
 
     const accounts = body.accounts
-      .filter((account) => account?.type === "ledger" || account?.type === "bank" || account?.type === "fixedAsset")
+      .filter(
+        (account) =>
+          account?.type === "ledger" || account?.type === "bank" || account?.type === "fixedAsset"
+      )
       .map((account) => ({
         id: account?.id,
         accountId: account?.accountId,
@@ -244,7 +247,11 @@ if (!globalThis[INSTALL_KEY]) {
       return compactCombinedContainerDetail(body);
     }
 
-    if (/^\/api\/factory\/workers\/\d+\/bales$/.test(pathname) && profile === "worker-bales-summary" && Array.isArray(body)) {
+    if (
+      /^\/api\/factory\/workers\/\d+\/bales$/.test(pathname) &&
+      profile === "worker-bales-summary" &&
+      Array.isArray(body)
+    ) {
       return compactWorkerBaleSummary(body);
     }
 
@@ -252,7 +259,11 @@ if (!globalThis[INSTALL_KEY]) {
       return compactLedgerPicker(body);
     }
 
-    if (/^\/api\/locations\/\d+\/inventory$/.test(pathname) && profile === "view" && Array.isArray(body)) {
+    if (
+      /^\/api\/locations\/\d+\/inventory$/.test(pathname) &&
+      profile === "view" &&
+      Array.isArray(body)
+    ) {
       return compactLocationInventoryView(body);
     }
 
