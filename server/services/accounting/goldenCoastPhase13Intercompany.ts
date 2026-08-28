@@ -115,28 +115,36 @@ function selectCandidate(input: {
   accounts: readonly GoldenCoastPhase13LedgerRow[];
 }): { selected: GoldenCoastPhase13LedgerRow | null; adopted: boolean } {
   const canonical = input.accounts.filter((row) => row.subType === input.definition.subType).sort(byId);
+  const legacy = input.accounts
+    .filter((row) => row.subType !== input.definition.subType)
+    .filter((row) => row.code === input.definition.code || row.name === input.definition.name)
+    .sort(byId);
+
   const liveCanonical = canonical.filter(isLive);
   if (liveCanonical.length > 1) {
     throw new GoldenCoastPhase13IntercompanyError(
       `Company ${input.companyId} has ${liveCanonical.length} active ${input.definition.subType} accounts; repair duplicates before Golden Coast setup`
     );
   }
-  const canonicalSelected = liveCanonical[0] ?? canonical[0] ?? null;
-  if (canonicalSelected) return { selected: canonicalSelected, adopted: false };
 
-  // Older installs sometimes created the reciprocal account by its stable code
-  // or default name but never stamped the Phase 7 subtype. Adopt that row rather
-  // than creating a duplicate account and breaking historical voucher links.
-  const legacy = input.accounts
-    .filter((row) => row.code === input.definition.code || row.name === input.definition.name)
-    .sort(byId);
   const liveLegacy = legacy.filter(isLive);
   if (liveLegacy.length > 1) {
     throw new GoldenCoastPhase13IntercompanyError(
       `Company ${input.companyId} has multiple live legacy candidates for ${input.definition.subType}; repair duplicates before Golden Coast setup`
     );
   }
-  return { selected: liveLegacy[0] ?? legacy[0] ?? null, adopted: legacy.length > 0 };
+
+  // Preserve the live account that already owns historical voucher links before
+  // considering any soft-deleted canonical row. This avoids reviving a deleted
+  // duplicate when a healthy legacy account with the stable code/name exists.
+  if (liveCanonical[0]) return { selected: liveCanonical[0], adopted: false };
+  if (liveLegacy[0]) return { selected: liveLegacy[0], adopted: true };
+
+  const deletedCanonical = canonical[0] ?? null;
+  if (deletedCanonical) return { selected: deletedCanonical, adopted: false };
+
+  const deletedLegacy = legacy[0] ?? null;
+  return { selected: deletedLegacy, adopted: deletedLegacy != null };
 }
 
 /**
