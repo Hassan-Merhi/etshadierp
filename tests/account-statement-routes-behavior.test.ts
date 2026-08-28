@@ -251,6 +251,31 @@ describe("account statement route behavior", () => {
     expect(invalid.statusCode).toBe(400);
   });
 
+  it("rejects repeated query values at account statement boundaries", async () => {
+    const prePeriod = responseHarness();
+    await routes.get("GET /api/accounts/:type/:id/pre-period-balance")!(
+      request({ params: { type: "bank", id: "3" }, query: { endDate: ["2026-08-01", "2026-08-02"] } }),
+      prePeriod
+    );
+    expect(prePeriod.statusCode).toBe(400);
+    expect(harness.db.select).not.toHaveBeenCalled();
+
+    const pdf = responseHarness();
+    await routes.get("GET /api/accounts/:type/:id/statement-pdf")!(
+      request({ params: { type: "supplier", id: "8" }, query: { startDate: ["2026-08-01"] } }),
+      pdf
+    );
+    expect(pdf.statusCode).toBe(400);
+    expect(harness.generateAccountStatementPdf).not.toHaveBeenCalled();
+
+    const excel = responseHarness();
+    await routes.get("GET /api/accounts/statement/export-excel")!(
+      request({ query: { accountId: ["8", "9"] } }),
+      excel
+    );
+    expect(excel.statusCode).toBe(400);
+  });
+
   it("generates a statement PDF with a sanitized human-readable filename", async () => {
     harness.selectResults.push([{ name: "Supplier / Alpha" }]);
     const res = responseHarness();

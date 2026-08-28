@@ -7,6 +7,7 @@ import { sql } from "drizzle-orm";
 import { generateSpSalesFormExcel } from "../../services/sp-sales-form";
 import { generateSpSalesFormExcelV2 } from "../../services/spSalesFormExportV2";
 import { requireSpCompany } from "./spHelpers";
+import { validateStatementDateRange } from "../../lib/accountStatementExportSafety";
 
 type QueryRecord = Record<string, unknown>;
 type QueryResultLike = { rows: QueryRecord[] };
@@ -28,13 +29,27 @@ export function registerSpExportRoutes(app: Express) {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const { fromDate, toDate, locationId } = req.query;
+      const { fromDate: fromDateRaw, toDate: toDateRaw, locationId: locationIdRaw } = req.query;
 
-      if (!fromDate || !toDate) {
-        return res.status(400).json({ message: "fromDate and toDate are required (YYYY-MM-DD)" });
+      if (typeof fromDateRaw !== "string" || typeof toDateRaw !== "string") {
+        return res.status(400).json({ message: "fromDate and toDate must each be a single YYYY-MM-DD value" });
       }
+      if (locationIdRaw !== undefined && typeof locationIdRaw !== "string") {
+        return res.status(400).json({ message: "locationId must be a single positive integer" });
+      }
+      const dateRange = validateStatementDateRange(fromDateRaw, toDateRaw);
+      if (!dateRange.ok) return res.status(400).json({ message: dateRange.message });
 
-      const locId = locationId ? parseInt(locationId as string) : undefined;
+      let locId: number | undefined;
+      if (locationIdRaw) {
+        const parsedLocationId = Number.parseInt(locationIdRaw, 10);
+        if (!Number.isSafeInteger(parsedLocationId) || parsedLocationId <= 0) {
+          return res.status(400).json({ message: "locationId must be a single positive integer" });
+        }
+        locId = parsedLocationId;
+      }
+      const fromDate = fromDateRaw;
+      const toDate = toDateRaw;
 
       // Fetch location and company name for the filename
       let locationName = "";
@@ -55,14 +70,14 @@ export function registerSpExportRoutes(app: Express) {
       const buffer = await generateSpSalesFormExcel({
         companyId,
         locationId: locId,
-        fromDate: fromDate as string,
-        toDate: toDate as string,
+        fromDate,
+        toDate,
         locationName,
         supplierName: companyName,
       });
 
-      const from = (fromDate as string).slice(5).replace("-", "");
-      const to = (toDate as string).slice(5).replace("-", "");
+      const from = fromDate.slice(5).replace("-", "");
+      const to = toDate.slice(5).replace("-", "");
       const safeLoc = locationName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
       const safeCo = companyName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
       const filename = `${safeLoc} ${safeCo} sales form ${from}-${to}.xlsx`.replace(/\s+/g, " ").trim();
@@ -81,14 +96,44 @@ export function registerSpExportRoutes(app: Express) {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const { fromDate, toDate, locationId, cashAccountId } = req.query;
+      const {
+        fromDate: fromDateRaw,
+        toDate: toDateRaw,
+        locationId: locationIdRaw,
+        cashAccountId: cashAccountIdRaw,
+      } = req.query;
 
-      if (!fromDate || !toDate) {
-        return res.status(400).json({ message: "fromDate and toDate are required (YYYY-MM-DD)" });
+      if (typeof fromDateRaw !== "string" || typeof toDateRaw !== "string") {
+        return res.status(400).json({ message: "fromDate and toDate must each be a single YYYY-MM-DD value" });
+      }
+      if (locationIdRaw !== undefined && typeof locationIdRaw !== "string") {
+        return res.status(400).json({ message: "locationId must be a single positive integer" });
+      }
+      if (cashAccountIdRaw !== undefined && typeof cashAccountIdRaw !== "string") {
+        return res.status(400).json({ message: "cashAccountId must be a single positive integer" });
+      }
+      const dateRange = validateStatementDateRange(fromDateRaw, toDateRaw);
+      if (!dateRange.ok) return res.status(400).json({ message: dateRange.message });
+
+      let locId: number | undefined;
+      if (locationIdRaw) {
+        const parsedLocationId = Number.parseInt(locationIdRaw, 10);
+        if (!Number.isSafeInteger(parsedLocationId) || parsedLocationId <= 0) {
+          return res.status(400).json({ message: "locationId must be a single positive integer" });
+        }
+        locId = parsedLocationId;
       }
 
-      const locId = locationId ? parseInt(locationId as string) : undefined;
-      let cashId = cashAccountId ? parseInt(cashAccountId as string) : undefined;
+      let cashId: number | undefined;
+      if (cashAccountIdRaw) {
+        const parsedCashId = Number.parseInt(cashAccountIdRaw, 10);
+        if (!Number.isSafeInteger(parsedCashId) || parsedCashId <= 0) {
+          return res.status(400).json({ message: "cashAccountId must be a single positive integer" });
+        }
+        cashId = parsedCashId;
+      }
+      const fromDate = fromDateRaw;
+      const toDate = toDateRaw;
 
       // Validate the cash account belongs to this company; ignore silently if not.
       if (cashId) {
@@ -129,15 +174,15 @@ export function registerSpExportRoutes(app: Express) {
       const buffer = await generateSpSalesFormExcelV2({
         companyId,
         locationId: locId,
-        fromDate: fromDate as string,
-        toDate: toDate as string,
+        fromDate,
+        toDate,
         locationName,
         supplierName: companyName,
         cashAccountId: cashId,
       });
 
-      const from = (fromDate as string).slice(5).replace("-", "");
-      const to = (toDate as string).slice(5).replace("-", "");
+      const from = fromDate.slice(5).replace("-", "");
+      const to = toDate.slice(5).replace("-", "");
       const safeLoc = locationName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
       const safeCo = companyName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
       const filename = `${safeLoc} ${safeCo} system sales form ${from}-${to}.xlsx`.replace(/\s+/g, " ").trim();

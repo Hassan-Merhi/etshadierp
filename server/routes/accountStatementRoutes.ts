@@ -98,10 +98,16 @@ export function registerAccountStatementRoutes(app: Express) {
     try {
       const accountType = req.params.type;
       const accountId = parseInt(req.params.id);
-      const { endDate } = req.query as { endDate?: string };
+      const endDateRaw = req.query.endDate;
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
+      if (endDateRaw !== undefined && typeof endDateRaw !== "string") {
+        return res.status(400).json({ message: "endDate must be a single YYYY-MM-DD value" });
+      }
+      const endDate = endDateRaw;
+      const endDateValidation = validateStatementDateRange(undefined, endDate);
+      if (!endDateValidation.ok) return res.status(400).json({ message: endDateValidation.message });
 
       const typeToColumn: Record<string, any> = {
         ledger: voucherEntries.ledgerAccountId,
@@ -282,18 +288,22 @@ export function registerAccountStatementRoutes(app: Express) {
       const accountType = req.params.type;
       const accountId = parseInt(req.params.id);
       const companyId = req.session.currentCompanyId;
-      const {
-        startDate,
-        endDate,
-        lang = "en",
-      } = req.query as {
-        startDate?: string;
-        endDate?: string;
-        lang?: string;
-      };
+      const { startDate: startDateRaw, endDate: endDateRaw, lang: langRaw } = req.query;
 
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
+      if (startDateRaw !== undefined && typeof startDateRaw !== "string") {
+        return res.status(400).json({ message: "startDate must be a single YYYY-MM-DD value" });
+      }
+      if (endDateRaw !== undefined && typeof endDateRaw !== "string") {
+        return res.status(400).json({ message: "endDate must be a single YYYY-MM-DD value" });
+      }
+      if (langRaw !== undefined && typeof langRaw !== "string") {
+        return res.status(400).json({ message: "lang must be a single string value" });
+      }
+      const startDate = startDateRaw;
+      const endDate = endDateRaw;
+      const lang = langRaw ?? "en";
       const dateRange = validateStatementDateRange(startDate, endDate);
       if (!dateRange.ok) return res.status(400).json({ message: dateRange.message });
 
@@ -355,11 +365,30 @@ export function registerAccountStatementRoutes(app: Express) {
       const companyId = req.session.currentCompanyId as number;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const accountType = (req.query.accountType as string) || "ledger";
-      const accountId = parseInt(req.query.accountId as string);
-      if (isNaN(accountId)) return res.status(400).json({ message: "Invalid accountId" });
-      const startDate = (req.query.startDate as string) || undefined;
-      const endDate = (req.query.endDate as string) || undefined;
+      const accountTypeRaw = req.query.accountType;
+      const accountIdRaw = req.query.accountId;
+      const startDateRaw = req.query.startDate;
+      const endDateRaw = req.query.endDate;
+      if (accountTypeRaw !== undefined && typeof accountTypeRaw !== "string") {
+        return res.status(400).json({ message: "accountType must be a single string value" });
+      }
+      if (typeof accountIdRaw !== "string") {
+        return res.status(400).json({ message: "Invalid accountId" });
+      }
+      if (startDateRaw !== undefined && typeof startDateRaw !== "string") {
+        return res.status(400).json({ message: "startDate must be a single YYYY-MM-DD value" });
+      }
+      if (endDateRaw !== undefined && typeof endDateRaw !== "string") {
+        return res.status(400).json({ message: "endDate must be a single YYYY-MM-DD value" });
+      }
+
+      const accountType = accountTypeRaw || "ledger";
+      const accountId = Number.parseInt(accountIdRaw, 10);
+      if (!Number.isSafeInteger(accountId) || accountId <= 0) {
+        return res.status(400).json({ message: "Invalid accountId" });
+      }
+      const startDate = startDateRaw;
+      const endDate = endDateRaw;
       const dateRange = validateStatementDateRange(startDate, endDate);
       if (!dateRange.ok) return res.status(400).json({ message: dateRange.message });
 
