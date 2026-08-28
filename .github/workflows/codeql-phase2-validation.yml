@@ -1,0 +1,42 @@
+name: CodeQL Phase 2 Validation
+
+on:
+  push:
+    branches: ["security/codeql-phase2-parameter-tampering"]
+    paths:
+      - ".github/workflows/codeql-phase2-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_ENV: test
+      SESSION_SECRET: ci-session-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js 24.19.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24.19.0"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Type-check
+        run: npm run check
+
+      - name: Check changed-file formatting
+        run: node node_modules/prettier/bin/prettier.cjs --check server/routes/accountStatementRoutes.ts server/routes/inventory-movement/movement.ts server/routes/sp/spExportRoutes.ts tests/account-statement-routes-behavior.test.ts tests/codeql-phase2-query-boundaries.test.ts
+
+      - name: Run Phase 2 regression tests
+        run: node node_modules/vitest/vitest.mjs run tests/account-statement-routes-behavior.test.ts tests/codeql-phase2-query-boundaries.test.ts
