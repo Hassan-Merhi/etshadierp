@@ -7,7 +7,8 @@ export const GOLDEN_COAST_PHASE3_PARTNER_EQUITY_USD = "100000.00";
 export type GoldenCoastPhase3MoneyInput = string | number;
 
 export type GoldenCoastPhase3CashAccount =
-  { kind: "ledger"; id: number; name?: string } | { kind: "bank"; id: number; name?: string };
+  | { kind: "ledger"; id: number; name?: string }
+  | { kind: "bank"; id: number; name?: string };
 
 export interface GoldenCoastPhase3RoleAccounts {
   freshStartEquityAccountId: number;
@@ -24,7 +25,20 @@ export interface GoldenCoastPhase3CutoverInput {
   stockOtwUsd: GoldenCoastPhase3MoneyInput;
   stockInHandUsd: GoldenCoastPhase3MoneyInput;
   containerReserveUsd: GoldenCoastPhase3MoneyInput;
+  /**
+   * Portion of Stock OTW supplied in-kind by Fresh Start. It is part of Fresh
+   * Start's opening contribution and therefore must not consume Hassan's
+   * $100,000 funding balance.
+   */
+  freshStartContributedStockOtwUsd?: GoldenCoastPhase3MoneyInput;
+  /** Same rule for Fresh Start-contributed inventory already offloaded at cutover. */
+  freshStartContributedStockInHandUsd?: GoldenCoastPhase3MoneyInput;
   gcSalesCashUsd?: GoldenCoastPhase3MoneyInput;
+  /**
+   * Compatibility assertion only. Phase 13 derives Hassan Savings from the
+   * funding allocation. Supplying a different amount is rejected rather than
+   * letting a caller create an extra liability on top of Hassan's $100,000.
+   */
   hassanSavingsUsd?: GoldenCoastPhase3MoneyInput;
   cashAccount: GoldenCoastPhase3CashAccount;
   accounts: GoldenCoastPhase3RoleAccounts;
@@ -50,6 +64,13 @@ export interface GoldenCoastPhase3CutoverPlan {
   stockOtwUsd: string;
   stockInHandUsd: string;
   containerReserveUsd: string;
+  freshStartContributedStockOtwUsd: string;
+  freshStartContributedStockInHandUsd: string;
+  freshStartContributedInventoryUsd: string;
+  freshStartResidualFundingUsd: string;
+  cashFundedInventoryUsd: string;
+  hassanFundingUsesUsd: string;
+  hassanOpeningEquityUsd: string;
   gcSalesCashUsd: string;
   hassanSavingsUsd: string;
   openingCashUsd: string;
@@ -108,7 +129,9 @@ export function goldenCoastPhase3VoucherNumber(companyId: number): string {
 function validateRoleAccounts(accounts: GoldenCoastPhase3RoleAccounts): void {
   const values = Object.entries(accounts).map(([field, value]) => positiveId(value, field));
   if (new Set(values).size !== values.length) {
-    throw new GoldenCoastPhase3CutoverError("Each Golden Coast Phase 3 role must resolve to a distinct ledger account");
+    throw new GoldenCoastPhase3CutoverError(
+      "Each Golden Coast Phase 3 role must resolve to a distinct ledger account"
+    );
   }
 }
 
@@ -158,15 +181,26 @@ function pushIfPositive(
 /**
  * Builds the one-time September 1 Golden Coast opening-balance journal.
  *
- * Phase 2 establishes two $100,000 / 50% partner-equity targets. Phase 3 turns
- * those targets into an actual balanced opening position without inventing a
- * permanent clearing balance. Stock OTW, Stock in Hand and Container Reserve
- * are debited at the supplied cutover values; existing settlement liabilities
- * may be carried in as GC Sales Cash / Hassan Savings credits; the remaining
- * amount needed to satisfy Assets = Equity + Liabilities is the opening cash or
- * bank debit. Profit Pending Distribution deliberately starts at zero.
+ * Phase 13 hardens the original Phase 3 model in two ways:
+ *
+ * 1. Fresh Start-contributed inventory is explicitly separated from inventory
+ *    paid from Hassan's $100,000 funding balance. An in-kind Fresh Start
+ *    container never reduces Hassan's available funding merely because it is
+ *    sitting in Stock OTW or Stock in Hand at cutover.
+ * 2. Hassan Savings is derived automatically as the unused portion of Hassan's
+ *    $100,000 after cash-funded inventory and Container Reserve. It is a
+ *    classification of Hassan's opening contribution, not an extra liability
+ *    stacked on top of two $100,000 equity credits.
+ *
+ * The resulting opening source balances therefore remain exactly $200,000 plus
+ * any separately carried GC Sales Cash liability. Fresh Start keeps the fixed
+ * $100,000 opening equity target. Hassan's $100,000 is split between Hassan
+ * Equity (the amount deployed into cash-funded inventory/reserve) and Hassan
+ * Savings (the still-withdrawable residual).
  */
-export function buildGoldenCoastPhase3CutoverPlan(input: GoldenCoastPhase3CutoverInput): GoldenCoastPhase3CutoverPlan {
+export function buildGoldenCoastPhase3CutoverPlan(
+  input: GoldenCoastPhase3CutoverInput
+): GoldenCoastPhase3CutoverPlan {
   if (!input || typeof input !== "object") {
     throw new GoldenCoastPhase3CutoverError("Phase 3 cutover input is required");
   }
@@ -177,19 +211,73 @@ export function buildGoldenCoastPhase3CutoverPlan(input: GoldenCoastPhase3Cutove
   const stockOtw = requiredNonNegative(input.stockOtwUsd, "stockOtwUsd");
   const stockInHand = requiredNonNegative(input.stockInHandUsd, "stockInHandUsd");
   const containerReserve = requiredNonNegative(input.containerReserveUsd, "containerReserveUsd");
+  const freshStartStockOtw = nonNegative(
+    input.freshStartContributedStockOtwUsd,
+    "freshStartContributedStockOtwUsd"
+  );
+  const freshStartStockInHand = nonNegative(
+    input.freshStartContributedStockInHandUsd,
+    "freshStartContributedStockInHandUsd"
+  );
   const gcSalesCash = nonNegative(input.gcSalesCashUsd, "gcSalesCashUsd");
-  const hassanSavings = nonNegative(input.hassanSavingsUsd, "hassanSavingsUsd");
   const partnerEquity = new Decimal(GOLDEN_COAST_PHASE3_PARTNER_EQUITY_USD);
   const totalPartnerEquity = partnerEquity.times(2);
 
+  if (freshStartStockOtw.gt(stockOtw)) {
+    throw new GoldenCoastPhase3CutoverError(
+      `freshStartContributedStockOtwUsd cannot exceed total Stock OTW ${money(stockOtw)}`
+    );
+  }
+  if (freshStartStockInHand.gt(stockInHand)) {
+    throw new GoldenCoastPhase3CutoverError(
+      `freshStartContributedStockInHandUsd cannot exceed total Stock in Hand ${money(stockInHand)}`
+    );
+  }
+
+  const freshStartContributedInventory = freshStartStockOtw.plus(freshStartStockInHand);
+  if (freshStartContributedInventory.gt(partnerEquity)) {
+    throw new GoldenCoastPhase3CutoverError(
+      `Fresh Start contributed inventory ${money(freshStartContributedInventory)} exceeds the ${money(
+        partnerEquity
+      )} opening contribution target`
+    );
+  }
+
+  const cashFundedInventory = stockOtw
+    .minus(freshStartStockOtw)
+    .plus(stockInHand.minus(freshStartStockInHand));
+  const hassanFundingUses = cashFundedInventory.plus(containerReserve);
+  if (hassanFundingUses.gt(partnerEquity)) {
+    throw new GoldenCoastPhase3CutoverError(
+      `Hassan cash-funded inventory plus Container Reserve exceeds the ${money(partnerEquity)} funding balance by ${money(
+        hassanFundingUses.minus(partnerEquity)
+      )}`
+    );
+  }
+
+  const hassanSavings = partnerEquity.minus(hassanFundingUses);
+  if (input.hassanSavingsUsd != null && input.hassanSavingsUsd !== "") {
+    const assertedSavings = nonNegative(input.hassanSavingsUsd, "hassanSavingsUsd");
+    if (!assertedSavings.eq(hassanSavings)) {
+      throw new GoldenCoastPhase3CutoverError(
+        `hassanSavingsUsd is automatic: expected ${money(hassanSavings)} from the opening funding allocation, not ${money(
+          assertedSavings
+        )}`
+      );
+    }
+  }
+
+  const hassanOpeningEquity = hassanFundingUses;
+  const freshStartResidualFunding = partnerEquity.minus(freshStartContributedInventory);
   const nonCashAssets = stockOtw.plus(stockInHand).plus(containerReserve);
-  const liabilitiesAndEquity = totalPartnerEquity.plus(gcSalesCash).plus(hassanSavings);
+  const liabilitiesAndEquity = totalPartnerEquity.plus(gcSalesCash);
   const openingCash = liabilitiesAndEquity.minus(nonCashAssets);
 
   if (openingCash.lt(0)) {
     throw new GoldenCoastPhase3CutoverError(
-      `Opening non-cash assets exceed partner equity plus carried settlement liabilities by ${money(openingCash.abs())}; ` +
-        "do not force a negative cash balance — correct the cutover values first"
+      `Opening non-cash assets exceed partner equity plus carried settlement liabilities by ${money(
+        openingCash.abs()
+      )}; do not force a negative cash balance — correct the cutover values first`
     );
   }
 
@@ -213,19 +301,29 @@ export function buildGoldenCoastPhase3CutoverPlan(input: GoldenCoastPhase3Cutove
     ledgerCredit(
       input.accounts.freshStartEquityAccountId,
       partnerEquity,
-      `${description} — Fresh Start FZ 50% opening equity`
-    ),
+      `${description} — Fresh Start FZ 50% opening contribution`
+    )
+  );
+  pushIfPositive(entries, hassanOpeningEquity, () =>
     ledgerCredit(
       input.accounts.hassanEquityAccountId,
-      partnerEquity,
-      `${description} — Hassan Dakik 50% opening equity`
+      hassanOpeningEquity,
+      `${description} — Hassan funding deployed into inventory/reserve`
+    )
+  );
+  pushIfPositive(entries, hassanSavings, () =>
+    ledgerCredit(
+      input.accounts.hassanSavingsAccountId,
+      hassanSavings,
+      `${description} — automatic Hassan Savings residual`
     )
   );
   pushIfPositive(entries, gcSalesCash, () =>
-    ledgerCredit(input.accounts.gcSalesCashAccountId, gcSalesCash, `${description} — carried GC Sales Cash payable`)
-  );
-  pushIfPositive(entries, hassanSavings, () =>
-    ledgerCredit(input.accounts.hassanSavingsAccountId, hassanSavings, `${description} — carried Hassan Savings loan`)
+    ledgerCredit(
+      input.accounts.gcSalesCashAccountId,
+      gcSalesCash,
+      `${description} — carried GC Sales Cash payable`
+    )
   );
 
   const debitTotal = entries.reduce((sum, entry) => sum.plus(entry.debitAmount), new Decimal(0));
@@ -247,6 +345,13 @@ export function buildGoldenCoastPhase3CutoverPlan(input: GoldenCoastPhase3Cutove
     stockOtwUsd: money(stockOtw),
     stockInHandUsd: money(stockInHand),
     containerReserveUsd: money(containerReserve),
+    freshStartContributedStockOtwUsd: money(freshStartStockOtw),
+    freshStartContributedStockInHandUsd: money(freshStartStockInHand),
+    freshStartContributedInventoryUsd: money(freshStartContributedInventory),
+    freshStartResidualFundingUsd: money(freshStartResidualFunding),
+    cashFundedInventoryUsd: money(cashFundedInventory),
+    hassanFundingUsesUsd: money(hassanFundingUses),
+    hassanOpeningEquityUsd: money(hassanOpeningEquity),
     gcSalesCashUsd: money(gcSalesCash),
     hassanSavingsUsd: money(hassanSavings),
     openingCashUsd: money(openingCash),
