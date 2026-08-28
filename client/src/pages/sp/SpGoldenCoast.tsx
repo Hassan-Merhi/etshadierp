@@ -647,7 +647,7 @@ export default function SpGoldenCoast() {
                     {releaseDebtEnglish("Phase 7 validates both companies, live balances, cash accounts, and intercompany routing on the server.")}
                   </CardDescription>
                 </div>
-                <Badge variant="secondary">Phase 7</Badge>
+                <Badge variant="secondary">{releaseDebtEnglish("Phase 7")}</Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -807,7 +807,7 @@ export default function SpGoldenCoast() {
                     {releaseDebtEnglish("Phase 9 pays out only from the live credit balance of the canonical Hassan Savings account.")}
                   </CardDescription>
                 </div>
-                <Badge variant="secondary">Phase 9</Badge>
+                <Badge variant="secondary">{releaseDebtEnglish("Phase 9")}</Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -942,7 +942,7 @@ export default function SpGoldenCoast() {
                     {releaseDebtEnglish("Phase 10 clears only the server-calculated collectible GC Sales Cash balance into an approved Golden Coast cash or bank account.")}
                   </CardDescription>
                 </div>
-                <Badge variant="secondary">Phase 10</Badge>
+                <Badge variant="secondary">{releaseDebtEnglish("Phase 10")}</Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -1049,7 +1049,7 @@ export default function SpGoldenCoast() {
                     {releaseDebtEnglish("Phase 11 derives revenue, COGS, shared charges, and both 50/50 shares from posted ledger activity. The UI never supplies accounting totals or split percentages.")}
                   </CardDescription>
                 </div>
-                <Badge variant="secondary">Phase 11</Badge>
+                <Badge variant="secondary">{releaseDebtEnglish("Phase 11")}</Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-5">

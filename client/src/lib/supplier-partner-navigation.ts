@@ -1,10 +1,11 @@
 import { BarChart3, Building2, CircleDollarSign, LayoutDashboard, Layers, Link2, Wrench } from "lucide-react";
 import type { NavItem, NavSection } from "@/components/sidebar/sidebarPrimitives";
 import { NAV_COLOR } from "@/components/sidebar/sidebarPrimitives";
+import { releaseDebtEnglish } from "@/i18n/finalCloseoutTranslations";
 
 export const SUPPLIER_PARTNER_DAILY_ITEMS: NavItem[] = [
   { title: "Overview", url: "/sp", icon: LayoutDashboard },
-  { title: "Golden Coast", url: "/sp/golden-coast", icon: CircleDollarSign },
+  { title: releaseDebtEnglish("Golden Coast"), url: "/sp/golden-coast", icon: CircleDollarSign },
   { title: "SP Reports", url: "/sp/reports", icon: BarChart3 },
   { title: "Opening Stock", url: "/sp/opening-stock", icon: Layers },
   { title: "Aliases", url: "/sp/aliases", icon: Link2 },
