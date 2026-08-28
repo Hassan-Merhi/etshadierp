@@ -161,7 +161,7 @@ export function buildGoldenCoastPhase11MonthlyClosePosting(input: {
   const shared = new Decimal(plan.totalSharedChargesUsd);
   const net = new Decimal(plan.netProfitLossUsd);
   const description = releaseDebtEnglish(`Golden Coast monthly 50/50 close — ${plan.periodMonth}`);
-  const entries: Array<Record<string, unknown>> = [];
+  const entries: Parameters<typeof buildGenericVoucherPostingRequest>[0]["entries"] = [];
 
   if (revenue.gt(0)) {
     entries.push({ ledgerAccountId: accounts.salesAccountId, debitAmount: money(revenue), creditAmount: "0", narration: description });
