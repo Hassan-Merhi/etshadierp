@@ -24,9 +24,9 @@ const rejectStaticImport = (source, specifier, message) => {
   }
 };
 const requireDynamicImport = (source, specifier, message) => {
-  const escaped = specifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`import\\s*\\(\\s*["']${escaped}["']\\s*\\)`);
-  if (!pattern.test(source)) failures.push(message);
+  const doubleQuoted = `import("${specifier}")`;
+  const singleQuoted = `import('${specifier}')`;
+  if (!source.includes(doubleQuoted) && !source.includes(singleQuoted)) failures.push(message);
 };
 
 // server/index.ts may keep its stable scheduler API, but the scheduler barrel
