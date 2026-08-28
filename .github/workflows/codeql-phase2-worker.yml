@@ -1,0 +1,561 @@
+name: CodeQL Phase 2 Worker
+
+on:
+  push:
+    branches: ["security/codeql-phase2-parameter-tampering"]
+    paths:
+      - ".github/workflows/codeql-phase2-worker.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: codeql-phase2-worker
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Apply parameter-tampering repairs
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"Expected exactly one match in {path}, found {count}")
+              p.write_text(text.replace(old, new, 1))
+
+          movement = "server/routes/inventory-movement/movement.ts"
+          replace_once(
+              movement,
+              '''      const { stockItemId: siStr, locationId: locStr, startDate, endDate } = req.query;
+      if (!siStr) return res.status(400).json({ message: "stockItemId required" });
+
+      const stockItemId = parseInt(siStr as string);
+      const locationId = locStr ? parseInt(locStr as string) : null;
+      // When no dates supplied (All Time preset), span from a safe epoch to today.
+      const today = new Date().toISOString().slice(0, 10);
+      const sd = (startDate as string) || "2000-01-01";
+      const ed = (endDate as string) || today;
+''',
+              '''      const {
+        stockItemId: stockItemIdRaw,
+        locationId: locationIdRaw,
+        startDate: startDateRaw,
+        endDate: endDateRaw,
+      } = req.query;
+      if (typeof stockItemIdRaw !== "string") {
+        return res.status(400).json({ message: "stockItemId must be a single positive integer" });
+      }
+      if (locationIdRaw !== undefined && typeof locationIdRaw !== "string") {
+        return res.status(400).json({ message: "locationId must be a single positive integer" });
+      }
+      if (startDateRaw !== undefined && typeof startDateRaw !== "string") {
+        return res.status(400).json({ message: "startDate must be a single YYYY-MM-DD value" });
+      }
+      if (endDateRaw !== undefined && typeof endDateRaw !== "string") {
+        return res.status(400).json({ message: "endDate must be a single YYYY-MM-DD value" });
+      }
+
+      const stockItemId = Number.parseInt(stockItemIdRaw, 10);
+      if (!Number.isSafeInteger(stockItemId) || stockItemId <= 0) {
+        return res.status(400).json({ message: "stockItemId must be a single positive integer" });
+      }
+
+      let locationId: number | null = null;
+      if (locationIdRaw) {
+        const parsedLocationId = Number.parseInt(locationIdRaw, 10);
+        if (!Number.isSafeInteger(parsedLocationId) || parsedLocationId <= 0) {
+          return res.status(400).json({ message: "locationId must be a single positive integer" });
+        }
+        locationId = parsedLocationId;
+      }
+
+      // When no dates supplied (All Time preset), span from a safe epoch to today.
+      const today = new Date().toISOString().slice(0, 10);
+      const sd = startDateRaw || "2000-01-01";
+      const ed = endDateRaw || today;
+      const datePattern = /^\\d{4}-\\d{2}-\\d{2}$/;
+      if (!datePattern.test(sd) || !datePattern.test(ed) || sd > ed) {
+        return res.status(400).json({ message: "Invalid inventory movement date range" });
+      }
+'''
+          )
+          replace_once(
+              movement,
+              '''      const { stockItemId: siStr, locationId: locStr, year: yearStr, month: monthStr } = req.query;
+      if (!siStr || !yearStr || !monthStr)
+        return res.status(400).json({ message: "stockItemId, year, month required" });
+
+      const stockItemId = parseInt(siStr as string);
+      const locationId = locStr ? parseInt(locStr as string) : null;
+      const year = parseInt(yearStr as string);
+      const month = parseInt(monthStr as string);
+''',
+              '''      const {
+        stockItemId: stockItemIdRaw,
+        locationId: locationIdRaw,
+        year: yearRaw,
+        month: monthRaw,
+      } = req.query;
+      if (typeof stockItemIdRaw !== "string" || typeof yearRaw !== "string" || typeof monthRaw !== "string") {
+        return res.status(400).json({ message: "stockItemId, year, month must be single integer values" });
+      }
+      if (locationIdRaw !== undefined && typeof locationIdRaw !== "string") {
+        return res.status(400).json({ message: "locationId must be a single positive integer" });
+      }
+
+      const stockItemId = Number.parseInt(stockItemIdRaw, 10);
+      const year = Number.parseInt(yearRaw, 10);
+      const month = Number.parseInt(monthRaw, 10);
+      if (!Number.isSafeInteger(stockItemId) || stockItemId <= 0) {
+        return res.status(400).json({ message: "stockItemId must be a single positive integer" });
+      }
+      if (!Number.isSafeInteger(year) || year < 2000 || year > 9999) {
+        return res.status(400).json({ message: "year must be a valid four-digit year" });
+      }
+      if (!Number.isSafeInteger(month) || month < 1 || month > 12) {
+        return res.status(400).json({ message: "month must be between 1 and 12" });
+      }
+
+      let locationId: number | null = null;
+      if (locationIdRaw) {
+        const parsedLocationId = Number.parseInt(locationIdRaw, 10);
+        if (!Number.isSafeInteger(parsedLocationId) || parsedLocationId <= 0) {
+          return res.status(400).json({ message: "locationId must be a single positive integer" });
+        }
+        locationId = parsedLocationId;
+      }
+'''
+          )
+
+          sp = "server/routes/sp/spExportRoutes.ts"
+          replace_once(
+              sp,
+              '''import { requireSpCompany } from "./spHelpers";
+''',
+              '''import { requireSpCompany } from "./spHelpers";
+import { validateStatementDateRange } from "../../lib/accountStatementExportSafety";
+'''
+          )
+          replace_once(
+              sp,
+              '''      const { fromDate, toDate, locationId } = req.query;
+
+      if (!fromDate || !toDate) {
+        return res.status(400).json({ message: "fromDate and toDate are required (YYYY-MM-DD)" });
+      }
+
+      const locId = locationId ? parseInt(locationId as string) : undefined;
+''',
+              '''      const { fromDate: fromDateRaw, toDate: toDateRaw, locationId: locationIdRaw } = req.query;
+
+      if (typeof fromDateRaw !== "string" || typeof toDateRaw !== "string") {
+        return res.status(400).json({ message: "fromDate and toDate must each be a single YYYY-MM-DD value" });
+      }
+      if (locationIdRaw !== undefined && typeof locationIdRaw !== "string") {
+        return res.status(400).json({ message: "locationId must be a single positive integer" });
+      }
+      const dateRange = validateStatementDateRange(fromDateRaw, toDateRaw);
+      if (!dateRange.ok) return res.status(400).json({ message: dateRange.message });
+
+      let locId: number | undefined;
+      if (locationIdRaw) {
+        const parsedLocationId = Number.parseInt(locationIdRaw, 10);
+        if (!Number.isSafeInteger(parsedLocationId) || parsedLocationId <= 0) {
+          return res.status(400).json({ message: "locationId must be a single positive integer" });
+        }
+        locId = parsedLocationId;
+      }
+      const fromDate = fromDateRaw;
+      const toDate = toDateRaw;
+'''
+          )
+          replace_once(
+              sp,
+              '''        fromDate: fromDate as string,
+        toDate: toDate as string,
+''',
+              '''        fromDate,
+        toDate,
+'''
+          )
+          replace_once(
+              sp,
+              '''      const from = (fromDate as string).slice(5).replace("-", "");
+      const to = (toDate as string).slice(5).replace("-", "");
+''',
+              '''      const from = fromDate.slice(5).replace("-", "");
+      const to = toDate.slice(5).replace("-", "");
+'''
+          )
+          replace_once(
+              sp,
+              '''      const { fromDate, toDate, locationId, cashAccountId } = req.query;
+
+      if (!fromDate || !toDate) {
+        return res.status(400).json({ message: "fromDate and toDate are required (YYYY-MM-DD)" });
+      }
+
+      const locId = locationId ? parseInt(locationId as string) : undefined;
+      let cashId = cashAccountId ? parseInt(cashAccountId as string) : undefined;
+''',
+              '''      const {
+        fromDate: fromDateRaw,
+        toDate: toDateRaw,
+        locationId: locationIdRaw,
+        cashAccountId: cashAccountIdRaw,
+      } = req.query;
+
+      if (typeof fromDateRaw !== "string" || typeof toDateRaw !== "string") {
+        return res.status(400).json({ message: "fromDate and toDate must each be a single YYYY-MM-DD value" });
+      }
+      if (locationIdRaw !== undefined && typeof locationIdRaw !== "string") {
+        return res.status(400).json({ message: "locationId must be a single positive integer" });
+      }
+      if (cashAccountIdRaw !== undefined && typeof cashAccountIdRaw !== "string") {
+        return res.status(400).json({ message: "cashAccountId must be a single positive integer" });
+      }
+      const dateRange = validateStatementDateRange(fromDateRaw, toDateRaw);
+      if (!dateRange.ok) return res.status(400).json({ message: dateRange.message });
+
+      let locId: number | undefined;
+      if (locationIdRaw) {
+        const parsedLocationId = Number.parseInt(locationIdRaw, 10);
+        if (!Number.isSafeInteger(parsedLocationId) || parsedLocationId <= 0) {
+          return res.status(400).json({ message: "locationId must be a single positive integer" });
+        }
+        locId = parsedLocationId;
+      }
+
+      let cashId: number | undefined;
+      if (cashAccountIdRaw) {
+        const parsedCashId = Number.parseInt(cashAccountIdRaw, 10);
+        if (!Number.isSafeInteger(parsedCashId) || parsedCashId <= 0) {
+          return res.status(400).json({ message: "cashAccountId must be a single positive integer" });
+        }
+        cashId = parsedCashId;
+      }
+      const fromDate = fromDateRaw;
+      const toDate = toDateRaw;
+'''
+          )
+          replace_once(
+              sp,
+              '''        fromDate: fromDate as string,
+        toDate: toDate as string,
+''',
+              '''        fromDate,
+        toDate,
+'''
+          )
+          replace_once(
+              sp,
+              '''      const from = (fromDate as string).slice(5).replace("-", "");
+      const to = (toDate as string).slice(5).replace("-", "");
+''',
+              '''      const from = fromDate.slice(5).replace("-", "");
+      const to = toDate.slice(5).replace("-", "");
+'''
+          )
+
+          account = "server/routes/accountStatementRoutes.ts"
+          replace_once(
+              account,
+              '''      const accountType = req.params.type;
+      const accountId = parseInt(req.params.id);
+      const { endDate } = req.query as { endDate?: string };
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
+''',
+              '''      const accountType = req.params.type;
+      const accountId = parseInt(req.params.id);
+      const endDateRaw = req.query.endDate;
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
+      if (endDateRaw !== undefined && typeof endDateRaw !== "string") {
+        return res.status(400).json({ message: "endDate must be a single YYYY-MM-DD value" });
+      }
+      const endDate = endDateRaw;
+      const endDateValidation = validateStatementDateRange(undefined, endDate);
+      if (!endDateValidation.ok) return res.status(400).json({ message: endDateValidation.message });
+'''
+          )
+          replace_once(
+              account,
+              '''      const {
+        startDate,
+        endDate,
+        lang = "en",
+      } = req.query as {
+        startDate?: string;
+        endDate?: string;
+        lang?: string;
+      };
+
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
+      const dateRange = validateStatementDateRange(startDate, endDate);
+''',
+              '''      const { startDate: startDateRaw, endDate: endDateRaw, lang: langRaw } = req.query;
+
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
+      if (startDateRaw !== undefined && typeof startDateRaw !== "string") {
+        return res.status(400).json({ message: "startDate must be a single YYYY-MM-DD value" });
+      }
+      if (endDateRaw !== undefined && typeof endDateRaw !== "string") {
+        return res.status(400).json({ message: "endDate must be a single YYYY-MM-DD value" });
+      }
+      if (langRaw !== undefined && typeof langRaw !== "string") {
+        return res.status(400).json({ message: "lang must be a single string value" });
+      }
+      const startDate = startDateRaw;
+      const endDate = endDateRaw;
+      const lang = langRaw ?? "en";
+      const dateRange = validateStatementDateRange(startDate, endDate);
+'''
+          )
+          replace_once(
+              account,
+              '''      const accountType = (req.query.accountType as string) || "ledger";
+      const accountId = parseInt(req.query.accountId as string);
+      if (isNaN(accountId)) return res.status(400).json({ message: "Invalid accountId" });
+      const startDate = (req.query.startDate as string) || undefined;
+      const endDate = (req.query.endDate as string) || undefined;
+      const dateRange = validateStatementDateRange(startDate, endDate);
+''',
+              '''      const accountTypeRaw = req.query.accountType;
+      const accountIdRaw = req.query.accountId;
+      const startDateRaw = req.query.startDate;
+      const endDateRaw = req.query.endDate;
+      if (accountTypeRaw !== undefined && typeof accountTypeRaw !== "string") {
+        return res.status(400).json({ message: "accountType must be a single string value" });
+      }
+      if (typeof accountIdRaw !== "string") {
+        return res.status(400).json({ message: "Invalid accountId" });
+      }
+      if (startDateRaw !== undefined && typeof startDateRaw !== "string") {
+        return res.status(400).json({ message: "startDate must be a single YYYY-MM-DD value" });
+      }
+      if (endDateRaw !== undefined && typeof endDateRaw !== "string") {
+        return res.status(400).json({ message: "endDate must be a single YYYY-MM-DD value" });
+      }
+
+      const accountType = accountTypeRaw || "ledger";
+      const accountId = Number.parseInt(accountIdRaw, 10);
+      if (!Number.isSafeInteger(accountId) || accountId <= 0) {
+        return res.status(400).json({ message: "Invalid accountId" });
+      }
+      const startDate = startDateRaw;
+      const endDate = endDateRaw;
+      const dateRange = validateStatementDateRange(startDate, endDate);
+'''
+          )
+
+          account_test = "tests/account-statement-routes-behavior.test.ts"
+          replace_once(
+              account_test,
+              '''  it("generates a statement PDF with a sanitized human-readable filename", async () => {
+''',
+              '''  it("rejects repeated query values at account statement boundaries", async () => {
+    const prePeriod = responseHarness();
+    await routes.get("GET /api/accounts/:type/:id/pre-period-balance")!(
+      request({ params: { type: "bank", id: "3" }, query: { endDate: ["2026-08-01", "2026-08-02"] } }),
+      prePeriod
+    );
+    expect(prePeriod.statusCode).toBe(400);
+    expect(harness.db.select).not.toHaveBeenCalled();
+
+    const pdf = responseHarness();
+    await routes.get("GET /api/accounts/:type/:id/statement-pdf")!(
+      request({ params: { type: "supplier", id: "8" }, query: { startDate: ["2026-08-01"] } }),
+      pdf
+    );
+    expect(pdf.statusCode).toBe(400);
+    expect(harness.generateAccountStatementPdf).not.toHaveBeenCalled();
+
+    const excel = responseHarness();
+    await routes.get("GET /api/accounts/statement/export-excel")!(
+      request({ query: { accountId: ["8", "9"] } }),
+      excel
+    );
+    expect(excel.statusCode).toBe(400);
+  });
+
+  it("generates a statement PDF with a sanitized human-readable filename", async () => {
+'''
+          )
+
+          Path("tests/codeql-phase2-query-boundaries.test.ts").write_text(r'''import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const harness = vi.hoisted(() => {
+  const makeBuilder = () => {
+    const builder: any = {
+      from: vi.fn(() => builder),
+      where: vi.fn(() => builder),
+      then: (resolve: (value: unknown[]) => unknown, reject: (reason: unknown) => unknown) =>
+        Promise.resolve([]).then(resolve, reject),
+    };
+    return builder;
+  };
+
+  return {
+    db: {
+      select: vi.fn(() => makeBuilder()),
+      execute: vi.fn(async () => ({ rows: [] })),
+    },
+    calculateHistoricalLocationInventory: vi.fn(),
+    fetchStockMovements: vi.fn(),
+    requireSpCompany: vi.fn(),
+    generateV1: vi.fn(),
+    generateV2: vi.fn(),
+  };
+});
+
+vi.mock("../server/db", () => ({ db: harness.db }));
+vi.mock("../server/auth", () => ({ requireAuth: (_req: any, _res: any, next: any) => next() }));
+vi.mock("../server/lib/httpHandlers", () => ({ getErrorMessage: (error: any) => error?.message || String(error) }));
+vi.mock("../server/lib/logger", () => ({ logger: { warn: vi.fn(), error: vi.fn() } }));
+vi.mock("../server/routes/helpers/inventoryHistoryHelpers", () => ({
+  calculateHistoricalLocationInventory: harness.calculateHistoricalLocationInventory,
+}));
+vi.mock("../server/routes/inventory-movement/_helpers", () => ({
+  MONTH_NAMES_INV: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+  dayBefore: (value: string) => value,
+  fetchStockMovements: harness.fetchStockMovements,
+}));
+vi.mock("../server/routes/sp/spHelpers", () => ({ requireSpCompany: harness.requireSpCompany }));
+vi.mock("../server/services/sp-sales-form", () => ({ generateSpSalesFormExcel: harness.generateV1 }));
+vi.mock("../server/services/spSalesFormExportV2", () => ({ generateSpSalesFormExcelV2: harness.generateV2 }));
+vi.mock("drizzle-orm", () => ({
+  eq: (column: unknown, value: unknown) => ({ column, value }),
+  sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }),
+}));
+vi.mock("@shared/schema", () => ({
+  stockItems: { id: "stock.id", openingQty: "stock.openingQty", openingRate: "stock.openingRate" },
+}));
+
+import { registerInventoryMovementReportRoutes } from "../server/routes/inventory-movement/movement";
+import { registerSpExportRoutes } from "../server/routes/sp/spExportRoutes";
+
+type Handler = (req: any, res: any) => unknown;
+
+function buildRoutes() {
+  const routes = new Map<string, Handler>();
+  const app: any = {
+    get: (path: string, ...handlers: Handler[]) => routes.set(`GET ${path}`, handlers.at(-1)!),
+  };
+  registerInventoryMovementReportRoutes(app);
+  registerSpExportRoutes(app);
+  return routes;
+}
+
+function request(query: Record<string, unknown>) {
+  return { session: { currentCompanyId: 4 }, params: {}, query } as any;
+}
+
+function responseHarness() {
+  const res: any = {
+    statusCode: 200,
+    body: undefined,
+    status: vi.fn((code: number) => {
+      res.statusCode = code;
+      return res;
+    }),
+    json: vi.fn((body: unknown) => {
+      res.body = body;
+      return res;
+    }),
+    setHeader: vi.fn(),
+    send: vi.fn((body: unknown) => {
+      res.body = body;
+      return res;
+    }),
+  };
+  return res;
+}
+
+describe("CodeQL Phase 2 query boundaries", () => {
+  const routes = buildRoutes();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    harness.requireSpCompany.mockResolvedValue(4);
+    harness.generateV1.mockResolvedValue(Buffer.from("v1"));
+    harness.generateV2.mockResolvedValue(Buffer.from("v2"));
+  });
+
+  it("rejects repeated inventory movement identifiers", async () => {
+    const summary = responseHarness();
+    await routes.get("GET /api/inventory/movement")!(request({ stockItemId: ["1", "2"] }), summary);
+    expect(summary.statusCode).toBe(400);
+    expect(harness.fetchStockMovements).not.toHaveBeenCalled();
+
+    const drill = responseHarness();
+    await routes.get("GET /api/inventory/movement/drill")!(
+      request({ stockItemId: "1", year: ["2026", "2027"], month: "8" }),
+      drill
+    );
+    expect(drill.statusCode).toBe(400);
+    expect(harness.fetchStockMovements).not.toHaveBeenCalled();
+  });
+
+  it("rejects repeated SP export dates and identifiers", async () => {
+    const v1 = responseHarness();
+    await routes.get("GET /api/sp/sales-form/export")!(
+      request({ fromDate: ["2026-08-01", "2026-08-02"], toDate: "2026-08-28" }),
+      v1
+    );
+    expect(v1.statusCode).toBe(400);
+    expect(harness.generateV1).not.toHaveBeenCalled();
+
+    const v2 = responseHarness();
+    await routes.get("GET /api/sp/sales-form/export-v2")!(
+      request({ fromDate: "2026-08-01", toDate: "2026-08-28", cashAccountId: ["5", "6"] }),
+      v2
+    );
+    expect(v2.statusCode).toBe(400);
+    expect(harness.generateV2).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed scalar values before database work", async () => {
+    const movement = responseHarness();
+    await routes.get("GET /api/inventory/movement")!(request({ stockItemId: "not-a-number" }), movement);
+    expect(movement.statusCode).toBe(400);
+    expect(harness.db.select).not.toHaveBeenCalled();
+
+    const sp = responseHarness();
+    await routes.get("GET /api/sp/sales-form/export-v2")!(
+      request({ fromDate: "2026-08-28", toDate: "2026-08-01" }),
+      sp
+    );
+    expect(sp.statusCode).toBe(400);
+    expect(harness.generateV2).not.toHaveBeenCalled();
+  });
+});
+''')
+          PY
+
+      - name: Commit repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ets-ci-repair[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/routes/inventory-movement/movement.ts server/routes/sp/spExportRoutes.ts server/routes/accountStatementRoutes.ts tests/account-statement-routes-behavior.test.ts tests/codeql-phase2-query-boundaries.test.ts
+          git commit -m "security: validate CodeQL critical query boundaries"
+          git push origin HEAD:${GITHUB_REF_NAME}
