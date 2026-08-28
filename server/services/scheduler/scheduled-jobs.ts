@@ -57,14 +57,22 @@ async function checkAndRunScheduledDailyExport(): Promise<void> {
 }
 
 /**
- * Auto-post monthly rent accrual vouchers for every active rental contract
- * across all modules (ERP, FACTORY, PROPERTIES) and all companies.
- * Safe to run multiple times — already-accrued rows are skipped.
+ * Daily rental catch-up for every active contract across all modules/companies.
+ * Contracts can bill on any day of the month, so a once-a-month cron cannot
+ * reliably recognise prepaid rent on the correct billing date. This job is
+ * idempotent: already-recognised/accrued rows are skipped.
  */
-async function runMonthlyRentalAccrual() {
-  logger.info("[RentalAccrual] Monthly auto-accrual started.");
+async function runDailyRentalAccrual() {
+  logger.info("[RentalAccrual] Daily billing-date catch-up started.");
   try {
-    const { ensureMonthlyForCompany, postRentAccrualForCompany } = await import("../../routes/rental/shared");
+    const [{ ensureMonthlyForCompany, postRentAccrualForCompany }, { getUtcTodayString }, repairModule] =
+      await Promise.all([
+        import("../../routes/rental/shared"),
+        import("../rental/rentalPeriodService"),
+        import("../rental/legacyPrepaidRecognitionRepair"),
+      ]);
+    const { repairLegacyFullyPrepaidRentRecognition } = repairModule;
+    const asOfDate = getUtcTodayString();
     const { rows } = await pool.query<{ id: number }>("SELECT id FROM companies");
     const modules: Array<{ module: string; income: string; expense: string }> = [
       { module: "ERP", income: "Rental Income - ERP", expense: "Rent Expense - ERP Shops" },
@@ -72,19 +80,32 @@ async function runMonthlyRentalAccrual() {
       { module: "PROPERTIES", income: "Rental Income - Properties", expense: "Rent Expense - Property Shops" },
     ];
 
+    let totalRepaired = 0;
     let totalAccrued = 0;
     for (const { id: companyId } of rows) {
       for (const { module, income, expense } of modules) {
         try {
-          await ensureMonthlyForCompany(companyId, module as unknown as Parameters<typeof ensureMonthlyForCompany>[1]);
-          const { accrued } = await postRentAccrualForCompany(companyId, expense, module, income);
+          await ensureMonthlyForCompany(
+            companyId,
+            module as unknown as Parameters<typeof ensureMonthlyForCompany>[1],
+            asOfDate
+          );
+
+          if (module === "ERP" || module === "FACTORY") {
+            const { repaired } = await repairLegacyFullyPrepaidRentRecognition(companyId, module, expense, asOfDate);
+            totalRepaired += repaired;
+          }
+
+          const { accrued } = await postRentAccrualForCompany(companyId, expense, module, income, asOfDate);
           totalAccrued += accrued;
         } catch (err: unknown) {
           logger.error(`[RentalAccrual] company=${companyId} module=${module}: ${getErrorMessage(err)}`);
         }
       }
     }
-    logger.info(`[RentalAccrual] Monthly auto-accrual complete — ${totalAccrued} rows accrued.`);
+    logger.info(
+      `[RentalAccrual] Daily billing-date catch-up complete — ${totalRepaired} legacy row(s) repaired, ${totalAccrued} row(s) accrued/recognised.`
+    );
   } catch (err: unknown) {
     logger.error("[RentalAccrual] Fatal error:", { error: getErrorMessage(err) });
   }
@@ -106,8 +127,10 @@ export function startScheduler() {
     }
   );
 
-  // Run on the 2nd of every month at 6:00 AM EST — auto-post rent accrual vouchers
-  cron.schedule("0 6 2 * *", createSchedulerTick("monthlyRentalAccrual", runMonthlyRentalAccrual), {
+  // Run every day at 6:00 AM ET. Rental contracts can bill on the 1st, 20th,
+  // or any other day, so daily catch-up is required for correct monthly expense
+  // recognition. The posting functions are idempotent and skip completed rows.
+  cron.schedule("0 6 * * *", createSchedulerTick("dailyRentalAccrual", runDailyRentalAccrual), {
     timezone: "America/New_York",
   });
 
@@ -197,7 +220,7 @@ export function startScheduler() {
     action: "start",
     jobs: [
       "monthlyNetPositionWhatsApp(1st 07:00 EST)",
-      "monthlyRentalAccrual(2nd 06:00 EST)",
+      "dailyRentalAccrual(daily 06:00 ET)",
       "hourlyChecks(stock/export/containers)",
       "convergenceReconciliation(daily 03:30 ET)",
       "overdueCustomers(daily 09:00 EST)",
