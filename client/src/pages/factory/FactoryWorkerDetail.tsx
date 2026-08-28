@@ -6,6 +6,7 @@ const PATCH_KEY = "__factoryWorkerBalesProfilePatch";
 
 type FetchPatchState = {
   originalFetch: typeof window.fetch;
+  wrapperFetch: typeof window.fetch;
   users: number;
 };
 
@@ -15,16 +16,23 @@ function installWorkerBalesProfilePatch(): () => void {
 
   if (!state) {
     const originalFetch = window.fetch.bind(window);
-    state = { originalFetch, users: 0 };
-    globalState[PATCH_KEY] = state;
+    const wrapperFetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const current = globalState[PATCH_KEY];
+      if (!current || current.users <= 0) {
+        if (window.fetch === wrapperFetch) window.fetch = originalFetch;
+        if (current === state) delete globalState[PATCH_KEY];
+        return originalFetch(input, init);
+      }
 
-    window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-      const rawUrl = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      const rawUrl =
+        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
       try {
         const parsed = new URL(rawUrl, window.location.origin);
         if (/^\/api\/factory\/workers\/\d+\/bales$/.test(parsed.pathname)) {
           parsed.searchParams.set("profile", "worker-bales-summary");
-          const profiledUrl = rawUrl.startsWith("http") ? parsed.toString() : `${parsed.pathname}${parsed.search}`;
+          const profiledUrl = rawUrl.startsWith("http")
+            ? parsed.toString()
+            : `${parsed.pathname}${parsed.search}`;
           const requestInput = input instanceof Request ? new Request(profiledUrl, input) : profiledUrl;
           return originalFetch(requestInput, init);
         }
@@ -33,6 +41,10 @@ function installWorkerBalesProfilePatch(): () => void {
       }
       return originalFetch(input, init);
     }) as typeof window.fetch;
+
+    state = { originalFetch, wrapperFetch, users: 0 };
+    globalState[PATCH_KEY] = state;
+    window.fetch = wrapperFetch;
   }
 
   state.users += 1;
@@ -40,7 +52,7 @@ function installWorkerBalesProfilePatch(): () => void {
     const current = globalState[PATCH_KEY];
     if (!current) return;
     current.users -= 1;
-    if (current.users <= 0) {
+    if (current.users <= 0 && window.fetch === current.wrapperFetch) {
       window.fetch = current.originalFetch;
       delete globalState[PATCH_KEY];
     }
@@ -58,7 +70,7 @@ export default function FactoryWorkerDetail() {
       cleanupRef.current?.();
       cleanupRef.current = null;
     },
-    []
+    [],
   );
 
   return <FactoryWorkerDetailView model={model} />;
