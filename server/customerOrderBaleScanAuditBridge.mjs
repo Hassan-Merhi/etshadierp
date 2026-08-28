@@ -70,8 +70,36 @@ export async function ensureCustomerOrderBaleScanAudit(options = {}) {
       repaired.push("customer_order_bales.scanned_at");
     }
 
-    const historyLookup = await client.query(`SELECT to_regclass('public.customer_order_bales_history') AS table_name`);
-    const hasHistory = Boolean(historyLookup.rows[0]?.table_name);
+    let historyLookup = await client.query(`SELECT to_regclass('public.customer_order_bales_history') AS table_name`);
+    let hasHistory = Boolean(historyLookup.rows[0]?.table_name);
+
+    // This bridge can be preloaded before the ordered startup migrations. On a
+    // first upgrade the live bale table may already exist while the archive
+    // table does not. Create the canonical archive shape here so the live
+    // trigger never points at a later-created table that lacks scanned_at.
+    if (!hasHistory) {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS public.customer_order_bales_history (
+          id serial PRIMARY KEY,
+          original_id integer NOT NULL,
+          order_id integer NOT NULL,
+          bale_id integer NOT NULL,
+          bale_reference varchar(100) NOT NULL,
+          location_id integer NOT NULL,
+          weight decimal(15,3) NOT NULL,
+          article_code varchar(50),
+          bale_name text,
+          price_used decimal(20,2) NOT NULL,
+          scanned_by text,
+          scanned_at timestamptz,
+          cancelled_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      repaired.push("customer_order_bales_history table");
+      historyLookup = await client.query(`SELECT to_regclass('public.customer_order_bales_history') AS table_name`);
+      hasHistory = Boolean(historyLookup.rows[0]?.table_name);
+    }
+
     if (hasHistory) {
       const historyColumn = await client.query(`
         SELECT 1
@@ -87,9 +115,11 @@ export async function ensureCustomerOrderBaleScanAudit(options = {}) {
       }
     }
 
-    // Future inserts get the database-server scan time. When a cancelled loading
-    // is restored, reuse its archived timestamp instead of inventing a new one.
-    // A legacy archived row with no timestamp deliberately stays NULL.
+    // Preserve a prior timestamp when a cancelled loading is restored. For a
+    // genuinely new scan/import, scanned_by is populated by the authenticated
+    // route and the database server supplies the timestamp. Recovery/admin
+    // reconstruction rows intentionally have no scanner identity, so they stay
+    // NULL instead of receiving a fabricated scan time.
     await client.query(`
       CREATE OR REPLACE FUNCTION public.set_customer_order_bale_scanned_at()
       RETURNS trigger
@@ -98,27 +128,40 @@ export async function ensureCustomerOrderBaleScanAudit(options = {}) {
       DECLARE
         restored_at TIMESTAMPTZ;
         restored_match BOOLEAN := FALSE;
+        history_has_scanned_at BOOLEAN := FALSE;
       BEGIN
         IF NEW.scanned_at IS NOT NULL THEN
           RETURN NEW;
         END IF;
 
         IF to_regclass('public.customer_order_bales_history') IS NOT NULL THEN
-          SELECT h.scanned_at, TRUE
-          INTO restored_at, restored_match
-          FROM public.customer_order_bales_history h
-          WHERE h.order_id = NEW.order_id
-            AND h.bale_id = NEW.bale_id
-          ORDER BY h.cancelled_at DESC
-          LIMIT 1;
+          SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'customer_order_bales_history'
+              AND column_name = 'scanned_at'
+          ) INTO history_has_scanned_at;
 
-          IF restored_match THEN
-            NEW.scanned_at := restored_at;
-            RETURN NEW;
+          IF history_has_scanned_at THEN
+            SELECT h.scanned_at, TRUE
+            INTO restored_at, restored_match
+            FROM public.customer_order_bales_history h
+            WHERE h.order_id = NEW.order_id
+              AND h.bale_id = NEW.bale_id
+            ORDER BY h.cancelled_at DESC
+            LIMIT 1;
+
+            IF restored_match THEN
+              NEW.scanned_at := restored_at;
+              RETURN NEW;
+            END IF;
           END IF;
         END IF;
 
-        NEW.scanned_at := CURRENT_TIMESTAMP;
+        IF NEW.scanned_by IS NOT NULL AND btrim(NEW.scanned_by) <> '' THEN
+          NEW.scanned_at := CURRENT_TIMESTAMP;
+        END IF;
         RETURN NEW;
       END;
       $$
