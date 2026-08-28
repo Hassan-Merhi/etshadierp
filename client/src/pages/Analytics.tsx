@@ -23,7 +23,8 @@ function isAccountsAllUrl(value: unknown): boolean {
 }
 
 function isAnalyticsRoute(pathname: string): boolean {
-  return pathname === "/analytics" || pathname.endsWith("/analytics");
+  const normalizedPathname = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  return normalizedPathname === "/analytics" || normalizedPathname.endsWith("/analytics");
 }
 
 function extractAccounts(payload: unknown): unknown[] | null {
