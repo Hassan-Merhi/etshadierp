@@ -269,10 +269,7 @@ describe("account statement route behavior", () => {
     expect(harness.generateAccountStatementPdf).not.toHaveBeenCalled();
 
     const excel = responseHarness();
-    await routes.get("GET /api/accounts/statement/export-excel")!(
-      request({ query: { accountId: ["8", "9"] } }),
-      excel
-    );
+    await routes.get("GET /api/accounts/statement/export-excel")!(request({ query: { accountId: ["8", "9"] } }), excel);
     expect(excel.statusCode).toBe(400);
   });
 

@@ -168,12 +168,7 @@ export function registerInventoryMovementReportRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const {
-        stockItemId: stockItemIdRaw,
-        locationId: locationIdRaw,
-        year: yearRaw,
-        month: monthRaw,
-      } = req.query;
+      const { stockItemId: stockItemIdRaw, locationId: locationIdRaw, year: yearRaw, month: monthRaw } = req.query;
       if (typeof stockItemIdRaw !== "string" || typeof yearRaw !== "string" || typeof monthRaw !== "string") {
         return res.status(400).json({ message: "stockItemId, year, month must be single integer values" });
       }
