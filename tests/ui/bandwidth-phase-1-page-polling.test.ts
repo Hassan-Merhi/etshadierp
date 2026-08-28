@@ -46,9 +46,18 @@ describe("Bandwidth Phase 1 page request policy", () => {
     expect(source).toContain("setQueryData<OrderDetail>");
   });
 
-  it("does not load the bale-removal history before its dialog opens", () => {
+  /**
+   * The removal history is read once per order rather than deferred until the
+   * section expands. Gating the query on the expanded flag made the collapsed
+   * section unreachable: it only renders when the log has entries, so nothing
+   * was ever there to expand. The bandwidth rule the gate protected is kept by
+   * the 30s stale window and the absence of a refetch interval on this query.
+   */
+  it("reads the bale-removal history once per order instead of polling it", () => {
     const source = readPageSources("client/src/pages/factory/FactoryContainerLoadingScan.tsx");
-    expect(source).toContain("enabled: !!orderId && showRemovalLog");
+    expect(source).toContain("bale-removals");
+    expect(source).not.toContain("enabled: !!orderId && showRemovalLog");
+    expect(source).toContain("staleTime: 30_000");
   });
 
   it("throttles shipping syncs across tabs and cancels delayed tracking refreshes on unmount", () => {

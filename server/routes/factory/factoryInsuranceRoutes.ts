@@ -18,6 +18,11 @@ import { postBalancedVoucherTx } from "../../services/accounting/centralPostingE
 import { createDatabasePostingDependencies } from "../../services/accounting/databasePostingDependencies";
 import { infrastructurePostingIdentity } from "../../services/accounting/infrastructureVoucherIdentity";
 import { isCompanyIsolationError, resolveRequestCompanyId } from "../../services/security/requestCompanyScope";
+import {
+  privilegedDestructiveRateLimit,
+  privilegedMutationRateLimit,
+  privilegedReadRateLimit,
+} from "../../middleware/privilegedEndpointSecurity";
 import { upload } from "../_helpers";
 import { readExcel, writeWorkbook } from "../../excelHelper";
 import {
@@ -310,7 +315,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     }
   });
 
-  app.get("/api/insurance/import/template", requireAuth, async (_req: Request, res: Response) => {
+  app.get("/api/insurance/import/template", privilegedReadRateLimit, requireAuth, async (_req: Request, res: Response) => {
     try {
       const buffer = await writeWorkbook(createInsuranceImportTemplate());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -324,7 +329,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     }
   });
 
-  app.post("/api/insurance/import/preview", requireAuth, upload.single("file"), async (req: Request, res: Response) => {
+  app.post("/api/insurance/import/preview", privilegedMutationRateLimit, requireAuth, upload.single("file"), async (req: Request, res: Response) => {
     try {
       resolveRequestCompanyId(req);
       if (!req.file) return res.status(400).json({ message: "Choose an .xlsx workbook first" });
@@ -344,7 +349,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     }
   });
 
-  app.post("/api/insurance/import/apply", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/insurance/import/apply", privilegedMutationRateLimit, requireAuth, async (req: Request, res: Response) => {
     try {
       const parsed = insuranceImportApplySchema.safeParse(req.body);
       if (!parsed.success) {
@@ -483,6 +488,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
 
   app.post(
     "/api/insurance/admin/clear-all",
+    privilegedDestructiveRateLimit,
     requireAuth,
     requireRole("Admin", "Developer"),
     async (req: Request, res: Response) => {
