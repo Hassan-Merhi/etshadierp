@@ -13,10 +13,7 @@ const SUPPLIER_PARTNER_PATHS = new Set([
 ]);
 
 export type AuthenticatedAppRouteDecision =
-  | { kind: "continue" }
-  | { kind: "loading" }
-  | { kind: "empty" }
-  | { kind: "redirect"; to: string };
+  { kind: "continue" } | { kind: "loading" } | { kind: "empty" } | { kind: "redirect"; to: string };
 
 interface ResolveAuthenticatedAppRouteOptions {
   currentLocation: string;
