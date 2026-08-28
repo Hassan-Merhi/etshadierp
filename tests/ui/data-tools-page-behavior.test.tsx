@@ -134,22 +134,26 @@ describe("ERP data tools behavior", () => {
     render(<DataToolsTab />);
 
     expect(screen.getByRole("heading", { name: "Data Tools" })).toBeInTheDocument();
-    expect(screen.getByText("Silent stock transfer")).toBeInTheDocument();
-    expect(screen.getByText("Silent production / consumption")).toBeInTheDocument();
+    expect(screen.getByText("Silent Stock Transfer")).toBeInTheDocument();
+    expect(screen.getByText("Silent Production / Consumption")).toBeInTheDocument();
     expect(screen.getByText("Merge stock items")).toBeInTheDocument();
+    expect(screen.getByText("Reconcile OTW")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("button-open-bulk-rename"));
     expect(screen.getByTestId("bulk-rename-dialog")).toBeInTheDocument();
   });
 
-  it("shows the developer cost override and enables it after selecting a location", () => {
+  it("runs the sales cost repair mutation and invalidates the sales report", async () => {
     render(<DataToolsTab />);
+    fireEvent.click(screen.getByTestId("button-fix-cost-prices"));
 
-    const importButton = screen.getByTestId("button-open-cost-price-import");
-    expect(importButton).toBeDisabled();
-
-    fireEvent.click(screen.getAllByRole("button", { name: "Main" }).at(-1)!);
-    expect(importButton).toBeEnabled();
+    await waitFor(() =>
+      expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/sales-report/recalculate-costs", {})
+    );
+    expect(harness.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["/api/sales-report"] });
+    expect(harness.toast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Cost Prices Updated", description: "Updated 4 of 5 sales items" })
+    );
   });
 
   it("builds and applies a silent production adjustment from live location stock", async () => {
