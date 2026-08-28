@@ -20,6 +20,12 @@ const SOFT_RSS_MB = parsePositiveInt(process.env.MEMORY_SOFT_RSS_MB, 1200);
 const HARD_RSS_MB = parsePositiveInt(process.env.MEMORY_HARD_RSS_MB, 1500);
 const SAMPLE_INTERVAL_MS = parsePositiveInt(process.env.MEMORY_SAMPLE_INTERVAL_MS, 15_000);
 const HARD_SAMPLES_BEFORE_EXIT = parsePositiveInt(process.env.MEMORY_HARD_SAMPLES_BEFORE_EXIT, 4);
+// process.memoryUsage() walks all memory categories and can be relatively
+// expensive. Request bursts should not turn the safety guard itself into CPU
+// work, and four requests in the same millisecond should not count as four
+// independent hard-pressure samples. One request-triggered sample per second
+// is responsive enough to shed API load before the interval sampler fires.
+const REQUEST_SAMPLE_MIN_INTERVAL_MS = 1_000;
 
 const pressureState = {
   level: "normal",
@@ -34,8 +40,16 @@ const pressureState = {
 globalThis.__erpMemoryPressure = pressureState;
 
 function sampleMemory(trigger = "interval") {
+  const sampledAt = Date.now();
+  if (
+    trigger === "request" &&
+    sampledAt - pressureState.lastSampleAt < REQUEST_SAMPLE_MIN_INTERVAL_MS
+  ) {
+    return;
+  }
+
   const memory = process.memoryUsage();
-  pressureState.lastSampleAt = Date.now();
+  pressureState.lastSampleAt = sampledAt;
   pressureState.rssMb = mb(memory.rss);
   pressureState.heapUsedMb = mb(memory.heapUsed);
   pressureState.externalMb = mb(memory.external);
@@ -204,10 +218,12 @@ Server.prototype.emit = function patchedEmit(event, ...args) {
     reject(res, 503, "SERVER_SHUTTING_DOWN", "Server is restarting. Please retry shortly.", 5);
     return true;
   }
-  sampleMemory("request");
-  if (pressureState.level === "critical" && path.startsWith("/api/")) {
-    reject(res, 503, "MEMORY_PRESSURE", "Server is temporarily protecting itself from high memory usage.", 10);
-    return true;
+  if (path.startsWith("/api/")) {
+    sampleMemory("request");
+    if (pressureState.level === "critical") {
+      reject(res, 503, "MEMORY_PRESSURE", "Server is temporarily protecting itself from high memory usage.", 10);
+      return true;
+    }
   }
   const rule = pathLimits.find((candidate) => candidate.test(path));
   if (!rule) return originalEmit.call(this, event, ...args);
@@ -263,6 +279,7 @@ console.log(
     softRssMb: SOFT_RSS_MB,
     hardRssMb: HARD_RSS_MB,
     sampleIntervalMs: SAMPLE_INTERVAL_MS,
+    requestSampleMinIntervalMs: REQUEST_SAMPLE_MIN_INTERVAL_MS,
     hardSamplesBeforeExit: HARD_SAMPLES_BEFORE_EXIT,
   })
 );
