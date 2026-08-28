@@ -6,9 +6,6 @@ import { db } from "../db";
 import { broadcast } from "../wsServer";
 import { registerAccountRoutes } from "./accounts";
 import { registerAdminRoutes } from "./adminRoutes";
-import { registerAiAgentRoutes } from "./aiAgentRoutes";
-import { registerAiImportRoutes } from "./ai-import";
-import { registerAiValidationRoutes } from "./aiValidationRoutes";
 import { registerApprovalRoutes } from "./approvalRoutes";
 import { registerAuthRoutes } from "./authRoutes";
 import { registerBalanceRepairRoutes } from "./balance-repair";
@@ -16,7 +13,6 @@ import { registerBaleRoutes } from "./baleRoutes";
 import { registerBarcodeImageBandwidthMiddleware } from "./barcodeImageBandwidthMiddleware";
 import { registerBankAssetRoutes } from "./bankAssetRoutes";
 import { registerBusinessAlertRoutes } from "./businessAlertsRoutes";
-import { registerChatbotRoutes } from "./chatbot";
 import { registerContainerRoutes } from "./containerRoutes";
 import { registerContainerTrackingRoutes } from "./containerTrackingRoutes";
 import { registerCreditNoteRoutes } from "./creditNoteRoutes";
@@ -24,7 +20,6 @@ import { registerCustomerRoutes } from "./customerRoutes";
 import { registerDebugRoutes } from "./debugRoutes";
 import { registerEmployeeRoutes } from "./employeeRoutes";
 import { registerErpRentalRoutes } from "./erpRentalRoutes";
-import { registerExportRoutes } from "./exportRoutes";
 import { registerFactoryAttendanceRoutes } from "./factoryAttendanceRoutes";
 import { registerFactoryIntelligenceRoutes } from "./factory-intelligence";
 import { registerFactoryPayrollRoutes } from "./factory-payroll";
@@ -42,10 +37,9 @@ import { registerImportCycleRoutes } from "./import-cycle";
 import { registerImportRoutes } from "./import";
 import { registerIntercompanyNotificationRoutes } from "./intercompanyNotificationRoutes";
 import { registerInventoryRoutes } from "./inventoryRoutes";
+import { registerLazyRouteModule } from "./lazyRouteRegistrar";
 import { registerLedgerRoutes } from "./ledgerRoutes";
 import { registerLocationRoutes } from "./locationRoutes";
-import { registerNetPositionMonthlyExcelRoute } from "./netPositionMonthlyExcelRoute";
-import { registerNetProfitExcelRoute } from "./netProfitExcelRoute";
 import { registerNotificationRoutes } from "./notificationRoutes";
 import { registerPasskeyRoutes } from "./passkeyRoutes";
 import { registerPosRoutes } from "./posRoutes";
@@ -181,20 +175,49 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerAdminRoutes(app);
   registerBalanceRepairRoutes(app);
   registerStockSummaryRoutes(app);
-  registerChatbotRoutes(app);
+
+  await registerLazyRouteModule(app, {
+    prefixes: ["/api/chatbot"],
+    load: async () => (await import("./chatbot")).registerChatbotRoutes,
+  });
+
   registerCreditNoteRoutes(app);
-  registerNetProfitExcelRoute(app);
-  registerNetPositionMonthlyExcelRoute(app);
+
+  await registerLazyRouteModule(app, {
+    prefixes: ["/api/reports/net-profit-excel"],
+    load: async () => (await import("./netProfitExcelRoute")).registerNetProfitExcelRoute,
+  });
+  await registerLazyRouteModule(app, {
+    prefixes: ["/api/reports/net-position-monthly-excel"],
+    load: async () => (await import("./netPositionMonthlyExcelRoute")).registerNetPositionMonthlyExcelRoute,
+  });
+
   registerWhatsAppRoutes(app);
-  registerExportRoutes(app);
+
+  await registerLazyRouteModule(app, {
+    prefixes: ["/api/export"],
+    load: async () => (await import("./exportRoutes")).registerExportRoutes,
+  });
+
   registerGitRoutes(app);
   registerContainerTrackingRoutes(app);
   registerUserNotesRoutes(app);
   registerSpRoutes(app);
   registerSpMigrationRoutes(app);
-  registerAiImportRoutes(app);
-  registerAiValidationRoutes(app);
-  registerAiAgentRoutes(app);
+
+  await registerLazyRouteModule(app, {
+    prefixes: ["/api/ai-import"],
+    load: async () => (await import("./ai-import")).registerAiImportRoutes,
+  });
+  await registerLazyRouteModule(app, {
+    prefixes: ["/api/ai-validation"],
+    load: async () => (await import("./aiValidationRoutes")).registerAiValidationRoutes,
+  });
+  await registerLazyRouteModule(app, {
+    prefixes: ["/api/ai-agent"],
+    load: async () => (await import("./aiAgentRoutes")).registerAiAgentRoutes,
+  });
+
   registerApprovalRoutes(app);
   registerBusinessAlertRoutes(app);
   registerIntercompanyNotificationRoutes(app);
