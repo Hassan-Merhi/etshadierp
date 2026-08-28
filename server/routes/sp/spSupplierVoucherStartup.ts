@@ -7,17 +7,13 @@ import {
 type SpSupplierVoucherStartupDependencies = {
   ensureTrigger: () => Promise<void>;
   repairLinks: () => Promise<number>;
-  runMaintenanceScope: (
-    reason: string,
-    callback: () => Promise<number>,
-  ) => Promise<number>;
+  runMaintenanceScope: (reason: string, callback: () => Promise<number>) => Promise<number>;
 };
 
 const defaultDependencies: SpSupplierVoucherStartupDependencies = {
   ensureTrigger: ensureSpSupplierVoucherSyncTrigger,
   repairLinks: () => repairSpSupplierVoucherLinks(),
-  runMaintenanceScope: (reason, callback) =>
-    runWithDatabaseMaintenanceScope(reason, callback),
+  runMaintenanceScope: (reason, callback) => runWithDatabaseMaintenanceScope(reason, callback),
 };
 
 /**
@@ -26,7 +22,7 @@ const defaultDependencies: SpSupplierVoucherStartupDependencies = {
  * to use their verified tenant scope and never pass through this helper.
  */
 export async function runSpSupplierVoucherStartup(
-  dependencies: SpSupplierVoucherStartupDependencies = defaultDependencies,
+  dependencies: SpSupplierVoucherStartupDependencies = defaultDependencies
 ): Promise<number> {
   return dependencies.runMaintenanceScope("sp-supplier-voucher-sync-startup", async () => {
     await dependencies.ensureTrigger();
