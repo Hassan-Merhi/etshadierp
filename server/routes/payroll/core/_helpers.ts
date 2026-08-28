@@ -79,19 +79,36 @@ export async function writeDaybookEntry(
 }
 
 /** Find or create a ledger account by name for a company. Returns the account row.
- *  Skips soft-deleted accounts and handles race-condition unique-constraint failures. */
+ *  Skips soft-deleted accounts and handles race-condition unique-constraint failures.
+ *  If a requested child name collides with its parent account, use a detail suffix
+ *  rather than creating a self-parent hierarchy cycle. */
 export async function findOrCreateLedger(
   companyId: number,
   name: string,
   accountType: string,
   opts?: { parentId?: number; subType?: string }
 ): Promise<{ id: number }> {
-  const [existing] = await db
+  let accountName = name;
+  let [existing] = await db
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
     .where(
-      and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name), isNull(ledgerAccounts.deletedAt))
+      and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, accountName), isNull(ledgerAccounts.deletedAt))
     );
+
+  if (existing && opts?.parentId && existing.id === opts.parentId) {
+    accountName = `${name} (Detail)`;
+    [existing] = await db
+      .select({ id: ledgerAccounts.id })
+      .from(ledgerAccounts)
+      .where(
+        and(
+          eq(ledgerAccounts.companyId, companyId),
+          eq(ledgerAccounts.name, accountName),
+          isNull(ledgerAccounts.deletedAt)
+        )
+      );
+  }
   if (existing) return existing;
 
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -101,7 +118,7 @@ export async function findOrCreateLedger(
       .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
     const nextCode = String((maxCodeRow?.maxCode ?? 0) + 1 + attempt);
     try {
-      const insertVals: any = { companyId, code: nextCode, name, accountType, active: true, isHidden: false };
+      const insertVals: any = { companyId, code: nextCode, name: accountName, accountType, active: true, isHidden: false };
       if (opts?.parentId) insertVals.parentId = opts.parentId;
       if (opts?.subType) insertVals.subType = opts.subType;
       const [created] = await db.insert(ledgerAccounts).values(insertVals).returning({ id: ledgerAccounts.id });
@@ -114,7 +131,7 @@ export async function findOrCreateLedger(
           .where(
             and(
               eq(ledgerAccounts.companyId, companyId),
-              eq(ledgerAccounts.name, name),
+              eq(ledgerAccounts.name, accountName),
               isNull(ledgerAccounts.deletedAt)
             )
           );
@@ -124,7 +141,7 @@ export async function findOrCreateLedger(
       throw err;
     }
   }
-  throw new Error(`Unable to create ledger account "${name}" after multiple attempts`);
+  throw new Error(`Unable to create ledger account "${accountName}" after multiple attempts`);
 }
 
 export const workerUpload = multer({
