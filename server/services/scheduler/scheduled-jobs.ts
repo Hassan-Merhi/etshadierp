@@ -2,23 +2,14 @@ import cron from "node-cron";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
-import { ensureMonthlyForCompany, postRentAccrualForCompany } from "../../routes/rental/shared";
-import { getUtcTodayString } from "../rental/rentalPeriodService";
-import { repairLegacyFullyPrepaidRentRecognition } from "../rental/legacyPrepaidRecognitionRepair";
-import { runScheduledConvergenceReconciliation } from "../accounting/scheduledConvergenceReconciliation";
-import { hasTodayExportSucceeded, isTodayExportRunning, runDailyExport } from "./daily-export";
 import { createSchedulerTick } from "./schedulerTickGuard";
 
-// Guards startScheduler against a double start. Declared here rather than in
-// daily-export because this is the only module that reads or writes it, and a
-// `let` cannot be reassigned across a module boundary.
+// Guards startScheduler against a double start.
 let schedulerStarted = false;
-import { checkAndRunContainersWhatsApp, purgeOldSoftDeletes } from "./maintenance";
-import { checkOverdueCustomers, runMonthlyWhatsAppNetPosition } from "./net-position";
-import { checkAndRunNetPositionExport, checkAndRunStockReport } from "./stock-report";
 
 async function checkAndRunScheduledDailyExport(): Promise<void> {
   try {
+    const { hasTodayExportSucceeded, isTodayExportRunning } = await import("./daily-export-state");
     const r = await pool.query(
       `SELECT schedule_enabled, schedule_hour, schedule_timezone FROM export_settings WHERE id = 1`
     );
@@ -30,24 +21,22 @@ async function checkAndRunScheduledDailyExport(): Promise<void> {
     const configuredHour: number = row.schedule_hour ?? 18;
     const tz: string = row.schedule_timezone || "America/New_York";
 
-    // Get the current hour in the configured timezone
     const nowInTz = new Date(new Date().toLocaleString("en-US", { timeZone: tz }));
     const currentHour = nowInTz.getHours();
 
     if (currentHour !== configuredHour) return;
 
-    // Already succeeded today?
     if (await hasTodayExportSucceeded()) {
       logger.info("[DailyExport] Hourly check: today's export already succeeded — skipping.");
       return;
     }
-    // Already running?
     if (await isTodayExportRunning()) {
       logger.info("[DailyExport] Hourly check: export is currently running — skipping.");
       return;
     }
 
     logger.info(`[DailyExport] Hourly check: time matches (${configuredHour}:00 ${tz}) — starting export.`);
+    const { runDailyExport } = await import("./daily-export");
     const MAX_ATTEMPTS = 4;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const ok = await runDailyExport();
@@ -76,6 +65,13 @@ async function checkAndRunScheduledDailyExport(): Promise<void> {
 async function runDailyRentalAccrual() {
   logger.info("[RentalAccrual] Daily billing-date catch-up started.");
   try {
+    const [{ ensureMonthlyForCompany, postRentAccrualForCompany }, { getUtcTodayString }, repairModule] =
+      await Promise.all([
+        import("../../routes/rental/shared"),
+        import("../rental/rentalPeriodService"),
+        import("../rental/legacyPrepaidRecognitionRepair"),
+      ]);
+    const { repairLegacyFullyPrepaidRentRecognition } = repairModule;
     const asOfDate = getUtcTodayString();
     const { rows } = await pool.query<{ id: number }>("SELECT id FROM companies");
     const modules: Array<{ module: string; income: string; expense: string }> = [
@@ -95,10 +91,6 @@ async function runDailyRentalAccrual() {
             asOfDate
           );
 
-          // Old overpayments made before the prepaid workflow existed could have
-          // been expensed on the payment date and left with no accrual stamp.
-          // Repair those fully-prepaid legacy months before the normal idempotent
-          // accrual/recognition engine runs.
           if (module === "ERP" || module === "FACTORY") {
             const { repaired } = await repairLegacyFullyPrepaidRentRecognition(companyId, module, expense, asOfDate);
             totalRepaired += repaired;
@@ -124,9 +116,16 @@ export function startScheduler() {
   schedulerStarted = true;
 
   // Run on the 1st of every month at 7:00 AM EST — send net-position Excel via WhatsApp
-  cron.schedule("0 7 1 * *", createSchedulerTick("monthlyNetPosition", runMonthlyWhatsAppNetPosition), {
-    timezone: "America/New_York",
-  });
+  cron.schedule(
+    "0 7 1 * *",
+    createSchedulerTick("monthlyNetPosition", async () => {
+      const { runMonthlyWhatsAppNetPosition } = await import("./net-position");
+      await runMonthlyWhatsAppNetPosition();
+    }),
+    {
+      timezone: "America/New_York",
+    }
+  );
 
   // Run every day at 6:00 AM ET. Rental contracts can bill on the 1st, 20th,
   // or any other day, so daily catch-up is required for correct monthly expense
@@ -136,14 +135,15 @@ export function startScheduler() {
   });
 
   // Every hour: check stock report, net position export, AND the configurable daily export.
-  // The daily export fires when the current local hour (in the stored timezone) matches
-  // the stored schedule_hour — this replaces the old hardcoded 6 PM EST cron.
+  // Individual modules are loaded only when this tick executes instead of at process startup.
   cron.schedule(
     "0 * * * *",
     createSchedulerTick("hourlyChecks", async () => {
-      await checkAndRunStockReport();
-      await checkAndRunNetPositionExport();
+      const stockReport = await import("./stock-report");
+      await stockReport.checkAndRunStockReport();
+      await stockReport.checkAndRunNetPositionExport();
       await checkAndRunScheduledDailyExport();
+      const { checkAndRunContainersWhatsApp } = await import("./maintenance");
       await checkAndRunContainersWhatsApp();
     }),
     {
@@ -158,6 +158,8 @@ export function startScheduler() {
   cron.schedule(
     "30 3 * * *",
     createSchedulerTick("convergenceReconciliation", async () => {
+      const { runScheduledConvergenceReconciliation } =
+        await import("../accounting/scheduledConvergenceReconciliation");
       await runScheduledConvergenceReconciliation();
     }),
     {
@@ -166,14 +168,28 @@ export function startScheduler() {
   );
 
   // Overdue customer payment reminder — runs every day at 9:00 AM EST
-  cron.schedule("0 9 * * *", createSchedulerTick("overdueCheck", checkOverdueCustomers), {
-    timezone: "America/New_York",
-  });
+  cron.schedule(
+    "0 9 * * *",
+    createSchedulerTick("overdueCheck", async () => {
+      const { checkOverdueCustomers } = await import("./net-position");
+      await checkOverdueCustomers();
+    }),
+    {
+      timezone: "America/New_York",
+    }
+  );
 
   // Purge soft-deleted items older than 30 days — runs daily at 2:00 AM EST
-  cron.schedule("0 2 * * *", createSchedulerTick("softDeletePurge", purgeOldSoftDeletes), {
-    timezone: "America/New_York",
-  });
+  cron.schedule(
+    "0 2 * * *",
+    createSchedulerTick("softDeletePurge", async () => {
+      const { purgeOldSoftDeletes } = await import("./maintenance");
+      await purgeOldSoftDeletes();
+    }),
+    {
+      timezone: "America/New_York",
+    }
+  );
 
   // Container auto-tracking — runs every 6 hours (00:00, 06:00, 12:00, 18:00 EST)
   cron.schedule(
