@@ -12,15 +12,17 @@ describe("SP supplier voucher startup scope", () => {
       expect(maintenanceActive).toBe(true);
       return 4;
     });
-    const runMaintenanceScope = vi.fn(async (reason: string, callback: () => Promise<number>) => {
-      expect(reason).toBe("sp-supplier-voucher-sync-startup");
-      maintenanceActive = true;
-      try {
-        return await callback();
-      } finally {
-        maintenanceActive = false;
-      }
-    });
+    const runMaintenanceScope = vi.fn(
+      async (reason: string, callback: () => Promise<number>) => {
+        expect(reason).toBe("sp-supplier-voucher-sync-startup");
+        maintenanceActive = true;
+        try {
+          return await callback();
+        } finally {
+          maintenanceActive = false;
+        }
+      },
+    );
 
     await expect(
       runSpSupplierVoucherStartup({ ensureTrigger, repairLinks, runMaintenanceScope }),
