@@ -313,6 +313,7 @@ export function buildGoldenCoastPhase11MonthlyClosePosting(input: {
       currency: "USD",
     },
     entries,
+    exchangeRate: null,
     actor: input.actor,
   });
 
