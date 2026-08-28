@@ -14,7 +14,6 @@ import { registerBarcodeImageBandwidthMiddleware } from "./barcodeImageBandwidth
 import { registerBankAssetRoutes } from "./bankAssetRoutes";
 import { registerBusinessAlertRoutes } from "./businessAlertsRoutes";
 import { registerContainerRoutes } from "./containerRoutes";
-import { registerContainerTrackingRoutes } from "./containerTrackingRoutes";
 import { registerCreditNoteRoutes } from "./creditNoteRoutes";
 import { registerCustomerRoutes } from "./customerRoutes";
 import { registerDebugRoutes } from "./debugRoutes";
@@ -29,7 +28,6 @@ import { registerFactoryRoutes } from "./factoryRoutes";
 import { registerFactoryWorkerRoutes } from "./factory-workers";
 import { registerFactoryWhatsappRoutes } from "./factoryWhatsappRoutes";
 import { registerFiscalTransferRoutes } from "./fiscal-transfers";
-import { registerGitRoutes } from "./git";
 import { registerGlobalTransactionRoutes } from "./globalTransactionRoutes";
 import { registerGoldenCoastAccountingRoutes } from "./goldenCoastAccountingRoutes";
 import { registerGoldenCoastLegacyPostingRetirement } from "./goldenCoastLegacyPostingRetirement";
@@ -48,6 +46,7 @@ import { registerRemoteControlSessionRoutes } from "./remoteControlSessionRoutes
 import { registerRemoteKeyboardControlRoutes } from "./remoteKeyboardControlRoutes";
 import { registerRemoteSupportAuditRoutes } from "./remoteSupportAuditRoutes";
 import { registerRemoteSupportRolloutRoutes } from "./remoteSupportRolloutRoutes";
+import { phase4LazyRoutes } from "./renderPhase4LazyRoutes";
 import { installRemoteSupportSessionStopAudit } from "../services/remoteSupportAuditService";
 import { registerReportsRoutes } from "./reportsRoutes";
 import { registerScreenFeedRoutes } from "./screenFeedRoutes";
@@ -57,7 +56,6 @@ import { registerSpMigrationRoutes } from "./sp-migration";
 import { registerStatsRoutes } from "./statsRoutes";
 import { registerStockRoutes } from "./stockRoutes";
 import { registerStockSummaryRoutes } from "./stockSummaryRoutes";
-import { registerSupplierProfitCheckRoutes } from "./supplier-profit-check";
 import { registerSupplierProformaRoutes } from "./supplierProformaRoutes";
 import { registerSupplierRoutes } from "./supplierRoutes";
 import { registerTransporterStatementRoutes } from "./transporterStatementRoutes";
@@ -114,7 +112,7 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerFactoryIntelligenceRoutes(app, requireAuth, db);
   registerFactoryAttendanceRoutes(app, requireAuth, db);
   registerSupplierProformaRoutes(app, requireAuth);
-  registerSupplierProfitCheckRoutes(app, requireAuth);
+  await phase4LazyRoutes.supplierProfitCheck(app, requireAuth);
   registerGlobalTransactionRoutes(app, requireAuth);
   registerGoldenCoastLegacyPostingRetirement(app);
   registerGoldenCoastAccountingRoutes(app);
@@ -190,8 +188,8 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
     prefixes: ["/api/export"],
     load: async () => (await import("./exportRoutes")).registerExportRoutes,
   });
-  registerGitRoutes(app);
-  registerContainerTrackingRoutes(app);
+  await phase4LazyRoutes.git(app);
+  await phase4LazyRoutes.containerTracking(app);
   registerUserNotesRoutes(app);
   registerSpRoutes(app);
   registerSpMigrationRoutes(app);
