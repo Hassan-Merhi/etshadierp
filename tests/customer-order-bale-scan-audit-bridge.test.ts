@@ -2,20 +2,16 @@
  * Behavioural coverage for the customer-order bale scan-audit startup bridge.
  *
  * The bridge adds `scanned_at` to the live and archive bale tables and installs
- * the two triggers that fill it. Three properties are load-bearing and none of
- * them is visible from the schema alone:
+ * the two triggers that fill it. Four properties are load-bearing:
  *
  *   - **No backfill.** Rows scanned before the feature existed have no
- *     trustworthy scan time. The bridge must never write one, because an
- *     invented timestamp is indistinguishable from a recorded one afterwards.
- *   - **Idempotence.** It runs on every boot. A column or trigger that is
- *     already present must not be recreated, or a redeploy takes a table lock
- *     it does not need.
+ *     trustworthy scan time. The bridge must never write one.
+ *   - **First-upgrade safety.** The archive table may not exist yet when this
+ *     preload runs, so the bridge must create the canonical shape itself.
+ *   - **Idempotence.** It runs on every boot and must not recreate installed
+ *     columns or triggers.
  *   - **Fail closed.** A failure aborts startup with the transaction rolled
- *     back, rather than leaving the server up with a half-installed audit trail.
- *
- * The bridge is driven against a stubbed pg client so the statements it issues
- * are observable without a database.
+ *     back instead of leaving a half-installed audit trail.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -43,7 +39,6 @@ vi.mock("../server/lib/databaseSsl.mjs", () => ({
 // @ts-expect-error - plain ESM startup bridge shared with the server boot path.
 import { ensureCustomerOrderBaleScanAudit as ensureSchema } from "../server/customerOrderBaleScanAuditBridge.mjs";
 
-/** The real DATABASE_URL is left alone; pg is stubbed, so any target will do. */
 function ensureCustomerOrderBaleScanAudit() {
   return ensureSchema({ connectionString: "postgresql://scan-audit-test/db" }) as Promise<void>;
 }
@@ -72,6 +67,11 @@ function fakeDatabase(state: Partial<DatabaseState> = {}) {
     const sql = String(statement);
     const present = (yes: boolean) => (yes ? { rows: [{}], rowCount: 1 } : { rows: [], rowCount: 0 });
 
+    if (/CREATE TABLE IF NOT EXISTS public\.customer_order_bales_history/i.test(sql)) {
+      db.historyTable = true;
+      db.historyColumn = true;
+      return { rows: [], rowCount: 0 };
+    }
     if (sql.includes("to_regclass('public.customer_order_bales_history')")) {
       return { rows: [{ table_name: db.historyTable ? "customer_order_bales_history" : null }], rowCount: 1 };
     }
@@ -88,7 +88,6 @@ function fakeDatabase(state: Partial<DatabaseState> = {}) {
   };
 }
 
-/** Every statement the bridge issued, in order. */
 function issued() {
   return harness.query.mock.calls.map(([statement]) => String(statement));
 }
@@ -122,10 +121,18 @@ describe("customer order bale scan audit bridge", () => {
   it("never backfills a scan time onto rows that predate the feature", async () => {
     await ensureCustomerOrderBaleScanAudit();
 
-    // An UPDATE here would stamp historical bales with a fabricated time that
-    // nothing downstream could tell apart from a real one.
     expect(issuedMatching(/UPDATE\s+(public\.)?customer_order_bales/i)).toEqual([]);
     expect(issuedMatching(/scanned_at\s*=/i)).toEqual([]);
+  });
+
+  it("timestamps only authenticated scan/import rows and preserves unknown recovery rows", async () => {
+    await ensureCustomerOrderBaleScanAudit();
+
+    const triggerFunction = issued().find((statement) => statement.includes("set_customer_order_bale_scanned_at"));
+    expect(triggerFunction).toContain("NEW.scanned_by IS NOT NULL");
+    expect(triggerFunction).toContain("btrim(NEW.scanned_by) <> ''");
+    expect(triggerFunction).toContain("NEW.scanned_at := CURRENT_TIMESTAMP");
+    expect(triggerFunction).toContain("history_has_scanned_at");
   });
 
   it("takes no locks when the columns and triggers are already installed", async () => {
@@ -137,18 +144,20 @@ describe("customer order bale scan audit bridge", () => {
 
     expect(issuedMatching(/ALTER TABLE/)).toEqual([]);
     expect(issuedMatching(/CREATE TRIGGER/)).toEqual([]);
+    expect(issuedMatching(/CREATE TABLE IF NOT EXISTS public\.customer_order_bales_history/)).toEqual([]);
     expect(issued().at(-1)).toBe("COMMIT");
   });
 
-  it("installs only the live-table half when no history table exists", async () => {
+  it("creates the canonical history table when preload runs before startup migrations", async () => {
     harness.query.mockImplementation(fakeDatabase({ historyTable: false }));
 
     await ensureCustomerOrderBaleScanAudit();
 
+    const createHistory = issuedMatching(/CREATE TABLE IF NOT EXISTS public\.customer_order_bales_history/);
+    expect(createHistory).toHaveLength(1);
+    expect(createHistory[0]).toContain("scanned_at timestamptz");
     expect(issuedMatching(/CREATE TRIGGER customer_order_bales_set_scanned_at/)).toHaveLength(1);
-    // The live trigger function still probes for the archive table at runtime;
-    // what must not happen is any attempt to alter or trigger on one.
-    expect(issuedMatching(/(ALTER TABLE|CREATE TRIGGER)[\s\S]*customer_order_bales_history/)).toEqual([]);
+    expect(issuedMatching(/CREATE TRIGGER customer_order_bales_history_copy_scanned_at/)).toHaveLength(1);
   });
 
   it("does nothing when the bale table itself is absent", async () => {
@@ -156,7 +165,7 @@ describe("customer order bale scan audit bridge", () => {
 
     await ensureCustomerOrderBaleScanAudit();
 
-    expect(issuedMatching(/ALTER TABLE|CREATE TRIGGER|CREATE OR REPLACE FUNCTION/)).toEqual([]);
+    expect(issuedMatching(/ALTER TABLE|CREATE TRIGGER|CREATE OR REPLACE FUNCTION|CREATE TABLE/)).toEqual([]);
     expect(issued().at(-1)).toBe("COMMIT");
   });
 
