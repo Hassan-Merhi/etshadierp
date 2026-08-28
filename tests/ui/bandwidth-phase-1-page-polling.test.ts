@@ -55,9 +55,7 @@ describe("Bandwidth Phase 1 page request policy", () => {
    */
   it("reads the bale-removal history once per order instead of polling it", () => {
     const source = readPageSources("client/src/pages/factory/FactoryContainerLoadingScan.tsx");
-    expect(source).toContain("bale-removals");
-    expect(source).not.toContain("enabled: !!orderId && showRemovalLog");
-    expect(source).toContain("staleTime: 30_000");
+    expect(source).toMatch(/"bale-removals"[\s\S]*?enabled: !!orderId,[\s\S]*?staleTime: 30_000/);
   });
 
   it("throttles shipping syncs across tabs and cancels delayed tracking refreshes on unmount", () => {
