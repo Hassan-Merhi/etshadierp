@@ -1,0 +1,43 @@
+name: Phase 10 Prettier Once
+
+on:
+  push:
+    branches:
+      - chatgpt/golden-coast-phase10-sales-cash-settlement
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.event.head_commit.message == 'chore: run one-time Phase 10 prettier fix'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Format only failed Phase 10 files
+        run: |
+          npx prettier --write \
+            server/routes/sp/spGoldenCoastPhase10SalesCashSettlementRoutes.test.ts \
+            server/routes/sp/spGoldenCoastPhase10SalesCashSettlementRoutes.ts \
+            server/services/accounting/goldenCoastPhase10SalesCashSettlement.test.ts
+      - name: Commit formatting if needed
+        run: |
+          if git diff --quiet; then
+            echo 'No formatting changes needed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            server/routes/sp/spGoldenCoastPhase10SalesCashSettlementRoutes.test.ts \
+            server/routes/sp/spGoldenCoastPhase10SalesCashSettlementRoutes.ts \
+            server/services/accounting/goldenCoastPhase10SalesCashSettlement.test.ts
+          git commit -m 'style: format Phase 10 settlement files'
+          git push origin HEAD:chatgpt/golden-coast-phase10-sales-cash-settlement
