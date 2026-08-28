@@ -36,7 +36,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- artifacts/security/codeql-phase1-open-alerts.json artifacts/security/codeql-phase1-inventory.md; then
+          if [[ -z "$(git status --porcelain -- artifacts/security/codeql-phase1-open-alerts.json artifacts/security/codeql-phase1-inventory.md)" ]]; then
             echo "Inventory artifacts already match the live main snapshot."
             exit 0
           fi
