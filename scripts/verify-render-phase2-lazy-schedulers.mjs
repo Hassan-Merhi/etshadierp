@@ -19,8 +19,9 @@ const rejectText = (source, text, message) => {
   if (source.includes(text)) failures.push(message);
 };
 const rejectStaticImport = (source, specifier, message) => {
-  const escaped = specifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  if (new RegExp(`from\\s+["']${escaped}["']`).test(source)) failures.push(message);
+  if (source.includes(`from "${specifier}"`) || source.includes(`from '${specifier}'`)) {
+    failures.push(message);
+  }
 };
 
 // server/index.ts may keep its stable scheduler API, but the scheduler barrel
@@ -114,10 +115,10 @@ requireText(
 );
 for (const heavyMarker of [
   'from "archiver"',
-  'generateNetPositionExcel',
-  'sendExportEmail',
-  'runDailyWhatsAppSend',
-  'createScheduledExportArtifact',
+  "generateNetPositionExcel",
+  "sendExportEmail",
+  "runDailyWhatsAppSend",
+  "createScheduledExportArtifact",
 ]) {
   rejectText(recoveryState, heavyMarker, `recovery probe must not retain heavy dependency: ${heavyMarker}`);
 }
