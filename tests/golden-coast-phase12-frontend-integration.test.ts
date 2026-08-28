@@ -8,12 +8,15 @@ describe("Golden Coast Phase 12 frontend integration", () => {
   it("registers a Golden Coast operations entry point without changing setup routing", () => {
     const routes = read("client/src/routes/AppRoutes.tsx");
     const navigation = read("client/src/lib/supplier-partner-navigation.ts");
+    const routeGuard = read("client/src/app/authenticatedAppRouteGuard.ts");
 
     expect(routes).toContain('import SpGoldenCoast from "@/pages/sp/SpGoldenCoast"');
     expect(routes).toContain('location === "/sp/golden-coast"');
-    expect(navigation).toContain('{ title: "Golden Coast", url: "/sp/golden-coast"');
+    expect(navigation).toContain('releaseDebtEnglish("Golden Coast")');
+    expect(navigation).toContain('url: "/sp/golden-coast"');
     expect(navigation).toContain('{ title: "Setup", url: "/sp/setup"');
     expect(navigation).toContain('{ title: "Migration", url: "/sp/setup?tab=migration"');
+    expect(routeGuard).toContain('"/sp/golden-coast"');
   });
 
   it("keeps Phase 6 sales on the existing POS workflow", () => {
