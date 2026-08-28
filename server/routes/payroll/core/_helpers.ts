@@ -93,7 +93,11 @@ export async function findOrCreateLedger(
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
     .where(
-      and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, accountName), isNull(ledgerAccounts.deletedAt))
+      and(
+        eq(ledgerAccounts.companyId, companyId),
+        eq(ledgerAccounts.name, accountName),
+        isNull(ledgerAccounts.deletedAt)
+      )
     );
 
   if (existing && opts?.parentId && existing.id === opts.parentId) {
@@ -118,7 +122,14 @@ export async function findOrCreateLedger(
       .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
     const nextCode = String((maxCodeRow?.maxCode ?? 0) + 1 + attempt);
     try {
-      const insertVals: any = { companyId, code: nextCode, name: accountName, accountType, active: true, isHidden: false };
+      const insertVals: any = {
+        companyId,
+        code: nextCode,
+        name: accountName,
+        accountType,
+        active: true,
+        isHidden: false,
+      };
       if (opts?.parentId) insertVals.parentId = opts.parentId;
       if (opts?.subType) insertVals.subType = opts.subType;
       const [created] = await db.insert(ledgerAccounts).values(insertVals).returning({ id: ledgerAccounts.id });
