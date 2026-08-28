@@ -117,4 +117,45 @@ describe("postBalancedVoucherTx", () => {
     expect(dependencies.idempotency.record).not.toHaveBeenCalled();
     expect(dependencies.audit.recordPosting).not.toHaveBeenCalled();
   });
+
+  it("rejects a posting into a month the Golden Coast monthly close finalized", async () => {
+    // execute() is called twice before ownership: the transaction-scope
+    // assertion, then the finalized-period probe. Only the second returns a row.
+    const tx = {
+      execute: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ finalized: 1 }] }),
+    };
+    const dependencies = {
+      ownership: { validateVoucherOwnership: vi.fn() },
+      idempotency: { findExisting: vi.fn().mockResolvedValue(null), record: vi.fn() },
+      audit: { recordPosting: vi.fn() },
+    };
+
+    await expect(postBalancedVoucherTx(tx, request(), dependencies)).rejects.toThrowError(
+      expect.objectContaining<PostingValidationError>({ code: "POSTING_PERIOD_FINALIZED" })
+    );
+    // A frozen period must stop before anything is written or audited.
+    expect(dependencies.ownership.validateVoucherOwnership).not.toHaveBeenCalled();
+    expect(dependencies.idempotency.record).not.toHaveBeenCalled();
+    expect(dependencies.audit.recordPosting).not.toHaveBeenCalled();
+  });
+
+  it("skips the finalized-period probe when the voucher date carries no YYYY-MM", async () => {
+    const tx = { execute: vi.fn(async () => ({ rows: [] })) };
+    const ownershipReached = new Error("ownership reached");
+    const dependencies = {
+      ownership: { validateVoucherOwnership: vi.fn().mockRejectedValue(ownershipReached) },
+      idempotency: { findExisting: vi.fn().mockResolvedValue(null), record: vi.fn() },
+      audit: { recordPosting: vi.fn() },
+    };
+    const input = request();
+    input.voucher.voucherDate = "not-a-date";
+
+    await expect(postBalancedVoucherTx(tx, input, dependencies)).rejects.toBe(ownershipReached);
+    // Only the transaction-scope assertion ran: with no month to check, the
+    // guard returns before querying rather than treating it as finalized.
+    expect(tx.execute).toHaveBeenCalledTimes(1);
+  });
 });
