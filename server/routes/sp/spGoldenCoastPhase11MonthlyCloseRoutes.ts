@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, NextFunction, Request, Response } from "express";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
 import { accountingPostingRequests, ledgerAccounts, spProfitSplits, vouchers } from "@shared/schema";
@@ -13,11 +13,17 @@ import {
   privilegedReadRateLimit,
   privilegedRequestBudget,
 } from "../../middleware/privilegedEndpointSecurity";
-import { PostingValidationError, postBalancedVoucherTx, type PostingActor } from "../../services/accounting/centralPostingEngine";
-import { createDatabasePostingDependencies } from "../../services/accounting/databasePostingDependencies";
-import { getGoldenCoastAccountDefinition, type GoldenCoastAccountRole } from "../../services/accounting/goldenCoastPhase2Accounts";
 import {
-  GOLDEN_COAST_PHASE11_SOURCE_TYPE,
+  PostingValidationError,
+  postBalancedVoucherTx,
+  type PostingActor,
+} from "../../services/accounting/centralPostingEngine";
+import { createDatabasePostingDependencies } from "../../services/accounting/databasePostingDependencies";
+import {
+  getGoldenCoastAccountDefinition,
+  type GoldenCoastAccountRole,
+} from "../../services/accounting/goldenCoastPhase2Accounts";
+import {
   GOLDEN_COAST_PHASE11_SPLIT_PCT,
   GoldenCoastPhase11CloseError,
   buildGoldenCoastPhase11MonthlyClosePosting,
@@ -27,7 +33,11 @@ import {
   planGoldenCoastPhase11MonthlyClose,
   type GoldenCoastPhase11Accounts,
 } from "../../services/accounting/goldenCoastPhase11MonthlyClose";
-import { goldenCoastPhase3VoucherNumber, isGoldenCoastCompany, type DbLike } from "./spGoldenCoastPhase4CutoverFifoRoutes";
+import {
+  goldenCoastPhase3VoucherNumber,
+  isGoldenCoastCompany,
+  type DbLike,
+} from "./spGoldenCoastPhase4CutoverFifoRoutes";
 import { requireSpCompany } from "./spHelpers";
 
 const postingDependencies = createDatabasePostingDependencies();
@@ -49,6 +59,24 @@ function actorFromRequest(req: Request): PostingActor {
   };
 }
 
+function monthBounds(periodMonth: string): { start: string; end: string } {
+  const [year, month] = periodMonth.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return { start: `${periodMonth}-01`, end: `${periodMonth}-${String(lastDay).padStart(2, "0")}` };
+}
+
+function assertMonthEnded(periodMonth: string): void {
+  const { end } = monthBounds(periodMonth);
+  const today = new Date().toISOString().slice(0, 10);
+  if (end >= today) {
+    throw new Phase11RouteError(
+      `The ${periodMonth} monthly close is not eligible until the month has ended`,
+      "GC_PHASE11_MONTH_NOT_ENDED",
+      409
+    );
+  }
+}
+
 async function assertCutoverPosted(conn: DbLike, companyId: number): Promise<void> {
   const result = await conn.execute(sql`
     SELECT id FROM vouchers
@@ -57,7 +85,13 @@ async function assertCutoverPosted(conn: DbLike, companyId: number): Promise<voi
       AND deleted_at IS NULL
     LIMIT 1
   `);
-  if (!resultRows(result)[0]) throw new Phase11RouteError("Golden Coast Phase 3 cutover must be posted first", "GC_PHASE11_NOT_READY", 409);
+  if (!resultRows(result)[0]) {
+    throw new Phase11RouteError(
+      "Golden Coast Phase 3 cutover must be posted before monthly close",
+      "GC_PHASE11_NOT_READY",
+      409
+    );
+  }
 }
 
 async function resolveCanonicalRole(conn: DbLike, companyId: number, role: GoldenCoastAccountRole): Promise<number> {
@@ -65,19 +99,43 @@ async function resolveCanonicalRole(conn: DbLike, companyId: number, role: Golde
   const rows = await conn
     .select({ id: ledgerAccounts.id, accountType: ledgerAccounts.accountType })
     .from(ledgerAccounts)
-    .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.subType, def.subType), eq(ledgerAccounts.active, true), isNull(ledgerAccounts.deletedAt)))
+    .where(
+      and(
+        eq(ledgerAccounts.companyId, companyId),
+        eq(ledgerAccounts.subType, def.subType),
+        eq(ledgerAccounts.active, true),
+        isNull(ledgerAccounts.deletedAt)
+      )
+    )
     .limit(2);
   if (rows.length !== 1 || !def.acceptedAccountTypes.includes(String(rows[0]?.accountType ?? ""))) {
-    throw new Phase11RouteError(`Golden Coast role ${role} is missing, ambiguous, or invalid`, "GC_PHASE11_ACCOUNT_INVALID", 409);
+    throw new Phase11RouteError(
+      `Golden Coast role ${role} is missing, ambiguous, or invalid`,
+      "GC_PHASE11_ACCOUNT_INVALID",
+      409
+    );
   }
   return Number(rows[0].id);
 }
 
-async function resolveLegacyIncomeExpense(conn: DbLike, companyId: number, subType: string, acceptedTypes: readonly string[], required: boolean): Promise<number | null> {
+async function resolveLegacyIncomeExpense(
+  conn: DbLike,
+  companyId: number,
+  subType: string,
+  acceptedTypes: readonly string[],
+  required: boolean
+): Promise<number | null> {
   const rows = await conn
     .select({ id: ledgerAccounts.id, accountType: ledgerAccounts.accountType })
     .from(ledgerAccounts)
-    .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.subType, subType), eq(ledgerAccounts.active, true), isNull(ledgerAccounts.deletedAt)))
+    .where(
+      and(
+        eq(ledgerAccounts.companyId, companyId),
+        eq(ledgerAccounts.subType, subType),
+        eq(ledgerAccounts.active, true),
+        isNull(ledgerAccounts.deletedAt)
+      )
+    )
     .limit(2);
   if (rows.length === 0 && !required) return null;
   if (rows.length !== 1 || !acceptedTypes.includes(String(rows[0]?.accountType ?? ""))) {
@@ -87,7 +145,7 @@ async function resolveLegacyIncomeExpense(conn: DbLike, companyId: number, subTy
 }
 
 async function resolveAccounts(conn: DbLike, companyId: number): Promise<GoldenCoastPhase11Accounts> {
-  const [salesAccountId, cogsAccountId, sharedChargesAccountId, profitPendingDistributionAccountId, freshStartEquityAccountId, hassanEquityAccountId] = await Promise.all([
+  const [sales, cogs, shared, ppd, fresh, hassan] = await Promise.all([
     resolveLegacyIncomeExpense(conn, companyId, "sp_sales", ["Income"], true),
     resolveLegacyIncomeExpense(conn, companyId, "sp_cogs", ["Direct Expense", "Expense"], true),
     resolveLegacyIncomeExpense(conn, companyId, "sp_shared_charges", ["Direct Expense", "Expense"], false),
@@ -96,16 +154,22 @@ async function resolveAccounts(conn: DbLike, companyId: number): Promise<GoldenC
     resolveCanonicalRole(conn, companyId, "hassan_equity"),
   ]);
   return {
-    salesAccountId: Number(salesAccountId),
-    cogsAccountId: Number(cogsAccountId),
-    sharedChargesAccountId,
-    profitPendingDistributionAccountId,
-    freshStartEquityAccountId,
-    hassanEquityAccountId,
+    salesAccountId: Number(sales),
+    cogsAccountId: Number(cogs),
+    sharedChargesAccountId: shared,
+    profitPendingDistributionAccountId: ppd,
+    freshStartEquityAccountId: fresh,
+    hassanEquityAccountId: hassan,
   };
 }
 
-async function accountPeriodActivity(conn: DbLike, companyId: number, accountId: number | null, start: string, end: string) {
+async function accountPeriodActivity(
+  conn: DbLike,
+  companyId: number,
+  accountId: number | null,
+  start: string,
+  end: string
+): Promise<{ debit: string; credit: string }> {
   if (!accountId) return { debit: "0", credit: "0" };
   const result = await conn.execute(sql`
     SELECT
@@ -128,10 +192,14 @@ async function accountPeriodActivity(conn: DbLike, companyId: number, accountId:
 async function ppdBalance(conn: DbLike, companyId: number, accountId: number): Promise<Decimal> {
   const result = await conn.execute(sql`
     SELECT (
-      CASE WHEN la.opening_balance_side = 'Cr' THEN -COALESCE(la.opening_balance, 0)::numeric ELSE COALESCE(la.opening_balance, 0)::numeric END
+      CASE WHEN la.opening_balance_side = 'Cr'
+        THEN -COALESCE(la.opening_balance, 0)::numeric
+        ELSE COALESCE(la.opening_balance, 0)::numeric
+      END
       + COALESCE((
         SELECT SUM(CAST(ve.debit_amount AS numeric) - CAST(ve.credit_amount AS numeric))
-        FROM voucher_entries ve JOIN vouchers v ON v.id = ve.voucher_id
+        FROM voucher_entries ve
+        JOIN vouchers v ON v.id = ve.voucher_id
         WHERE ve.ledger_account_id = ${accountId}
           AND v.company_id = ${companyId}
           AND v.deleted_at IS NULL
@@ -139,7 +207,10 @@ async function ppdBalance(conn: DbLike, companyId: number, accountId: number): P
       ), 0)
     )::text AS balance
     FROM ledger_accounts la
-    WHERE la.id = ${accountId} AND la.company_id = ${companyId}
+    WHERE la.id = ${accountId}
+      AND la.company_id = ${companyId}
+      AND la.active = true
+      AND la.deleted_at IS NULL
     LIMIT 1
   `);
   return new Decimal(String(resultRows(result)[0]?.balance ?? "0"));
@@ -147,11 +218,13 @@ async function ppdBalance(conn: DbLike, companyId: number, accountId: number): P
 
 async function buildPlan(conn: DbLike, companyId: number, body: unknown) {
   const close = parseGoldenCoastPhase11CloseInput({ companyId, body });
+  assertMonthEnded(close.periodMonth);
   const accounts = await resolveAccounts(conn, companyId);
+  const { start, end } = monthBounds(close.periodMonth);
   const [sales, cogs, shared] = await Promise.all([
-    accountPeriodActivity(conn, companyId, accounts.salesAccountId, `${close.periodMonth}-01`, `${close.periodMonth}-31`),
-    accountPeriodActivity(conn, companyId, accounts.cogsAccountId, `${close.periodMonth}-01`, `${close.periodMonth}-31`),
-    accountPeriodActivity(conn, companyId, accounts.sharedChargesAccountId, `${close.periodMonth}-01`, `${close.periodMonth}-31`),
+    accountPeriodActivity(conn, companyId, accounts.salesAccountId, start, end),
+    accountPeriodActivity(conn, companyId, accounts.cogsAccountId, start, end),
+    accountPeriodActivity(conn, companyId, accounts.sharedChargesAccountId, start, end),
   ]);
   const revenue = Decimal.max(new Decimal(sales.credit).minus(sales.debit), 0);
   const totalCogs = Decimal.max(new Decimal(cogs.debit).minus(cogs.credit), 0);
@@ -162,17 +235,34 @@ async function buildPlan(conn: DbLike, companyId: number, body: unknown) {
     totalCogsUsd: totalCogs.toFixed(2),
     totalSharedChargesUsd: totalShared.toFixed(2),
   });
-  return { close, accounts, plan };
+  return { accounts, plan };
 }
 
 async function findReplay(tx: DatabaseTransaction, companyId: number, periodMonth: string) {
   const key = goldenCoastPhase11IdempotencyKey(companyId, periodMonth);
-  const [marker] = await tx.select({ voucherId: accountingPostingRequests.voucherId, sourceId: accountingPostingRequests.sourceId }).from(accountingPostingRequests)
-    .where(and(eq(accountingPostingRequests.companyId, companyId), eq(accountingPostingRequests.idempotencyKey, key))).limit(1);
+  const [marker] = await tx
+    .select({ voucherId: accountingPostingRequests.voucherId, sourceId: accountingPostingRequests.sourceId })
+    .from(accountingPostingRequests)
+    .where(and(eq(accountingPostingRequests.companyId, companyId), eq(accountingPostingRequests.idempotencyKey, key)))
+    .limit(1);
   if (!marker) return null;
-  const [split] = await tx.select().from(spProfitSplits).where(and(eq(spProfitSplits.companyId, companyId), eq(spProfitSplits.periodMonth, periodMonth))).limit(1);
-  const [voucher] = await tx.select().from(vouchers).where(and(eq(vouchers.id, Number(marker.voucherId)), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt))).limit(1);
-  if (!split || !voucher) throw new Phase11RouteError("Persisted Phase 11 close state is inconsistent", "GC_PHASE11_IDEMPOTENCY_INCONSISTENT", 409);
+  const [split] = await tx
+    .select()
+    .from(spProfitSplits)
+    .where(and(eq(spProfitSplits.companyId, companyId), eq(spProfitSplits.periodMonth, periodMonth)))
+    .limit(1);
+  const [voucher] = await tx
+    .select()
+    .from(vouchers)
+    .where(and(eq(vouchers.id, Number(marker.voucherId)), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt)))
+    .limit(1);
+  if (!split || !voucher) {
+    throw new Phase11RouteError(
+      "Persisted Phase 11 close state is inconsistent",
+      "GC_PHASE11_IDEMPOTENCY_INCONSISTENT",
+      409
+    );
+  }
   return { split, voucher, sourceId: String(marker.sourceId ?? "") };
 }
 
@@ -192,19 +282,35 @@ function respondKnownError(res: Response, error: unknown): boolean {
   return false;
 }
 
-async function readiness(req: Request, res: Response) {
+async function readiness(req: Request, res: Response): Promise<void> {
   try {
     const companyId = await requireSpCompany(req, res);
     if (!companyId) return;
-    if (!(await isGoldenCoastCompany(db, companyId))) throw new Phase11RouteError("Golden Coast is not configured", "GC_PHASE11_NOT_CONFIGURED", 409);
+    if (!(await isGoldenCoastCompany(db, companyId))) {
+      throw new Phase11RouteError("Golden Coast is not configured", "GC_PHASE11_NOT_CONFIGURED", 409);
+    }
     await assertCutoverPosted(db, companyId);
     const periodMonth = String(req.query.periodMonth ?? "");
     const probe = parseGoldenCoastPhase11CloseInput({ companyId, body: { periodMonth, clientRequestId: "readiness" } });
-    const replay = await db.select().from(spProfitSplits).where(and(eq(spProfitSplits.companyId, companyId), eq(spProfitSplits.periodMonth, probe.periodMonth))).limit(1);
-    if (replay.length) return res.json({ ready: false, alreadyClosed: true, split: replay[0] });
+    assertMonthEnded(probe.periodMonth);
+    const existing = await db
+      .select()
+      .from(spProfitSplits)
+      .where(and(eq(spProfitSplits.companyId, companyId), eq(spProfitSplits.periodMonth, probe.periodMonth)))
+      .limit(1);
+    if (existing.length) {
+      res.json({ ready: false, alreadyClosed: true, split: existing[0] });
+      return;
+    }
     const { accounts, plan } = await buildPlan(db, companyId, { periodMonth, clientRequestId: "readiness" });
     const pending = await ppdBalance(db, companyId, accounts.profitPendingDistributionAccountId);
-    res.json({ ready: pending.isZero(), alreadyClosed: false, plan, splitPct: GOLDEN_COAST_PHASE11_SPLIT_PCT, profitPendingDistributionBalanceUsd: pending.toFixed(2) });
+    res.json({
+      ready: pending.isZero(),
+      alreadyClosed: false,
+      plan,
+      splitPct: GOLDEN_COAST_PHASE11_SPLIT_PCT,
+      profitPendingDistributionBalanceUsd: pending.toFixed(2),
+    });
   } catch (error: unknown) {
     logger.error("Golden Coast Phase 11 readiness failed", { error });
     if (respondKnownError(res, error)) return;
@@ -212,13 +318,16 @@ async function readiness(req: Request, res: Response) {
   }
 }
 
-async function closeMonth(req: Request, res: Response) {
+async function closeMonth(req: Request, res: Response): Promise<void> {
   try {
     const companyId = await requireSpCompany(req, res);
     if (!companyId) return;
-    if (!(await isGoldenCoastCompany(db, companyId))) throw new Phase11RouteError("Golden Coast is not configured", "GC_PHASE11_NOT_CONFIGURED", 409);
+    if (!(await isGoldenCoastCompany(db, companyId))) {
+      throw new Phase11RouteError("Golden Coast is not configured", "GC_PHASE11_NOT_CONFIGURED", 409);
+    }
     await assertCutoverPosted(db, companyId);
     const parsed = parseGoldenCoastPhase11CloseInput({ companyId, body: req.body });
+    assertMonthEnded(parsed.periodMonth);
 
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(73111, ${companyId})`);
@@ -226,31 +335,61 @@ async function closeMonth(req: Request, res: Response) {
       const replay = await findReplay(tx, companyId, parsed.periodMonth);
       if (replay) return { replayed: true, ...replay };
 
-      const existing = await tx.select().from(spProfitSplits).where(and(eq(spProfitSplits.companyId, companyId), eq(spProfitSplits.periodMonth, parsed.periodMonth))).limit(1);
-      if (existing.length) throw new Phase11RouteError(`Profit split for ${parsed.periodMonth} already exists without a Phase 11 posting marker`, "GC_PHASE11_EXISTING_LEGACY_SPLIT", 409);
+      const existing = await tx
+        .select()
+        .from(spProfitSplits)
+        .where(and(eq(spProfitSplits.companyId, companyId), eq(spProfitSplits.periodMonth, parsed.periodMonth)))
+        .limit(1);
+      if (existing.length) {
+        throw new Phase11RouteError(
+          `Profit split for ${parsed.periodMonth} already exists without a Phase 11 posting marker`,
+          "GC_PHASE11_EXISTING_LEGACY_SPLIT",
+          409
+        );
+      }
 
       const { accounts, plan } = await buildPlan(tx, companyId, req.body);
       const pendingBefore = await ppdBalance(tx, companyId, accounts.profitPendingDistributionAccountId);
-      if (!pendingBefore.isZero()) throw new Phase11RouteError("Profit Pending Distribution must be zero before a new monthly close", "GC_PHASE11_PPD_NOT_ZERO", 409);
+      if (!pendingBefore.isZero()) {
+        throw new Phase11RouteError(
+          "Profit Pending Distribution must be zero before a new monthly close",
+          "GC_PHASE11_PPD_NOT_ZERO",
+          409
+        );
+      }
 
       const digest = goldenCoastPhase11CloseDigest({ plan, accounts });
-      const postingRequest = buildGoldenCoastPhase11MonthlyClosePosting({ plan, accounts, digest, actor: actorFromRequest(req) });
+      const postingRequest = buildGoldenCoastPhase11MonthlyClosePosting({
+        plan,
+        accounts,
+        digest,
+        actor: actorFromRequest(req),
+      });
       const posted = await postBalancedVoucherTx(tx, postingRequest, postingDependencies);
       const pendingAfter = await ppdBalance(tx, companyId, accounts.profitPendingDistributionAccountId);
-      if (!pendingAfter.isZero()) throw new Phase11RouteError("Profit Pending Distribution did not return to zero; monthly close rolled back", "GC_PHASE11_PPD_NOT_ZERO", 409);
+      if (!pendingAfter.isZero()) {
+        throw new Phase11RouteError(
+          "Profit Pending Distribution did not return to zero; monthly close rolled back",
+          "GC_PHASE11_PPD_NOT_ZERO",
+          409
+        );
+      }
 
-      const [split] = await tx.insert(spProfitSplits).values({
-        companyId,
-        periodMonth: plan.periodMonth,
-        totalRevenue: plan.totalRevenueUsd,
-        totalCogs: plan.totalCogsUsd,
-        totalSharedCharges: plan.totalSharedChargesUsd,
-        grossProfit: new Decimal(plan.totalRevenueUsd).minus(plan.totalCogsUsd).toFixed(2),
-        splitPct: GOLDEN_COAST_PHASE11_SPLIT_PCT,
-        ourShare: plan.hassanShareUsd,
-        supplierShare: plan.freshStartShareUsd,
-        finalizedAt: new Date(),
-      }).returning();
+      const [split] = await tx
+        .insert(spProfitSplits)
+        .values({
+          companyId,
+          periodMonth: plan.periodMonth,
+          totalRevenue: plan.totalRevenueUsd,
+          totalCogs: plan.totalCogsUsd,
+          totalSharedCharges: plan.totalSharedChargesUsd,
+          grossProfit: new Decimal(plan.totalRevenueUsd).minus(plan.totalCogsUsd).toFixed(2),
+          splitPct: GOLDEN_COAST_PHASE11_SPLIT_PCT,
+          ourShare: plan.hassanShareUsd,
+          supplierShare: plan.freshStartShareUsd,
+          finalizedAt: new Date(),
+        })
+        .returning();
       return { replayed: false, split, voucher: posted.voucher, plan };
     });
     res.json(result);
@@ -261,7 +400,40 @@ async function closeMonth(req: Request, res: Response) {
   }
 }
 
+async function retireLegacyGoldenCoastProfitSplit(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const companyId = await requireSpCompany(req, res);
+    if (!companyId) return;
+    if (!(await isGoldenCoastCompany(db, companyId))) {
+      next();
+      return;
+    }
+    res.status(409).json({
+      code: "GC_PHASE11_LEGACY_PROFIT_SPLIT_RETIRED",
+      message: releaseDebtEnglish(
+        "Golden Coast profit splits must use the Phase 11 ledger-derived monthly close; client-supplied profit totals are retired."
+      ),
+    });
+  } catch (error: unknown) {
+    next(error);
+  }
+}
+
 export function registerSpGoldenCoastPhase11MonthlyCloseRoutes(app: Express) {
-  app.get("/api/sp/golden-coast/phase11/monthly-close/readiness", requireAuth, requireNonPOS, privilegedReadRateLimit, readiness);
-  app.post("/api/sp/golden-coast/phase11/monthly-close", requireAuth, requireNonPOS, privilegedMutationRateLimit, phase11RequestBudget, closeMonth);
+  app.get(
+    "/api/sp/golden-coast/phase11/profit-splits/monthly-close/readiness",
+    requireAuth,
+    requireNonPOS,
+    privilegedReadRateLimit,
+    readiness
+  );
+  app.post(
+    "/api/sp/golden-coast/phase11/profit-splits/monthly-close",
+    requireAuth,
+    requireNonPOS,
+    privilegedMutationRateLimit,
+    phase11RequestBudget,
+    closeMonth
+  );
+  app.post("/api/sp/profit-splits", requireAuth, retireLegacyGoldenCoastProfitSplit);
 }
