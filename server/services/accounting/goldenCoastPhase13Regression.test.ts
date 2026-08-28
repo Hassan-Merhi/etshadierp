@@ -42,7 +42,9 @@ describe("Golden Coast Phase 13 accounting boundary regressions", () => {
       ])
     );
     expect(posting.entries.some((entry) => entry.ledgerAccountId === phase8Accounts.hassanEquityAccountId)).toBe(false);
-    expect(posting.entries.some((entry) => entry.ledgerAccountId === phase8Accounts.hassanSavingsAccountId)).toBe(false);
+    expect(posting.entries.some((entry) => entry.ledgerAccountId === phase8Accounts.hassanSavingsAccountId)).toBe(
+      false
+    );
   });
 
   it("does not expose a post-cutover contributed-container switch through the Phase 8 parser", () => {

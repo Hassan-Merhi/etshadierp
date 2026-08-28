@@ -143,7 +143,12 @@ async function bindGoldenCoastSettings(
 
 async function resolveCompanyPair(conn: DbLike, companyId: number): Promise<GoldenCoastCompanyPair> {
   const [goldenCoast] = await conn
-    .select({ id: companies.id, name: companies.name, parentCompanyId: companies.parentCompanyId, active: companies.active })
+    .select({
+      id: companies.id,
+      name: companies.name,
+      parentCompanyId: companies.parentCompanyId,
+      active: companies.active,
+    })
     .from(companies)
     .where(and(eq(companies.id, companyId), eq(companies.active, true)))
     .limit(1);
@@ -278,10 +283,7 @@ async function applyIntercompanyPlan(
   };
 }
 
-async function phase13StatusWithAuthorizedHadi(
-  tx: DatabaseTransaction,
-  pair: GoldenCoastCompanyPair
-) {
+async function phase13StatusWithAuthorizedHadi(tx: DatabaseTransaction, pair: GoldenCoastCompanyPair) {
   const defs = goldenCoastPhase13IntercompanyDefinitions({
     goldenCoastCompanyName: pair.goldenCoastCompanyName,
     hadiCompanyName: pair.hadiCompanyName,
@@ -415,7 +417,11 @@ async function handleGoldenCoastSetup(req: Request, res: Response): Promise<void
       });
 
       await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
-      const goldenCoastIntercompany = await applyIntercompanyPlan(tx, pair.goldenCoastCompanyId, defs.golden_coast_hadi);
+      const goldenCoastIntercompany = await applyIntercompanyPlan(
+        tx,
+        pair.goldenCoastCompanyId,
+        defs.golden_coast_hadi
+      );
       await assertTransactionCompanyScope(tx, pair.hadiCompanyId);
       const hadiIntercompany = await applyIntercompanyPlan(tx, pair.hadiCompanyId, defs.hadi_golden_coast);
       await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);

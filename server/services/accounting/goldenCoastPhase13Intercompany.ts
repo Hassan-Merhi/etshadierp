@@ -186,7 +186,7 @@ export function summarizeGoldenCoastPhase13IntercompanyAccount(input: {
   assertScoped(companyId, accounts);
   try {
     const plan = planGoldenCoastPhase13IntercompanyAccount({ companyId, definition: input.definition, accounts });
-    const selected = plan.accountId == null ? null : accounts.find((row) => row.id === plan.accountId) ?? null;
+    const selected = plan.accountId == null ? null : (accounts.find((row) => row.id === plan.accountId) ?? null);
     if (!selected) {
       return {
         role: input.definition.role,

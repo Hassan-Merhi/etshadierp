@@ -7,8 +7,7 @@ export const GOLDEN_COAST_PHASE3_PARTNER_EQUITY_USD = "100000.00";
 export type GoldenCoastPhase3MoneyInput = string | number;
 
 export type GoldenCoastPhase3CashAccount =
-  | { kind: "ledger"; id: number; name?: string }
-  | { kind: "bank"; id: number; name?: string };
+  { kind: "ledger"; id: number; name?: string } | { kind: "bank"; id: number; name?: string };
 
 export interface GoldenCoastPhase3RoleAccounts {
   freshStartEquityAccountId: number;
@@ -129,9 +128,7 @@ export function goldenCoastPhase3VoucherNumber(companyId: number): string {
 function validateRoleAccounts(accounts: GoldenCoastPhase3RoleAccounts): void {
   const values = Object.entries(accounts).map(([field, value]) => positiveId(value, field));
   if (new Set(values).size !== values.length) {
-    throw new GoldenCoastPhase3CutoverError(
-      "Each Golden Coast Phase 3 role must resolve to a distinct ledger account"
-    );
+    throw new GoldenCoastPhase3CutoverError("Each Golden Coast Phase 3 role must resolve to a distinct ledger account");
   }
 }
 
@@ -198,9 +195,7 @@ function pushIfPositive(
  * Equity (the amount deployed into cash-funded inventory/reserve) and Hassan
  * Savings (the still-withdrawable residual).
  */
-export function buildGoldenCoastPhase3CutoverPlan(
-  input: GoldenCoastPhase3CutoverInput
-): GoldenCoastPhase3CutoverPlan {
+export function buildGoldenCoastPhase3CutoverPlan(input: GoldenCoastPhase3CutoverInput): GoldenCoastPhase3CutoverPlan {
   if (!input || typeof input !== "object") {
     throw new GoldenCoastPhase3CutoverError("Phase 3 cutover input is required");
   }
@@ -211,10 +206,7 @@ export function buildGoldenCoastPhase3CutoverPlan(
   const stockOtw = requiredNonNegative(input.stockOtwUsd, "stockOtwUsd");
   const stockInHand = requiredNonNegative(input.stockInHandUsd, "stockInHandUsd");
   const containerReserve = requiredNonNegative(input.containerReserveUsd, "containerReserveUsd");
-  const freshStartStockOtw = nonNegative(
-    input.freshStartContributedStockOtwUsd,
-    "freshStartContributedStockOtwUsd"
-  );
+  const freshStartStockOtw = nonNegative(input.freshStartContributedStockOtwUsd, "freshStartContributedStockOtwUsd");
   const freshStartStockInHand = nonNegative(
     input.freshStartContributedStockInHandUsd,
     "freshStartContributedStockInHandUsd"
@@ -243,9 +235,7 @@ export function buildGoldenCoastPhase3CutoverPlan(
     );
   }
 
-  const cashFundedInventory = stockOtw
-    .minus(freshStartStockOtw)
-    .plus(stockInHand.minus(freshStartStockInHand));
+  const cashFundedInventory = stockOtw.minus(freshStartStockOtw).plus(stockInHand.minus(freshStartStockInHand));
   const hassanFundingUses = cashFundedInventory.plus(containerReserve);
   if (hassanFundingUses.gt(partnerEquity)) {
     throw new GoldenCoastPhase3CutoverError(
@@ -319,11 +309,7 @@ export function buildGoldenCoastPhase3CutoverPlan(
     )
   );
   pushIfPositive(entries, gcSalesCash, () =>
-    ledgerCredit(
-      input.accounts.gcSalesCashAccountId,
-      gcSalesCash,
-      `${description} — carried GC Sales Cash payable`
-    )
+    ledgerCredit(input.accounts.gcSalesCashAccountId, gcSalesCash, `${description} — carried GC Sales Cash payable`)
   );
 
   const debitTotal = entries.reduce((sum, entry) => sum.plus(entry.debitAmount), new Decimal(0));

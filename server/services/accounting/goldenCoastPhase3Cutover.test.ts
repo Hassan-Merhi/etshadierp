@@ -149,7 +149,9 @@ describe("Golden Coast Phase 3 opening-balance cutover hardened by Phase 13", ()
   });
 
   it("puts all unused Hassan funding into Savings when there are no Hassan-funded uses", () => {
-    const plan = buildGoldenCoastPhase3CutoverPlan(input({ stockOtwUsd: 0, stockInHandUsd: 0, containerReserveUsd: 0 }));
+    const plan = buildGoldenCoastPhase3CutoverPlan(
+      input({ stockOtwUsd: 0, stockInHandUsd: 0, containerReserveUsd: 0 })
+    );
 
     expect(plan.hassanOpeningEquityUsd).toBe("0.00");
     expect(plan.hassanSavingsUsd).toBe("100000.00");
@@ -163,9 +165,9 @@ describe("Golden Coast Phase 3 opening-balance cutover hardened by Phase 13", ()
   });
 
   it("rejects contribution classifications larger than the inventory they classify", () => {
-    expect(() =>
-      buildGoldenCoastPhase3CutoverPlan(input({ freshStartContributedStockOtwUsd: "44000.01" }))
-    ).toThrow(/cannot exceed total Stock OTW/);
+    expect(() => buildGoldenCoastPhase3CutoverPlan(input({ freshStartContributedStockOtwUsd: "44000.01" }))).toThrow(
+      /cannot exceed total Stock OTW/
+    );
     expect(() =>
       buildGoldenCoastPhase3CutoverPlan(
         input({ stockInHandUsd: "100.00", freshStartContributedStockInHandUsd: "100.01" })

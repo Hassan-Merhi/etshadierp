@@ -72,12 +72,7 @@ describe("Golden Coast Phase 13 HADI intercompany account planner", () => {
     });
     expect(plan.action).toBe("repair");
     expect(plan.accountId).toBe(10);
-    expect(plan.repairs.map((repair) => repair.field)).toEqual([
-      "accountType",
-      "isHidden",
-      "active",
-      "deletedAt",
-    ]);
+    expect(plan.repairs.map((repair) => repair.field)).toEqual(["accountType", "isHidden", "active", "deletedAt"]);
   });
 
   it("provisions the HADI-side reciprocal account with the same repair rules", () => {

@@ -102,9 +102,7 @@ function IntercompanyReadinessRow({ account }: { account: GoldenCoastIntercompan
           <span className="font-medium">{account.name ?? account.expectedName}</span>
           <span className="font-mono text-xs text-muted-foreground">{account.subType}</span>
         </div>
-        {account.issues?.length > 0 && (
-          <p className="text-xs text-amber-600 mt-0.5">{account.issues.join(" · ")}</p>
-        )}
+        {account.issues?.length > 0 && <p className="text-xs text-amber-600 mt-0.5">{account.issues.join(" · ")}</p>}
       </div>
       <span className="text-xs text-muted-foreground whitespace-nowrap">{account.accountType ?? "Intercompany"}</span>
     </div>
@@ -178,7 +176,9 @@ export default function SpSetupPanel() {
         (item: { action?: string }) => item.action && item.action !== "none"
       );
       if (intercompanyChanges.length > 0) {
-        messages.push(`Provisioned/repaired ${intercompanyChanges.length} Golden Coast ↔ HADI intercompany account(s).`);
+        messages.push(
+          `Provisioned/repaired ${intercompanyChanges.length} Golden Coast ↔ HADI intercompany account(s).`
+        );
       }
 
       toast({
@@ -259,7 +259,9 @@ export default function SpSetupPanel() {
           {status?.bankAccounts?.length === 0 && (
             <div className="flex items-start gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/20 rounded-md p-3">
               <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <span>No bank accounts found. Add at least one bank account for prepaid payments and sales receipts.</span>
+              <span>
+                No bank accounts found. Add at least one bank account for prepaid payments and sales receipts.
+              </span>
             </div>
           )}
 
@@ -304,8 +306,8 @@ export default function SpSetupPanel() {
             <div>
               <CardTitle className="text-base">{releaseDebtEnglish("Golden Coast Accounting Readiness")}</CardTitle>
               <CardDescription className="text-xs mt-1">
-                {goldenCoast?.configuredRoleCount ?? 0} of {goldenCoast?.requiredRoleCount ?? 0} balance-sheet roles plus
-                the reciprocal HADI intercompany pair
+                {goldenCoast?.configuredRoleCount ?? 0} of {goldenCoast?.requiredRoleCount ?? 0} balance-sheet roles
+                plus the reciprocal HADI intercompany pair
               </CardDescription>
             </div>
             {goldenCoastReady ? (
@@ -381,27 +383,27 @@ export default function SpSetupPanel() {
                   )}
                 </p>
               )}
-              {phase13.blockers?.length > 0 && (
-                <p className="text-xs text-amber-600">{phase13.blockers.join(" · ")}</p>
-              )}
+              {phase13.blockers?.length > 0 && <p className="text-xs text-amber-600">{phase13.blockers.join(" · ")}</p>}
             </div>
           )}
 
           <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground space-y-1">
             <p>
-              Fresh Start-contributed inventory is an in-kind contribution and does not consume Hassan's $100,000 funding
-              balance.
+              Fresh Start-contributed inventory is an in-kind contribution and does not consume Hassan's $100,000
+              funding balance.
             </p>
             <p>
-              Cash-funded inventory plus Container Reserve consume Hassan funding. The unused balance becomes Hassan Savings
-              automatically at cutover; it is not added as extra capital.
+              Cash-funded inventory plus Container Reserve consume Hassan funding. The unused balance becomes Hassan
+              Savings automatically at cutover; it is not added as extra capital.
             </p>
           </div>
 
           <Button
             onClick={() => {
               const payload = requestSetupConfirmation(
-                goldenCoastReady ? "Re-verify Golden Coast and HADI accounting" : "Provision Golden Coast and HADI accounting",
+                goldenCoastReady
+                  ? "Re-verify Golden Coast and HADI accounting"
+                  : "Provision Golden Coast and HADI accounting",
                 phase13?.parentCompanyId
               );
               if (payload) goldenCoastMutation.mutate(payload);

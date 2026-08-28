@@ -45,11 +45,12 @@ describe("Golden Coast Phase 3 cutover route surface hardened by Phase 13", () =
   });
 
   it("accepts the Fresh Start contribution split in both preview and posting", () => {
-    expect(routeSource.match(/freshStartContributedStockOtwUsd: req\.body\?\.freshStartContributedStockOtwUsd/g)?.length).toBe(
-      2
-    );
     expect(
-      routeSource.match(/freshStartContributedStockInHandUsd: req\.body\?\.freshStartContributedStockInHandUsd/g)?.length
+      routeSource.match(/freshStartContributedStockOtwUsd: req\.body\?\.freshStartContributedStockOtwUsd/g)?.length
+    ).toBe(2);
+    expect(
+      routeSource.match(/freshStartContributedStockInHandUsd: req\.body\?\.freshStartContributedStockInHandUsd/g)
+        ?.length
     ).toBe(2);
     expect(routeSource).toContain('freshStartContributedInventory: "Excluded from Hassan funding usage"');
     expect(routeSource).toContain('cashFundedInventory: "Consumes Hassan funding"');
