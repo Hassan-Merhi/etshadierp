@@ -15,6 +15,9 @@ const bridge = read("server/exportBufferBridge.mjs");
 const memoryGuard = read("server/runtimeMemoryGuard.mjs");
 const puppeteer = read("server/lib/puppeteerSemaphore.ts");
 const exportAudit = read("scripts/audit-large-export-buffers.mjs");
+const renderBlueprint = read("render.yaml");
+const hasRenderEnv = (key, value) =>
+  renderBlueprint.includes(`- key: ${key}\n        value: "${value}"`);
 
 assert(dev.includes("--import ./server/exportBufferBridge.mjs"), "Export bridge must be preloaded in development.");
 assert(start.includes("--import ./server/exportBufferBridge.mjs"), "Export bridge must be preloaded in production.");
@@ -34,6 +37,37 @@ assert(memoryGuard.includes("MEMORY_HARD_RSS_MB"), "Runtime memory guard must re
 assert(memoryGuard.includes("MEMORY_PRESSURE"), "Critical memory pressure must reject new API work safely.");
 assert(memoryGuard.includes('path.includes("/export")'), "Export endpoints must retain endpoint-level concurrency protection.");
 assert(memoryGuard.includes("controlled-restart"), "Sustained hard memory pressure must trigger controlled restart behavior.");
+assert(
+  memoryGuard.includes("REQUEST_SAMPLE_MIN_INTERVAL_MS = 1_000"),
+  "Request-triggered memory sampling must remain throttled."
+);
+assert(
+  memoryGuard.includes('if (path.startsWith("/api/"))'),
+  "Request-triggered memory sampling must stay limited to API traffic."
+);
+
+assert(
+  hasRenderEnv("NODE_OPTIONS", "--max-old-space-size=320"),
+  "Render runtime must cap the Node old-space heap for the 512 MB Starter service."
+);
+assert(
+  hasRenderEnv("MEMORY_SOFT_RSS_MB", "384"),
+  "Render memory soft pressure must start below the Starter memory ceiling."
+);
+assert(
+  hasRenderEnv("MEMORY_HARD_RSS_MB", "448"),
+  "Render memory hard pressure must start before the Starter OOM ceiling."
+);
+assert(hasRenderEnv("PG_POOL_MAX", "8"), "Render main database pool must keep its Phase 1 peak connection budget.");
+assert(hasRenderEnv("PG_POOL_MIN", "0"), "Render main database pool must not pin idle connections open.");
+assert(
+  hasRenderEnv("PG_IDLE_TIMEOUT_MS", "30000"),
+  "Render main database pool must release idle clients after 30 seconds."
+);
+assert(
+  hasRenderEnv("PG_SESSION_POOL_MAX", "2"),
+  "Render session database pool must keep its Phase 1 connection budget."
+);
 
 assert(puppeteer.includes("PUPPETEER_MAX_CONCURRENT"), "Puppeteer concurrency must be deployment-configurable and bounded.");
 assert(puppeteer.includes("PUPPETEER_MAX_QUEUE_DEPTH"), "Puppeteer waiting callers must have a queue-depth limit.");

@@ -5,6 +5,7 @@ on:
     paths:
       - "server/**"
       - "scripts/**"
+      - "render.yaml"
       - "docs/program-6d-query-classifications.json"
       - "docs/program-6d-phase10-current-review.json"
       - "docs/archive/program-6d-database-query-optimization.md"
@@ -15,6 +16,7 @@ on:
     paths:
       - "server/**"
       - "scripts/**"
+      - "render.yaml"
       - "docs/program-6d-query-classifications.json"
       - "docs/program-6d-phase10-current-review.json"
       - "docs/archive/program-6d-database-query-optimization.md"
@@ -70,6 +72,12 @@ jobs:
         continue-on-error: true
         run: node scripts/verify-program6d-query-safety.mjs
 
+      - name: Resource-control invariants
+        id: resource_controls
+        if: always()
+        continue-on-error: true
+        run: node scripts/verify-program6f-export-resource-controls.mjs
+
       - name: Upload query-audit evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -87,8 +95,9 @@ jobs:
         env:
           QUERY_REVIEW_OUTCOME: ${{ steps.query_review.outcome }}
           QUERY_SAFETY_OUTCOME: ${{ steps.query_safety.outcome }}
+          RESOURCE_CONTROLS_OUTCOME: ${{ steps.resource_controls.outcome }}
         run: |
-          if [ "$QUERY_REVIEW_OUTCOME" != "success" ] || [ "$QUERY_SAFETY_OUTCOME" != "success" ]; then
+          if [ "$QUERY_REVIEW_OUTCOME" != "success" ] || [ "$QUERY_SAFETY_OUTCOME" != "success" ] || [ "$RESOURCE_CONTROLS_OUTCOME" != "success" ]; then
             echo "Performance/database safety gate failed."
             exit 1
           fi
