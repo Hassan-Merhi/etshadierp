@@ -41,10 +41,7 @@ globalThis.__erpMemoryPressure = pressureState;
 
 function sampleMemory(trigger = "interval") {
   const sampledAt = Date.now();
-  if (
-    trigger === "request" &&
-    sampledAt - pressureState.lastSampleAt < REQUEST_SAMPLE_MIN_INTERVAL_MS
-  ) {
+  if (trigger === "request" && sampledAt - pressureState.lastSampleAt < REQUEST_SAMPLE_MIN_INTERVAL_MS) {
     return;
   }
 
