@@ -31,7 +31,12 @@ export function registerSpExportRoutes(app: Express) {
 
       const { fromDate: fromDateRaw, toDate: toDateRaw, locationId: locationIdRaw } = req.query;
 
-      if (typeof fromDateRaw !== "string" || typeof toDateRaw !== "string") {
+      if (
+        typeof fromDateRaw !== "string" ||
+        typeof toDateRaw !== "string" ||
+        fromDateRaw.length === 0 ||
+        toDateRaw.length === 0
+      ) {
         return res.status(400).json({ message: "fromDate and toDate must each be a single YYYY-MM-DD value" });
       }
       if (locationIdRaw !== undefined && typeof locationIdRaw !== "string") {
@@ -103,7 +108,12 @@ export function registerSpExportRoutes(app: Express) {
         cashAccountId: cashAccountIdRaw,
       } = req.query;
 
-      if (typeof fromDateRaw !== "string" || typeof toDateRaw !== "string") {
+      if (
+        typeof fromDateRaw !== "string" ||
+        typeof toDateRaw !== "string" ||
+        fromDateRaw.length === 0 ||
+        toDateRaw.length === 0
+      ) {
         return res.status(400).json({ message: "fromDate and toDate must each be a single YYYY-MM-DD value" });
       }
       if (locationIdRaw !== undefined && typeof locationIdRaw !== "string") {
