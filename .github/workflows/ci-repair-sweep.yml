@@ -12,6 +12,14 @@ on:
         required: false
         type: string
         default: unspecified
+      ignore_run_id:
+        description: >-
+          A CI Repair Bot run id to ignore when checking for an already-active
+          repair run. Set when the sweep is invoked from inside a repair run,
+          so that run does not suppress its own continuation.
+        required: false
+        type: string
+        default: ''
     outputs:
       dispatched:
         description: Whether a CI Repair Bot run was dispatched by this sweep.
@@ -39,20 +47,36 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SWEEP_REASON: ${{ inputs.reason }}
+          IGNORE_RUN_ID: ${{ inputs.ignore_run_id }}
         run: |
           set -euo pipefail
           echo "dispatched=false" >> "$GITHUB_OUTPUT"
           echo "Sweep reason: $SWEEP_REASON"
 
+          # Safety valve: the continuation sweep re-runs after every repair
+          # run, so a PR that can never go green must not spin the loop
+          # forever. Sequential repair runs cannot realistically exceed this
+          # in an hour, so it only ever trips on a genuine runaway.
+          window_start="$(date -u -d '60 minutes ago' +%Y-%m-%dT%H:%M:%SZ)"
+          recent_runs="$(
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci-repair-bot.yml/runs?per_page=100" \
+              --jq "[.workflow_runs[] | select(.created_at > \"$window_start\")] | length"
+          )"
+          if (( recent_runs >= 30 )); then
+            echo "Repair runs in the last hour: $recent_runs. Refusing to dispatch another."
+            exit 0
+          fi
+
           # Never queue a second repair run behind one that is already working.
           active_runs="$(
             gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci-repair-bot.yml/runs?per_page=50" \
-              --jq '[.workflow_runs[] | select(
-                      .status == "queued" or
-                      .status == "in_progress" or
-                      .status == "waiting" or
-                      .status == "requested" or
-                      .status == "pending")] | length'
+              --jq "[.workflow_runs[] | select(
+                      (.id | tostring) != \"$IGNORE_RUN_ID\" and (
+                      .status == \"queued\" or
+                      .status == \"in_progress\" or
+                      .status == \"waiting\" or
+                      .status == \"requested\" or
+                      .status == \"pending\"))] | length"
           )"
           if (( active_runs > 0 )); then
             echo "A CI Repair Bot run is already queued or in progress; skipping dispatch."

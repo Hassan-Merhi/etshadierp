@@ -1,28 +1,28 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import {
-  ArrowUpRight,
+  RefreshCw,
   Building2,
-  Eraser,
   Loader2,
+  Database,
   Trash2,
+  AlertTriangle,
   PieChart,
+  Layers,
   ScanSearch,
   Info,
-  ShieldCheck,
-  Sparkles,
   Wrench,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ZeroBalancesDialog, InitializeBalancesDialog } from "./AccountingRepairDialogs";
 import { CleanEmptyAccountsDialog } from "./CleanEmptyAccountsDialog";
-import { ResetCompanyDataDialog } from "./SystemMaintenanceDialogs";
+import { FixPOCreditsDialog, ResetCompanyDataDialog } from "./SystemMaintenanceDialogs";
 import { useLocation } from "wouter";
 
 interface SystemToolsTabProps {
@@ -35,7 +35,7 @@ interface SystemToolsTabProps {
 interface ToolCard {
   category: string;
   categoryColor: string;
-  icon: ReactNode;
+  icon: React.ReactNode;
   iconBg: string;
   title: string;
   description: string;
@@ -45,62 +45,6 @@ interface ToolCard {
   devOnly?: boolean;
 }
 
-function SectionHeading({
-  icon: Icon,
-  eyebrow,
-  title,
-  description,
-}: {
-  icon: LucideIcon;
-  eyebrow: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-        <Icon className="h-4 w-4" />
-      </div>
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{eyebrow}</p>
-        <h3 className="mt-1 text-sm font-semibold tracking-tight">{title}</h3>
-        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-      </div>
-    </div>
-  );
-}
-
-function SystemToolCard({ card }: { card: ToolCard }) {
-  return (
-    <div
-      className="group flex min-h-[218px] flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/80 p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md sm:p-6"
-      data-testid={card.testId}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${card.iconBg}`}>{card.icon}</div>
-        <Badge className={`rounded-full border-0 px-2.5 py-1 text-[10px] font-semibold ${card.categoryColor}`}>
-          {card.category}
-        </Badge>
-      </div>
-
-      <div className="mt-5 flex-1 space-y-1.5">
-        <h4 className="text-base font-semibold tracking-tight">{card.title}</h4>
-        <p className="max-w-sm text-sm leading-5 text-muted-foreground">{card.description}</p>
-      </div>
-
-      <Button
-        variant="outline"
-        className="mt-5 h-10 w-full justify-between border-border/70 bg-background/50 transition-colors group-hover:border-primary/30 group-hover:bg-primary/[0.03]"
-        onClick={card.onAction}
-        data-testid={`button-action-${card.testId}`}
-      >
-        <span>{card.actionLabel}</span>
-        <ArrowUpRight className="h-4 w-4 text-primary transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-      </Button>
-    </div>
-  );
-}
-
 export function SystemToolsTab({ appMode, currentUser, selectedCompany, companies }: SystemToolsTabProps) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -108,6 +52,9 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
   const isFactory = appMode === "factory";
   const isProperties = appMode === "properties";
 
+  const [isZeroBalanceDialogOpen, setIsZeroBalanceDialogOpen] = useState(false);
+  const [isInitBalancesDialogOpen, setIsInitBalancesDialogOpen] = useState(false);
+  const [isFixPOCreditsDialogOpen, setIsFixPOCreditsDialogOpen] = useState(false);
   const [isResetDataDialogOpen, setIsResetDataDialogOpen] = useState(false);
   const [emptyAccountsOpen, setEmptyAccountsOpen] = useState(false);
 
@@ -124,6 +71,19 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to update parent company.", variant: "destructive" });
+    },
+  });
+
+  const fixParentPOSupplierMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/fix-parent-po-supplier-entries", {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "Done", description: data?.message || "Supplier entries fixed." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to fix supplier entries.", variant: "destructive" });
     },
   });
 
@@ -147,6 +107,30 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
       testId: "card-deleted-items",
     },
     {
+      category: "Accounting",
+      categoryColor: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+      icon: <RefreshCw className="h-6 w-6 text-red-500" />,
+      iconBg: "bg-red-500/10",
+      title: "Zero Account Balances",
+      description: "Reset opening balances for selected accounts in the current company.",
+      actionLabel: "Zero Balances",
+      onAction: () => setIsZeroBalanceDialogOpen(true),
+      testId: "card-zero-balances",
+      devOnly: true,
+    },
+    {
+      category: "Accounting",
+      categoryColor: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+      icon: <Database className="h-6 w-6 text-blue-500" />,
+      iconBg: "bg-blue-500/10",
+      title: "Initialize Accounting",
+      description: "Initial setup for companies with no accounting structure.",
+      actionLabel: "Initialize",
+      onAction: () => setIsInitBalancesDialogOpen(true),
+      testId: "card-init-accounting",
+      devOnly: true,
+    },
+    {
       category: "Diagnostics",
       categoryColor: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
       icon: <ScanSearch className="h-6 w-6 text-amber-500" />,
@@ -156,6 +140,56 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
       actionLabel: "Run Check",
       onAction: () => navigate("/import-cycle-diagnostics"),
       testId: "card-import-cycle",
+    },
+    {
+      category: "Diagnostics",
+      categoryColor: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+      icon: <AlertTriangle className="h-6 w-6 text-amber-500" />,
+      iconBg: "bg-amber-500/10",
+      title: "Orphaned Vouchers",
+      description: "Find and clean up charge vouchers for OTW containers.",
+      actionLabel: "Diagnose",
+      devOnly: true,
+      onAction: async () => {
+        try {
+          const response = await fetch("/api/debug/orphaned-charge-vouchers", {
+            method: "GET",
+            credentials: "include",
+          });
+          const result = await response.json();
+          if (response.ok) {
+            if (result.orphanedVoucherCount === 0) {
+              toast({
+                title: "No Orphaned Vouchers",
+                description: "All OTW containers have no leftover charge vouchers.",
+              });
+            } else {
+              toast({
+                title: `Found ${result.orphanedVoucherCount} orphaned voucher(s)`,
+                description: `Total impact: ${result.totalImpact}`,
+                variant: "destructive",
+              });
+            }
+          } else {
+            toast({ title: "Error", description: result.message, variant: "destructive" });
+          }
+        } catch (error) {
+          toast({ title: "Error", description: getErrorDetails(error).message, variant: "destructive" });
+        }
+      },
+      testId: "card-orphaned-vouchers",
+    },
+    {
+      category: "Diagnostics",
+      categoryColor: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+      icon: <Layers className="h-6 w-6 text-purple-500" />,
+      iconBg: "bg-purple-500/10",
+      title: "Container Analysis",
+      description: "Analyze offloads for duplicates and quantity issues.",
+      actionLabel: "Go to Analysis",
+      onAction: () => navigate("/containers"),
+      testId: "card-container-analysis",
+      devOnly: true,
     },
     {
       category: "Financials",
@@ -169,174 +203,171 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
       testId: "card-net-position",
     },
   ];
-  const visibleCards = cards.filter((card) => isDev || !card.devOnly);
 
   return (
     <div className="space-y-8">
-      <header className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-card via-card to-primary/10 p-5 shadow-sm sm:p-6">
-        <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-                <Wrench className="h-5 w-5" />
-              </div>
-              <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs">
-                Admin tools
-              </Badge>
-            </div>
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">System Tools</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                Recovery, diagnostics, and financial insights for{" "}
-                <span className="font-medium text-foreground">{selectedCompany?.name || "the current company"}</span>.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              Access and actions are filtered by your role.
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 sm:min-w-[330px]">
-            <div className="rounded-xl border border-border/60 bg-background/70 p-3">
-              <p className="text-2xl font-semibold tabular-nums">{visibleCards.length}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Tools</p>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-background/70 p-3">
-              <p className="text-2xl font-semibold">{isDev ? "Developer" : "Admin"}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Access</p>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-background/70 p-3">
-              <p className="text-2xl font-semibold">{isFactory ? "Factory" : isProperties ? "Properties" : "ERP"}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Workspace</p>
-            </div>
-          </div>
+      {/* Header */}
+      <div>
+        <div className="flex items-center gap-3 mb-1">
+          <h2 className="text-2xl font-semibold">System Tools</h2>
+          <Badge variant="secondary" className="text-xs">
+            Admin Tools
+          </Badge>
         </div>
-      </header>
+        <p className="text-muted-foreground text-sm">Manage recovery, diagnostics, and financial position insights.</p>
+      </div>
 
-      <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.04] px-4 py-3 text-sm text-muted-foreground">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+      {/* Warning banner */}
+      <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+        <Info className="h-4 w-4 mt-0.5 shrink-0" />
         <span>
-          These tools can affect company records or financial views. Review the impact before confirming changes.
+          System tools can affect company records, diagnostics, or user access. Use them carefully and review changes
+          before confirming.
         </span>
       </div>
 
-      <section className="space-y-4">
-        <SectionHeading
-          icon={Sparkles}
-          eyebrow="Workspace tools"
-          title="Recovery, diagnostics & insights"
-          description="Open a focused tool only when you need to inspect or change system data."
-        />
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          {visibleCards.map((card) => (
-            <SystemToolCard key={card.testId} card={card} />
-          ))}
-        </div>
-      </section>
+      {/* Tool cards grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {cards
+          .filter((card) => isDev || !card.devOnly)
+          .map((card) => (
+            <div
+              key={card.testId}
+              className="relative rounded-xl border bg-card p-5 flex flex-col gap-4"
+              data-testid={card.testId}
+            >
+              {/* Category badge */}
+              <span
+                className={`absolute top-4 right-4 text-xs font-medium px-2 py-0.5 rounded-full ${card.categoryColor}`}
+              >
+                {card.category}
+              </span>
 
+              {/* Icon */}
+              <div className={`w-11 h-11 rounded-lg flex items-center justify-center ${card.iconBg}`}>{card.icon}</div>
+
+              {/* Text */}
+              <div className="flex-1 space-y-1 pr-20">
+                <h4 className="font-semibold text-sm">{card.title}</h4>
+                <p className="text-sm text-muted-foreground leading-snug">{card.description}</p>
+              </div>
+
+              {/* Link-style action */}
+              <button
+                className="flex items-center gap-1 text-sm font-medium text-primary hover:underline w-fit"
+                onClick={card.onAction}
+                data-testid={`button-action-${card.testId}`}
+              >
+                {card.actionLabel} <span className="text-base leading-none">›</span>
+              </button>
+            </div>
+          ))}
+      </div>
+
+      {/* Global Settings */}
       {isDev && (
-        <section className="space-y-4">
-          <SectionHeading
-            icon={Building2}
-            eyebrow="Configuration"
-            title="Global settings"
-            description="Keep cross-company reporting preferences in one place."
-          />
-          <Card className="overflow-hidden border-border/70 bg-card/80 shadow-sm">
-            <CardContent className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <Building2 className="h-5 w-5" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold tracking-tight">Master parent company</h4>
-                  <p className="mt-1 max-w-xl text-sm leading-5 text-muted-foreground">
-                    The primary company used for net position reporting.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 sm:min-w-[280px]">
-                <Select
-                  value={parentCompanyData?.parentCompanyId?.toString() || "none"}
-                  onValueChange={(val) => setParentCompanyMutation.mutate(val === "none" ? null : parseInt(val))}
-                >
-                  <SelectTrigger className="w-full" data-testid="select-parent-company">
-                    <SelectValue placeholder="No parent company set" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None (Disabled)</SelectItem>
-                    {companies.map((c) => (
-                      <SelectItem key={c.id} value={c.id.toString()}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {setParentCompanyMutation.isPending && <Loader2 className="h-4 w-4 shrink-0 animate-spin" />}
-              </div>
-            </CardContent>
-          </Card>
-        </section>
+        <div className="rounded-xl border bg-card p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-muted-foreground" />
+            <h3 className="font-semibold">Global Settings</h3>
+          </div>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h4 className="font-medium text-sm">Master Parent Company</h4>
+              <p className="text-sm text-muted-foreground">The primary company for net position reporting.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Select
+                value={parentCompanyData?.parentCompanyId?.toString() || "none"}
+                onValueChange={(val) => setParentCompanyMutation.mutate(val === "none" ? null : parseInt(val))}
+              >
+                <SelectTrigger className="w-[240px]" data-testid="select-parent-company">
+                  <SelectValue placeholder="No parent company set" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (Disabled)</SelectItem>
+                  {companies.map((c) => (
+                    <SelectItem key={c.id} value={c.id.toString()}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {setParentCompanyMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            </div>
+          </div>
+        </div>
       )}
 
+      {/* Advanced Maintenance (Developer only) */}
       {isDev && (
-        <section className="space-y-4">
-          <SectionHeading
-            icon={Wrench}
-            eyebrow="Developer only"
-            title="Advanced maintenance"
-            description="High-impact maintenance actions are kept separate from everyday diagnostics."
-          />
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Card className="group overflow-hidden border-destructive/20 bg-card/80 shadow-sm transition-all hover:-translate-y-0.5 hover:border-destructive/40 hover:shadow-md">
-              <CardContent className="flex h-full flex-col p-5 sm:p-6">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
-                  <Trash2 className="h-5 w-5" />
-                </div>
-                <div className="mt-4 flex-1">
-                  <h4 className="text-base font-semibold tracking-tight">Reset company data</h4>
-                  <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                    Clear vouchers and entries for a company while preserving master data.
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-5 h-10 w-full border-destructive/30 hover:bg-destructive/5"
-                  onClick={() => setIsResetDataDialogOpen(true)}
-                >
-                  Reset Data
-                </Button>
-              </CardContent>
+        <div className="pt-2 border-t space-y-4">
+          <div className="flex items-center gap-2 px-1">
+            <Wrench className="h-4 w-4 text-muted-foreground" />
+            <h3 className="font-medium text-sm uppercase tracking-wider text-muted-foreground">Advanced Maintenance</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card className="p-4">
+              <h4 className="font-semibold text-sm mb-1">Fix Inter-Company</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                Manage credit management between subsidiaries and parent.
+              </p>
+              <Button size="sm" variant="outline" className="w-full" onClick={() => setIsFixPOCreditsDialogOpen(true)}>
+                Manage Credits
+              </Button>
             </Card>
 
-            <Card className="group overflow-hidden border-border/70 bg-card/80 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
-              <CardContent className="flex h-full flex-col p-5 sm:p-6">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <Eraser className="h-5 w-5" />
-                </div>
-                <div className="mt-4 flex-1">
-                  <h4 className="text-base font-semibold tracking-tight">Clean empty accounts</h4>
-                  <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                    Review and remove ledger accounts that have no transactions.
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-5 h-10 w-full"
-                  onClick={() => setEmptyAccountsOpen(true)}
-                >
-                  Clean Accounts
-                </Button>
-              </CardContent>
+            <Card className="p-4">
+              <h4 className="font-semibold text-sm mb-1">Reset Company Data</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                Clear vouchers and entries for a company (Preserves Master Data).
+              </p>
+              <Button size="sm" variant="outline" className="w-full" onClick={() => setIsResetDataDialogOpen(true)}>
+                Reset Data
+              </Button>
+            </Card>
+
+            <Card className="p-4">
+              <h4 className="font-semibold text-sm mb-1">Clean Empty Accounts</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                Bulk delete ledger accounts that have no transactions.
+              </p>
+              <Button size="sm" variant="outline" className="w-full" onClick={() => setEmptyAccountsOpen(true)}>
+                Clean Accounts
+              </Button>
+            </Card>
+
+            <Card className="p-4">
+              <h4 className="font-semibold text-sm mb-1">Fix Parent PO Supplier</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                Fix supplier entries in parent company for subsidiary POs.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full"
+                onClick={() => fixParentPOSupplierMutation.mutate()}
+                disabled={fixParentPOSupplierMutation.isPending}
+              >
+                {fixParentPOSupplierMutation.isPending ? "Fixing..." : "Fix Supplier Entries"}
+              </Button>
             </Card>
           </div>
-        </section>
+        </div>
       )}
 
+      {/* Dialogs */}
+      <ZeroBalancesDialog
+        open={isZeroBalanceDialogOpen}
+        onOpenChange={setIsZeroBalanceDialogOpen}
+        companyId={selectedCompany?.id}
+      />
+      <InitializeBalancesDialog open={isInitBalancesDialogOpen} onOpenChange={setIsInitBalancesDialogOpen} />
+      <FixPOCreditsDialog
+        open={isFixPOCreditsDialogOpen}
+        onOpenChange={setIsFixPOCreditsDialogOpen}
+        companies={companies}
+      />
       <ResetCompanyDataDialog
         open={isResetDataDialogOpen}
         onOpenChange={setIsResetDataDialogOpen}
