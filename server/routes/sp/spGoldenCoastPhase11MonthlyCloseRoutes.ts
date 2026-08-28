@@ -45,7 +45,11 @@ const phase11RequestBudget = privilegedRequestBudget({ maxBodyBytes: 16 * 1024, 
 type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 class Phase11RouteError extends Error {
-  constructor(message: string, readonly code: string, readonly status = 400) {
+  constructor(
+    message: string,
+    readonly code: string,
+    readonly status = 400
+  ) {
     super(releaseDebtEnglish(message));
     this.name = "Phase11RouteError";
   }
@@ -139,7 +143,11 @@ async function resolveLegacyIncomeExpense(
     .limit(2);
   if (rows.length === 0 && !required) return null;
   if (rows.length !== 1 || !acceptedTypes.includes(String(rows[0]?.accountType ?? ""))) {
-    throw new Phase11RouteError(`${subType} account is missing, ambiguous, or invalid`, "GC_PHASE11_ACCOUNT_INVALID", 409);
+    throw new Phase11RouteError(
+      `${subType} account is missing, ambiguous, or invalid`,
+      "GC_PHASE11_ACCOUNT_INVALID",
+      409
+    );
   }
   return Number(rows[0].id);
 }
@@ -254,7 +262,9 @@ async function findReplay(tx: DatabaseTransaction, companyId: number, periodMont
   const [voucher] = await tx
     .select()
     .from(vouchers)
-    .where(and(eq(vouchers.id, Number(marker.voucherId)), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt)))
+    .where(
+      and(eq(vouchers.id, Number(marker.voucherId)), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt))
+    )
     .limit(1);
   if (!split || !voucher) {
     throw new Phase11RouteError(
@@ -272,7 +282,9 @@ function respondKnownError(res: Response, error: unknown): boolean {
     return true;
   }
   if (error instanceof GoldenCoastPhase11CloseError) {
-    res.status(error.code === "GC_PHASE11_NOTHING_TO_CLOSE" ? 409 : 400).json({ code: error.code, message: error.message });
+    res
+      .status(error.code === "GC_PHASE11_NOTHING_TO_CLOSE" ? 409 : 400)
+      .json({ code: error.code, message: error.message });
     return true;
   }
   if (error instanceof PostingValidationError) {

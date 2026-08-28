@@ -67,7 +67,9 @@ describe("Golden Coast Phase 11 monthly close", () => {
     });
     const digest = goldenCoastPhase11CloseDigest({ plan, accounts });
     const posting = buildGoldenCoastPhase11MonthlyClosePosting({ plan, accounts, digest });
-    const ppd = entries(posting).filter((entry) => entry.ledgerAccountId === accounts.profitPendingDistributionAccountId);
+    const ppd = entries(posting).filter(
+      (entry) => entry.ledgerAccountId === accounts.profitPendingDistributionAccountId
+    );
     const debit = ppd.reduce((sum, entry) => sum + Number(entry.debitAmount), 0);
     const credit = ppd.reduce((sum, entry) => sum + Number(entry.creditAmount), 0);
     expect(debit).toBe(credit);
@@ -84,7 +86,9 @@ describe("Golden Coast Phase 11 monthly close", () => {
     });
     const digest = goldenCoastPhase11CloseDigest({ plan, accounts });
     const posting = buildGoldenCoastPhase11MonthlyClosePosting({ plan, accounts, digest });
-    const ppd = entries(posting).filter((entry) => entry.ledgerAccountId === accounts.profitPendingDistributionAccountId);
+    const ppd = entries(posting).filter(
+      (entry) => entry.ledgerAccountId === accounts.profitPendingDistributionAccountId
+    );
     expect(ppd.reduce((sum, entry) => sum + Number(entry.debitAmount) - Number(entry.creditAmount), 0)).toBe(0);
     expect(entries(posting)).toContainEqual({ ledgerAccountId: 15, debitAmount: "150.00", creditAmount: "0" });
     expect(entries(posting)).toContainEqual({ ledgerAccountId: 16, debitAmount: "150.00", creditAmount: "0" });
@@ -102,9 +106,11 @@ describe("Golden Coast Phase 11 monthly close", () => {
       accounts,
       digest: goldenCoastPhase11CloseDigest({ plan, accounts }),
     });
-    expect(entries(posting).map((entry) => entry.ledgerAccountId).sort((a, b) => Number(a) - Number(b))).toEqual(
-      [11, 12, 14, 14, 14, 15, 16]
-    );
+    expect(
+      entries(posting)
+        .map((entry) => entry.ledgerAccountId)
+        .sort((a, b) => Number(a) - Number(b))
+    ).toEqual([11, 12, 14, 14, 14, 15, 16]);
   });
 
   it("rejects pre-cutover months and months without activity", () => {

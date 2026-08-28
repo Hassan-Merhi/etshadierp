@@ -91,7 +91,10 @@ function parseMonth(value: unknown): { periodMonth: string; periodStart: string;
   return { periodMonth, periodStart, periodEnd };
 }
 
-export function parseGoldenCoastPhase11CloseInput(input: { companyId: number; body: unknown }): GoldenCoastPhase11CloseInput {
+export function parseGoldenCoastPhase11CloseInput(input: {
+  companyId: number;
+  body: unknown;
+}): GoldenCoastPhase11CloseInput {
   const companyId = positiveId(input.companyId, "companyId");
   if (!input.body || typeof input.body !== "object" || Array.isArray(input.body)) {
     throw new GoldenCoastPhase11CloseError("A Phase 11 monthly close request body is required");
@@ -102,7 +105,8 @@ export function parseGoldenCoastPhase11CloseInput(input: { companyId: number; bo
   if (!clientRequestId || clientRequestId.length > 64 || !REQUEST_ID_PATTERN.test(clientRequestId)) {
     throw new GoldenCoastPhase11CloseError("clientRequestId must be 1-64 supported characters");
   }
-  const reference = typeof body.reference === "string" && body.reference.trim() ? body.reference.trim().slice(0, 200) : null;
+  const reference =
+    typeof body.reference === "string" && body.reference.trim() ? body.reference.trim().slice(0, 200) : null;
   return { companyId, periodMonth, clientRequestId, reference };
 }
 
@@ -117,7 +121,10 @@ export function planGoldenCoastPhase11MonthlyClose(input: {
   const cogs = nonNegativeMoney(input.totalCogsUsd, "totalCogsUsd");
   const shared = nonNegativeMoney(input.totalSharedChargesUsd, "totalSharedChargesUsd");
   if (revenue.isZero() && cogs.isZero() && shared.isZero()) {
-    throw new GoldenCoastPhase11CloseError("The selected month has no closeable Golden Coast activity", "GC_PHASE11_NOTHING_TO_CLOSE");
+    throw new GoldenCoastPhase11CloseError(
+      "The selected month has no closeable Golden Coast activity",
+      "GC_PHASE11_NOTHING_TO_CLOSE"
+    );
   }
   const net = revenue.minus(cogs).minus(shared);
   const fresh = net.div(2).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
@@ -164,28 +171,92 @@ export function buildGoldenCoastPhase11MonthlyClosePosting(input: {
   const entries: Parameters<typeof buildGenericVoucherPostingRequest>[0]["entries"] = [];
 
   if (revenue.gt(0)) {
-    entries.push({ ledgerAccountId: accounts.salesAccountId, debitAmount: money(revenue), creditAmount: "0", narration: description });
-    entries.push({ ledgerAccountId: accounts.profitPendingDistributionAccountId, debitAmount: "0", creditAmount: money(revenue), narration: description });
+    entries.push({
+      ledgerAccountId: accounts.salesAccountId,
+      debitAmount: money(revenue),
+      creditAmount: "0",
+      narration: description,
+    });
+    entries.push({
+      ledgerAccountId: accounts.profitPendingDistributionAccountId,
+      debitAmount: "0",
+      creditAmount: money(revenue),
+      narration: description,
+    });
   }
   if (cogs.gt(0)) {
-    entries.push({ ledgerAccountId: accounts.profitPendingDistributionAccountId, debitAmount: money(cogs), creditAmount: "0", narration: description });
-    entries.push({ ledgerAccountId: accounts.cogsAccountId, debitAmount: "0", creditAmount: money(cogs), narration: description });
+    entries.push({
+      ledgerAccountId: accounts.profitPendingDistributionAccountId,
+      debitAmount: money(cogs),
+      creditAmount: "0",
+      narration: description,
+    });
+    entries.push({
+      ledgerAccountId: accounts.cogsAccountId,
+      debitAmount: "0",
+      creditAmount: money(cogs),
+      narration: description,
+    });
   }
   if (shared.gt(0)) {
-    if (!accounts.sharedChargesAccountId) throw new GoldenCoastPhase11CloseError("Shared Charges account is required when monthly shared charges are non-zero", "GC_PHASE11_ACCOUNT_INVALID");
-    entries.push({ ledgerAccountId: accounts.profitPendingDistributionAccountId, debitAmount: money(shared), creditAmount: "0", narration: description });
-    entries.push({ ledgerAccountId: accounts.sharedChargesAccountId, debitAmount: "0", creditAmount: money(shared), narration: description });
+    if (!accounts.sharedChargesAccountId)
+      throw new GoldenCoastPhase11CloseError(
+        "Shared Charges account is required when monthly shared charges are non-zero",
+        "GC_PHASE11_ACCOUNT_INVALID"
+      );
+    entries.push({
+      ledgerAccountId: accounts.profitPendingDistributionAccountId,
+      debitAmount: money(shared),
+      creditAmount: "0",
+      narration: description,
+    });
+    entries.push({
+      ledgerAccountId: accounts.sharedChargesAccountId,
+      debitAmount: "0",
+      creditAmount: money(shared),
+      narration: description,
+    });
   }
 
   if (net.gt(0)) {
-    entries.push({ ledgerAccountId: accounts.profitPendingDistributionAccountId, debitAmount: money(net), creditAmount: "0", narration: description });
-    entries.push({ ledgerAccountId: accounts.freshStartEquityAccountId, debitAmount: "0", creditAmount: money(new Decimal(plan.freshStartShareUsd)), narration: description });
-    entries.push({ ledgerAccountId: accounts.hassanEquityAccountId, debitAmount: "0", creditAmount: money(new Decimal(plan.hassanShareUsd)), narration: description });
+    entries.push({
+      ledgerAccountId: accounts.profitPendingDistributionAccountId,
+      debitAmount: money(net),
+      creditAmount: "0",
+      narration: description,
+    });
+    entries.push({
+      ledgerAccountId: accounts.freshStartEquityAccountId,
+      debitAmount: "0",
+      creditAmount: money(new Decimal(plan.freshStartShareUsd)),
+      narration: description,
+    });
+    entries.push({
+      ledgerAccountId: accounts.hassanEquityAccountId,
+      debitAmount: "0",
+      creditAmount: money(new Decimal(plan.hassanShareUsd)),
+      narration: description,
+    });
   } else if (net.lt(0)) {
     const loss = net.abs();
-    entries.push({ ledgerAccountId: accounts.freshStartEquityAccountId, debitAmount: money(new Decimal(plan.freshStartShareUsd).abs()), creditAmount: "0", narration: description });
-    entries.push({ ledgerAccountId: accounts.hassanEquityAccountId, debitAmount: money(new Decimal(plan.hassanShareUsd).abs()), creditAmount: "0", narration: description });
-    entries.push({ ledgerAccountId: accounts.profitPendingDistributionAccountId, debitAmount: "0", creditAmount: money(loss), narration: description });
+    entries.push({
+      ledgerAccountId: accounts.freshStartEquityAccountId,
+      debitAmount: money(new Decimal(plan.freshStartShareUsd).abs()),
+      creditAmount: "0",
+      narration: description,
+    });
+    entries.push({
+      ledgerAccountId: accounts.hassanEquityAccountId,
+      debitAmount: money(new Decimal(plan.hassanShareUsd).abs()),
+      creditAmount: "0",
+      narration: description,
+    });
+    entries.push({
+      ledgerAccountId: accounts.profitPendingDistributionAccountId,
+      debitAmount: "0",
+      creditAmount: money(loss),
+      narration: description,
+    });
   }
 
   const posting = buildGenericVoucherPostingRequest({
