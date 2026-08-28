@@ -5,12 +5,12 @@ import { describe, expect, it } from "vitest";
 const read = (relativePath: string) => fs.readFileSync(path.resolve(process.cwd(), relativePath), "utf8");
 
 describe("Golden Coast Phase 12 frontend integration", () => {
-  it("registers a Golden Coast operations entry point without changing setup routing", () => {
+  it("registers a lazy Golden Coast operations entry point without changing setup routing", () => {
     const routes = read("client/src/routes/AppRoutes.tsx");
     const navigation = read("client/src/lib/supplier-partner-navigation.ts");
     const routeGuard = read("client/src/app/authenticatedAppRouteGuard.ts");
 
-    expect(routes).toContain('import SpGoldenCoast from "@/pages/sp/SpGoldenCoast"');
+    expect(routes).toContain('const SpGoldenCoast = lazy(() => import("@/pages/sp/SpGoldenCoast"))');
     expect(routes).toContain('location === "/sp/golden-coast"');
     expect(navigation).toContain('releaseDebtEnglish("Golden Coast")');
     expect(navigation).toContain('url: "/sp/golden-coast"');
