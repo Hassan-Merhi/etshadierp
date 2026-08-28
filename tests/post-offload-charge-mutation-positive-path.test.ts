@@ -219,6 +219,17 @@ describe("post-offload charge mutation positive paths", () => {
       })
     );
     expect(harness.insertedValues.filter(({ table }) => table === harness.tables.voucherEntries)).toHaveLength(2);
+    expect(harness.insertedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: harness.tables.accountingPostingRequests,
+          values: expect.objectContaining({
+            sourceId: "4:9:41:voucher",
+            idempotencyKey: "infra:factory-post-offload-charge:4:9:41:voucher",
+          }),
+        }),
+      ])
+    );
     expect(harness.updatedValues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -308,6 +319,13 @@ describe("post-offload charge mutation positive paths", () => {
     expect(harness.insertedValues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ table: harness.tables.vouchers }),
+        expect.objectContaining({
+          table: harness.tables.accountingPostingRequests,
+          values: expect.objectContaining({
+            sourceId: "4:9:41:voucher",
+            idempotencyKey: "infra:factory-post-offload-charge:4:9:41:voucher",
+          }),
+        }),
         expect.objectContaining({
           table: harness.tables.voucherEntries,
           values: expect.objectContaining({ factorySupplierId: 66, creditAmount: "60" }),
