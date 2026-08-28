@@ -67,9 +67,8 @@ function money(value: Decimal): string {
   return value.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2);
 }
 
-function nonNegativeMoney(value: unknown, field: string): Decimal {
+function signedMoney(value: unknown, field: string): Decimal {
   const parsed = decimal(value, field);
-  if (parsed.isNegative()) throw new GoldenCoastPhase11CloseError(`${field} cannot be negative`);
   if (parsed.decimalPlaces() > 2) throw new GoldenCoastPhase11CloseError(`${field} supports at most 2 decimal places`);
   return parsed;
 }
@@ -117,9 +116,9 @@ export function planGoldenCoastPhase11MonthlyClose(input: {
   totalSharedChargesUsd: string | number;
 }): GoldenCoastPhase11ClosePlan {
   const { periodStart, periodEnd } = parseMonth(input.close.periodMonth);
-  const revenue = nonNegativeMoney(input.totalRevenueUsd, "totalRevenueUsd");
-  const cogs = nonNegativeMoney(input.totalCogsUsd, "totalCogsUsd");
-  const shared = nonNegativeMoney(input.totalSharedChargesUsd, "totalSharedChargesUsd");
+  const revenue = signedMoney(input.totalRevenueUsd, "totalRevenueUsd");
+  const cogs = signedMoney(input.totalCogsUsd, "totalCogsUsd");
+  const shared = signedMoney(input.totalSharedChargesUsd, "totalSharedChargesUsd");
   if (revenue.isZero() && cogs.isZero() && shared.isZero()) {
     throw new GoldenCoastPhase11CloseError(
       "The selected month has no closeable Golden Coast activity",
@@ -183,6 +182,20 @@ export function buildGoldenCoastPhase11MonthlyClosePosting(input: {
       creditAmount: money(revenue),
       narration: description,
     });
+  } else if (revenue.lt(0)) {
+    const contraRevenue = revenue.abs();
+    entries.push({
+      ledgerAccountId: accounts.profitPendingDistributionAccountId,
+      debitAmount: money(contraRevenue),
+      creditAmount: "0",
+      narration: description,
+    });
+    entries.push({
+      ledgerAccountId: accounts.salesAccountId,
+      debitAmount: "0",
+      creditAmount: money(contraRevenue),
+      narration: description,
+    });
   }
   if (cogs.gt(0)) {
     entries.push({
@@ -197,25 +210,55 @@ export function buildGoldenCoastPhase11MonthlyClosePosting(input: {
       creditAmount: money(cogs),
       narration: description,
     });
+  } else if (cogs.lt(0)) {
+    const contraCogs = cogs.abs();
+    entries.push({
+      ledgerAccountId: accounts.cogsAccountId,
+      debitAmount: money(contraCogs),
+      creditAmount: "0",
+      narration: description,
+    });
+    entries.push({
+      ledgerAccountId: accounts.profitPendingDistributionAccountId,
+      debitAmount: "0",
+      creditAmount: money(contraCogs),
+      narration: description,
+    });
   }
-  if (shared.gt(0)) {
+  if (!shared.isZero()) {
     if (!accounts.sharedChargesAccountId)
       throw new GoldenCoastPhase11CloseError(
         "Shared Charges account is required when monthly shared charges are non-zero",
         "GC_PHASE11_ACCOUNT_INVALID"
       );
-    entries.push({
-      ledgerAccountId: accounts.profitPendingDistributionAccountId,
-      debitAmount: money(shared),
-      creditAmount: "0",
-      narration: description,
-    });
-    entries.push({
-      ledgerAccountId: accounts.sharedChargesAccountId,
-      debitAmount: "0",
-      creditAmount: money(shared),
-      narration: description,
-    });
+    if (shared.gt(0)) {
+      entries.push({
+        ledgerAccountId: accounts.profitPendingDistributionAccountId,
+        debitAmount: money(shared),
+        creditAmount: "0",
+        narration: description,
+      });
+      entries.push({
+        ledgerAccountId: accounts.sharedChargesAccountId,
+        debitAmount: "0",
+        creditAmount: money(shared),
+        narration: description,
+      });
+    } else {
+      const contraShared = shared.abs();
+      entries.push({
+        ledgerAccountId: accounts.sharedChargesAccountId,
+        debitAmount: money(contraShared),
+        creditAmount: "0",
+        narration: description,
+      });
+      entries.push({
+        ledgerAccountId: accounts.profitPendingDistributionAccountId,
+        debitAmount: "0",
+        creditAmount: money(contraShared),
+        narration: description,
+      });
+    }
   }
 
   if (net.gt(0)) {
