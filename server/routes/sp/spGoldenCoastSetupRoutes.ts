@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
-import { and, eq, inArray, isNull } from "drizzle-orm";
-import { companySettings, ledgerAccounts } from "@shared/schema";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { companies, companySettings, ledgerAccounts } from "@shared/schema";
 import { requireAuth, requireRole } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
@@ -19,30 +19,50 @@ import {
   planGoldenCoastAccountProvisioning,
   summarizeGoldenCoastAccountSetup,
 } from "../../services/accounting/goldenCoastPhase2Accounts";
+import {
+  GoldenCoastPhase13IntercompanyError,
+  goldenCoastPhase13IntercompanyDefinitions,
+  planGoldenCoastPhase13IntercompanyAccount,
+  summarizeGoldenCoastPhase13IntercompanyAccount,
+  type GoldenCoastPhase13IntercompanyDefinition,
+  type GoldenCoastPhase13LedgerRow,
+} from "../../services/accounting/goldenCoastPhase13Intercompany";
+import { getCompanyRequestRuntimeContext } from "../../services/security/companyRequestRuntimeContext";
+import { assertTransactionCompanyScope } from "../../services/security/transactionCompanyScope";
 import { requireSpCompany } from "./spHelpers";
 
-// ── Golden Coast Phase 2 ledger provisioning ─────────────────────────────────
-//
-// Lives in the existing Supplier Partner setup area so an Admin can verify the
-// Phase 2 balance-sheet roles next to the rest of SP setup. All reads and writes
-// are scoped to the currently selected supplier_partner company.
+// ── Golden Coast account + readiness provisioning ────────────────────────────
+// Phase 2 owns the canonical Golden Coast balance-sheet roles. Phase 13 extends
+// this same Admin setup action with the reciprocal Golden Coast ↔ HADI
+// intercompany accounts needed by Phase 7. No HADI transfer workflow is changed
+// here; setup only provisions/repairs the accounts that Phase 7 already expects.
 
 type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type DbLike = DatabaseTransaction | typeof db;
 
-// Provisioning runs a multi-table transaction over the company chart of
-// accounts, and the status read scans every ledger account in the company.
-// Both are rate limited so an authenticated caller cannot use them to hammer
-// the database, matching the Golden Coast Phase 1 accounting endpoints.
 const goldenCoastRequestBudget = privilegedRequestBudget({ maxBodyBytes: 16 * 1024, maxCollectionItems: 25 });
 
-/**
- * Loads every ledger account in this company that Phase 2 may resolve a role
- * to, including inactive and soft-deleted rows so setup can repair them.
- */
-async function loadGoldenCoastAccounts(
-  tx: DatabaseTransaction | typeof db,
-  companyId: number
-): Promise<GoldenCoastLedgerRow[]> {
+interface GoldenCoastCompanyPair {
+  goldenCoastCompanyId: number;
+  goldenCoastCompanyName: string;
+  hadiCompanyId: number;
+  hadiCompanyName: string;
+}
+
+class GoldenCoastSetupRouteError extends Error {
+  readonly code: string;
+  readonly status: number;
+
+  constructor(message: string, code: string, status: number) {
+    super(message);
+    this.name = "GoldenCoastSetupRouteError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
+/** Loads every Phase 2 role candidate, including inactive/soft-deleted rows. */
+async function loadGoldenCoastAccounts(tx: DbLike, companyId: number): Promise<GoldenCoastLedgerRow[]> {
   const rows = await tx
     .select({
       id: ledgerAccounts.id,
@@ -66,15 +86,8 @@ async function loadGoldenCoastAccounts(
   return rows.map((row) => ({ ...row, id: Number(row.id), companyId: Number(row.companyId) }));
 }
 
-/**
- * Every live account name in this company, as name -> id. Provisioning consults
- * it so a rename or insert cannot violate uq_ledger_accounts_company_name_active
- * and abort the transaction.
- */
-async function loadCompanyAccountNames(
-  tx: DatabaseTransaction | typeof db,
-  companyId: number
-): Promise<Map<string, number>> {
+/** Every live account name in one company, used to avoid unique-name clashes. */
+async function loadCompanyAccountNames(tx: DbLike, companyId: number): Promise<Map<string, number>> {
   const rows = await tx
     .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
     .from(ledgerAccounts)
@@ -82,10 +95,7 @@ async function loadCompanyAccountNames(
   return new Map(rows.map((row) => [row.name, Number(row.id)]));
 }
 
-async function loadGoldenCoastSettings(
-  tx: DatabaseTransaction | typeof db,
-  companyId: number
-): Promise<GoldenCoastSettingsSnapshot> {
+async function loadGoldenCoastSettings(tx: DbLike, companyId: number): Promise<GoldenCoastSettingsSnapshot> {
   const [row] = await tx
     .select({
       spPosPayableAccountId: companySettings.spPosPayableAccountId,
@@ -97,11 +107,6 @@ async function loadGoldenCoastSettings(
   return row ?? {};
 }
 
-/**
- * Points the company-settings columns that later POS/close phases read at the
- * canonical Phase 2 accounts. Existing rows are updated in place; a company with
- * no settings row yet gets one.
- */
 async function bindGoldenCoastSettings(
   tx: DatabaseTransaction,
   companyId: number,
@@ -136,12 +141,224 @@ async function bindGoldenCoastSettings(
   return changed;
 }
 
+async function resolveCompanyPair(conn: DbLike, companyId: number): Promise<GoldenCoastCompanyPair> {
+  const [goldenCoast] = await conn
+    .select({ id: companies.id, name: companies.name, parentCompanyId: companies.parentCompanyId, active: companies.active })
+    .from(companies)
+    .where(and(eq(companies.id, companyId), eq(companies.active, true)))
+    .limit(1);
+  if (!goldenCoast) {
+    throw new GoldenCoastSetupRouteError(
+      "The selected Golden Coast company is missing or inactive",
+      "GC_PHASE13_COMPANY_INVALID",
+      409
+    );
+  }
+
+  const hadiCompanyId = Number(goldenCoast.parentCompanyId ?? 0);
+  if (!Number.isInteger(hadiCompanyId) || hadiCompanyId <= 0 || hadiCompanyId === companyId) {
+    throw new GoldenCoastSetupRouteError(
+      "Golden Coast must have a distinct active parent HADI company configured before intercompany setup can complete",
+      "GC_PHASE13_PARENT_COMPANY_INVALID",
+      409
+    );
+  }
+
+  const [hadi] = await conn
+    .select({ id: companies.id, name: companies.name })
+    .from(companies)
+    .where(and(eq(companies.id, hadiCompanyId), eq(companies.active, true)))
+    .limit(1);
+  if (!hadi) {
+    throw new GoldenCoastSetupRouteError(
+      "The configured Golden Coast parent HADI company is missing or inactive",
+      "GC_PHASE13_PARENT_COMPANY_INVALID",
+      409
+    );
+  }
+
+  return {
+    goldenCoastCompanyId: Number(goldenCoast.id),
+    goldenCoastCompanyName: String(goldenCoast.name),
+    hadiCompanyId: Number(hadi.id),
+    hadiCompanyName: String(hadi.name),
+  };
+}
+
+function isHadiCompanyAuthorized(pair: GoldenCoastCompanyPair): boolean {
+  return getCompanyRequestRuntimeContext()?.authorizedCompanyIds?.includes(pair.hadiCompanyId) === true;
+}
+
+function assertHadiCompanyAuthorized(pair: GoldenCoastCompanyPair): void {
+  if (isHadiCompanyAuthorized(pair)) return;
+  throw new GoldenCoastSetupRouteError(
+    `HADI company ${pair.hadiCompanyId} is not authorized for this request; send targetCompanyId=${pair.hadiCompanyId} so the tenant boundary verifies membership first`,
+    "GC_PHASE13_HADI_SCOPE_UNAUTHORIZED",
+    403
+  );
+}
+
+async function loadIntercompanyCandidates(
+  conn: DbLike,
+  companyId: number,
+  definition: GoldenCoastPhase13IntercompanyDefinition
+): Promise<GoldenCoastPhase13LedgerRow[]> {
+  const rows = await conn
+    .select({
+      id: ledgerAccounts.id,
+      companyId: ledgerAccounts.companyId,
+      code: ledgerAccounts.code,
+      name: ledgerAccounts.name,
+      accountType: ledgerAccounts.accountType,
+      subType: ledgerAccounts.subType,
+      isHidden: ledgerAccounts.isHidden,
+      active: ledgerAccounts.active,
+      deletedAt: ledgerAccounts.deletedAt,
+    })
+    .from(ledgerAccounts)
+    .where(
+      and(
+        eq(ledgerAccounts.companyId, companyId),
+        or(
+          eq(ledgerAccounts.subType, definition.subType),
+          eq(ledgerAccounts.code, definition.code),
+          eq(ledgerAccounts.name, definition.name)
+        )
+      )
+    );
+  return rows.map((row) => ({ ...row, id: Number(row.id), companyId: Number(row.companyId) }));
+}
+
+async function applyIntercompanyPlan(
+  tx: DatabaseTransaction,
+  companyId: number,
+  definition: GoldenCoastPhase13IntercompanyDefinition
+): Promise<{ role: string; action: string; accountId: number; fields: string[] }> {
+  const accounts = await loadIntercompanyCandidates(tx, companyId, definition);
+  const plan = planGoldenCoastPhase13IntercompanyAccount({ companyId, definition, accounts });
+
+  if (plan.accountId == null) {
+    const [codeClash] = await tx
+      .select({ id: ledgerAccounts.id })
+      .from(ledgerAccounts)
+      .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, definition.code)))
+      .limit(1);
+    const liveNames = await loadCompanyAccountNames(tx, companyId);
+    const code = codeClash ? `${definition.code}-${companyId}` : definition.code;
+    const name = liveNames.has(definition.name) ? `${definition.name} (${definition.code})` : definition.name;
+    const [inserted] = await tx
+      .insert(ledgerAccounts)
+      .values({
+        companyId,
+        code,
+        name,
+        accountType: definition.accountType,
+        subType: definition.subType,
+        isHidden: false,
+        active: true,
+      })
+      .returning({ id: ledgerAccounts.id });
+    return { role: definition.role, action: "create", accountId: Number(inserted.id), fields: [] };
+  }
+
+  if (plan.repairs.length > 0) {
+    const patch: Record<string, unknown> = {};
+    for (const repair of plan.repairs) patch[repair.field] = repair.to;
+    await tx
+      .update(ledgerAccounts)
+      .set(patch)
+      .where(and(eq(ledgerAccounts.id, plan.accountId), eq(ledgerAccounts.companyId, companyId)));
+  }
+
+  return {
+    role: definition.role,
+    action: plan.action,
+    accountId: plan.accountId,
+    fields: plan.repairs.map((repair) => repair.field),
+  };
+}
+
+async function phase13StatusWithAuthorizedHadi(
+  tx: DatabaseTransaction,
+  pair: GoldenCoastCompanyPair
+) {
+  const defs = goldenCoastPhase13IntercompanyDefinitions({
+    goldenCoastCompanyName: pair.goldenCoastCompanyName,
+    hadiCompanyName: pair.hadiCompanyName,
+  });
+
+  await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
+  const goldenCoastRows = await loadIntercompanyCandidates(tx, pair.goldenCoastCompanyId, defs.golden_coast_hadi);
+  const goldenCoastAccount = summarizeGoldenCoastPhase13IntercompanyAccount({
+    companyId: pair.goldenCoastCompanyId,
+    definition: defs.golden_coast_hadi,
+    accounts: goldenCoastRows,
+  });
+
+  await assertTransactionCompanyScope(tx, pair.hadiCompanyId);
+  const hadiRows = await loadIntercompanyCandidates(tx, pair.hadiCompanyId, defs.hadi_golden_coast);
+  const hadiAccount = summarizeGoldenCoastPhase13IntercompanyAccount({
+    companyId: pair.hadiCompanyId,
+    definition: defs.hadi_golden_coast,
+    accounts: hadiRows,
+  });
+  await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
+
+  const blockers = [goldenCoastAccount, hadiAccount]
+    .filter((item) => item.status !== "ok")
+    .flatMap((item) => item.issues.map((issue) => `${item.role}: ${issue}`));
+  return {
+    isConfigured: blockers.length === 0,
+    parentCompanyId: pair.hadiCompanyId,
+    parentCompanyName: pair.hadiCompanyName,
+    parentAuthorized: true,
+    goldenCoastAccount,
+    hadiAccount,
+    blockers,
+  };
+}
+
+async function phase13Status(req: Request, companyId: number) {
+  const pair = await resolveCompanyPair(db, companyId);
+  const defs = goldenCoastPhase13IntercompanyDefinitions({
+    goldenCoastCompanyName: pair.goldenCoastCompanyName,
+    hadiCompanyName: pair.hadiCompanyName,
+  });
+  const goldenCoastRows = await loadIntercompanyCandidates(db, companyId, defs.golden_coast_hadi);
+  const goldenCoastAccount = summarizeGoldenCoastPhase13IntercompanyAccount({
+    companyId,
+    definition: defs.golden_coast_hadi,
+    accounts: goldenCoastRows,
+  });
+
+  if (!isHadiCompanyAuthorized(pair)) {
+    const blockers = [...goldenCoastAccount.issues];
+    blockers.push(
+      `Authorize HADI company ${pair.hadiCompanyId} with targetCompanyId=${pair.hadiCompanyId} to verify or repair the reciprocal account.`
+    );
+    return {
+      isConfigured: false,
+      parentCompanyId: pair.hadiCompanyId,
+      parentCompanyName: pair.hadiCompanyName,
+      parentAuthorized: false,
+      goldenCoastAccount,
+      hadiAccount: null,
+      blockers,
+    };
+  }
+
+  return db.transaction(async (tx) => phase13StatusWithAuthorizedHadi(tx, pair));
+}
+
 async function handleGoldenCoastSetup(req: Request, res: Response): Promise<void> {
   try {
     const companyId = await requireSpCompany(req, res);
     if (!companyId) return;
+    const pair = await resolveCompanyPair(db, companyId);
+    assertHadiCompanyAuthorized(pair);
 
     const result = await db.transaction(async (tx) => {
+      await assertTransactionCompanyScope(tx, companyId);
       const accounts = await loadGoldenCoastAccounts(tx, companyId);
       const existingNames = await loadCompanyAccountNames(tx, companyId);
       const plan = planGoldenCoastAccountProvisioning({ companyId, accounts, existingNames });
@@ -152,15 +369,12 @@ async function handleGoldenCoastSetup(req: Request, res: Response): Promise<void
 
       for (const item of plan.items) {
         if (item.accountId == null) {
-          // Reuse the canonical code unless it is already taken in this company,
-          // which would violate the (company_id, code) unique index.
           const [clash] = await tx
             .select({ id: ledgerAccounts.id })
             .from(ledgerAccounts)
             .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, item.code)))
             .limit(1);
           const code = clash ? `${item.code}-${item.subType.slice(-6).toUpperCase()}` : item.code;
-
           const [inserted] = await tx
             .insert(ledgerAccounts)
             .values({
@@ -173,7 +387,6 @@ async function handleGoldenCoastSetup(req: Request, res: Response): Promise<void
               active: true,
             })
             .returning({ id: ledgerAccounts.id, code: ledgerAccounts.code, name: ledgerAccounts.name });
-
           const accountId = Number(inserted.id);
           created.push({ role: item.role, accountId, code: inserted.code, name: inserted.name });
           if (item.settingsKey) settingsBindings[item.settingsKey] = accountId;
@@ -182,19 +395,12 @@ async function handleGoldenCoastSetup(req: Request, res: Response): Promise<void
 
         if (item.settingsKey) settingsBindings[item.settingsKey] = item.accountId;
         if (item.repairs.length === 0) continue;
-
-        // Field-level, non-destructive repair of an existing account. The row's
-        // id — and therefore every historical voucher entry pointing at it — is
-        // preserved; only role configuration is rewritten.
         const patch: Record<string, unknown> = {};
-        for (const repair of item.repairs) {
-          patch[repair.field] = repair.to;
-        }
+        for (const repair of item.repairs) patch[repair.field] = repair.to;
         await tx
           .update(ledgerAccounts)
           .set(patch)
           .where(and(eq(ledgerAccounts.id, item.accountId), eq(ledgerAccounts.companyId, companyId)));
-
         repaired.push({
           role: item.role,
           accountId: item.accountId,
@@ -203,6 +409,16 @@ async function handleGoldenCoastSetup(req: Request, res: Response): Promise<void
       }
 
       const settingsChanged = await bindGoldenCoastSettings(tx, companyId, settingsBindings);
+      const defs = goldenCoastPhase13IntercompanyDefinitions({
+        goldenCoastCompanyName: pair.goldenCoastCompanyName,
+        hadiCompanyName: pair.hadiCompanyName,
+      });
+
+      await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
+      const goldenCoastIntercompany = await applyIntercompanyPlan(tx, pair.goldenCoastCompanyId, defs.golden_coast_hadi);
+      await assertTransactionCompanyScope(tx, pair.hadiCompanyId);
+      const hadiIntercompany = await applyIntercompanyPlan(tx, pair.hadiCompanyId, defs.hadi_golden_coast);
+      await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
 
       const finalAccounts = await loadGoldenCoastAccounts(tx, companyId);
       const finalSettings = await loadGoldenCoastSettings(tx, companyId);
@@ -213,32 +429,53 @@ async function handleGoldenCoastSetup(req: Request, res: Response): Promise<void
         settings: finalSettings,
         existingNames: finalNames,
       });
+      const phase13 = await phase13StatusWithAuthorizedHadi(tx, pair);
 
-      return { created, repaired, settingsChanged, warnings: plan.warnings, status };
+      return {
+        created,
+        repaired,
+        settingsChanged,
+        warnings: plan.warnings,
+        status,
+        phase13,
+        intercompanyChanges: [goldenCoastIntercompany, hadiIntercompany],
+      };
     });
 
-    logger.info("Golden Coast Phase 2 account setup applied", {
-      module: "golden-coast-phase2",
+    logger.info("Golden Coast account setup applied", {
+      module: "golden-coast-phase13",
       companyId,
       created: result.created.length,
       repaired: result.repaired.length,
       settingsChanged: result.settingsChanged,
+      intercompanyChanges: result.intercompanyChanges,
     });
 
     res.json({
       success: true,
       ...result,
       message:
-        result.created.length === 0 && result.repaired.length === 0 && result.settingsChanged.length === 0
+        result.created.length === 0 &&
+        result.repaired.length === 0 &&
+        result.settingsChanged.length === 0 &&
+        result.intercompanyChanges.every((item) => item.action === "none")
           ? "Golden Coast accounts already configured"
-          : "Golden Coast account setup complete",
+          : "Golden Coast account setup and HADI intercompany repair complete",
     });
   } catch (error: unknown) {
+    if (error instanceof GoldenCoastSetupRouteError) {
+      res.status(error.status).json({ message: error.message, code: error.code });
+      return;
+    }
     if (error instanceof GoldenCoastPhase2SetupError) {
       res.status(400).json({ message: error.message, code: "GC_PHASE2_SETUP_INVALID" });
       return;
     }
-    logger.error("Golden Coast Phase 2 account setup failed", { error });
+    if (error instanceof GoldenCoastPhase13IntercompanyError) {
+      res.status(409).json({ message: error.message, code: "GC_PHASE13_INTERCOMPANY_INVALID" });
+      return;
+    }
+    logger.error("Golden Coast account setup failed", { error });
     res.status(500).json({ message: getErrorMessage(error) });
   }
 }
@@ -248,19 +485,31 @@ async function handleGoldenCoastSetupStatus(req: Request, res: Response): Promis
     const companyId = await requireSpCompany(req, res);
     if (!companyId) return;
 
-    const [accounts, settings, existingNames] = await Promise.all([
+    const [accounts, settings, existingNames, phase13] = await Promise.all([
       loadGoldenCoastAccounts(db, companyId),
       loadGoldenCoastSettings(db, companyId),
       loadCompanyAccountNames(db, companyId),
+      phase13Status(req, companyId),
     ]);
 
-    res.json(summarizeGoldenCoastAccountSetup({ companyId, accounts, settings, existingNames }));
+    res.json({
+      ...summarizeGoldenCoastAccountSetup({ companyId, accounts, settings, existingNames }),
+      phase13,
+    });
   } catch (error: unknown) {
+    if (error instanceof GoldenCoastSetupRouteError) {
+      res.status(error.status).json({ message: error.message, code: error.code });
+      return;
+    }
     if (error instanceof GoldenCoastPhase2SetupError) {
       res.status(400).json({ message: error.message, code: "GC_PHASE2_SETUP_INVALID" });
       return;
     }
-    logger.error("Golden Coast Phase 2 setup status failed", { error });
+    if (error instanceof GoldenCoastPhase13IntercompanyError) {
+      res.status(409).json({ message: error.message, code: "GC_PHASE13_INTERCOMPANY_INVALID" });
+      return;
+    }
+    logger.error("Golden Coast setup status failed", { error });
     res.status(500).json({ message: getErrorMessage(error) });
   }
 }
