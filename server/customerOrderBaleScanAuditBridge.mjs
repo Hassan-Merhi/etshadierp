@@ -65,9 +65,7 @@ async function ensureCustomerOrderBaleScanAudit() {
       repaired.push("customer_order_bales.scanned_at");
     }
 
-    const historyLookup = await client.query(
-      `SELECT to_regclass('public.customer_order_bales_history') AS table_name`
-    );
+    const historyLookup = await client.query(`SELECT to_regclass('public.customer_order_bales_history') AS table_name`);
     const hasHistory = Boolean(historyLookup.rows[0]?.table_name);
     if (hasHistory) {
       const historyColumn = await client.query(`
