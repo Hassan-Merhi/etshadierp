@@ -1,16 +1,23 @@
 import { runWithDatabaseMaintenanceScope } from "../../services/security/databaseScopeRuntimeContext";
-import { ensureSpSupplierVoucherSyncTrigger, repairSpSupplierVoucherLinks } from "./spSupplierVoucherSync";
+import {
+  ensureSpSupplierVoucherSyncTrigger,
+  repairSpSupplierVoucherLinks,
+} from "./spSupplierVoucherSync";
 
 type SpSupplierVoucherStartupDependencies = {
   ensureTrigger: () => Promise<void>;
   repairLinks: () => Promise<number>;
-  runMaintenanceScope: (reason: string, callback: () => Promise<number>) => Promise<number>;
+  runMaintenanceScope: (
+    reason: string,
+    callback: () => Promise<number>,
+  ) => Promise<number>;
 };
 
 const defaultDependencies: SpSupplierVoucherStartupDependencies = {
   ensureTrigger: ensureSpSupplierVoucherSyncTrigger,
   repairLinks: () => repairSpSupplierVoucherLinks(),
-  runMaintenanceScope: (reason, callback) => runWithDatabaseMaintenanceScope(reason, callback),
+  runMaintenanceScope: (reason, callback) =>
+    runWithDatabaseMaintenanceScope(reason, callback),
 };
 
 /**
