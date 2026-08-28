@@ -5,7 +5,7 @@ const routeSource = readFileSync(new URL("./spGoldenCoastPhase3CutoverRoutes.ts"
 const spIndexSource = readFileSync(new URL("./index.ts", import.meta.url), "utf8");
 const accessControlSource = readFileSync(new URL("./spAccessControl.ts", import.meta.url), "utf8");
 
-describe("Golden Coast Phase 3 cutover route surface", () => {
+describe("Golden Coast Phase 3 cutover route surface hardened by Phase 13", () => {
   it("registers status, preview and cutover inside Supplier Partner routes", () => {
     expect(routeSource).toContain('"/api/sp/golden-coast/phase3/status"');
     expect(routeSource).toContain('"/api/sp/golden-coast/phase3/preview"');
@@ -42,6 +42,19 @@ describe("Golden Coast Phase 3 cutover route surface", () => {
     expect(routeSource).toContain("eq(ledgerAccounts.companyId, companyId)");
     expect(routeSource).toContain("eq(bankAccounts.active, true)");
     expect(routeSource).toContain("eq(ledgerAccounts.active, true)");
+  });
+
+  it("accepts the Fresh Start contribution split in both preview and posting", () => {
+    expect(
+      routeSource.match(/freshStartContributedStockOtwUsd: req\.body\?\.freshStartContributedStockOtwUsd/g)?.length
+    ).toBe(2);
+    expect(
+      routeSource.match(/freshStartContributedStockInHandUsd: req\.body\?\.freshStartContributedStockInHandUsd/g)
+        ?.length
+    ).toBe(2);
+    expect(routeSource).toContain('freshStartContributedInventory: "Excluded from Hassan funding usage"');
+    expect(routeSource).toContain('cashFundedInventory: "Consumes Hassan funding"');
+    expect(routeSource).toContain("Automatic residual of Hassan's $100,000 opening funding balance");
   });
 
   it("refuses a fresh opening journal over stored opening balances or voucher history", () => {

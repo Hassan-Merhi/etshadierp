@@ -27,7 +27,6 @@ function input(overrides: Partial<GoldenCoastPhase3CutoverInput> = {}): GoldenCo
     stockInHandUsd: "0.00",
     containerReserveUsd: "22300.00",
     gcSalesCashUsd: "0.00",
-    hassanSavingsUsd: "0.00",
     cashAccount: { kind: "bank", id: 22, name: "Operating Bank" },
     accounts,
     ...overrides,
@@ -41,8 +40,8 @@ function total(
   return entries.reduce((sum, entry) => sum + Number(entry[field]), 0);
 }
 
-describe("Golden Coast Phase 3 opening-balance cutover", () => {
-  it("locks the cutover to September 1, 2026 and two $100,000 partner-equity targets", () => {
+describe("Golden Coast Phase 3 opening-balance cutover hardened by Phase 13", () => {
+  it("locks the cutover to September 1, 2026 and keeps the two $100,000 opening contribution targets", () => {
     const plan = buildGoldenCoastPhase3CutoverPlan(input());
 
     expect(plan.cutoverDate).toBe(GOLDEN_COAST_PHASE3_CUTOVER_DATE);
@@ -60,38 +59,85 @@ describe("Golden Coast Phase 3 opening-balance cutover", () => {
     expect(goldenCoastPhase3VoucherNumber(7)).not.toBe(goldenCoastPhase3VoucherNumber(8));
   });
 
-  it("calculates the residual cash/bank opening balance instead of using a permanent clearing account", () => {
+  it("automatically moves the classic $33,700 residual into Hassan Savings", () => {
     const plan = buildGoldenCoastPhase3CutoverPlan(input());
 
-    // $200,000 total partner equity - $44,000 Stock OTW - $22,300 reserve.
+    // Legacy cash-funded example: $100,000 - $44,000 goods - $22,300 reserve.
+    expect(plan.cashFundedInventoryUsd).toBe("44000.00");
+    expect(plan.hassanFundingUsesUsd).toBe("66300.00");
+    expect(plan.hassanOpeningEquityUsd).toBe("66300.00");
+    expect(plan.hassanSavingsUsd).toBe("33700.00");
+    expect(plan.entries.find((entry) => entry.ledgerAccountId === accounts.hassanSavingsAccountId)?.creditAmount).toBe(
+      "33700.00"
+    );
+    expect(plan.entries.find((entry) => entry.ledgerAccountId === accounts.hassanEquityAccountId)?.creditAmount).toBe(
+      "66300.00"
+    );
+  });
+
+  it("does not charge Hassan for a Fresh Start-contributed container", () => {
+    const plan = buildGoldenCoastPhase3CutoverPlan(input({ freshStartContributedStockOtwUsd: "44000.00" }));
+
+    expect(plan.freshStartContributedStockOtwUsd).toBe("44000.00");
+    expect(plan.freshStartContributedInventoryUsd).toBe("44000.00");
+    expect(plan.cashFundedInventoryUsd).toBe("0.00");
+    expect(plan.hassanFundingUsesUsd).toBe("22300.00");
+    expect(plan.hassanOpeningEquityUsd).toBe("22300.00");
+    expect(plan.hassanSavingsUsd).toBe("77700.00");
+    expect(plan.freshStartResidualFundingUsd).toBe("56000.00");
+  });
+
+  it("supports a mixed Fresh Start-contributed and cash-funded Stock OTW balance", () => {
+    const plan = buildGoldenCoastPhase3CutoverPlan(
+      input({ stockOtwUsd: "70000.00", freshStartContributedStockOtwUsd: "44000.00" })
+    );
+
+    expect(plan.cashFundedInventoryUsd).toBe("26000.00");
+    expect(plan.hassanFundingUsesUsd).toBe("48300.00");
+    expect(plan.hassanSavingsUsd).toBe("51700.00");
+  });
+
+  it("classifies Fresh Start-contributed stock already in hand without consuming Hassan funding", () => {
+    const plan = buildGoldenCoastPhase3CutoverPlan(
+      input({
+        stockOtwUsd: "0.00",
+        stockInHandUsd: "44000.00",
+        freshStartContributedStockInHandUsd: "44000.00",
+      })
+    );
+
+    expect(plan.freshStartContributedStockInHandUsd).toBe("44000.00");
+    expect(plan.cashFundedInventoryUsd).toBe("0.00");
+    expect(plan.hassanSavingsUsd).toBe("77700.00");
+  });
+
+  it("keeps opening cash based on the real $200,000 source pool rather than adding Hassan Savings on top", () => {
+    const plan = buildGoldenCoastPhase3CutoverPlan(input());
+
     expect(plan.openingCashUsd).toBe("133700.00");
-    expect(plan.stockOtwUsd).toBe("44000.00");
-    expect(plan.containerReserveUsd).toBe("22300.00");
     expect(plan.entries.some((entry) => entry.bankAccountId === 22 && entry.debitAmount === "133700.00")).toBe(true);
+    expect(total(plan.entries, "debitAmount")).toBe(200000);
+    expect(total(plan.entries, "creditAmount")).toBe(200000);
+    expect(plan.totalAmount).toBe("200000.00");
   });
 
-  it("posts Fresh Start and Hassan as separate 50/50 equity credits", () => {
-    const plan = buildGoldenCoastPhase3CutoverPlan(input());
-    const freshStart = plan.entries.find((entry) => entry.ledgerAccountId === accounts.freshStartEquityAccountId);
-    const hassan = plan.entries.find((entry) => entry.ledgerAccountId === accounts.hassanEquityAccountId);
-
-    expect(freshStart?.creditAmount).toBe("100000.00");
-    expect(hassan?.creditAmount).toBe("100000.00");
-    expect(freshStart?.debitAmount).toBe("0.00");
-    expect(hassan?.debitAmount).toBe("0.00");
-  });
-
-  it("carries an existing GC Sales Cash payable and Hassan Savings loan as opening liabilities", () => {
-    const plan = buildGoldenCoastPhase3CutoverPlan(input({ gcSalesCashUsd: "12500.50", hassanSavingsUsd: "7500.25" }));
+  it("adds a carried GC Sales Cash payable to the source pool without changing the Hassan residual formula", () => {
+    const plan = buildGoldenCoastPhase3CutoverPlan(input({ gcSalesCashUsd: "12500.50" }));
 
     expect(plan.gcSalesCashUsd).toBe("12500.50");
-    expect(plan.hassanSavingsUsd).toBe("7500.25");
-    expect(plan.openingCashUsd).toBe("153700.75");
+    expect(plan.hassanSavingsUsd).toBe("33700.00");
+    expect(plan.openingCashUsd).toBe("146200.50");
     expect(plan.entries.find((entry) => entry.ledgerAccountId === accounts.gcSalesCashAccountId)?.creditAmount).toBe(
       "12500.50"
     );
-    expect(plan.entries.find((entry) => entry.ledgerAccountId === accounts.hassanSavingsAccountId)?.creditAmount).toBe(
-      "7500.25"
+  });
+
+  it("accepts hassanSavingsUsd only as an exact compatibility assertion", () => {
+    const exact = buildGoldenCoastPhase3CutoverPlan(input({ hassanSavingsUsd: "33700.00" }));
+    expect(exact.hassanSavingsUsd).toBe("33700.00");
+
+    expect(() => buildGoldenCoastPhase3CutoverPlan(input({ hassanSavingsUsd: "0.00" }))).toThrow(
+      /hassanSavingsUsd is automatic: expected 33700.00/
     );
   });
 
@@ -102,91 +148,115 @@ describe("Golden Coast Phase 3 opening-balance cutover", () => {
     expect(cash?.bankAccountId).toBeUndefined();
   });
 
-  it("omits zero-value asset and liability lines while preserving a balanced journal", () => {
+  it("puts all unused Hassan funding into Savings when there are no Hassan-funded uses", () => {
     const plan = buildGoldenCoastPhase3CutoverPlan(
-      input({
-        stockOtwUsd: 0,
-        stockInHandUsd: 0,
-        containerReserveUsd: 0,
-        gcSalesCashUsd: 0,
-        hassanSavingsUsd: 0,
-      })
+      input({ stockOtwUsd: 0, stockInHandUsd: 0, containerReserveUsd: 0 })
     );
 
-    expect(plan.entries).toHaveLength(3);
+    expect(plan.hassanOpeningEquityUsd).toBe("0.00");
+    expect(plan.hassanSavingsUsd).toBe("100000.00");
     expect(plan.openingCashUsd).toBe("200000.00");
+    expect(plan.entries.find((entry) => entry.ledgerAccountId === accounts.hassanEquityAccountId)).toBeUndefined();
+    expect(plan.entries.find((entry) => entry.ledgerAccountId === accounts.hassanSavingsAccountId)?.creditAmount).toBe(
+      "100000.00"
+    );
     expect(total(plan.entries, "debitAmount")).toBe(200000);
     expect(total(plan.entries, "creditAmount")).toBe(200000);
   });
 
-  it("is balanced to the cent for stock, reserve, cash, equity and carried liabilities", () => {
+  it("rejects contribution classifications larger than the inventory they classify", () => {
+    expect(() => buildGoldenCoastPhase3CutoverPlan(input({ freshStartContributedStockOtwUsd: "44000.01" }))).toThrow(
+      /cannot exceed total Stock OTW/
+    );
+    expect(() =>
+      buildGoldenCoastPhase3CutoverPlan(
+        input({ stockInHandUsd: "100.00", freshStartContributedStockInHandUsd: "100.01" })
+      )
+    ).toThrow(/cannot exceed total Stock in Hand/);
+  });
+
+  it("rejects Fresh Start contributed inventory above its $100,000 opening target", () => {
+    expect(() =>
+      buildGoldenCoastPhase3CutoverPlan(
+        input({
+          stockOtwUsd: "70000.00",
+          stockInHandUsd: "40000.00",
+          freshStartContributedStockOtwUsd: "70000.00",
+          freshStartContributedStockInHandUsd: "40000.00",
+          containerReserveUsd: 0,
+        })
+      )
+    ).toThrow(/Fresh Start contributed inventory .* exceeds the 100000.00 opening contribution target/);
+  });
+
+  it("rejects Hassan-funded inventory and reserve above Hassan's $100,000 balance", () => {
+    expect(() =>
+      buildGoldenCoastPhase3CutoverPlan(
+        input({ stockOtwUsd: "80000.00", stockInHandUsd: "0.00", containerReserveUsd: "22300.00" })
+      )
+    ).toThrow(/Hassan cash-funded inventory plus Container Reserve exceeds the 100000.00 funding balance/);
+  });
+
+  it("is balanced to the cent with mixed contribution origin and carried settlement liability", () => {
     const plan = buildGoldenCoastPhase3CutoverPlan(
       input({
         stockOtwUsd: "44000.25",
         stockInHandUsd: "32000.10",
-        containerReserveUsd: "22300.15",
+        containerReserveUsd: "12300.15",
+        freshStartContributedStockOtwUsd: "44000.25",
+        freshStartContributedStockInHandUsd: "10000.10",
         gcSalesCashUsd: "8500.50",
-        hassanSavingsUsd: "1100.20",
       })
     );
 
     expect(total(plan.entries, "debitAmount")).toBeCloseTo(total(plan.entries, "creditAmount"), 8);
-    expect(plan.totalAmount).toBe("209600.70");
+    expect(plan.totalAmount).toBe("208500.50");
+    expect(plan.hassanSavingsUsd).toBe("65699.85");
   });
 
   it("rejects omitted required asset balances instead of silently treating them as zero", () => {
-    const missingStockOtw = input() as GoldenCoastPhase3CutoverInput & {
-      stockOtwUsd?: string;
-    };
+    const missingStockOtw = input() as GoldenCoastPhase3CutoverInput & { stockOtwUsd?: string };
     delete missingStockOtw.stockOtwUsd;
     expect(() => buildGoldenCoastPhase3CutoverPlan(missingStockOtw as GoldenCoastPhase3CutoverInput)).toThrow(
       /stockOtwUsd is required/
     );
 
-    const missingStockInHand = input() as GoldenCoastPhase3CutoverInput & {
-      stockInHandUsd?: string;
-    };
+    const missingStockInHand = input() as GoldenCoastPhase3CutoverInput & { stockInHandUsd?: string };
     delete missingStockInHand.stockInHandUsd;
     expect(() => buildGoldenCoastPhase3CutoverPlan(missingStockInHand as GoldenCoastPhase3CutoverInput)).toThrow(
       /stockInHandUsd is required/
     );
 
-    const missingReserve = input() as GoldenCoastPhase3CutoverInput & {
-      containerReserveUsd?: string;
-    };
+    const missingReserve = input() as GoldenCoastPhase3CutoverInput & { containerReserveUsd?: string };
     delete missingReserve.containerReserveUsd;
     expect(() => buildGoldenCoastPhase3CutoverPlan(missingReserve as GoldenCoastPhase3CutoverInput)).toThrow(
       /containerReserveUsd is required/
     );
   });
 
-  it("keeps optional carried liabilities defaultable to zero", () => {
-    const plan = buildGoldenCoastPhase3CutoverPlan(input({ gcSalesCashUsd: undefined, hassanSavingsUsd: undefined }));
-    expect(plan.gcSalesCashUsd).toBe("0.00");
-    expect(plan.hassanSavingsUsd).toBe("0.00");
-  });
-
-  it("rejects negative opening balances", () => {
+  it("rejects negative and sub-cent opening balances", () => {
     expect(() => buildGoldenCoastPhase3CutoverPlan(input({ stockOtwUsd: "-0.01" }))).toThrow(
       GoldenCoastPhase3CutoverError
     );
-    expect(() => buildGoldenCoastPhase3CutoverPlan(input({ hassanSavingsUsd: -1 }))).toThrow(
-      /hassanSavingsUsd cannot be negative/
+    expect(() => buildGoldenCoastPhase3CutoverPlan(input({ freshStartContributedStockOtwUsd: -1 }))).toThrow(
+      /freshStartContributedStockOtwUsd cannot be negative/
     );
-  });
-
-  it("rejects sub-cent values so the central posting engine cannot round the cutover out of balance", () => {
     expect(() => buildGoldenCoastPhase3CutoverPlan(input({ containerReserveUsd: "1.001" }))).toThrow(
       /two decimal places/
     );
   });
 
-  it("rejects a negative residual cash position instead of manufacturing a credit cash line", () => {
+  it("rejects over-allocation before a negative residual cash line can be manufactured", () => {
     expect(() =>
       buildGoldenCoastPhase3CutoverPlan(
-        input({ stockOtwUsd: "150000", stockInHandUsd: "60000", containerReserveUsd: 0 })
+        input({
+          stockOtwUsd: "150000",
+          stockInHandUsd: "60000",
+          containerReserveUsd: 0,
+          freshStartContributedStockOtwUsd: "100000",
+        })
       )
-    ).toThrow(/non-cash assets exceed partner equity/);
+    ).toThrow(/Hassan cash-funded inventory plus Container Reserve exceeds the 100000.00 funding balance/);
   });
 
   it("rejects duplicate canonical role ids", () => {
