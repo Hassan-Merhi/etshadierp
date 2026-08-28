@@ -6,9 +6,6 @@ import { db } from "../db";
 import { broadcast } from "../wsServer";
 import { registerAccountRoutes } from "./accounts";
 import { registerAdminRoutes } from "./adminRoutes";
-import { registerAiAgentRoutes } from "./aiAgentRoutes";
-import { registerAiImportRoutes } from "./ai-import";
-import { registerAiValidationRoutes } from "./aiValidationRoutes";
 import { registerApprovalRoutes } from "./approvalRoutes";
 import { registerAuthRoutes } from "./authRoutes";
 import { registerBalanceRepairRoutes } from "./balance-repair";
@@ -16,15 +13,12 @@ import { registerBaleRoutes } from "./baleRoutes";
 import { registerBarcodeImageBandwidthMiddleware } from "./barcodeImageBandwidthMiddleware";
 import { registerBankAssetRoutes } from "./bankAssetRoutes";
 import { registerBusinessAlertRoutes } from "./businessAlertsRoutes";
-import { registerChatbotRoutes } from "./chatbot";
 import { registerContainerRoutes } from "./containerRoutes";
-import { registerContainerTrackingRoutes } from "./containerTrackingRoutes";
 import { registerCreditNoteRoutes } from "./creditNoteRoutes";
 import { registerCustomerRoutes } from "./customerRoutes";
 import { registerDebugRoutes } from "./debugRoutes";
 import { registerEmployeeRoutes } from "./employeeRoutes";
 import { registerErpRentalRoutes } from "./erpRentalRoutes";
-import { registerExportRoutes } from "./exportRoutes";
 import { registerFactoryAttendanceRoutes } from "./factoryAttendanceRoutes";
 import { registerFactoryIntelligenceRoutes } from "./factory-intelligence";
 import { registerFactoryPayrollRoutes } from "./factory-payroll";
@@ -34,7 +28,6 @@ import { registerFactoryRoutes } from "./factoryRoutes";
 import { registerFactoryWorkerRoutes } from "./factory-workers";
 import { registerFactoryWhatsappRoutes } from "./factoryWhatsappRoutes";
 import { registerFiscalTransferRoutes } from "./fiscal-transfers";
-import { registerGitRoutes } from "./git";
 import { registerGlobalTransactionRoutes } from "./globalTransactionRoutes";
 import { registerGoldenCoastAccountingRoutes } from "./goldenCoastAccountingRoutes";
 import { registerGoldenCoastLegacyPostingRetirement } from "./goldenCoastLegacyPostingRetirement";
@@ -42,10 +35,9 @@ import { registerImportCycleRoutes } from "./import-cycle";
 import { registerImportRoutes } from "./import";
 import { registerIntercompanyNotificationRoutes } from "./intercompanyNotificationRoutes";
 import { registerInventoryRoutes } from "./inventoryRoutes";
+import { registerLazyRouteModule } from "./lazyRouteRegistrar";
 import { registerLedgerRoutes } from "./ledgerRoutes";
 import { registerLocationRoutes } from "./locationRoutes";
-import { registerNetPositionMonthlyExcelRoute } from "./netPositionMonthlyExcelRoute";
-import { registerNetProfitExcelRoute } from "./netProfitExcelRoute";
 import { registerNotificationRoutes } from "./notificationRoutes";
 import { registerPasskeyRoutes } from "./passkeyRoutes";
 import { registerPosRoutes } from "./posRoutes";
@@ -54,6 +46,7 @@ import { registerRemoteControlSessionRoutes } from "./remoteControlSessionRoutes
 import { registerRemoteKeyboardControlRoutes } from "./remoteKeyboardControlRoutes";
 import { registerRemoteSupportAuditRoutes } from "./remoteSupportAuditRoutes";
 import { registerRemoteSupportRolloutRoutes } from "./remoteSupportRolloutRoutes";
+import { phase4LazyRoutes } from "./renderPhase4LazyRoutes";
 import { installRemoteSupportSessionStopAudit } from "../services/remoteSupportAuditService";
 import { registerReportsRoutes } from "./reportsRoutes";
 import { registerScreenFeedRoutes } from "./screenFeedRoutes";
@@ -63,7 +56,6 @@ import { registerSpMigrationRoutes } from "./sp-migration";
 import { registerStatsRoutes } from "./statsRoutes";
 import { registerStockRoutes } from "./stockRoutes";
 import { registerStockSummaryRoutes } from "./stockSummaryRoutes";
-import { registerSupplierProfitCheckRoutes } from "./supplier-profit-check";
 import { registerSupplierProformaRoutes } from "./supplierProformaRoutes";
 import { registerSupplierRoutes } from "./supplierRoutes";
 import { registerTransporterStatementRoutes } from "./transporterStatementRoutes";
@@ -112,7 +104,6 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerWriteInvalidationSignal(app);
   registerPermissionBoundaryRoutes(app);
   registerWhatsAppFastSendRoutes(app);
-
   registerBandwidthPhase3FactoryReads(app);
   registerFactoryRoutes(app, requireAuth, db);
   registerFactoryWorkerRoutes(app, requireAuth, db);
@@ -121,7 +112,7 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerFactoryIntelligenceRoutes(app, requireAuth, db);
   registerFactoryAttendanceRoutes(app, requireAuth, db);
   registerSupplierProformaRoutes(app, requireAuth);
-  registerSupplierProfitCheckRoutes(app, requireAuth);
+  await phase4LazyRoutes.supplierProfitCheck(app, requireAuth);
   registerGlobalTransactionRoutes(app, requireAuth);
   registerGoldenCoastLegacyPostingRetirement(app);
   registerGoldenCoastAccountingRoutes(app);
@@ -143,7 +134,6 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerInsuranceHistoricalRepairRoutes(app);
   registerAttributionHistoricalRepairRoutes(app);
   registerFactorySheetsAndSacksRoutes(app);
-
   registerLegacyHealthRoutes(app);
   registerAuthRoutes(app);
   registerPasskeyRoutes(app);
@@ -162,7 +152,6 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerIntercompanyPosConfigRoutes(app);
   registerErpWorkerDocumentRoutes(app);
   registerSalaryAdvanceRoutes(app);
-
   registerStockRoutes(app);
   registerBankAssetRoutes(app);
   registerContainerRoutes(app);
@@ -181,20 +170,41 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerAdminRoutes(app);
   registerBalanceRepairRoutes(app);
   registerStockSummaryRoutes(app);
-  registerChatbotRoutes(app);
+  await registerLazyRouteModule(app, {
+    prefixes: ["/api/chatbot", "/api/users"],
+    load: async () => (await import("./chatbot")).registerChatbotRoutes,
+  });
   registerCreditNoteRoutes(app);
-  registerNetProfitExcelRoute(app);
-  registerNetPositionMonthlyExcelRoute(app);
+  await registerLazyRouteModule(app, {
+    prefixes: ["/api/reports/net-profit-excel"],
+    load: async () => (await import("./netProfitExcelRoute")).registerNetProfitExcelRoute,
+  });
+  await registerLazyRouteModule(app, {
+    prefixes: ["/api/reports/net-position-monthly-excel"],
+    load: async () => (await import("./netPositionMonthlyExcelRoute")).registerNetPositionMonthlyExcelRoute,
+  });
   registerWhatsAppRoutes(app);
-  registerExportRoutes(app);
-  registerGitRoutes(app);
-  registerContainerTrackingRoutes(app);
+  await registerLazyRouteModule(app, {
+    prefixes: ["/api/export"],
+    load: async () => (await import("./exportRoutes")).registerExportRoutes,
+  });
+  await phase4LazyRoutes.git(app);
+  await phase4LazyRoutes.containerTracking(app);
   registerUserNotesRoutes(app);
   registerSpRoutes(app);
   registerSpMigrationRoutes(app);
-  registerAiImportRoutes(app);
-  registerAiValidationRoutes(app);
-  registerAiAgentRoutes(app);
+  await registerLazyRouteModule(app, {
+    prefixes: ["/api/ai-import"],
+    load: async () => (await import("./ai-import")).registerAiImportRoutes,
+  });
+  await registerLazyRouteModule(app, {
+    prefixes: ["/api/ai-validation"],
+    load: async () => (await import("./aiValidationRoutes")).registerAiValidationRoutes,
+  });
+  await registerLazyRouteModule(app, {
+    prefixes: ["/api/ai-agent"],
+    load: async () => (await import("./aiAgentRoutes")).registerAiAgentRoutes,
+  });
   registerApprovalRoutes(app);
   registerBusinessAlertRoutes(app);
   registerIntercompanyNotificationRoutes(app);
