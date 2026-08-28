@@ -135,9 +135,8 @@ export function startScheduler() {
   cron.schedule(
     "30 3 * * *",
     createSchedulerTick("convergenceReconciliation", async () => {
-      const { runScheduledConvergenceReconciliation } = await import(
-        "../accounting/scheduledConvergenceReconciliation"
-      );
+      const { runScheduledConvergenceReconciliation } =
+        await import("../accounting/scheduledConvergenceReconciliation");
       await runScheduledConvergenceReconciliation();
     }),
     {

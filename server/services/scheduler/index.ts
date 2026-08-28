@@ -51,10 +51,7 @@ export async function checkAndRecoverDailyExport(): Promise<void> {
 }
 
 /** Preserve the existing public scheduler API used by the WhatsApp route. */
-export async function triggerDailyWhatsAppSendNow(
-  fromDate?: string,
-  toDate?: string
-): Promise<{ message: string }> {
+export async function triggerDailyWhatsAppSendNow(fromDate?: string, toDate?: string): Promise<{ message: string }> {
   const maintenance = await import("./maintenance");
   return maintenance.triggerDailyWhatsAppSendNow(fromDate, toDate);
 }
