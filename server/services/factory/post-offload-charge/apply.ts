@@ -262,7 +262,11 @@ export async function applyPostOffloadChargeMutation(
           exchangeRate: String(chargeData.fxRateToUsd),
           sourceModule: "FACTORY",
         },
-        infrastructurePostingIdentity("factory-post-offload-charge", `${companyId}:${containerId}`, "voucher"),
+        infrastructurePostingIdentity(
+          "factory-post-offload-charge",
+          `${companyId}:${containerId}:${inserted.id}`,
+          "voucher"
+        ),
         params
       );
       voucherId = voucherRow.id;
@@ -572,7 +576,11 @@ export async function applyPostOffloadChargeMutation(
           exchangeRate: String(chargeData.fxRateToUsd),
           sourceModule: "FACTORY",
         },
-        infrastructurePostingIdentity("factory-post-offload-charge", `${companyId}:${containerId}`, "voucher"),
+        infrastructurePostingIdentity(
+          "factory-post-offload-charge",
+          `${companyId}:${containerId}:${chargeId}`,
+          "voucher"
+        ),
         params
       );
       newVoucherId = voucherRow.id;

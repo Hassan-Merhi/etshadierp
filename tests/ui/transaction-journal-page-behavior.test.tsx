@@ -178,13 +178,15 @@ describe("transaction journal page behavior", () => {
 
   it("supports search, quick type filters, and factory inclusion", () => {
     render(<TransactionJournal />);
+    expect(screen.getByTestId("button-toggle-factory")).toHaveTextContent("Included");
+
     fireEvent.change(screen.getByTestId("input-search"), { target: { value: "PAY-101" } });
     fireEvent.click(screen.getByTestId("button-search"));
     expect(screen.getByTestId("button-clear-search")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("chip-type-payment"));
     fireEvent.click(screen.getByTestId("button-toggle-factory"));
-    expect(screen.getByTestId("button-toggle-factory")).toHaveTextContent("Included");
+    expect(screen.getByTestId("button-toggle-factory")).toHaveTextContent("Excluded");
   });
 
   it("resets pagination for every filter path and can clear the complete filter set", () => {
@@ -206,7 +208,7 @@ describe("transaction journal page behavior", () => {
     expect(screen.getByTestId("button-reset-filters")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("button-reset-filters"));
     expect(screen.getByTestId("input-search")).toHaveValue("");
-    expect(screen.getByTestId("button-toggle-factory")).toHaveTextContent("Excluded");
+    expect(screen.getByTestId("button-toggle-factory")).toHaveTextContent("Included");
     expect(screen.queryByTestId("button-reset-filters")).not.toBeInTheDocument();
   });
 

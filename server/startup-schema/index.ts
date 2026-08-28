@@ -35,6 +35,7 @@ import { canonicalStockMovementJournal } from "./021-canonical-stock-movement-jo
 import { tenantControlIntegrityRepairs } from "./022-tenant-control-integrity-repairs";
 import { financialOperationRequests } from "./023-financial-operation-requests";
 import { stockItemSchemaCatchup } from "./024-stock-item-schema-catchup";
+import { insuranceMonthlyAmounts } from "./025-insurance-monthly-amounts";
 
 export const startupMigrations: string[] = [
   ...coreTablesAndColumns,
@@ -67,6 +68,7 @@ export const startupMigrations: string[] = [
   // Re-assert the canonical stock_items tail columns for long-lived databases.
   // PO Import performs full-row stock reads and otherwise fails before parsing.
   ...stockItemSchemaCatchup,
+  ...insuranceMonthlyAmounts,
 ];
 
 // Re-exported so server/index.ts can bootstrap the journal from the module it
