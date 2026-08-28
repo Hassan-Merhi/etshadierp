@@ -259,8 +259,7 @@ export function reclassifyLegacyDeferredRentForProperties(
   }
 
   if (!inFlight) {
-    const tenantCompanyId =
-      origin === "request" && scope?.kind === "tenant" ? scope.companyId : null;
+    const tenantCompanyId = origin === "request" && scope?.kind === "tenant" ? scope.companyId : null;
     const reclassificationPromise =
       origin === "startup"
         ? runWithDatabaseMaintenanceScope(
