@@ -7,6 +7,8 @@
  * autofocus and its Enter-to-scan handler, the flash ring colours follow the
  * scan outcome, and detailed view still lists individual bales newest-first.
  */
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   AlignJustify,
   ChevronDown,
@@ -25,6 +27,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { FactoryContainerLoadingScanModel } from "./useFactoryContainerLoadingScanModel";
+
+interface BaleScanAudit {
+  id: number;
+  scannedBy: string | null;
+  scannedAt: string | null;
+}
+
+function formatScanDateTime(value: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const dateText = date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const timeText = date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${dateText} • ${timeText}`;
+}
 
 function ScanControls({ model }: { model: FactoryContainerLoadingScanModel }) {
   if (!model.orderId) return null;
@@ -100,7 +124,13 @@ function ScanControls({ model }: { model: FactoryContainerLoadingScanModel }) {
   );
 }
 
-function BaleGroups({ model }: { model: FactoryContainerLoadingScanModel }) {
+function BaleGroups({
+  model,
+  scanAuditByBaleId,
+}: {
+  model: FactoryContainerLoadingScanModel;
+  scanAuditByBaleId: Map<number, BaleScanAudit>;
+}) {
   if (model.orderedGroups.length === 0) {
     return (
       <div
@@ -141,28 +171,41 @@ function BaleGroups({ model }: { model: FactoryContainerLoadingScanModel }) {
               <TableBody>
                 {[...group.bales]
                   .sort((a, b) => b.id - a.id)
-                  .map((bale) => (
-                    <TableRow key={bale.id} data-testid={`row-bale-${bale.id}`}>
-                      <TableCell data-testid={`text-bale-ref-${bale.id}`}>
-                        <div className="font-mono text-sm">{bale.baleReference}</div>
-                        {bale.baleName && <div className="text-xs text-muted-foreground mt-0.5">{bale.baleName}</div>}
-                      </TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground">
-                        {parseFloat(bale.weight || "0").toFixed(2)} kg
-                      </TableCell>
-                      <TableCell className="w-[40px]">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => model.setBaleToDelete({ id: bale.id, baleReference: bale.baleReference })}
-                          disabled={model.removeBaleMutation.isPending}
-                          data-testid={`button-remove-bale-${bale.id}`}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  .map((bale) => {
+                    const scanAudit = scanAuditByBaleId.get(bale.id);
+                    const scannedAtText = formatScanDateTime(scanAudit?.scannedAt ?? null);
+                    return (
+                      <TableRow key={bale.id} data-testid={`row-bale-${bale.id}`}>
+                        <TableCell data-testid={`text-bale-ref-${bale.id}`}>
+                          <div className="font-mono text-sm">{bale.baleReference}</div>
+                          {bale.baleName && <div className="text-xs text-muted-foreground mt-0.5">{bale.baleName}</div>}
+                          {scanAudit && (scanAudit.scannedBy || scannedAtText) && (
+                            <div
+                              className="text-[11px] text-muted-foreground mt-0.5"
+                              data-testid={`text-bale-scan-audit-${bale.id}`}
+                            >
+                              {scanAudit.scannedBy ? `Scanned by ${scanAudit.scannedBy}` : "Scanned"}
+                              {scannedAtText ? ` • ${scannedAtText}` : ""}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          {parseFloat(bale.weight || "0").toFixed(2)} kg
+                        </TableCell>
+                        <TableCell className="w-[40px]">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => model.setBaleToDelete({ id: bale.id, baleReference: bale.baleReference })}
+                            disabled={model.removeBaleMutation.isPending}
+                            data-testid={`button-remove-bale-${bale.id}`}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
               </TableBody>
             </Table>
           )}
@@ -232,6 +275,21 @@ function RemovalLog({ model }: { model: FactoryContainerLoadingScanModel }) {
 
 export function ScannedBalesPanel({ model }: { model: FactoryContainerLoadingScanModel }) {
   const { scanFlash, bales, totalWeight, viewMode, lastScannedRef } = model;
+  const { data: scanAuditRows = [] } = useQuery<BaleScanAudit[]>({
+    queryKey: ["/api/factory/customer-orders", model.orderId, "scan-audit", bales.length],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/customer-orders/${model.orderId}/bale-removals?includeScanAudit=1`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const payload = await res.json();
+      return Array.isArray(payload?.scanAudit) ? payload.scanAudit : [];
+    },
+    enabled: !!model.orderId,
+    staleTime: 0,
+  });
+  const scanAuditByBaleId = useMemo(() => new Map(scanAuditRows.map((entry) => [entry.id, entry])), [scanAuditRows]);
+
   return (
     <div className="lg:w-[60%] flex flex-col min-h-0">
       <div
@@ -287,7 +345,7 @@ export function ScannedBalesPanel({ model }: { model: FactoryContainerLoadingSca
           )}
 
           <div className="flex-1 overflow-y-auto">
-            <BaleGroups model={model} />
+            <BaleGroups model={model} scanAuditByBaleId={scanAuditByBaleId} />
           </div>
         </div>
       </div>
