@@ -14,7 +14,6 @@ import {
   Banknote,
   Info,
   SlidersHorizontal,
-  Clock,
   WalletCards,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -89,7 +88,6 @@ export function FactoryWorkersRosterPanel({ model }: FactoryWorkersModelProps) {
     totalSalary,
     totalTransport,
     totalAdvances,
-    totalDueToday,
     totalRemainingToBePaid,
   } = model;
 
@@ -136,13 +134,6 @@ export function FactoryWorkersRosterPanel({ model }: FactoryWorkersModelProps) {
                 <Banknote className="h-4 w-4 text-amber-500" />
                 <span className="text-muted-foreground">Advances</span>
                 <span className="font-semibold font-mono">${totalAdvances.toLocaleString()}</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
-                <Clock className="h-4 w-4 text-emerald-500" />
-                <span className="text-muted-foreground">Due Today</span>
-                <span className="font-semibold font-mono text-emerald-600 dark:text-emerald-400">
-                  ${totalDueToday.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
               </div>
               <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
                 <WalletCards className="h-4 w-4 text-violet-500" />
@@ -493,9 +484,6 @@ export function FactoryWorkersRosterPanel({ model }: FactoryWorkersModelProps) {
                 <TableHead className="w-[10%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                   Due Today
                 </TableHead>
-                <TableHead className="w-[10%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
-                  Due − Adv
-                </TableHead>
                 <TableHead className="w-[80px] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                   Status
                 </TableHead>
@@ -711,31 +699,6 @@ export function FactoryWorkersRosterPanel({ model }: FactoryWorkersModelProps) {
                               </p>
                             </PopoverContent>
                           </Popover>
-                        );
-                      })()}
-                    </TableCell>
-
-                    {/* ── Due Today − Advance ────────────────────────── */}
-                    <TableCell className="py-3 text-right font-mono text-sm">
-                      {(() => {
-                        const advance = parseFloat(worker.pendingAdvanceBalance || "0");
-                        const dueNet = amountDue[worker.id]?.net ?? 0;
-                        if (advance === 0 && dueNet === 0) return <span className="text-muted-foreground/40">—</span>;
-                        const diff = dueNet - advance;
-                        const fmt = (n: number) =>
-                          n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                        return (
-                          <span
-                            className={
-                              diff > 0
-                                ? "text-emerald-600 dark:text-emerald-400"
-                                : diff < 0
-                                  ? "text-amber-600 dark:text-amber-400"
-                                  : "text-muted-foreground/40"
-                            }
-                          >
-                            {diff >= 0 ? "" : "−"}${fmt(Math.abs(diff))}
-                          </span>
                         );
                       })()}
                     </TableCell>
