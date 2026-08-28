@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  buildGoldenCoastPhase3CutoverPlan,
-  type GoldenCoastPhase3CutoverInput,
-} from "./goldenCoastPhase3Cutover";
+import { buildGoldenCoastPhase3CutoverPlan, type GoldenCoastPhase3CutoverInput } from "./goldenCoastPhase3Cutover";
 import {
   buildGoldenCoastPhase5SalePostings,
   goldenCoastPhase5SaleDigest,
