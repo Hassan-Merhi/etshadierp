@@ -19,8 +19,9 @@ import { createDatabasePostingDependencies } from "../../services/accounting/dat
 import { infrastructurePostingIdentity } from "../../services/accounting/infrastructureVoucherIdentity";
 import { isCompanyIsolationError, resolveRequestCompanyId } from "../../services/security/requestCompanyScope";
 import { upload } from "../_helpers";
-import { readExcel } from "../../excelHelper";
+import { readExcel, writeWorkbook } from "../../excelHelper";
 import {
+  createInsuranceImportTemplate,
   parseInsuranceWorkbook,
   type InsuranceImportRow,
 } from "../../services/factory/insuranceWorkbookImport";
@@ -301,6 +302,20 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     } catch (error: unknown) {
       logger.error("DELETE /api/insurance/members/:id error:", { error });
       sendRouteError(res, error, "Failed to delete insurance member");
+    }
+  });
+
+  app.get("/api/insurance/import/template", requireAuth, async (_req: Request, res: Response) => {
+    try {
+      const buffer = await writeWorkbook(createInsuranceImportTemplate());
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", 'attachment; filename="Insurance_Import_Template.xlsx"');
+      res.setHeader("Cache-Control", "no-store, max-age=0");
+      res.setHeader("Pragma", "no-cache");
+      return res.send(buffer);
+    } catch (error: unknown) {
+      logger.error("GET /api/insurance/import/template error:", { error });
+      return sendRouteError(res, error, "Failed to create Insurance import template");
     }
   });
 

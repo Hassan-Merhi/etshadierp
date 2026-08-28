@@ -258,6 +258,52 @@ describe("POST /api/insurance/generate", () => {
 });
 
 describe("Insurance multi-sheet Excel import", () => {
+  it("downloads a blank workbook with reusable month sheets and supported headers", async () => {
+    const response = await agent
+      .get("/api/insurance/import/template")
+      .buffer(true)
+      .parse((_res, callback) => {
+        const chunks: Buffer[] = [];
+        (_res as any).on("data", (chunk: Buffer) => chunks.push(chunk));
+        (_res as any).on("end", () => callback(null, Buffer.concat(chunks)));
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("spreadsheetml.sheet");
+    expect(response.headers["content-disposition"]).toContain("Insurance_Import_Template.xlsx");
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(response.body as Buffer);
+    expect(workbook.worksheets.map((worksheet) => worksheet.name)).toEqual([
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ]);
+
+    for (const worksheet of workbook.worksheets) {
+      expect(worksheet.getRow(1).values.slice(1)).toEqual([
+        "Name",
+        "Monthly Amount",
+        "Start Date",
+        "Insurance Number",
+        "Nationality",
+        "Position",
+        "Date of Birth",
+        "Notes",
+      ]);
+      expect(worksheet.rowCount).toBe(1);
+    }
+  });
+
   it("previews month-named sheets and applies monthly amounts", async () => {
     await deactivateAllMembers();
     const workbook = new ExcelJS.Workbook();

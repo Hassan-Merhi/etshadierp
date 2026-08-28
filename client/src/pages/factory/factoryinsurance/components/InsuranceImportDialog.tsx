@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, Loader2, Upload } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Loader2, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -88,7 +88,15 @@ export function InsuranceImportDialog({ open, onClose }: InsuranceImportDialogPr
 
         <div className="space-y-4">
           <div className="rounded-md border bg-muted/30 p-3 text-sm">
-            <p className="font-medium">Workbook format</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium">Workbook format</p>
+              <Button asChild variant="outline" size="sm" data-testid="button-download-insurance-template">
+                <a href="/api/insurance/import/template" download="Insurance_Import_Template.xlsx">
+                  <Download className="h-4 w-4" />
+                  Download Template
+                </a>
+              </Button>
+            </div>
             <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
               <li>Name sheets “January”, “February”, etc. The selected year below is used for plain month names.</li>
               <li>Sheet names such as “January 2026” or “2026-01” keep their own year.</li>

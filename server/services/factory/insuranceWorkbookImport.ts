@@ -1,5 +1,5 @@
 import type { ExcelWorkbook } from "../../excelHelper";
-import { sheetToJson } from "../../excelHelper";
+import { createWorkbook, sheetToJson } from "../../excelHelper";
 
 export interface InsuranceImportRow {
   sheetName: string;
@@ -26,6 +26,76 @@ export interface InsuranceImportPreview {
   warnings: InsuranceImportIssue[];
   recognizedSheets: Array<{ sheetName: string; monthStart: string; rowCount: number }>;
   ignoredSheets: string[];
+}
+
+export const INSURANCE_IMPORT_HEADERS = [
+  "Name",
+  "Monthly Amount",
+  "Start Date",
+  "Insurance Number",
+  "Nationality",
+  "Position",
+  "Date of Birth",
+  "Notes",
+] as const;
+
+const INSURANCE_TEMPLATE_MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+/**
+ * Creates a blank workbook that can be reused for any import year.
+ *
+ * Plain month sheet names are intentional: the import dialog's selected year
+ * supplies the year when users fill in this reusable template.
+ */
+export function createInsuranceImportTemplate() {
+  const workbook = createWorkbook();
+  workbook.creator = "ERP";
+  workbook.title = "Insurance Import Template";
+  workbook.subject = "Monthly Insurance member import";
+  workbook.description = "Blank monthly worksheets for importing Insurance member amounts.";
+
+  for (const month of INSURANCE_TEMPLATE_MONTHS) {
+    const worksheet = workbook.addWorksheet(month);
+    worksheet.addRow([...INSURANCE_IMPORT_HEADERS]);
+    worksheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    worksheet.getRow(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF2563EB" },
+    };
+    worksheet.getRow(1).alignment = { vertical: "middle" };
+    worksheet.views = [{ state: "frozen", ySplit: 1 }];
+    worksheet.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: 1, column: INSURANCE_IMPORT_HEADERS.length },
+    };
+    worksheet.columns = [
+      { width: 28 },
+      { width: 16 },
+      { width: 14 },
+      { width: 20 },
+      { width: 18 },
+      { width: 20 },
+      { width: 14 },
+      { width: 36 },
+    ];
+    worksheet.getColumn(2).numFmt = "0.00";
+  }
+
+  return workbook;
 }
 
 const MONTHS = new Map<string, number>(
