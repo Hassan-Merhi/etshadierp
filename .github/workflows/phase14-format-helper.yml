@@ -1,0 +1,40 @@
+name: Phase 14 Format Helper
+
+on:
+  push:
+    branches:
+      - chatgpt/golden-coast-phase14-final-certification
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download Phase 14 source and Prettier config
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            "https://raw.githubusercontent.com/${REPOSITORY}/${REVISION}/server/services/accounting/goldenCoastPhase14FinalCertification.test.ts" \
+            --output /tmp/phase14.ts
+          curl --fail --silent --show-error --location \
+            "https://raw.githubusercontent.com/${REPOSITORY}/${REVISION}/.prettierrc" \
+            --output /tmp/.prettierrc
+
+      - name: Format with repository Prettier version
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase14-formatter
+          cd /tmp/phase14-formatter
+          npm init --yes >/dev/null
+          npm install --ignore-scripts --no-audit --no-fund prettier@3.8.4 >/dev/null
+          node node_modules/prettier/bin/prettier.cjs \
+            --config /tmp/.prettierrc \
+            --write /tmp/phase14.ts >/dev/null
+          echo "::group::PHASE14_FORMATTED_FILE"
+          cat /tmp/phase14.ts
+          echo "::endgroup::"
