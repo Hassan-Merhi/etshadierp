@@ -32,6 +32,7 @@ let ctx: TestContext;
 let agent: request.SuperAgentTest;
 let cityWorkerId: number;
 let cityLessWorkerId: number;
+let reservedNameWorkerId: number;
 
 interface BonusRow {
   id: number;
@@ -109,6 +110,12 @@ beforeAll(async () => {
     [ctx.companyId, `${TEST_PREFIX} Cityless Worker`]
   );
   cityLessWorkerId = withoutCity.rows[0].id;
+
+  const reservedName = await pool.query<{ id: number }>(
+    `INSERT INTO factory_workers (company_id, full_name) VALUES ($1, $2) RETURNING id`,
+    [ctx.companyId, "Workers"]
+  );
+  reservedNameWorkerId = reservedName.rows[0].id;
 }, 120000);
 
 beforeEach(async () => {
@@ -211,6 +218,25 @@ describe("POST /api/factory/worker-bonuses/:id/pay", () => {
     const legs = await bonusLegs(bonusId);
     expect(expenseAccount).not.toBeNull();
     expect(legs.find((leg) => leg.ledger_account_id === expenseAccount?.id)).toBeTruthy();
+  });
+
+  it("does not self-parent the group when a worker is literally named Workers", async () => {
+    const bonusId = await createBonus(reservedNameWorkerId, "45.00");
+
+    const response = await agent
+      .post(`/api/factory/worker-bonuses/${bonusId}/pay`)
+      .send({ cashAccountId: ctx.cashAccountId });
+    expect(response.status).toBe(200);
+
+    const group = await accountNamed("Bonus Expense - Workers");
+    const detail = await accountNamed("Bonus Expense - Workers (Detail)");
+    expect(group).not.toBeNull();
+    expect(detail).not.toBeNull();
+    expect(detail?.id).not.toBe(group?.id);
+    expect(detail?.parent_id).toBe(group?.id);
+
+    const legs = await bonusLegs(bonusId);
+    expect(legs.find((leg) => leg.ledger_account_id === detail?.id)).toBeTruthy();
   });
 
   it("will not pay the same bonus twice", async () => {
