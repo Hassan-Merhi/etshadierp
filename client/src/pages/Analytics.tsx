@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { queryClient } from "@/lib/queryClient";
 import AnalyticsLegacy from "./AnalyticsLegacy";
 
 const PATCH_KEY = "__analyticsAccountsResponsePatch";
@@ -23,25 +22,16 @@ function isAccountsAllUrl(value: unknown): boolean {
   }
 }
 
+function isAnalyticsRoute(pathname: string): boolean {
+  return pathname === "/analytics" || pathname.endsWith("/analytics");
+}
+
 function extractAccounts(payload: unknown): unknown[] | null {
   if (Array.isArray(payload)) return payload;
   if (!payload || typeof payload !== "object") return null;
 
   const accounts = (payload as AccountsResponse).accounts;
   return Array.isArray(accounts) ? accounts : null;
-}
-
-function normalizeCachedAccountsResponses(): void {
-  const cachedQueries = queryClient.getQueriesData({
-    predicate: (query) => isAccountsAllUrl(query.queryKey[0]),
-  });
-
-  for (const [queryKey, cachedValue] of cachedQueries) {
-    const accounts = extractAccounts(cachedValue);
-    if (accounts && cachedValue !== accounts) {
-      queryClient.setQueryData(queryKey, accounts);
-    }
-  }
 }
 
 function installAccountsResponsePatch(): () => void {
@@ -54,10 +44,14 @@ function installAccountsResponsePatch(): () => void {
     globalState[PATCH_KEY] = state;
 
     window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      const response = await originalFetch(input, init);
       const rawUrl = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      // This is a compatibility shim for AnalyticsLegacy only. Capture the route
+      // before awaiting so a same-tab navigation cannot make the next page's
+      // /api/accounts/all request inherit Analytics' array response shape.
+      const normalizeForAnalytics = isAccountsAllUrl(rawUrl) && isAnalyticsRoute(window.location.pathname);
+      const response = await originalFetch(input, init);
 
-      if (!isAccountsAllUrl(rawUrl)) return response;
+      if (!normalizeForAnalytics) return response;
 
       try {
         const payload = await response.clone().json();
@@ -92,7 +86,6 @@ function installAccountsResponsePatch(): () => void {
 export default function Analytics() {
   const cleanupRef = useRef<(() => void) | null>(null);
   if (!cleanupRef.current) {
-    normalizeCachedAccountsResponses();
     cleanupRef.current = installAccountsResponsePatch();
   }
 
