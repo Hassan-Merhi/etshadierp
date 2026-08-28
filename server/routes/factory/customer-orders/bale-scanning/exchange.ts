@@ -20,7 +20,8 @@ import {
   customerOrderCharges,
   customerOrderBaleRemovals,
 } from "@shared/schema";
-import { eq, and, or, desc } from "drizzle-orm";
+import { eq, and, or, desc, sql } from "drizzle-orm";
+import { resultRows } from "../../../../lib/queryResult";
 
 export function registerOrderBaleExchangeRoutes(app: Express) {
   // POST /api/factory/customer-orders/:id/bales/exchange — swap one bale for another on a FINALIZED order
@@ -124,7 +125,8 @@ export function registerOrderBaleExchangeRoutes(app: Express) {
     }
   });
 
-  // GET removal log for a specific order/loading
+  // GET removal log for a specific order/loading. includeScanAudit=1 reuses
+  // this existing route so the route manifest stays unchanged.
   app.get("/api/factory/customer-orders/:id/bale-removals", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -136,6 +138,24 @@ export function registerOrderBaleExchangeRoutes(app: Express) {
         .from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
+
+      if (req.query.includeScanAudit === "1") {
+        const auditResult = await db.execute(
+          sql`SELECT id,
+                     scanned_by AS "scannedBy",
+                     scanned_at AS "scannedAt"
+              FROM customer_order_bales
+              WHERE order_id = ${orderId}
+              ORDER BY id`
+        );
+        const scanAudit = resultRows(auditResult).map((row) => ({
+          id: Number(row.id),
+          scannedBy: row.scannedBy ?? null,
+          scannedAt: row.scannedAt ?? null,
+        }));
+        return res.json({ scanAudit });
+      }
+
       const removals = await db
         .select()
         .from(customerOrderBaleRemovals)
