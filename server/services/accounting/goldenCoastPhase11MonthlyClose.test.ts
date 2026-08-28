@@ -27,8 +27,8 @@ function close(periodMonth = "2026-09") {
 function entries(request: ReturnType<typeof buildGoldenCoastPhase11MonthlyClosePosting>) {
   return request.entries.map((entry) => ({
     ledgerAccountId: entry.ledgerAccountId,
-    debitAmount: String(entry.debitAmount),
-    creditAmount: String(entry.creditAmount),
+    debitAmount: Number(entry.debitAmount),
+    creditAmount: Number(entry.creditAmount),
   }));
 }
 
@@ -73,8 +73,8 @@ describe("Golden Coast Phase 11 monthly close", () => {
     const debit = ppd.reduce((sum, entry) => sum + Number(entry.debitAmount), 0);
     const credit = ppd.reduce((sum, entry) => sum + Number(entry.creditAmount), 0);
     expect(debit).toBe(credit);
-    expect(entries(posting)).toContainEqual({ ledgerAccountId: 15, debitAmount: "0", creditAmount: "550.00" });
-    expect(entries(posting)).toContainEqual({ ledgerAccountId: 16, debitAmount: "0", creditAmount: "550.00" });
+    expect(entries(posting)).toContainEqual({ ledgerAccountId: 15, debitAmount: 0, creditAmount: 550 });
+    expect(entries(posting)).toContainEqual({ ledgerAccountId: 16, debitAmount: 0, creditAmount: 550 });
   });
 
   it("keeps Profit Pending Distribution net zero for a loss close", () => {
@@ -90,8 +90,8 @@ describe("Golden Coast Phase 11 monthly close", () => {
       (entry) => entry.ledgerAccountId === accounts.profitPendingDistributionAccountId
     );
     expect(ppd.reduce((sum, entry) => sum + Number(entry.debitAmount) - Number(entry.creditAmount), 0)).toBe(0);
-    expect(entries(posting)).toContainEqual({ ledgerAccountId: 15, debitAmount: "150.00", creditAmount: "0" });
-    expect(entries(posting)).toContainEqual({ ledgerAccountId: 16, debitAmount: "150.00", creditAmount: "0" });
+    expect(entries(posting)).toContainEqual({ ledgerAccountId: 15, debitAmount: 150, creditAmount: 0 });
+    expect(entries(posting)).toContainEqual({ ledgerAccountId: 16, debitAmount: 150, creditAmount: 0 });
   });
 
   it("never touches Hassan Savings, GC Sales Cash, stock, reserve, or HADI roles", () => {

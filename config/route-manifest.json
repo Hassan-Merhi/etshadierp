@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "description": "Ordered snapshot of every registered Express route (method, path, guard chain) and middleware mount. Regenerate with UPDATE_ROUTE_MANIFEST=1 only when a route change is intended; during a file split the manifest must not change at all.",
-  "routeCount": 1908,
+  "routeCount": 1911,
   "middlewareMountCount": 93,
   "routes": [
     "GET /api/admin/operational-monitoring [requireAuth > <anonymous> > <anonymous>]",
@@ -1796,6 +1796,9 @@
     "GET /api/sp/aliases [requireAuth > <anonymous>]",
     "POST /api/sp/aliases [requireAuth > <anonymous>]",
     "DELETE /api/sp/aliases/:id [requireAuth > <anonymous>]",
+    "GET /api/sp/golden-coast/phase11/profit-splits/monthly-close/readiness [<anonymous> > requireAuth > requireNonPOS > readiness]",
+    "POST /api/sp/golden-coast/phase11/profit-splits/monthly-close [<anonymous> > <anonymous> > requireAuth > requireNonPOS > closeMonth]",
+    "POST /api/sp/profit-splits [<anonymous> > <anonymous> > requireAuth > retireLegacyGoldenCoastProfitSplit]",
     "GET /api/sp/report/payable [requireAuth > <anonymous>]",
     "GET /api/sp/report/profit [requireAuth > <anonymous>]",
     "GET /api/sp/report/stock [requireAuth > <anonymous>]",

@@ -51,7 +51,7 @@ describe("Golden Coast Phase 11 monthly close route surface", () => {
   });
 
   it("retires the old client-calculated Golden Coast split before generic reports mount", () => {
-    expect(routeSource).toContain('app.post("/api/sp/profit-splits"');
+    expect(routeSource).toMatch(/app\.post\(\s*"\/api\/sp\/profit-splits"/);
     expect(routeSource).toContain("GC_PHASE11_LEGACY_PROFIT_SPLIT_RETIRED");
     expect(routeSource).toContain("client-supplied profit totals are retired");
   });
