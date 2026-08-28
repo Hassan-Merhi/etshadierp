@@ -436,8 +436,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
         `);
         const updateResult = await db.execute(sql`
           UPDATE voucher_entries
-          SET ledger_account_id = ${bonusAcc.id},
-              narration = ${`Bonus - ${workerName}`}
+          SET ledger_account_id = ${bonusAcc.id}
           WHERE voucher_id = ${row.voucher_id}
             AND CAST(debit_amount AS numeric) > 0
         `);
