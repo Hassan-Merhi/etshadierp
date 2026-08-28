@@ -2,13 +2,16 @@
 
 Generated: `2026-08-28T18:19:08.352Z`
 Repository: `Hassan-Merhi/etshadierp`
-Main snapshot: `00880735f4cb13a8895ff520b50e35a025094708`
+Main ref observed at collection: `00880735f4cb13a8895ff520b50e35a025094708`
+CodeQL analyzed main snapshot: `2fb9747d2a8713ecc4dbe7b43dfe0421f20da74d`
 
 ## Scope and completeness
 
 The inventory paginated GitHub's code-scanning API with `state=open` and `ref=refs/heads/main`, then verified that `main` had not moved during collection. It fetched **1610** open alerts across **17** page(s), with **1610** unique alert numbers and **0** duplicate numbers.
 
 CodeQL accounts for **1559** open alerts; the remaining **51** are from other code-scanning tools.
+
+The open-alert state was queried for `refs/heads/main`, while CodeQL's most recent analyzed instances all point to `2fb9747d2a8713ecc4dbe7b43dfe0421f20da74d`. Alert locations and line numbers therefore belong to that analyzed SHA, not the newer observed branch head `00880735f4cb13a8895ff520b50e35a025094708`. Remediation must re-check the live alert/scan state after each fix rather than treating stale line numbers as exact current-main locations.
 
 ## Tools
 
