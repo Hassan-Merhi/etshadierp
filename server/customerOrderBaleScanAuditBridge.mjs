@@ -25,7 +25,7 @@ function log(level, message, extra = {}) {
 }
 
 async function ensureCustomerOrderBaleScanAudit() {
-  if (process.env.NODE_ENV === "test" || process.env.VITEST) return;
+  if (process.env.NODE_ENV === "test") return;
   if (!connectionString) {
     log("WARN", "Scan-audit schema check skipped because no database configuration is available");
     return;
