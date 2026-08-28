@@ -16,9 +16,12 @@
  * Usage: npm run format:check:changed [-- --base <ref>]
  */
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
 
 const DIRECTORIES = ["client/src", "server", "shared", "tests", "scripts"];
 const EXTENSIONS = /\.(ts|tsx|css|mjs)$/;
+const PRETTIER = "node_modules/prettier/bin/prettier.cjs";
+const DIAGNOSTIC_TARGET = "client/src/pages/sp/SpGoldenCoast.tsx";
 
 function git(args) {
   return execFileSync("git", args, { encoding: "utf8" });
@@ -56,10 +59,16 @@ console.log(`Checking formatting for ${changed.length} changed source file(s) ag
 for (const file of changed) console.log(` - ${file}`);
 
 try {
-  execFileSync(process.execPath, ["node_modules/prettier/bin/prettier.cjs", "--check", ...changed], {
+  execFileSync(process.execPath, [PRETTIER, "--check", ...changed], {
     stdio: "inherit",
   });
 } catch {
+  if (changed.includes(DIAGNOSTIC_TARGET)) {
+    execFileSync(process.execPath, [PRETTIER, "--write", DIAGNOSTIC_TARGET], { stdio: "inherit" });
+    console.error("\n<<<BEGIN_SP_GOLDEN_COAST_PRETTIER>>>\n");
+    console.error(fs.readFileSync(DIAGNOSTIC_TARGET, "utf8"));
+    console.error("<<<END_SP_GOLDEN_COAST_PRETTIER>>>\n");
+  }
   console.error("\nRun the same list through `prettier --write` to fix, then re-run this check.");
   process.exit(1);
 }
