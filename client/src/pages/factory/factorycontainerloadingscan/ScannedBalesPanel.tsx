@@ -178,9 +178,7 @@ function BaleGroups({
                       <TableRow key={bale.id} data-testid={`row-bale-${bale.id}`}>
                         <TableCell data-testid={`text-bale-ref-${bale.id}`}>
                           <div className="font-mono text-sm">{bale.baleReference}</div>
-                          {bale.baleName && (
-                            <div className="text-xs text-muted-foreground mt-0.5">{bale.baleName}</div>
-                          )}
+                          {bale.baleName && <div className="text-xs text-muted-foreground mt-0.5">{bale.baleName}</div>}
                           {scanAudit && (scanAudit.scannedBy || scannedAtText) && (
                             <div
                               className="text-[11px] text-muted-foreground mt-0.5"
@@ -290,10 +288,7 @@ export function ScannedBalesPanel({ model }: { model: FactoryContainerLoadingSca
     enabled: !!model.orderId,
     staleTime: 0,
   });
-  const scanAuditByBaleId = useMemo(
-    () => new Map(scanAuditRows.map((entry) => [entry.id, entry])),
-    [scanAuditRows]
-  );
+  const scanAuditByBaleId = useMemo(() => new Map(scanAuditRows.map((entry) => [entry.id, entry])), [scanAuditRows]);
 
   return (
     <div className="lg:w-[60%] flex flex-col min-h-0">
