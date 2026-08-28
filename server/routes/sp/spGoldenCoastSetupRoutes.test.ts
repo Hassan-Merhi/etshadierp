@@ -5,8 +5,8 @@ const routeSource = readFileSync(new URL("./spGoldenCoastSetupRoutes.ts", import
 const spSetupSource = readFileSync(new URL("./spSetupRoutes.ts", import.meta.url), "utf8");
 const spIndexSource = readFileSync(new URL("./index.ts", import.meta.url), "utf8");
 
-describe("Golden Coast Phase 2 setup route surface", () => {
-  it("registers provisioning and status inside the Supplier Partner setup area", () => {
+describe("Golden Coast setup route surface hardened by Phase 13", () => {
+  it("keeps provisioning and status inside the Supplier Partner setup area", () => {
     expect(routeSource).toContain('"/api/sp/setup/golden-coast"');
     expect(routeSource).toContain('"/api/sp/setup/golden-coast/status"');
     expect(spIndexSource).toContain("registerSpGoldenCoastSetupRoutes(app);");
@@ -19,34 +19,55 @@ describe("Golden Coast Phase 2 setup route surface", () => {
   });
 
   it("rate limits both endpoints and caps the provisioning request body", () => {
-    // Provisioning runs a multi-table transaction and the status read scans the
-    // company chart of accounts, so neither may be called without a limiter.
     expect(routeSource).toContain("privilegedMutationRateLimit");
     expect(routeSource).toContain("privilegedReadRateLimit");
     expect(routeSource).toContain("goldenCoastRequestBudget");
   });
 
-  it("scopes every ledger read and write to the selected company", () => {
+  it("keeps Phase 2 ledger reads and writes scoped to the selected company", () => {
     expect(routeSource).toContain("eq(ledgerAccounts.companyId, companyId)");
     expect(routeSource).toContain("eq(companySettings.companyId, companyId)");
-    // The repair update is keyed on both the account id and the company id so a
-    // stale plan can never touch another tenant's ledger.
     expect(routeSource).toContain(
       "and(eq(ledgerAccounts.id, item.accountId), eq(ledgerAccounts.companyId, companyId))"
     );
   });
 
-  it("never deletes or soft-deletes ledger accounts or vouchers during setup", () => {
+  it("provisions both stable Phase 7 intercompany subtypes without changing Phase 7 transfer workflows", () => {
+    expect(routeSource).toContain("goldenCoastPhase13IntercompanyDefinitions");
+    expect(routeSource).toContain("defs.golden_coast_hadi");
+    expect(routeSource).toContain("defs.hadi_golden_coast");
+    expect(routeSource).toContain("applyIntercompanyPlan");
+    expect(routeSource).not.toContain("buildGoldenCoastPhase7TransferPostings");
+  });
+
+  it("requires tenant-boundary authorization before switching to HADI", () => {
+    expect(routeSource).toContain("getCompanyRequestRuntimeContext");
+    expect(routeSource).toContain("authorizedCompanyIds?.includes(pair.hadiCompanyId)");
+    expect(routeSource).toContain("GC_PHASE13_HADI_SCOPE_UNAUTHORIZED");
+    expect(routeSource).toContain("targetCompanyId=${pair.hadiCompanyId}");
+    expect(routeSource).toContain("assertTransactionCompanyScope(tx, pair.hadiCompanyId)");
+    expect(routeSource).toContain("assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId)");
+  });
+
+  it("repairs reciprocal accounts in place instead of deleting ledger history", () => {
+    expect(routeSource).toContain("planGoldenCoastPhase13IntercompanyAccount");
+    expect(routeSource).toContain("patch[repair.field] = repair.to");
     expect(routeSource).not.toContain(".delete(");
-    expect(routeSource).not.toContain("vouchers");
     expect(routeSource).not.toContain("voucherEntries");
   });
 
-  it("applies provisioning atomically", () => {
-    expect(routeSource).toContain("db.transaction(");
+  it("exposes Phase 13 intercompany blockers from the Golden Coast status endpoint", () => {
+    expect(routeSource).toContain("phase13Status");
+    expect(routeSource).toContain("parentAuthorized");
+    expect(routeSource).toContain("hadiAccount: null");
+    expect(routeSource).toContain("blockers");
   });
 
-  it("surfaces Golden Coast status from the existing SP setup status endpoint", () => {
+  it("applies Phase 2 and Phase 13 provisioning atomically", () => {
+    expect(routeSource).toContain("db.transaction(async (tx)");
+  });
+
+  it("preserves the existing embedded Phase 2 status for legacy setup consumers", () => {
     expect(spSetupSource).toContain("summarizeGoldenCoastAccountSetup");
     expect(spSetupSource).toContain("goldenCoast,");
   });

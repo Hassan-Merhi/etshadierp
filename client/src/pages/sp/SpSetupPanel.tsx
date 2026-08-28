@@ -1,11 +1,12 @@
 import type { ClientErrorLike } from "@/lib/clientError";
+import { releaseDebtEnglish } from "@/i18n/finalCloseoutTranslations";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, AlertCircle, Loader2, Zap, ShieldCheck, Landmark } from "lucide-react";
+import { CheckCircle2, AlertCircle, Loader2, Zap, ShieldCheck, Landmark, ArrowLeftRight } from "lucide-react";
 
 interface GoldenCoastRoleStatus {
   role: string;
@@ -21,17 +22,41 @@ interface GoldenCoastRoleStatus {
   warnings: string[];
 }
 
+interface GoldenCoastIntercompanyAccountStatus {
+  role: string;
+  companyId: number;
+  subType: string;
+  expectedName: string;
+  status: "ok" | "missing" | "needs_repair" | "ambiguous";
+  accountId: number | null;
+  name: string | null;
+  accountType: string | null;
+  issues: string[];
+}
+
+interface GoldenCoastPhase13Status {
+  isConfigured: boolean;
+  parentCompanyId: number;
+  parentCompanyName: string;
+  parentAuthorized: boolean;
+  goldenCoastAccount: GoldenCoastIntercompanyAccountStatus;
+  hadiAccount: GoldenCoastIntercompanyAccountStatus | null;
+  blockers: string[];
+}
+
 interface GoldenCoastSetupStatus {
   isConfigured: boolean;
   requiredRoleCount: number;
   configuredRoleCount: number;
   roles: GoldenCoastRoleStatus[];
+  phase13?: GoldenCoastPhase13Status;
 }
 
 interface SetupConfirmationPayload {
   confirmation: "CHANGE SP SETUP";
   reason: string;
   idempotencyKey: string;
+  targetCompanyId?: number;
 }
 
 function createFreshIdempotencyKey(scope: string): string {
@@ -39,7 +64,7 @@ function createFreshIdempotencyKey(scope: string): string {
   return uuid ? `${scope}:${uuid}` : `${scope}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 }
 
-function requestSetupConfirmation(actionLabel: string): SetupConfirmationPayload | null {
+function requestSetupConfirmation(actionLabel: string, targetCompanyId?: number): SetupConfirmationPayload | null {
   if (typeof window === "undefined") return null;
   const confirmation = window.prompt(`${actionLabel}\n\nType exactly: CHANGE SP SETUP`);
   if (confirmation == null) return null;
@@ -59,15 +84,48 @@ function requestSetupConfirmation(actionLabel: string): SetupConfirmationPayload
     confirmation: "CHANGE SP SETUP",
     reason,
     idempotencyKey: createFreshIdempotencyKey("sp-setup"),
+    ...(targetCompanyId && targetCompanyId > 0 ? { targetCompanyId } : {}),
   };
+}
+
+function IntercompanyReadinessRow({ account }: { account: GoldenCoastIntercompanyAccountStatus }) {
+  const ok = account.status === "ok";
+  return (
+    <div className="flex items-start justify-between gap-3 text-sm py-1.5 border-b border-border/40 last:border-0">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          {ok ? (
+            <CheckCircle2 className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+          ) : (
+            <AlertCircle className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
+          )}
+          <span className="font-medium">{account.name ?? account.expectedName}</span>
+          <span className="font-mono text-xs text-muted-foreground">{account.subType}</span>
+        </div>
+        {account.issues?.length > 0 && <p className="text-xs text-amber-600 mt-0.5">{account.issues.join(" · ")}</p>}
+      </div>
+      <span className="text-xs text-muted-foreground whitespace-nowrap">{account.accountType ?? "Intercompany"}</span>
+    </div>
+  );
 }
 
 export default function SpSetupPanel() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: status, isLoading } = useQuery<any>({
+  const { data: status, isLoading: isSpStatusLoading } = useQuery<any>({
     queryKey: ["/api/sp/setup/status"],
+  });
+  const { data: goldenCoastBase, isLoading: isGoldenCoastStatusLoading } = useQuery<GoldenCoastSetupStatus>({
+    queryKey: ["/api/sp/setup/golden-coast/status"],
+  });
+  const parentCompanyId = Number(goldenCoastBase?.phase13?.parentCompanyId ?? 0);
+  const scopedGoldenCoastStatusUrl =
+    parentCompanyId > 0 ? `/api/sp/setup/golden-coast/status?targetCompanyId=${parentCompanyId}` : "";
+  const { data: goldenCoastScoped } = useQuery<GoldenCoastSetupStatus>({
+    queryKey: [scopedGoldenCoastStatusUrl],
+    enabled: parentCompanyId > 0,
+    retry: false,
   });
 
   const setupMutation = useMutation({
@@ -104,22 +162,34 @@ export default function SpSetupPanel() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sp/setup/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sp/setup/golden-coast/status"] });
+      if (scopedGoldenCoastStatusUrl) {
+        queryClient.invalidateQueries({ queryKey: [scopedGoldenCoastStatusUrl] });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
 
       const messages: string[] = [];
-      if (data.created?.length > 0) messages.push(`Created ${data.created.length} account(s).`);
-      if (data.repaired?.length > 0) messages.push(`Repaired ${data.repaired.length} account(s).`);
+      if (data.created?.length > 0) messages.push(`Created ${data.created.length} balance-sheet account(s).`);
+      if (data.repaired?.length > 0) messages.push(`Repaired ${data.repaired.length} balance-sheet account(s).`);
       if (data.settingsChanged?.length > 0) messages.push(`Bound ${data.settingsChanged.join(", ")}.`);
+      const intercompanyChanges = (data.intercompanyChanges ?? []).filter(
+        (item: { action?: string }) => item.action && item.action !== "none"
+      );
+      if (intercompanyChanges.length > 0) {
+        messages.push(
+          `Provisioned/repaired ${intercompanyChanges.length} Golden Coast ↔ HADI intercompany account(s).`
+        );
+      }
 
       toast({
-        title: "Golden Coast accounts provisioned",
-        description: messages.join(" ") || "All Golden Coast accounts were already configured.",
+        title: releaseDebtEnglish("Golden Coast accounting setup complete"),
+        description: messages.join(" ") || "Golden Coast and HADI accounting accounts were already configured.",
       });
     },
     onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  if (isLoading) {
+  if (isSpStatusLoading || isGoldenCoastStatusLoading) {
     return (
       <div className="flex items-center justify-center h-48">
         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -129,8 +199,10 @@ export default function SpSetupPanel() {
 
   const requiredAccountCount = status?.requiredAccountCount ?? status?.spAccounts?.length ?? 0;
   const supplierLinkGapCount = Number(status?.supplierVoucherLinkGapCount ?? 0);
-  const goldenCoast: GoldenCoastSetupStatus | undefined = status?.goldenCoast;
+  const goldenCoast: GoldenCoastSetupStatus | undefined = goldenCoastScoped ?? goldenCoastBase ?? status?.goldenCoast;
   const goldenCoastRoles: GoldenCoastRoleStatus[] = goldenCoast?.roles ?? [];
+  const phase13 = goldenCoast?.phase13;
+  const goldenCoastReady = goldenCoast?.isConfigured === true && phase13?.isConfigured === true;
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -232,15 +304,15 @@ export default function SpSetupPanel() {
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <CardTitle className="text-base">Golden Coast Balance Sheet Accounts</CardTitle>
+              <CardTitle className="text-base">{releaseDebtEnglish("Golden Coast Accounting Readiness")}</CardTitle>
               <CardDescription className="text-xs mt-1">
-                {goldenCoast?.configuredRoleCount ?? 0} of {goldenCoast?.requiredRoleCount ?? 0} partner, stock and
-                settlement roles provisioned for this company
+                {goldenCoast?.configuredRoleCount ?? 0} of {goldenCoast?.requiredRoleCount ?? 0} balance-sheet roles
+                plus the reciprocal HADI intercompany pair
               </CardDescription>
             </div>
-            {goldenCoast?.isConfigured ? (
+            {goldenCoastReady ? (
               <Badge variant="outline" className="text-green-600 border-green-600/40">
-                <CheckCircle2 className="h-3 w-3 mr-1" /> Configured
+                <CheckCircle2 className="h-3 w-3 mr-1" /> Ready
               </Badge>
             ) : (
               <Badge variant="outline" className="text-amber-600 border-amber-600/40">
@@ -293,19 +365,50 @@ export default function SpSetupPanel() {
             </div>
           )}
 
-          <p className="text-xs text-muted-foreground">
-            Opening balances are configuration targets only. The September 1, 2026 cutover posting is handled by a later
-            phase.
-          </p>
+          {phase13 && (
+            <div className="rounded-md border p-3 space-y-2" data-testid="gc-phase13-intercompany-readiness">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <ArrowLeftRight className="h-4 w-4" /> {releaseDebtEnglish("HADI intercompany pair")}
+                </div>
+                <span className="text-xs text-muted-foreground">{phase13.parentCompanyName}</span>
+              </div>
+              <IntercompanyReadinessRow account={phase13.goldenCoastAccount} />
+              {phase13.hadiAccount ? (
+                <IntercompanyReadinessRow account={phase13.hadiAccount} />
+              ) : (
+                <p className="text-xs text-amber-600">
+                  {releaseDebtEnglish(
+                    "HADI-side readiness needs parent-company authorization. Re-run Golden Coast setup to verify and repair it."
+                  )}
+                </p>
+              )}
+              {phase13.blockers?.length > 0 && <p className="text-xs text-amber-600">{phase13.blockers.join(" · ")}</p>}
+            </div>
+          )}
+
+          <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground space-y-1">
+            <p>
+              Fresh Start-contributed inventory is an in-kind contribution and does not consume Hassan's $100,000
+              funding balance.
+            </p>
+            <p>
+              Cash-funded inventory plus Container Reserve consume Hassan funding. The unused balance becomes Hassan
+              Savings automatically at cutover; it is not added as extra capital.
+            </p>
+          </div>
 
           <Button
             onClick={() => {
               const payload = requestSetupConfirmation(
-                goldenCoast?.isConfigured ? "Re-verify Golden Coast accounts" : "Provision Golden Coast accounts"
+                goldenCoastReady
+                  ? "Re-verify Golden Coast and HADI accounting"
+                  : "Provision Golden Coast and HADI accounting",
+                phase13?.parentCompanyId
               );
               if (payload) goldenCoastMutation.mutate(payload);
             }}
-            disabled={goldenCoastMutation.isPending}
+            disabled={goldenCoastMutation.isPending || !phase13?.parentCompanyId}
             data-testid="button-gc-setup"
           >
             {goldenCoastMutation.isPending ? (
@@ -313,7 +416,7 @@ export default function SpSetupPanel() {
             ) : (
               <Landmark className="h-4 w-4 mr-2" />
             )}
-            {goldenCoast?.isConfigured ? "Re-verify Golden Coast Accounts" : "Provision Golden Coast Accounts"}
+            {goldenCoastReady ? "Re-verify Golden Coast & HADI" : "Provision / Repair Golden Coast & HADI"}
           </Button>
         </CardContent>
       </Card>
