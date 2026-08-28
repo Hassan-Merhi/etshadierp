@@ -133,7 +133,9 @@ export function BackupStatusCard({
             <RunRow run={latestRun} />
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">Start an export above to see its status here.</p>
+          <p className="text-xs text-muted-foreground">
+            Start an export above to see its status here.
+          </p>
         )}
       </CardContent>
     </Card>

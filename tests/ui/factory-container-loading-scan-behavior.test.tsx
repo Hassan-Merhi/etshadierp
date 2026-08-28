@@ -21,7 +21,7 @@ const orderDetail = {
 };
 
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: ({ queryKey }: any) => {
+  useQuery: ({ queryKey, enabled }: any) => {
     const root = queryKey?.[0];
     if (root === "/api/factory/customers") return { data: [{ id: 1, legalName: "Buyer One" }] };
     if (root === "/api/locations") return { data: [{ id: 11, name: "Dock" }] };
@@ -40,7 +40,25 @@ vi.mock("@tanstack/react-query", () => ({
     if (root === "/api/factory/customer-orders" && queryKey?.[1] === 77 && queryKey?.length === 2)
       return { data: orderDetail };
     if (root === "/api/factory/bale-stock-count") return { data: { A1: 5 } };
-    if (root === "/api/factory/customer-orders" && queryKey?.[2] === "bale-removals") return { data: [] };
+    if (root === "/api/factory/customer-orders" && queryKey?.[2] === "bale-removals") {
+      return {
+        data: enabled
+          ? [
+              {
+                id: 201,
+                orderId: 77,
+                baleId: 10,
+                referenceNumber: "REF-REMOVED",
+                articleCode: "A1",
+                productName: "Shirts",
+                weightKg: "50",
+                removedByUsername: "loader",
+                removedAt: "2026-08-28T10:00:00.000Z",
+              },
+            ]
+          : [],
+      };
+    }
     return { data: [] };
   },
   useMutation: (config: any) => ({
@@ -235,5 +253,19 @@ describe("factory container loading scan behavior", () => {
     expect(harness.navigate).toHaveBeenCalledWith(expect.stringContaining("/factory/stock-bale-list?"));
     expect(harness.navigate.mock.calls.at(-1)?.[0]).toContain("articleCode=A1");
     expect(harness.navigate.mock.calls.at(-1)?.[0]).toContain("locationId=11");
+  });
+
+  it("shows the removed-bales section before it is expanded", async () => {
+    render(<FactoryContainerLoadingScan />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("button-toggle-removal-log")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("badge-removal-count")).toHaveTextContent("1");
+    expect(screen.queryByTestId("row-removal-201")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("button-toggle-removal-log"));
+    expect(screen.getByTestId("row-removal-201")).toHaveTextContent("REF-REMOVED");
+    expect(screen.getByTestId("row-removal-201")).toHaveTextContent("loader");
   });
 });

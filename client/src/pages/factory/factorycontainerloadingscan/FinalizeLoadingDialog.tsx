@@ -175,9 +175,7 @@ export function FinalizeLoadingDialog({ model }: { model: FactoryContainerLoadin
               <>
                 <Button
                   variant="outline"
-                  onClick={() =>
-                    finalizeMutation.mutate({ txDate: model.finalizeDate, createCarryoverProforma: false })
-                  }
+                  onClick={() => finalizeMutation.mutate({ txDate: model.finalizeDate, createCarryoverProforma: false })}
                   disabled={finalizeMutation.isPending}
                   data-testid="button-finalize-only"
                 >

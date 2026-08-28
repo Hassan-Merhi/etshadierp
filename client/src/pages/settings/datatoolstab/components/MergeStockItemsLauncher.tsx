@@ -3,15 +3,15 @@
  *
  * Extracted from DataToolsTab.tsx during the Phase 4 god-file split.
  */
-import { useState } from "react";
+import {useState} from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeftRight } from "lucide-react";
-import { MergeStockItemsCard } from "./MergeStockItemsCard";
-import { BulkMergeStockItemsCard } from "./BulkMergeStockItemsCard";
-import { MergeHistoryCard } from "./MergeHistoryCard";
+import {MergeStockItemsCard} from "./MergeStockItemsCard";
+import {BulkMergeStockItemsCard} from "./BulkMergeStockItemsCard";
+import {MergeHistoryCard} from "./MergeHistoryCard";
 
 export function MergeStockItemsLauncher() {
   const [open, setOpen] = useState(false);

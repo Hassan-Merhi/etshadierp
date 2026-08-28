@@ -189,18 +189,13 @@ export function LocationCostPriceOverride({ locations }: LocationCostPriceOverri
             <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400">
               <AlertTriangle className="h-5 w-5" />
             </div>
-            <Badge
-              variant="secondary"
-              className="border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-            >
+            <Badge variant="secondary" className="border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300">
               Developer
             </Badge>
           </div>
           <div className="space-y-1">
             <CardTitle className="text-base tracking-tight">{t("settings.dataTools.costOverride.title")}</CardTitle>
-            <CardDescription className="text-sm leading-5">
-              {t("settings.dataTools.costOverride.description")}
-            </CardDescription>
+            <CardDescription className="text-sm leading-5">{t("settings.dataTools.costOverride.description")}</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="mt-auto space-y-4 pt-1">

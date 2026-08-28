@@ -180,7 +180,9 @@ export function useFactoryContainerLoadingScanModel() {
       if (!res.ok) throw new Error("Failed to fetch removal log");
       return res.json();
     },
-    enabled: !!orderId && showRemovalLog,
+    // Load the log while the order is active so the collapsed section can
+    // discover that it has entries and render itself.
+    enabled: !!orderId,
     staleTime: 30_000,
   });
 
@@ -528,7 +530,14 @@ export function useFactoryContainerLoadingScanModel() {
         allowBypassOverload: isBypassOverload || undefined,
       });
     },
-    [scanCode, orderId, selectedLocationId, pendingBypassBaleRef, pendingBypassOverloadRef, addBaleMutation]
+    [
+      scanCode,
+      orderId,
+      selectedLocationId,
+      pendingBypassBaleRef,
+      pendingBypassOverloadRef,
+      addBaleMutation,
+    ]
   );
 
   const handleImportFile = useCallback(
