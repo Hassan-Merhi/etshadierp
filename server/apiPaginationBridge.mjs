@@ -19,9 +19,8 @@ if (!globalThis[INSTALL_KEY]) {
     "/api/factory/v5/stock-allocation",
     "/api/vouchers",
     // /api/ledger-accounts intentionally excluded: voucher pickers need the full
-    // list for all companies (HADI L'SHI has 212 accounts). Structured pagination
-    // is still available via ledgerAccountPaginationRoutes for callers that opt in
-    // with explicit ?page= / ?limit= / ?pagination=1 params.
+    // list for all companies. Compact response profiles are available for picker
+    // callers without changing the legacy array contract or applying pagination.
   ]);
 
   const heavyArrayPathPatterns = [
@@ -158,6 +157,72 @@ if (!globalThis[INSTALL_KEY]) {
     return { pos };
   }
 
+  function compactWorkerBaleSummary(body) {
+    return body.map((bale) => ({
+      id: bale?.id,
+      baleCode: bale?.baleCode,
+      productName: bale?.productName ?? null,
+      weightKg: bale?.weightKg,
+      totalCost: bale?.totalCost,
+      status: bale?.status,
+      finalizedAt: bale?.finalizedAt ?? null,
+    }));
+  }
+
+  function compactLedgerPicker(body) {
+    return body.map((account) => ({
+      id: account?.id,
+      code: account?.code,
+      name: account?.name,
+      accountType: account?.accountType,
+      subType: account?.subType ?? null,
+      parentId: account?.parentId ?? null,
+      active: account?.active !== false,
+      isHidden: account?.isHidden === true,
+    }));
+  }
+
+  function compactLocationInventoryView(body) {
+    return body.map((item) => ({
+      inventoryId: item?.inventoryId ?? null,
+      locationId: item?.locationId,
+      stockItemId: item?.stockItemId,
+      quantity: item?.quantity,
+      averageRate: item?.averageRate,
+      totalValue: item?.totalValue,
+      stockItemCode: item?.stockItemCode ?? "",
+      stockItemName: item?.stockItemName ?? "",
+      stockItemUom: item?.stockItemUom ?? "",
+      stockGroupId: item?.stockGroupId ?? null,
+      stockGroupName: item?.stockGroupName ?? null,
+      stockGroupCode: item?.stockGroupCode ?? null,
+      stockItemActive: item?.stockItemActive ?? null,
+      categoryId: item?.categoryId ?? null,
+      categoryName: item?.categoryName ?? null,
+    }));
+  }
+
+  function compactAnalyticsAccounts(body) {
+    if (!body || typeof body !== "object" || !Array.isArray(body.accounts)) return body;
+
+    const accounts = body.accounts
+      .filter((account) => account?.type === "ledger" || account?.type === "bank" || account?.type === "fixedAsset")
+      .map((account) => ({
+        id: account?.id,
+        accountId: account?.accountId,
+        type: account?.type,
+        code: account?.code ?? "",
+        name: account?.name ?? "",
+        accountType: account?.accountType ?? null,
+        subType: account?.subType ?? null,
+        balance: account?.balance ?? "0",
+        balanceSide: account?.balanceSide ?? null,
+        parentId: account?.parentId ?? null,
+      }));
+
+    return { accounts, asOfDate: body.asOfDate };
+  }
+
   function applyResponseProfile(pathname, searchParams, body) {
     const profile = searchParams.get("profile");
     if (!profile) return body;
@@ -177,6 +242,22 @@ if (!globalThis[INSTALL_KEY]) {
       typeof body === "object"
     ) {
       return compactCombinedContainerDetail(body);
+    }
+
+    if (/^\/api\/factory\/workers\/\d+\/bales$/.test(pathname) && profile === "worker-bales-summary" && Array.isArray(body)) {
+      return compactWorkerBaleSummary(body);
+    }
+
+    if (pathname === "/api/ledger-accounts" && profile === "picker" && Array.isArray(body)) {
+      return compactLedgerPicker(body);
+    }
+
+    if (/^\/api\/locations\/\d+\/inventory$/.test(pathname) && profile === "view" && Array.isArray(body)) {
+      return compactLocationInventoryView(body);
+    }
+
+    if (pathname === "/api/accounts/all" && profile === "analytics") {
+      return compactAnalyticsAccounts(body);
     }
 
     return body;
@@ -240,7 +321,15 @@ if (!globalThis[INSTALL_KEY]) {
       maxLimit,
       protectedPaths: [...heavyArrayPaths],
       protectedPathPatterns: heavyArrayPathPatterns.map((pattern) => pattern.source),
-      responseProfiles: ["otw-summary", "stock-otw", "combined-detail"],
+      responseProfiles: [
+        "otw-summary",
+        "stock-otw",
+        "combined-detail",
+        "worker-bales-summary",
+        "picker",
+        "view",
+        "analytics",
+      ],
     })
   );
 }
