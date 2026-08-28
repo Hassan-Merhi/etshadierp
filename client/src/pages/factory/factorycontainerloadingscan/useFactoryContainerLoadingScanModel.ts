@@ -89,6 +89,17 @@ export function useFactoryContainerLoadingScanModel() {
   const [selectedProformaId, setSelectedProformaId] = useState<string>("");
   const scannerRef = useRef<HTMLInputElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
+  const ignoreProformaRef = useRef(false);
+
+  const toggleIgnoreProforma = useCallback(() => {
+    const enabled = !ignoreProformaRef.current;
+    // Update the ref synchronously so a hardware scanner that fires immediately
+    // after the click cannot submit with the previous render's toggle value.
+    ignoreProformaRef.current = enabled;
+    setIgnoreProforma(enabled);
+    setPendingBypassBaleRef(null);
+    setTimeout(() => scannerRef.current?.focus(), 0);
+  }, []);
 
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
 
@@ -337,8 +348,16 @@ export function useFactoryContainerLoadingScanModel() {
     ) => {
       const body =
         payload.mode === "refNumber"
-          ? { locationId: parseInt(selectedLocationId), refNumbers: payload.refNumbers }
-          : { locationId: parseInt(selectedLocationId), items: payload.items };
+          ? {
+              locationId: parseInt(selectedLocationId),
+              refNumbers: payload.refNumbers,
+              allowBypassProforma: ignoreProformaRef.current || undefined,
+            }
+          : {
+              locationId: parseInt(selectedLocationId),
+              items: payload.items,
+              allowBypassProforma: ignoreProformaRef.current || undefined,
+            };
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales/bulk-import`, body);
       return await res.json();
     },
@@ -368,7 +387,7 @@ export function useFactoryContainerLoadingScanModel() {
   });
 
   const finalizeMutation = useMutation({
-    mutationFn: async (variables: { txDate?: string; createContinuation?: boolean }) => {
+    mutationFn: async (variables: { txDate?: string; createCarryoverProforma?: boolean }) => {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize-loading`, variables);
       return await res.json();
     },
@@ -377,19 +396,15 @@ export function useFactoryContainerLoadingScanModel() {
         { predicate: keyStartsWith("/api/factory/customer-orders"), refetchType: "active" },
         { cancelRefetch: false }
       );
-      const continuationId = data?.continuationOrder?.id;
+      const carriedOverProforma = data?.carriedOverProforma;
       toast({
         title: "Loading finalized",
-        description: continuationId
-          ? `Loading sent for verification. Continuation loading #${continuationId} is ready.`
+        description: carriedOverProforma
+          ? `Loading sent for verification. Proforma "${carriedOverProforma.name}" was created for the remaining quantity.`
           : "Loading has been sent for office verification",
       });
       setShowFinalizeDialog(false);
-      navigate(
-        continuationId
-          ? `/factory/sales/loading/new?orderId=${continuationId}&continuationFromOrderId=${orderId}`
-          : "/factory/invoicing?tab=invoices"
-      );
+      navigate("/factory/invoicing?tab=invoices");
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -509,19 +524,11 @@ export function useFactoryContainerLoadingScanModel() {
         // When ignoreProforma is ON, always bypass the proforma check so the
         // first scan succeeds immediately (item still appears as "Not in Proforma"
         // in the comparison table — only the double-scan requirement is skipped).
-        allowBypassProforma: ignoreProforma ? true : isBypassProforma || undefined,
+        allowBypassProforma: ignoreProformaRef.current ? true : isBypassProforma || undefined,
         allowBypassOverload: isBypassOverload || undefined,
       });
     },
-    [
-      scanCode,
-      orderId,
-      selectedLocationId,
-      pendingBypassBaleRef,
-      pendingBypassOverloadRef,
-      ignoreProforma,
-      addBaleMutation,
-    ]
+    [scanCode, orderId, selectedLocationId, pendingBypassBaleRef, pendingBypassOverloadRef, addBaleMutation]
   );
 
   const handleImportFile = useCallback(
@@ -754,7 +761,7 @@ export function useFactoryContainerLoadingScanModel() {
     setPendingBypassBaleRef,
     pendingBypassOverloadRef,
     ignoreProforma,
-    setIgnoreProforma,
+    toggleIgnoreProforma,
     addBaleMutation,
     lastScannedRef,
     showLastScannedPopup,

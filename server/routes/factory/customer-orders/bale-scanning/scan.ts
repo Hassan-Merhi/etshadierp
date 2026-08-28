@@ -24,7 +24,7 @@ import {
   customerOrders,
   customerOrderBales,
 } from "@shared/schema";
-import { eq, and, or, sql, inArray, ilike } from "drizzle-orm";
+import { eq, and, or, sql, inArray, ilike, isNull, ne } from "drizzle-orm";
 import { firstRow } from "../../../../lib/queryResult";
 
 export function registerOrderBaleScanRoutes(app: Express) {
@@ -259,7 +259,8 @@ export function registerOrderBaleScanRoutes(app: Express) {
                   and(
                     eq(customerOrders.companyId, companyId),
                     eq(customerOrders.proformaIdUsed, order.proformaIdUsed),
-                    sql`${customerOrders.status} != 'CANCELLED'`,
+                    ne(customerOrders.status, "CANCELLED"),
+                    isNull(customerOrders.deletedAt),
                     sql`LOWER(TRIM(COALESCE(${customerOrderBales.articleCode}, ''))) = ${normalizedEffectiveArticleCode}`
                   )
                 );

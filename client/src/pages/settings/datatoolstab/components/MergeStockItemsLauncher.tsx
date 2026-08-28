@@ -3,15 +3,15 @@
  *
  * Extracted from DataToolsTab.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Card, CardHeader, CardTitle, CardContent, CardDescription} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
-import {Tabs, TabsList, TabsTrigger, TabsContent} from "@/components/ui/tabs";
-import {ArrowLeftRight} from "lucide-react";
-import {MergeStockItemsCard} from "./MergeStockItemsCard";
-import {BulkMergeStockItemsCard} from "./BulkMergeStockItemsCard";
-import {MergeHistoryCard} from "./MergeHistoryCard";
+import { useState } from "react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ArrowLeftRight } from "lucide-react";
+import { MergeStockItemsCard } from "./MergeStockItemsCard";
+import { BulkMergeStockItemsCard } from "./BulkMergeStockItemsCard";
+import { MergeHistoryCard } from "./MergeHistoryCard";
 
 export function MergeStockItemsLauncher() {
   const [open, setOpen] = useState(false);
@@ -19,20 +19,22 @@ export function MergeStockItemsLauncher() {
 
   return (
     <>
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ArrowLeftRight className="h-4 w-4" />
-            Merge Duplicate Stock Items
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Merge two items into one, run a bulk merge from Excel, or view and reverse past merges.
-          </CardDescription>
+      <Card className="group flex h-full flex-col overflow-hidden border-border/70 bg-card/80 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
+        <CardHeader className="space-y-3 pb-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/60 bg-primary/10 text-primary">
+            <ArrowLeftRight className="h-5 w-5" />
+          </div>
+          <div className="space-y-1">
+            <CardTitle className="text-base tracking-tight">Merge duplicate stock items</CardTitle>
+            <CardDescription className="text-sm leading-5">
+              Merge items individually, run an Excel batch, or review and reverse past merges.
+            </CardDescription>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="mt-auto pt-1">
           <Button
             variant="outline"
-            className="w-full"
+            className="h-10 w-full"
             onClick={() => {
               setTab("single");
               setOpen(true);

@@ -151,6 +151,7 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     await pool.query("DELETE FROM customer_dispatch_batches WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM customer_dispatch_batch_sequences WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM customer_orders WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM proforma_stock_reservations WHERE company_id = $1", [company.id]);
     await pool.query(
       "DELETE FROM customer_proforma_lines WHERE proforma_id IN (SELECT id FROM customer_proformas WHERE company_id = $1)",
       [company.id]

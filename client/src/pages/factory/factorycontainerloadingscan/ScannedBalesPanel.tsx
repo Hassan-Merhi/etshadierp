@@ -37,13 +37,11 @@ function ScanControls({ model }: { model: FactoryContainerLoadingScanModel }) {
         </label>
         <div className="flex items-center gap-1">
           <Button
+            type="button"
             size="sm"
             variant={model.ignoreProforma ? "default" : "outline"}
-            onClick={() => {
-              model.setIgnoreProforma((v) => !v);
-              // Clear any pending proforma bypass warning when turning the mode on
-              model.setPendingBypassBaleRef(null);
-            }}
+            onClick={model.toggleIgnoreProforma}
+            aria-pressed={model.ignoreProforma}
             className={
               model.ignoreProforma
                 ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500"

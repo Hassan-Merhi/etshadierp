@@ -21,6 +21,7 @@ export function BackupStatusCard({
   const [dismissing, setDismissing] = useState(false);
 
   const hasAnyRun = status.recentRuns.length > 0;
+  const latestRun = status.latestRun ?? status.recentRuns[0] ?? null;
   const now = Date.now();
   const stuckRuns = status.recentRuns.filter(
     (r) => r.status === "running" && now - new Date(r.startedAt).getTime() > 5 * 60 * 1000
@@ -69,7 +70,7 @@ export function BackupStatusCard({
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="text-base flex items-center gap-2">
             {headerIcon}
-            Backup Status
+            Backup status
           </CardTitle>
           <div className="flex items-center gap-1">
             {stuckRuns.length > 0 && (
@@ -98,12 +99,12 @@ export function BackupStatusCard({
         </div>
         <CardDescription>
           {stuckRuns.length > 0
-            ? `${stuckRuns.length} run${stuckRuns.length === 1 ? "" : "s"} appear stalled — click "Dismiss stalled" to clear`
+            ? `${stuckRuns.length} stalled run${stuckRuns.length === 1 ? "" : "s"} need attention`
             : hasRunning
-              ? "A backup is currently in progress..."
-              : hasAnyRun
-                ? `Last ${status.recentRuns.length} run${status.recentRuns.length === 1 ? "" : "s"} — newest first`
-                : "No backup runs recorded yet"}
+              ? "A backup is currently in progress"
+              : latestRun
+                ? "Latest export activity"
+                : "No exports have run yet"}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -125,17 +126,14 @@ export function BackupStatusCard({
           </div>
         )}
 
-        {/* Run history */}
-        {hasAnyRun ? (
-          <div className="space-y-2">
-            {status.recentRuns.map((run) => (
-              <RunRow key={run.id} run={run} />
-            ))}
+        {/* Latest run */}
+        {latestRun ? (
+          <div>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Latest run</p>
+            <RunRow run={latestRun} />
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">
-            No backup runs recorded yet. Trigger a manual send or wait for the scheduled run.
-          </p>
+          <p className="text-xs text-muted-foreground">Start an export above to see its status here.</p>
         )}
       </CardContent>
     </Card>

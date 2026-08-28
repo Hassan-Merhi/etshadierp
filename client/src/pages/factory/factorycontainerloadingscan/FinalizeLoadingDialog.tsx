@@ -175,16 +175,18 @@ export function FinalizeLoadingDialog({ model }: { model: FactoryContainerLoadin
               <>
                 <Button
                   variant="outline"
-                  onClick={() => finalizeMutation.mutate({ txDate: model.finalizeDate, createContinuation: false })}
+                  onClick={() =>
+                    finalizeMutation.mutate({ txDate: model.finalizeDate, createCarryoverProforma: false })
+                  }
                   disabled={finalizeMutation.isPending}
                   data-testid="button-finalize-only"
                 >
                   NVM — Finalize Only
                 </Button>
                 <Button
-                  onClick={() => finalizeMutation.mutate({ txDate: model.finalizeDate, createContinuation: true })}
+                  onClick={() => finalizeMutation.mutate({ txDate: model.finalizeDate, createCarryoverProforma: true })}
                   disabled={finalizeMutation.isPending}
-                  data-testid="button-create-continuation"
+                  data-testid="button-create-carryover-proforma"
                 >
                   <CheckCircle className="mr-2 h-4 w-4" />
                   {finalizeMutation.isPending ? "Creating..." : `Move ${remainingProformaBales} Remaining`}

@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, ChevronRight, RefreshCw, Trash2, ClipboardList, CreditCard, BookOpen } from "lucide-react";
+import { Plus, ChevronRight, RefreshCw, Trash2, ClipboardList, CreditCard } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/PageHeader";
@@ -97,48 +97,6 @@ export default function PropertyRentalPage({
     },
   });
 
-  const postAccrual = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", apiBase + "/accrue");
-      return res.json() as Promise<{ accrued: number; skipped: number }>;
-    },
-    onSuccess: (data) => {
-      const n = data?.accrued ?? 0;
-      const s = data?.skipped ?? 0;
-      toast({
-        title: n > 0 ? `${n} accrual${n !== 1 ? "s" : ""} posted` : "Nothing new to accrue",
-        description:
-          n > 0
-            ? `Journal vouchers created (Dr Rent Expense / Cr Accrued Rent Payable)${s > 0 ? ` · ${s} month${s !== 1 ? "s" : ""} already done` : ""}`
-            : s > 0
-              ? `${s} month${s !== 1 ? "s" : ""} already accrued — nothing new to post.`
-              : "All due months are already paid.",
-      });
-      queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
-    },
-    onError: (e: ClientErrorLike) => toast({ title: "Accrual failed", description: e.message, variant: "destructive" }),
-  });
-
-  const resetAccrual = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", apiBase + "/re-accrue");
-      return res.json() as Promise<{ reset: number; accrued: number; skipped: number }>;
-    },
-    onSuccess: (data) => {
-      const r = data?.reset ?? 0;
-      const n = data?.accrued ?? 0;
-      toast({
-        title: r > 0 ? `Reset ${r} old journal${r !== 1 ? "s" : ""} → 1 combined journal` : "Nothing to reset",
-        description:
-          n > 0
-            ? `${n} month${n !== 1 ? "s" : ""} accrued into one journal entry.`
-            : "No new rows to accrue after reset.",
-      });
-      queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
-    },
-    onError: (e: ClientErrorLike) => toast({ title: "Re-accrual failed", description: e.message, variant: "destructive" }),
-  });
-
   const deleteUnit = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `${apiBase}/units/${id}`),
     onSuccess: () => {
@@ -214,30 +172,6 @@ export default function PropertyRentalPage({
                 <ClipboardList className="h-4 w-4 mr-1" />
                 Payments Log
               </Button>
-            )}
-            {(apiBase === "/api/erp/rental" || apiBase === "/api/factory/rental") && unitType === "SHOP" && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => postAccrual.mutate()}
-                  disabled={postAccrual.isPending || resetAccrual.isPending}
-                  data-testid={`button-${testIdPrefix}-post-accrual`}
-                >
-                  <BookOpen className={`h-4 w-4 mr-1 ${postAccrual.isPending ? "animate-pulse" : ""}`} />
-                  {postAccrual.isPending ? "Accruing…" : "Post Accrual"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => resetAccrual.mutate()}
-                  disabled={postAccrual.isPending || resetAccrual.isPending}
-                  data-testid={`button-${testIdPrefix}-re-accrue`}
-                >
-                  <BookOpen className={`h-4 w-4 mr-1 ${resetAccrual.isPending ? "animate-pulse" : ""}`} />
-                  {resetAccrual.isPending ? "Resetting…" : "Re-accrue"}
-                </Button>
-              </>
             )}
             <Button
               variant="outline"
