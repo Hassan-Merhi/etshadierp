@@ -35,6 +35,12 @@ function extractAccounts(payload: unknown): unknown[] | null {
   return Array.isArray(accounts) ? accounts : null;
 }
 
+function withAnalyticsProfile(rawUrl: string): string {
+  const parsed = new URL(rawUrl, window.location.origin);
+  parsed.searchParams.set("profile", "analytics");
+  return rawUrl.startsWith("http") ? parsed.toString() : `${parsed.pathname}${parsed.search}`;
+}
+
 function installAccountsResponsePatch(): () => void {
   const globalState = window as typeof window & { [PATCH_KEY]?: FetchPatchState };
   let state = globalState[PATCH_KEY];
@@ -50,7 +56,14 @@ function installAccountsResponsePatch(): () => void {
       // before awaiting so a same-tab navigation cannot make the next page's
       // /api/accounts/all request inherit Analytics' array response shape.
       const normalizeForAnalytics = isAccountsAllUrl(rawUrl) && isAnalyticsRoute(window.location.pathname);
-      const response = await originalFetch(input, init);
+      let requestInput: RequestInfo | URL = input;
+
+      if (normalizeForAnalytics) {
+        const profiledUrl = withAnalyticsProfile(rawUrl);
+        requestInput = input instanceof Request ? new Request(profiledUrl, input) : profiledUrl;
+      }
+
+      const response = await originalFetch(requestInput, init);
 
       if (!normalizeForAnalytics) return response;
 
