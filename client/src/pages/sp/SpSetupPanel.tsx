@@ -1,4 +1,5 @@
 import type { ClientErrorLike } from "@/lib/clientError";
+import { releaseDebtEnglish } from "@/i18n/finalCloseoutTranslations";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -181,7 +182,7 @@ export default function SpSetupPanel() {
       }
 
       toast({
-        title: "Golden Coast accounting setup complete",
+        title: releaseDebtEnglish("Golden Coast accounting setup complete"),
         description: messages.join(" ") || "Golden Coast and HADI accounting accounts were already configured.",
       });
     },
@@ -301,7 +302,7 @@ export default function SpSetupPanel() {
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <CardTitle className="text-base">Golden Coast Accounting Readiness</CardTitle>
+              <CardTitle className="text-base">{releaseDebtEnglish("Golden Coast Accounting Readiness")}</CardTitle>
               <CardDescription className="text-xs mt-1">
                 {goldenCoast?.configuredRoleCount ?? 0} of {goldenCoast?.requiredRoleCount ?? 0} balance-sheet roles plus
                 the reciprocal HADI intercompany pair
@@ -366,7 +367,7 @@ export default function SpSetupPanel() {
             <div className="rounded-md border p-3 space-y-2" data-testid="gc-phase13-intercompany-readiness">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-sm font-medium">
-                  <ArrowLeftRight className="h-4 w-4" /> HADI intercompany pair
+                  <ArrowLeftRight className="h-4 w-4" /> {releaseDebtEnglish("HADI intercompany pair")}
                 </div>
                 <span className="text-xs text-muted-foreground">{phase13.parentCompanyName}</span>
               </div>
@@ -375,7 +376,9 @@ export default function SpSetupPanel() {
                 <IntercompanyReadinessRow account={phase13.hadiAccount} />
               ) : (
                 <p className="text-xs text-amber-600">
-                  HADI-side readiness needs parent-company authorization. Re-run Golden Coast setup to verify and repair it.
+                  {releaseDebtEnglish(
+                    "HADI-side readiness needs parent-company authorization. Re-run Golden Coast setup to verify and repair it."
+                  )}
                 </p>
               )}
               {phase13.blockers?.length > 0 && (
