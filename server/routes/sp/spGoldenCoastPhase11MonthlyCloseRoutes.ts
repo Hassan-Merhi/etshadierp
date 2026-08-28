@@ -154,7 +154,7 @@ async function resolveLegacyIncomeExpense(
 
 async function resolveAccounts(conn: DbLike, companyId: number): Promise<GoldenCoastPhase11Accounts> {
   const [sales, cogs, shared, ppd, fresh, hassan] = await Promise.all([
-    resolveLegacyIncomeExpense(conn, companyId, "sp_sales", ["Income"], true),
+    resolveLegacyIncomeExpense(conn, companyId, "sp_sales", ["Income", "Direct Income"], true),
     resolveLegacyIncomeExpense(conn, companyId, "sp_cogs", ["Direct Expense", "Expense"], true),
     resolveLegacyIncomeExpense(conn, companyId, "sp_shared_charges", ["Direct Expense", "Expense"], false),
     resolveCanonicalRole(conn, companyId, "profit_pending_distribution"),
@@ -234,9 +234,9 @@ async function buildPlan(conn: DbLike, companyId: number, body: unknown) {
     accountPeriodActivity(conn, companyId, accounts.cogsAccountId, start, end),
     accountPeriodActivity(conn, companyId, accounts.sharedChargesAccountId, start, end),
   ]);
-  const revenue = Decimal.max(new Decimal(sales.credit).minus(sales.debit), 0);
-  const totalCogs = Decimal.max(new Decimal(cogs.debit).minus(cogs.credit), 0);
-  const totalShared = Decimal.max(new Decimal(shared.debit).minus(shared.credit), 0);
+  const revenue = new Decimal(sales.credit).minus(sales.debit);
+  const totalCogs = new Decimal(cogs.debit).minus(cogs.credit);
+  const totalShared = new Decimal(shared.debit).minus(shared.credit);
   const plan = planGoldenCoastPhase11MonthlyClose({
     close,
     totalRevenueUsd: revenue.toFixed(2),
@@ -434,18 +434,24 @@ async function retireLegacyGoldenCoastProfitSplit(req: Request, res: Response, n
 export function registerSpGoldenCoastPhase11MonthlyCloseRoutes(app: Express) {
   app.get(
     "/api/sp/golden-coast/phase11/profit-splits/monthly-close/readiness",
+    privilegedReadRateLimit,
     requireAuth,
     requireNonPOS,
-    privilegedReadRateLimit,
     readiness
   );
   app.post(
     "/api/sp/golden-coast/phase11/profit-splits/monthly-close",
-    requireAuth,
-    requireNonPOS,
     privilegedMutationRateLimit,
     phase11RequestBudget,
+    requireAuth,
+    requireNonPOS,
     closeMonth
   );
-  app.post("/api/sp/profit-splits", requireAuth, retireLegacyGoldenCoastProfitSplit);
+  app.post(
+    "/api/sp/profit-splits",
+    privilegedMutationRateLimit,
+    phase11RequestBudget,
+    requireAuth,
+    retireLegacyGoldenCoastProfitSplit
+  );
 }
