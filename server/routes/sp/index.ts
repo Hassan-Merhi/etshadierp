@@ -33,7 +33,7 @@ import { registerSpMigrationCutoverRoutes } from "./spMigrationCutoverRoutes";
 import { registerSpMigrationFinalVerificationRoutes } from "./spMigrationFinalVerification";
 import { registerSpMigrationPhase4Routes } from "./spMigrationPhase4Routes";
 import { ensureCutoverHardening, installExplicitCompanyWriteGuard } from "./spMigrationCutoverHardening";
-import { ensureSpSupplierVoucherSyncTrigger, repairSpSupplierVoucherLinks } from "./spSupplierVoucherSync";
+import { runSpSupplierVoucherStartup } from "./spSupplierVoucherStartup";
 
 export function registerSpRoutes(app: Express) {
   registerSpAccessControl(app);
@@ -55,17 +55,17 @@ export function registerSpRoutes(app: Express) {
     });
   });
 
-  void (async () => {
-    await ensureSpSupplierVoucherSyncTrigger();
-    const repairedCount = await repairSpSupplierVoucherLinks();
-    if (repairedCount > 0) {
-      logger.info("[SP] Repaired Goods-OTW voucher supplier links", { repairedCount });
-    }
-  })().catch((error) => {
-    logger.warn("[SP] Supplier voucher synchronization deferred until Setup", {
-      error: error instanceof Error ? error.message : String(error),
+  void runSpSupplierVoucherStartup()
+    .then((repairedCount) => {
+      if (repairedCount > 0) {
+        logger.info("[SP] Repaired Goods-OTW voucher supplier links", { repairedCount });
+      }
+    })
+    .catch((error) => {
+      logger.warn("[SP] Supplier voucher synchronization deferred until Setup", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     });
-  });
 
   registerSpSetupRoutes(app);
   registerSpGoldenCoastSetupRoutes(app);
