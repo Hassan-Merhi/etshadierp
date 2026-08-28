@@ -110,9 +110,7 @@ describe("loaded bale scan audit", () => {
     renderPanel();
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    expect(fetchMock.mock.calls[0][0]).toBe(
-      "/api/factory/customer-orders/77/bale-removals?includeScanAudit=1"
-    );
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/factory/customer-orders/77/bale-removals?includeScanAudit=1");
   });
 
   it("leaves a bale scanned before the feature shipped blank instead of inventing a date", async () => {
