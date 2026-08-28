@@ -18,8 +18,6 @@ const TARGET_FIELDS = [
   "factorySupplierId",
 ] as const;
 
-
-
 type TargetField = (typeof TARGET_FIELDS)[number];
 
 export interface PostingSourceIdentity {
