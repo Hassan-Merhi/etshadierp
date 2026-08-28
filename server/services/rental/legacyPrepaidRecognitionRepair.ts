@@ -46,7 +46,7 @@ async function findOrCreateAccount(
      ORDER BY id ASC LIMIT 1`,
     [companyId, name]
   );
-  if (!rows[0]) throw new Error(`Could not find/create rental account ${name}`);
+  if (!rows[0]) throw new Error(`RENTAL_ACCOUNT_CREATE_FAILED:${name}`);
   return rows[0].id;
 }
 
