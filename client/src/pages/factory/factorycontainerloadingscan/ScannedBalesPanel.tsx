@@ -280,10 +280,9 @@ export function ScannedBalesPanel({ model }: { model: FactoryContainerLoadingSca
   const { data: scanAuditRows = [] } = useQuery<BaleScanAudit[]>({
     queryKey: ["/api/factory/customer-orders", model.orderId, "scan-audit", bales.length],
     queryFn: async () => {
-      const res = await fetch(
-        `/api/factory/customer-orders/${model.orderId}/bale-removals?includeScanAudit=1`,
-        { credentials: "include" }
-      );
+      const res = await fetch(`/api/factory/customer-orders/${model.orderId}/bale-removals?includeScanAudit=1`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error(String(res.status));
       const payload = await res.json();
       return Array.isArray(payload?.scanAudit) ? payload.scanAudit : [];
