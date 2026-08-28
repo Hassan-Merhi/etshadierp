@@ -10,7 +10,8 @@ const harness = vi.hoisted(() => {
       where: vi.fn(() => builder),
       for: vi.fn(() => builder),
       limit: vi.fn(() => Promise.resolve(result)),
-      then: (resolve: (value: unknown[]) => unknown, reject: (reason: unknown) => unknown) => Promise.resolve(result).then(resolve, reject),
+      then: (resolve: (value: unknown[]) => unknown, reject: (reason: unknown) => unknown) =>
+        Promise.resolve(result).then(resolve, reject),
     };
     return builder;
   };
@@ -57,16 +58,35 @@ vi.mock("drizzle-orm", () => ({
   sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }),
 }));
 vi.mock("@shared/schema", () => ({
-  factoryBales: { id: "factoryBales.id", companyId: "factoryBales.companyId", status: "factoryBales.status", updatedAt: "factoryBales.updatedAt" },
+  factoryBales: {
+    id: "factoryBales.id",
+    companyId: "factoryBales.companyId",
+    status: "factoryBales.status",
+    updatedAt: "factoryBales.updatedAt",
+  },
   customerOrders: {
-    id: "customerOrders.id", companyId: "customerOrders.companyId", customerId: "customerOrders.customerId",
-    proformaIdUsed: "customerOrders.proformaIdUsed", status: "customerOrders.status", deletedAt: "customerOrders.deletedAt",
-    locationId: "customerOrders.locationId", orderDate: "customerOrders.orderDate", containerNotes: "customerOrders.containerNotes",
-    totalQtyBales: "customerOrders.totalQtyBales", loadingStartedAt: "customerOrders.loadingStartedAt",
-    loadingFinalizedAt: "customerOrders.loadingFinalizedAt", verifiedAt: "customerOrders.verifiedAt", updatedAt: "customerOrders.updatedAt",
+    id: "customerOrders.id",
+    companyId: "customerOrders.companyId",
+    customerId: "customerOrders.customerId",
+    proformaIdUsed: "customerOrders.proformaIdUsed",
+    status: "customerOrders.status",
+    deletedAt: "customerOrders.deletedAt",
+    locationId: "customerOrders.locationId",
+    orderDate: "customerOrders.orderDate",
+    containerNotes: "customerOrders.containerNotes",
+    totalQtyBales: "customerOrders.totalQtyBales",
+    loadingStartedAt: "customerOrders.loadingStartedAt",
+    loadingFinalizedAt: "customerOrders.loadingFinalizedAt",
+    verifiedAt: "customerOrders.verifiedAt",
+    updatedAt: "customerOrders.updatedAt",
     grandTotal: "customerOrders.grandTotal",
   },
-  customerOrderBales: { orderId: "customerOrderBales.orderId", articleCode: "customerOrderBales.articleCode", baleId: "customerOrderBales.baleId", priceUsed: "customerOrderBales.priceUsed" },
+  customerOrderBales: {
+    orderId: "customerOrderBales.orderId",
+    articleCode: "customerOrderBales.articleCode",
+    baleId: "customerOrderBales.baleId",
+    priceUsed: "customerOrderBales.priceUsed",
+  },
   customerProformas: {
     id: "customerProformas.id",
     companyId: "customerProformas.companyId",
@@ -74,8 +94,15 @@ vi.mock("@shared/schema", () => ({
     name: "customerProformas.name",
     deletedAt: "customerProformas.deletedAt",
   },
-  customerProformaLines: { proformaId: "customerProformaLines.proformaId", articleCode: "customerProformaLines.articleCode" },
-  factoryDaybookEntries: { companyId: "factoryDaybookEntries.companyId", txType: "factoryDaybookEntries.txType", referenceId: "factoryDaybookEntries.referenceId" },
+  customerProformaLines: {
+    proformaId: "customerProformaLines.proformaId",
+    articleCode: "customerProformaLines.articleCode",
+  },
+  factoryDaybookEntries: {
+    companyId: "factoryDaybookEntries.companyId",
+    txType: "factoryDaybookEntries.txType",
+    referenceId: "factoryDaybookEntries.referenceId",
+  },
   customers: {
     id: "customers.id",
     legalName: "customers.legalName",
@@ -109,9 +136,16 @@ function req(overrides: Record<string, unknown> = {}) {
 }
 function resHarness() {
   const res: any = {
-    statusCode: 200, body: undefined,
-    status: vi.fn((code: number) => { res.statusCode = code; return res; }),
-    json: vi.fn((body: unknown) => { res.body = body; return res; }),
+    statusCode: 200,
+    body: undefined,
+    status: vi.fn((code: number) => {
+      res.statusCode = code;
+      return res;
+    }),
+    json: vi.fn((body: unknown) => {
+      res.body = body;
+      return res;
+    }),
   };
   return res;
 }
@@ -132,7 +166,10 @@ describe("customer loading intelligence route", () => {
     expect(noCompany.body).toEqual({ message: "No company selected" });
 
     const invalidCustomer = resHarness();
-    await routes.get("GET /api/factory/customer-loading/products")!(req({ query: { customerId: "abc" } }), invalidCustomer);
+    await routes.get("GET /api/factory/customer-loading/products")!(
+      req({ query: { customerId: "abc" } }),
+      invalidCustomer
+    );
     expect(invalidCustomer.statusCode).toBe(400);
     expect(invalidCustomer.body).toEqual({ message: "Valid customerId is required" });
   });
@@ -148,14 +185,57 @@ describe("customer loading intelligence route", () => {
 
   it("classifies active loading orders as loaded and returns customer KPIs", async () => {
     harness.selectResults.push([{ id: 12, legalName: "Customer A" }]);
-    harness.executeResults.push({ rows: [
-      { id: 1, code: "P1", articleCode: "HMD11001", name: "Shirts", nameAr: null, categoryId: 3, categoryName: "Summer", categoryNameAr: null, weightPerBaleKg: "40.00", sellingPrice: "80.00", productionPrice: "50.00", active: true, totalBalesLoaded: 7, totalKgLoaded: "280.000", loadingCount: 2, lastLoadedAt: "2026-08-17T10:00:00.000Z" },
-      { id: 2, code: "P2", articleCode: "HMD11002", name: "Shorts", nameAr: null, categoryId: 3, categoryName: "Summer", categoryNameAr: null, weightPerBaleKg: "25.00", sellingPrice: "60.00", productionPrice: "40.00", active: true, totalBalesLoaded: 0, totalKgLoaded: "0", loadingCount: 0, lastLoadedAt: null },
-    ] });
+    harness.executeResults.push({
+      rows: [
+        {
+          id: 1,
+          code: "P1",
+          articleCode: "HMD11001",
+          name: "Shirts",
+          nameAr: null,
+          categoryId: 3,
+          categoryName: "Summer",
+          categoryNameAr: null,
+          weightPerBaleKg: "40.00",
+          sellingPrice: "80.00",
+          productionPrice: "50.00",
+          active: true,
+          totalBalesLoaded: 7,
+          totalKgLoaded: "280.000",
+          loadingCount: 2,
+          lastLoadedAt: "2026-08-17T10:00:00.000Z",
+        },
+        {
+          id: 2,
+          code: "P2",
+          articleCode: "HMD11002",
+          name: "Shorts",
+          nameAr: null,
+          categoryId: 3,
+          categoryName: "Summer",
+          categoryNameAr: null,
+          weightPerBaleKg: "25.00",
+          sellingPrice: "60.00",
+          productionPrice: "40.00",
+          active: true,
+          totalBalesLoaded: 0,
+          totalKgLoaded: "0",
+          loadingCount: 0,
+          lastLoadedAt: null,
+        },
+      ],
+    });
     const res = resHarness();
     await routes.get("GET /api/factory/customer-loading/products")!(req(), res);
     expect(res.statusCode).toBe(200);
-    expect(res.body.summary).toEqual({ totalProducts: 2, loadedProducts: 1, neverLoadedProducts: 1, productCoveragePct: 50, totalBalesLoaded: 7, totalKgLoaded: 280 });
+    expect(res.body.summary).toEqual({
+      totalProducts: 2,
+      loadedProducts: 1,
+      neverLoadedProducts: 1,
+      productCoveragePct: 50,
+      totalBalesLoaded: 7,
+      totalKgLoaded: 280,
+    });
     expect(res.body.products).toEqual([
       expect.objectContaining({ id: 1, loadingStatus: "LOADED", totalBalesLoaded: 7, totalKgLoaded: 280 }),
       expect.objectContaining({ id: 2, loadingStatus: "NEVER_LOADED", totalBalesLoaded: 0, totalKgLoaded: 0 }),
@@ -172,13 +252,19 @@ describe("customer loading intelligence route", () => {
 
   it("validates and scopes history drilldown before reading loading records", async () => {
     const invalid = resHarness();
-    await routes.get("GET /api/factory/customer-loading/history")!(req({ query: { customerId: "12", productId: "x" } }), invalid);
+    await routes.get("GET /api/factory/customer-loading/history")!(
+      req({ query: { customerId: "12", productId: "x" } }),
+      invalid
+    );
     expect(invalid.statusCode).toBe(400);
     expect(invalid.body).toEqual({ message: "Valid customerId and productId are required" });
 
     harness.selectResults.push([]);
     const foreignCustomer = resHarness();
-    await routes.get("GET /api/factory/customer-loading/history")!(req({ query: { customerId: "12", productId: "8" } }), foreignCustomer);
+    await routes.get("GET /api/factory/customer-loading/history")!(
+      req({ query: { customerId: "12", productId: "8" } }),
+      foreignCustomer
+    );
     expect(foreignCustomer.statusCode).toBe(404);
     expect(harness.db.execute).not.toHaveBeenCalled();
   });
@@ -187,13 +273,33 @@ describe("customer loading intelligence route", () => {
     harness.selectResults.push([{ id: 12, legalName: "Customer A" }]);
     harness.executeResults.push(
       { rows: [{ id: 8, code: "P8", articleCode: "HMD8", name: "Asian Wear" }] },
-      { rows: [{ sessionId: 33, invoiceId: 33, status: "VERIFIED", truckNo: "CONT-4", driverName: "Carrier", startedAt: "2026-08-17T08:00:00Z", completedAt: "2026-08-17T09:00:00Z", balesLoaded: 9, kgLoaded: "360.000", lastScanAt: "2026-08-17T08:55:00Z" }] }
+      {
+        rows: [
+          {
+            sessionId: 33,
+            invoiceId: 33,
+            status: "VERIFIED",
+            truckNo: "CONT-4",
+            driverName: "Carrier",
+            startedAt: "2026-08-17T08:00:00Z",
+            completedAt: "2026-08-17T09:00:00Z",
+            balesLoaded: 9,
+            kgLoaded: "360.000",
+            lastScanAt: "2026-08-17T08:55:00Z",
+          },
+        ],
+      }
     );
     const res = resHarness();
-    await routes.get("GET /api/factory/customer-loading/history")!(req({ query: { customerId: "12", productId: "8" } }), res);
+    await routes.get("GET /api/factory/customer-loading/history")!(
+      req({ query: { customerId: "12", productId: "8" } }),
+      res
+    );
     expect(res.statusCode).toBe(200);
     expect(res.body.product).toEqual({ id: 8, code: "P8", articleCode: "HMD8", name: "Asian Wear" });
-    expect(res.body.history[0]).toEqual(expect.objectContaining({ sessionId: 33, invoiceId: 33, status: "VERIFIED", balesLoaded: 9, kgLoaded: 360 }));
+    expect(res.body.history[0]).toEqual(
+      expect.objectContaining({ sessionId: 33, invoiceId: 33, status: "VERIFIED", balesLoaded: 9, kgLoaded: 360 })
+    );
     const historySql = harness.db.execute.mock.calls[1]?.[0] as any;
     const historyText = historySql.strings.join(" ");
     expect(historyText).toContain("DISTINCT ON (cob.bale_id)");
@@ -209,8 +315,15 @@ describe("customer loading intelligence route", () => {
         resHarness()
       ) as Promise<void>;
     const order = {
-      id: 10, companyId: 4, customerId: 12, proformaIdUsed: 7, locationId: 2, orderDate: "2026-08-24",
-      status: "LOADING", containerNotes: null, grandTotal: "0",
+      id: 10,
+      companyId: 4,
+      customerId: 12,
+      proformaIdUsed: 7,
+      locationId: 2,
+      orderDate: "2026-08-24",
+      status: "LOADING",
+      containerNotes: null,
+      grandTotal: "0",
     };
     const bale = { orderId: 10, baleId: 20, articleCode: "A", priceUsed: "5" };
     const proforma = { id: 7, companyId: 4, customerId: 12, name: "August Proforma" };
@@ -225,14 +338,16 @@ describe("customer loading intelligence route", () => {
       pricingMode: "per_kg",
       pricePerKg: "0.250000",
     };
-    const setup = (overrides: {
-      order?: any;
-      bales?: any[];
-      proforma?: any;
-      lines?: any[];
-      relatedOrders?: any[];
-      relatedBales?: any[];
-    } = {}) => {
+    const setup = (
+      overrides: {
+        order?: any;
+        bales?: any[];
+        proforma?: any;
+        lines?: any[];
+        relatedOrders?: any[];
+        relatedBales?: any[];
+      } = {}
+    ) => {
       harness.selectResults.push(
         [overrides.order ?? order],
         overrides.bales ?? [bale],
@@ -252,7 +367,8 @@ describe("customer loading intelligence route", () => {
       setup();
       const response = resHarness();
       await routes.get("POST /api/factory/customer-orders/:id/finalize-loading")!(
-        req({ body: { createCarryoverProforma: true }, params: { id: "10" } }), response
+        req({ body: { createCarryoverProforma: true }, params: { id: "10" } }),
+        response
       );
       expect(response.statusCode).toBe(200);
       const proformaInsert = harness.db.insert.mock.results[0]?.value;
@@ -288,7 +404,10 @@ describe("customer loading intelligence route", () => {
           { ...line, quantity: 3 },
           { ...line, articleCode: " a ", productName: "Product A second price", quantity: 3, pricePerBale: "12.00" },
         ],
-        relatedBales: [{ ...bale, articleCode: "A" }, { ...bale, articleCode: "a" }],
+        relatedBales: [
+          { ...bale, articleCode: "A" },
+          { ...bale, articleCode: "a" },
+        ],
       });
       harness.mutationResults[0] = [
         { id: 2, companyId: 4, customerId: 12, name: "August Proforma - 4 Remaining - Carried Over" },
@@ -312,7 +431,8 @@ describe("customer loading intelligence route", () => {
       setup();
       const response = resHarness();
       await routes.get("POST /api/factory/customer-orders/:id/finalize-loading")!(
-        req({ body: { createCarryoverProforma: false }, params: { id: "10" } }), response
+        req({ body: { createCarryoverProforma: false }, params: { id: "10" } }),
+        response
       );
       expect(response.statusCode).toBe(200);
       expect(harness.db.insert).not.toHaveBeenCalled();
@@ -344,7 +464,8 @@ describe("customer loading intelligence route", () => {
       setup({ relatedBales: [{ articleCode: "A" }, { articleCode: "A" }, { articleCode: "A" }] });
       const fullResponse = resHarness();
       await routes.get("POST /api/factory/customer-orders/:id/finalize-loading")!(
-        req({ body: { createCarryoverProforma: true }, params: { id: "10" } }), fullResponse
+        req({ body: { createCarryoverProforma: true }, params: { id: "10" } }),
+        fullResponse
       );
       expect(harness.db.insert).not.toHaveBeenCalled();
       expect(fullResponse.body).not.toHaveProperty("carriedOverProforma");
@@ -355,7 +476,8 @@ describe("customer loading intelligence route", () => {
       setup({ order: { ...order, proformaIdUsed: null } });
       const noProformaResponse = resHarness();
       await routes.get("POST /api/factory/customer-orders/:id/finalize-loading")!(
-        req({ body: { createCarryoverProforma: true }, params: { id: "10" } }), noProformaResponse
+        req({ body: { createCarryoverProforma: true }, params: { id: "10" } }),
+        noProformaResponse
       );
       expect(harness.db.insert).not.toHaveBeenCalled();
       expect(noProformaResponse.body).not.toHaveProperty("carriedOverProforma");
@@ -366,7 +488,8 @@ describe("customer loading intelligence route", () => {
       harness.db.transaction.mockRejectedValueOnce(new Error("daybook write failed"));
       const response = resHarness();
       await routes.get("POST /api/factory/customer-orders/:id/finalize-loading")!(
-        req({ body: { createCarryoverProforma: true }, params: { id: "10" } }), response
+        req({ body: { createCarryoverProforma: true }, params: { id: "10" } }),
+        response
       );
       expect(response.statusCode).toBe(400);
       expect(harness.db.update).not.toHaveBeenCalled();
