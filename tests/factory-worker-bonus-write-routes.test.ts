@@ -69,7 +69,9 @@ async function bonusVoucherCount(bonusId: number): Promise<number> {
   return Number(result.rows[0].count);
 }
 
-async function accountNamed(name: string): Promise<{ id: number; account_type: string; parent_id: number | null } | null> {
+async function accountNamed(
+  name: string
+): Promise<{ id: number; account_type: string; parent_id: number | null } | null> {
   const result = await pool.query<{ id: number; account_type: string; parent_id: number | null }>(
     `SELECT id, account_type, parent_id FROM ledger_accounts WHERE company_id = $1 AND name = $2`,
     [ctx.companyId, name]
