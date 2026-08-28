@@ -140,12 +140,12 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement", () => {
     const differentBank = settlement({ receiptAccount: { kind: "bank", id: 92 } });
     const differentReference = settlement({ reference: "Different collection" });
 
-    expect(
-      goldenCoastPhase10SettlementDigest({ settlement: differentBank, gcSalesCashAccountId: 44 })
-    ).not.toBe(digest);
-    expect(
-      goldenCoastPhase10SettlementDigest({ settlement: differentReference, gcSalesCashAccountId: 44 })
-    ).not.toBe(digest);
+    expect(goldenCoastPhase10SettlementDigest({ settlement: differentBank, gcSalesCashAccountId: 44 })).not.toBe(
+      digest
+    );
+    expect(goldenCoastPhase10SettlementDigest({ settlement: differentReference, gcSalesCashAccountId: 44 })).not.toBe(
+      digest
+    );
     expect(goldenCoastPhase10SettlementDigest({ settlement: base, gcSalesCashAccountId: 45 })).not.toBe(digest);
     expect(goldenCoastPhase10IdempotencyKey(7, base.clientRequestId)).toContain(base.clientRequestId);
   });

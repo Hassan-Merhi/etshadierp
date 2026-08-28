@@ -297,11 +297,7 @@ async function findReplayedSettlement(
     .select()
     .from(vouchers)
     .where(
-      and(
-        eq(vouchers.id, Number(marker.voucherId)),
-        eq(vouchers.companyId, companyId),
-        isNull(vouchers.deletedAt)
-      )
+      and(eq(vouchers.id, Number(marker.voucherId)), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt))
     )
     .limit(1);
   if (!voucher) {
@@ -332,9 +328,7 @@ async function findReplayedSettlement(
         ? Number(entry.bankAccountId ?? 0) === settlement.receiptAccount.id
         : Number(entry.ledgerAccountId ?? 0) === settlement.receiptAccount.id;
     return (
-      targetMatches &&
-      amountEquals(entry.debitAmount, settlement.amountUsd) &&
-      amountEquals(entry.creditAmount, "0")
+      targetMatches && amountEquals(entry.debitAmount, settlement.amountUsd) && amountEquals(entry.creditAmount, "0")
     );
   });
   if (!salesCashCredit || !receiptDebit) {
@@ -438,13 +432,7 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
         settlement,
         gcSalesCashAccountId: gcSalesCashAccount.id,
       });
-      const replayed = await findReplayedSettlement(
-        tx,
-        companyId,
-        settlement,
-        gcSalesCashAccount.id,
-        settlementDigest
-      );
+      const replayed = await findReplayedSettlement(tx, companyId, settlement, gcSalesCashAccount.id, settlementDigest);
       if (replayed) {
         const currentBalance = await gcSalesCashDebitBalance(tx, companyId, gcSalesCashAccount.id);
         return {
