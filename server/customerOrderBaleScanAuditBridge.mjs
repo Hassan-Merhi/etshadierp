@@ -24,16 +24,21 @@ function log(level, message, extra = {}) {
   );
 }
 
-async function ensureCustomerOrderBaleScanAudit() {
-  if (process.env.NODE_ENV === "test") return;
-  if (!connectionString) {
+/**
+ * `options.connectionString` overrides the environment-derived target. Server
+ * boot never passes it; it exists so the routine can be driven against a
+ * stubbed client without mutating process-wide database configuration.
+ */
+export async function ensureCustomerOrderBaleScanAudit(options = {}) {
+  const target = options.connectionString ?? connectionString;
+  if (!target) {
     log("WARN", "Scan-audit schema check skipped because no database configuration is available");
     return;
   }
 
   const client = new Client({
-    connectionString,
-    ssl: resolveDatabaseSsl(connectionString),
+    connectionString: target,
+    ssl: resolveDatabaseSsl(target),
     connectionTimeoutMillis: 8_000,
   });
 
@@ -195,4 +200,8 @@ async function ensureCustomerOrderBaleScanAudit() {
   }
 }
 
-await ensureCustomerOrderBaleScanAudit();
+// Importing this module installs the schema on a real server boot. Tests import
+// it for the exported routine and drive it against a stubbed client instead.
+if (process.env.NODE_ENV !== "test") {
+  await ensureCustomerOrderBaleScanAudit();
+}
