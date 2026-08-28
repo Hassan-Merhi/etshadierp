@@ -78,6 +78,12 @@ jobs:
         continue-on-error: true
         run: node scripts/verify-program6f-export-resource-controls.mjs
 
+      - name: Phase 2 scheduler-residency invariants
+        id: scheduler_residency
+        if: always()
+        continue-on-error: true
+        run: node scripts/verify-render-phase2-lazy-schedulers.mjs
+
       - name: Upload query-audit evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -96,8 +102,9 @@ jobs:
           QUERY_REVIEW_OUTCOME: ${{ steps.query_review.outcome }}
           QUERY_SAFETY_OUTCOME: ${{ steps.query_safety.outcome }}
           RESOURCE_CONTROLS_OUTCOME: ${{ steps.resource_controls.outcome }}
+          SCHEDULER_RESIDENCY_OUTCOME: ${{ steps.scheduler_residency.outcome }}
         run: |
-          if [ "$QUERY_REVIEW_OUTCOME" != "success" ] || [ "$QUERY_SAFETY_OUTCOME" != "success" ] || [ "$RESOURCE_CONTROLS_OUTCOME" != "success" ]; then
+          if [ "$QUERY_REVIEW_OUTCOME" != "success" ] || [ "$QUERY_SAFETY_OUTCOME" != "success" ] || [ "$RESOURCE_CONTROLS_OUTCOME" != "success" ] || [ "$SCHEDULER_RESIDENCY_OUTCOME" != "success" ]; then
             echo "Performance/database safety gate failed."
             exit 1
           fi
