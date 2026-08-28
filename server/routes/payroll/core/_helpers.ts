@@ -141,7 +141,7 @@ export async function findOrCreateLedger(
       throw err;
     }
   }
-  throw new Error(`Unable to create ledger account "${accountName}" after multiple attempts`);
+  throw new Error(`Unable to create ledger account "${name}" after multiple attempts`);
 }
 
 export const workerUpload = multer({
