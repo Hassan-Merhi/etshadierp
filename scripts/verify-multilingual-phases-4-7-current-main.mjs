@@ -26,7 +26,7 @@ const bundles = [
     parts: 4,
     translatorImport: "translatePhase4SupplierPartnerText",
     test: "tests/phase4-supplier-partner-translations.test.ts",
-    expectedCount: 231,
+    expectedCount: 235,
   },
   {
     phase: 5,
@@ -55,7 +55,7 @@ const bundles = [
     test: "tests/phase7-backend-messages-translations.test.ts",
     // The current mainline catalogue contains the reviewed backend-message
     // entries recorded by the Phase 7 translation contract.
-    expectedCount: 599,
+    expectedCount: 614,
   },
 ];
 
@@ -159,10 +159,10 @@ if (failures.length > 0) {
 console.log(
   JSON.stringify(
     {
-      phases: [4, 5, 6, 7],
+      phases: bundles.map((bundle) => bundle.phase),
       status: "reconciled-on-current-main",
       languages: ["en", "ar", "fr"],
-      reviewedEntries: 231 + 182 + 254 + 599,
+      reviewedEntries: bundles.reduce((total, bundle) => total + bundle.expectedCount, 0),
       storedBusinessValuesProtected: true,
       sqlRequired: false,
     },
