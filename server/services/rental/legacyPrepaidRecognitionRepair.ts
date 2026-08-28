@@ -22,15 +22,23 @@ type CandidateRow = {
 };
 
 type PaymentRow = {
+  id: number;
   payment_date: string;
   amount: string;
   voucher_id: number | null;
 };
 
 type DebitSummary = {
+  voucher_id: number;
   name: string;
   account_type: string;
   debit: string;
+};
+
+type ReclassChunk = {
+  paymentId: number;
+  paymentDate: string;
+  amount: number;
 };
 
 /**
@@ -39,9 +47,7 @@ type DebitSummary = {
  * prepaid flag. Ambiguous rows are left untouched rather than guessed.
  *
  * For old direct-expense postings, historical accounting is corrected at the
- * original dates:
- *   payment date: Dr Prepaid Rent / Cr Rent Expense
- *   billing date: Dr Rent Expense / Cr Prepaid Rent
+ * original payment dates, then recognized on the actual billing date.
  */
 export async function repairLegacyFullyPrepaidRentRecognition(
   companyId: number,
@@ -90,7 +96,7 @@ export async function repairLegacyFullyPrepaidRentRecognition(
     if (dueDate > asOfDate) continue;
 
     const { rows: earlyPayments } = await pool.query<PaymentRow>(
-      `SELECT payment_date::text, amount::text, voucher_id
+      `SELECT id, payment_date::text, amount::text, voucher_id
        FROM property_payments
        WHERE ledger_row_id = $1
          AND company_id = $2
@@ -113,31 +119,68 @@ export async function repairLegacyFullyPrepaidRentRecognition(
     }
 
     const { rows: debitSummary } = await pool.query<DebitSummary>(
-      `SELECT la.name, la.account_type, COALESCE(SUM(ve.debit_amount::numeric), 0)::text AS debit
+      `SELECT ve.voucher_id, la.name, la.account_type,
+              COALESCE(SUM(ve.debit_amount::numeric), 0)::text AS debit
        FROM voucher_entries ve
        JOIN ledger_accounts la ON la.id = ve.ledger_account_id
        WHERE ve.voucher_id = ANY($1::int[])
          AND la.company_id = $2
          AND ve.debit_amount::numeric > 0
          AND la.deleted_at IS NULL
-       GROUP BY la.name, la.account_type`,
+       GROUP BY ve.voucher_id, la.name, la.account_type`,
       [voucherIds, companyId]
     );
 
-    const prepaidDebit = debitSummary
-      .filter((entry) => entry.name.toLowerCase() === "prepaid rent")
-      .reduce((sum, entry) => sum + Number(entry.debit), 0);
-    const rentExpenseDebit = debitSummary
-      .filter(
-        (entry) =>
-          (entry.account_type === "Indirect Expense" || entry.account_type === "Expense") &&
-          entry.name.toLowerCase().includes("rent")
-      )
-      .reduce((sum, entry) => sum + Number(entry.debit), 0);
+    const summariesByVoucher = new Map<number, DebitSummary[]>();
+    for (const entry of debitSummary) {
+      const entries = summariesByVoucher.get(entry.voucher_id) ?? [];
+      entries.push(entry);
+      summariesByVoucher.set(entry.voucher_id, entries);
+    }
 
-    const alreadyPrepaid = prepaidDebit >= expected - 0.005;
-    const legacyDirectExpense = !alreadyPrepaid && rentExpenseDebit >= expected - 0.005;
-    if (!alreadyPrepaid && !legacyDirectExpense) {
+    let remaining = expected;
+    let ambiguous = false;
+    const reclassChunks: ReclassChunk[] = [];
+
+    for (const payment of earlyPayments) {
+      if (remaining <= 0.005) break;
+      const paymentAmount = Number(payment.amount);
+      if (!(paymentAmount > 0.005) || payment.voucher_id === null) {
+        ambiguous = true;
+        break;
+      }
+
+      const allocated = Math.min(paymentAmount, remaining);
+      const summaries = summariesByVoucher.get(payment.voucher_id) ?? [];
+      const prepaidDebit = summaries
+        .filter((entry) => entry.name.toLowerCase() === "prepaid rent")
+        .reduce((sum, entry) => sum + Number(entry.debit), 0);
+      const rentExpenseDebit = summaries
+        .filter(
+          (entry) =>
+            (entry.account_type === "Indirect Expense" || entry.account_type === "Expense") &&
+            entry.name.toLowerCase().includes("rent")
+        )
+        .reduce((sum, entry) => sum + Number(entry.debit), 0);
+
+      const paymentAlreadyPrepaid = prepaidDebit >= allocated - 0.005;
+      const paymentWasDirectExpense = !paymentAlreadyPrepaid && rentExpenseDebit >= allocated - 0.005;
+      if (!paymentAlreadyPrepaid && !paymentWasDirectExpense) {
+        ambiguous = true;
+        break;
+      }
+
+      if (paymentWasDirectExpense) {
+        reclassChunks.push({
+          paymentId: payment.id,
+          paymentDate: payment.payment_date.slice(0, 10),
+          amount: allocated,
+        });
+      }
+      remaining -= allocated;
+    }
+
+    if (ambiguous || remaining > 0.005) {
       skippedAmbiguous++;
       logger.warn("[RentalLegacyPrepaidRepair] skipped ambiguous row", {
         companyId,
@@ -145,13 +188,11 @@ export async function repairLegacyFullyPrepaidRentRecognition(
         ledgerRowId: row.id,
         dueDate,
         expected,
-        prepaidDebit,
-        rentExpenseDebit,
+        remaining,
       });
       continue;
     }
 
-    const paymentDate = earlyPayments[0].payment_date.slice(0, 10);
     const currency = row.currency || "USD";
     const amount = expected.toFixed(2);
     const period = `${String(row.month).padStart(2, "0")}/${row.year}`;
@@ -168,29 +209,36 @@ export async function repairLegacyFullyPrepaidRentRecognition(
         );
         const prepaidId = await findOrCreateLedgerAccount(tx, companyId, "Prepaid Rent", "Asset", "PREP-RENT");
 
-        if (legacyDirectExpense) {
+        for (const chunk of reclassChunks) {
+          const chunkAmount = chunk.amount.toFixed(2);
           const narration = `Legacy prepaid rent reclassification - unit${row.unit_id} - ${period}`;
           const { voucher } = await insertInfrastructureVoucherTx(
             tx,
             {
               companyId,
-              voucherNumber: `LEGACY-PREPAID-RECLASS-${companyId}-${row.id}`,
+              voucherNumber: `LEGACY-PREPAID-RECLASS-${companyId}-${row.id}-${chunk.paymentId}`,
               voucherType: "Journal",
-              voucherDate: paymentDate,
+              voucherDate: chunk.paymentDate,
               description: narration,
-              totalAmount: amount,
+              totalAmount: chunkAmount,
               currency,
               sourceModule: module,
             },
-            infrastructurePostingIdentity("rental-prepaid-repair", sourceId, "reclass"),
-            { ledgerRowId: row.id, amount, paymentDate, dueDate }
+            infrastructurePostingIdentity("rental-prepaid-repair", sourceId, `reclass:${chunk.paymentId}`),
+            {
+              ledgerRowId: row.id,
+              paymentId: chunk.paymentId,
+              amount: chunkAmount,
+              paymentDate: chunk.paymentDate,
+              dueDate,
+            }
           );
 
           await tx.insert(voucherEntries).values([
             {
               voucherId: voucher.id,
               ledgerAccountId: prepaidId,
-              debitAmount: amount,
+              debitAmount: chunkAmount,
               creditAmount: "0",
               narration,
             },
@@ -198,7 +246,7 @@ export async function repairLegacyFullyPrepaidRentRecognition(
               voucherId: voucher.id,
               ledgerAccountId: expenseId,
               debitAmount: "0",
-              creditAmount: amount,
+              creditAmount: chunkAmount,
               narration,
             },
           ]);
@@ -218,7 +266,7 @@ export async function repairLegacyFullyPrepaidRentRecognition(
             sourceModule: module,
           },
           infrastructurePostingIdentity("rental-prepaid-repair", sourceId, "recognition"),
-          { ledgerRowId: row.id, amount, paymentDate, dueDate }
+          { ledgerRowId: row.id, amount, dueDate }
         );
 
         await tx.insert(voucherEntries).values([
@@ -260,9 +308,8 @@ export async function repairLegacyFullyPrepaidRentRecognition(
         module,
         ledgerRowId: row.id,
         dueDate,
-        paymentDate,
         expected,
-        legacyDirectExpense,
+        reclassifiedPayments: reclassChunks.length,
       });
     } catch (error: unknown) {
       logger.error("[RentalLegacyPrepaidRepair] row repair failed", {
