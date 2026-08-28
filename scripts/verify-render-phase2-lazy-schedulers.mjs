@@ -110,11 +110,12 @@ for (const [specifier, label] of [
   );
 }
 
-// Schedule expressions are part of behavior. Phase 2 changes loading timing,
-// not when business jobs execute.
+// Schedule expressions are part of behavior. Keep the scheduler verifier aligned
+// with the intentional daily rental-accrual catch-up while preserving every other
+// Phase 2 scheduling invariant.
 for (const cronExpression of [
   '"0 7 1 * *"',
-  '"0 6 2 * *"',
+  '"0 6 * * *"',
   '"0 * * * *"',
   '"30 3 * * *"',
   '"0 9 * * *"',
