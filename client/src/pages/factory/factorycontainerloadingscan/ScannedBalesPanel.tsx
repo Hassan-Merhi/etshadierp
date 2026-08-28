@@ -290,7 +290,10 @@ export function ScannedBalesPanel({ model }: { model: FactoryContainerLoadingSca
     enabled: !!model.orderId,
     staleTime: 0,
   });
-  const scanAuditByBaleId = useMemo(() => new Map(scanAuditRows.map((entry) => [entry.id, entry])), [scanAuditRows]);
+  const scanAuditByBaleId = useMemo(
+    () => new Map(scanAuditRows.map((entry) => [entry.id, entry])),
+    [scanAuditRows]
+  );
 
   return (
     <div className="lg:w-[60%] flex flex-col min-h-0">
