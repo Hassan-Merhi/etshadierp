@@ -7,7 +7,15 @@ import { Zap, Download, MessageCircle, Building2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-import { Recipient, ExportSettings, Company, BackupStatus, WaSettings, WaRecipient } from "./ExportCenterTypes";
+import {
+  Recipient,
+  ExportSettings,
+  Company,
+  BackupStatus,
+  WaSettings,
+  WaRecipient,
+  NpSettings,
+} from "./ExportCenterTypes";
 import { ExportProgressDialog } from "./ExportProgressDialog";
 import { DailyExportTab } from "./DailyExportTab";
 import { RecipientsTab } from "./RecipientsTab";
@@ -53,10 +61,13 @@ export function ExportCenter() {
   });
   const { data: waSettings } = useQuery<WaSettings>({ queryKey: ["/api/whatsapp/settings"] });
   const { data: waRecipients = [] } = useQuery<WaRecipient[]>({ queryKey: ["/api/whatsapp/recipients"] });
+  const { data: npSettings } = useQuery<NpSettings>({ queryKey: ["/api/whatsapp/np-settings"] });
+
   // Computed
   const waGroups = waRecipients.filter((r) => r.isGroup && r.active);
   const waReady = !!(waSettings?.enabled && waSettings?.dailyRecipientId);
   const dailyWaGroup = waRecipients.find((r) => r.id === waSettings?.dailyRecipientId);
+  const npWaGroup = waRecipients.find((r) => r.id === npSettings?.recipientId);
   const filteredRuns = (backupStatus?.recentRuns ?? []).filter((r) => {
     if (historyFilter === "all") return true;
     if (historyFilter === "success") return r.status === "success";
@@ -185,7 +196,7 @@ export function ExportCenter() {
               waGroups={waGroups}
               waRecipients={waRecipients}
               dailyWaGroup={dailyWaGroup}
-              npWaGroup={undefined}
+              npWaGroup={npWaGroup}
               exportSettings={exportSettings}
               gmailUser={gmailUser}
               setGmailUser={setGmailUser}
