@@ -3,7 +3,6 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
 import {
   accountingPostingRequests,
-  bankAccounts,
   ledgerAccounts,
   locations,
   spStockMovements,
@@ -50,7 +49,6 @@ import {
   type GoldenCoastPhase5RoleAccounts,
   type GoldenCoastPhase5SaleInput,
   type GoldenCoastPhase5SalePlan,
-  type GoldenCoastPhase5SaleSideAccount,
 } from "../../services/accounting/goldenCoastPhase5PosSale";
 import {
   GoldenCoastPhase6DeductionError,
@@ -260,64 +258,6 @@ async function resolveSpecialLocationConfig(
     return { deductionPerQtyUsd: "0", specialLocationId: special ? Number(special.id) : null };
   }
   return { deductionPerQtyUsd: String(special.deduction ?? "0"), specialLocationId: Number(special.id) };
-}
-
-async function resolveSaleSideAccount(
-  conn: DbLike,
-  companyId: number,
-  raw: unknown,
-  fallbackLedgerAccountId: number
-): Promise<GoldenCoastPhase5SaleSideAccount> {
-  if (raw == null) return { kind: "ledger", id: fallbackLedgerAccountId };
-  if (typeof raw !== "object" || Array.isArray(raw)) {
-    throw new GoldenCoastPhase6RouteError("saleSideAccount must be an object when supplied");
-  }
-  const input = raw as Record<string, unknown>;
-  if (input.kind !== "ledger" && input.kind !== "bank") {
-    throw new GoldenCoastPhase6RouteError('saleSideAccount.kind must be "ledger" or "bank"');
-  }
-  const id = Number(input.id);
-  if (!Number.isInteger(id) || id <= 0)
-    throw new GoldenCoastPhase6RouteError("saleSideAccount.id must be a positive integer");
-
-  if (input.kind === "bank") {
-    const [row] = await conn
-      .select({ id: bankAccounts.id })
-      .from(bankAccounts)
-      .where(
-        and(
-          eq(bankAccounts.id, id),
-          eq(bankAccounts.companyId, companyId),
-          eq(bankAccounts.active, true),
-          isNull(bankAccounts.deletedAt)
-        )
-      )
-      .limit(1);
-    if (!row)
-      throw new GoldenCoastPhase6RouteError("saleSideAccount must reference an active bank account in this company");
-    return { kind: "bank", id };
-  }
-
-  if (id === fallbackLedgerAccountId) return { kind: "ledger", id };
-  const [row] = await conn
-    .select({ id: ledgerAccounts.id })
-    .from(ledgerAccounts)
-    .where(
-      and(
-        eq(ledgerAccounts.id, id),
-        eq(ledgerAccounts.companyId, companyId),
-        eq(ledgerAccounts.active, true),
-        isNull(ledgerAccounts.deletedAt),
-        inArray(ledgerAccounts.accountType, ["Cash", "Bank"])
-      )
-    )
-    .limit(1);
-  if (!row) {
-    throw new GoldenCoastPhase6RouteError(
-      "saleSideAccount must reference the Golden Coast sale-side role or an active Cash/Bank ledger account in this company"
-    );
-  }
-  return { kind: "ledger", id };
 }
 
 async function lockFifoLots(
@@ -632,12 +572,13 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
       await assertPhase4BridgePosted(tx, selectedCompany);
       const specialConfig = await resolveSpecialLocationConfig(tx, selectedCompany, sale.locationId);
       const accounts = await resolvePhase6Accounts(tx, selectedCompany);
-      const saleSideAccount = await resolveSaleSideAccount(
-        tx,
-        selectedCompany,
-        (req.body as Record<string, unknown> | undefined)?.saleSideAccount,
-        accounts.saleSideAccountId
-      );
+      if ((req.body as Record<string, unknown> | undefined)?.saleSideAccount != null) {
+        throw new GoldenCoastPhase6RouteError(
+          "saleSideAccount overrides are retired for Golden Coast",
+          "GC_PHASE6_SALE_SIDE_OVERRIDE_RETIRED"
+        );
+      }
+      const saleSideAccount = { kind: "ledger" as const, id: accounts.gcSalesCashAccountId };
       const saleDigest = goldenCoastPhase5SaleDigest({ sale, saleSideAccount });
       const expectedDeduction = preDeductionPlan(sale, specialConfig.deductionPerQtyUsd);
       const replayed = await findReplayedSale({
