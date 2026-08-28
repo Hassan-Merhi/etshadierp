@@ -1,35 +1,35 @@
 /**
- * schedulerService schema, split by domain.
+ * Scheduler entrypoint.
  *
- * Every part is re-exported here, so `@shared/schema` continues to expose
- * exactly the names it did before the split - which is the only thing that
- * has to hold, since these are declarations rather than ordered registrations.
+ * Keep this module intentionally light: server/index.ts imports it at process
+ * startup, so static imports or barrel re-exports here become permanent
+ * baseline RSS even when the corresponding scheduled job is not due.
  */
 import cron from "node-cron";
 import { logger } from "../../lib/logger";
 import { startScheduler as startCoreScheduler } from "./scheduled-jobs";
-import { checkAndRunLocationStockReports } from "./location-stock-report";
 import { createSchedulerTick } from "./schedulerTickGuard";
 
 let locationStockCronStarted = false;
 
 /**
- * Wrap the existing scheduler registration with the Phase-3 location-stock
- * schedule. It stays in the same scheduler service and honours the same global
- * ENABLE_SCHEDULERS gate in server/index.ts.
+ * Register the existing schedules without eagerly evaluating their report,
+ * export, WhatsApp, or accounting dependency graphs. The actual job module is
+ * loaded on the tick that needs it; schedules and job behavior are unchanged.
  */
 export function startScheduler(): void {
   startCoreScheduler();
   if (locationStockCronStarted) return;
   locationStockCronStarted = true;
 
-  // Sending a report is network work that can outlast the minute it started in,
-  // so the tick refuses to start a second pass while the first is still going.
-  // Successful no-op checks stay silent: this runs every minute and should not
-  // flood production logs when no location is due.
-  const locationStockTick = createSchedulerTick("locationStockWhatsApp", checkAndRunLocationStockReports, {
-    quiet: true,
-  });
+  const locationStockTick = createSchedulerTick(
+    "locationStockWhatsApp",
+    async () => {
+      const { checkAndRunLocationStockReports } = await import("./location-stock-report");
+      await checkAndRunLocationStockReports();
+    },
+    { quiet: true }
+  );
 
   cron.schedule("* * * * *", locationStockTick);
 
@@ -40,9 +40,18 @@ export function startScheduler(): void {
   });
 }
 
-export * from "./daily-export";
-export * from "./whatsapp-send";
-export * from "./stock-report";
-export * from "./net-position";
-export * from "./maintenance";
-export * from "./location-stock-report";
+/**
+ * Startup recovery is mostly a lightweight schedule/state probe. Keep the
+ * heavy ZIP/Excel/email stack out of startup unless a missed export truly has
+ * to run.
+ */
+export async function checkAndRecoverDailyExport(): Promise<void> {
+  const recovery = await import("./daily-export-state");
+  await recovery.checkAndRecoverDailyExport();
+}
+
+/** Preserve the existing public scheduler API used by the WhatsApp route. */
+export async function triggerDailyWhatsAppSendNow(fromDate?: string, toDate?: string): Promise<{ message: string }> {
+  const maintenance = await import("./maintenance");
+  return maintenance.triggerDailyWhatsAppSendNow(fromDate, toDate);
+}
