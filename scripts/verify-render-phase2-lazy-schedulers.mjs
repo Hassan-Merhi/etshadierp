@@ -23,10 +23,28 @@ const rejectStaticImport = (source, specifier, message) => {
     failures.push(message);
   }
 };
+const hasDynamicImport = (source, specifier) => {
+  const doubleQuoted = `"${specifier}"`;
+  const singleQuoted = `'${specifier}'`;
+  let cursor = 0;
+
+  while (cursor < source.length) {
+    const importStart = source.indexOf("import(", cursor);
+    if (importStart === -1) return false;
+
+    const importEnd = source.indexOf(")", importStart + "import(".length);
+    if (importEnd === -1) return false;
+
+    const argument = source.slice(importStart + "import(".length, importEnd).trim();
+    if (argument === doubleQuoted || argument === singleQuoted) return true;
+
+    cursor = importEnd + 1;
+  }
+
+  return false;
+};
 const requireDynamicImport = (source, specifier, message) => {
-  const doubleQuoted = `import("${specifier}")`;
-  const singleQuoted = `import('${specifier}')`;
-  if (!source.includes(doubleQuoted) && !source.includes(singleQuoted)) failures.push(message);
+  if (!hasDynamicImport(source, specifier)) failures.push(message);
 };
 
 // server/index.ts may keep its stable scheduler API, but the scheduler barrel
@@ -34,42 +52,42 @@ const requireDynamicImport = (source, specifier, message) => {
 requireText(
   serverIndex,
   'from "./services/scheduler"',
-  "server startup must keep using the scheduler entrypoint",
+  "server startup must keep using the scheduler entrypoint"
 );
 rejectText(
   schedulerIndex,
   'export * from "./daily-export"',
-  "scheduler entrypoint must not eagerly re-export daily-export",
+  "scheduler entrypoint must not eagerly re-export daily-export"
 );
 rejectText(
   schedulerIndex,
   'export * from "./stock-report"',
-  "scheduler entrypoint must not eagerly re-export stock-report",
+  "scheduler entrypoint must not eagerly re-export stock-report"
 );
 rejectText(
   schedulerIndex,
   'export * from "./net-position"',
-  "scheduler entrypoint must not eagerly re-export net-position",
+  "scheduler entrypoint must not eagerly re-export net-position"
 );
 rejectText(
   schedulerIndex,
   'export * from "./maintenance"',
-  "scheduler entrypoint must not eagerly re-export maintenance",
+  "scheduler entrypoint must not eagerly re-export maintenance"
 );
 requireDynamicImport(
   schedulerIndex,
   "./location-stock-report",
-  "per-minute location-stock work must lazy-load its implementation",
+  "per-minute location-stock work must lazy-load its implementation"
 );
 requireDynamicImport(
   schedulerIndex,
   "./daily-export-state",
-  "startup recovery must use the lightweight recovery probe",
+  "startup recovery must use the lightweight recovery probe"
 );
 requireDynamicImport(
   schedulerIndex,
   "./maintenance",
-  "manual WhatsApp scheduler API must lazy-load maintenance",
+  "manual WhatsApp scheduler API must lazy-load maintenance"
 );
 
 for (const [specifier, label] of [
@@ -83,12 +101,12 @@ for (const [specifier, label] of [
   rejectStaticImport(
     scheduledJobs,
     specifier,
-    `${label} implementation must not be a static scheduled-jobs import`,
+    `${label} implementation must not be a static scheduled-jobs import`
   );
   requireDynamicImport(
     scheduledJobs,
     specifier,
-    `${label} implementation must remain dynamically loaded by its tick`,
+    `${label} implementation must remain dynamically loaded by its tick`
   );
 }
 
@@ -108,7 +126,7 @@ for (const cronExpression of [
 requireText(
   schedulerIndex,
   'cron.schedule("* * * * *", locationStockTick)',
-  "location-stock every-minute registration must remain unchanged",
+  "location-stock every-minute registration must remain unchanged"
 );
 
 // The recovery probe itself must stay small and only cross into the heavy
@@ -116,7 +134,7 @@ requireText(
 requireDynamicImport(
   recoveryState,
   "./daily-export",
-  "daily export must load only after recovery state checks pass",
+  "daily export must load only after recovery state checks pass"
 );
 for (const heavyMarker of [
   'from "archiver"',
