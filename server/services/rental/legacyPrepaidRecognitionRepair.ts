@@ -166,13 +166,7 @@ export async function repairLegacyFullyPrepaidRentRecognition(
           "Indirect Expense",
           "SHOP-RENT-EXP"
         );
-        const prepaidId = await findOrCreateLedgerAccount(
-          tx,
-          companyId,
-          "Prepaid Rent",
-          "Asset",
-          "PREP-RENT"
-        );
+        const prepaidId = await findOrCreateLedgerAccount(tx, companyId, "Prepaid Rent", "Asset", "PREP-RENT");
 
         if (legacyDirectExpense) {
           const narration = `Legacy prepaid rent reclassification - unit${row.unit_id} - ${period}`;
