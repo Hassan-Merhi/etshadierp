@@ -75,6 +75,21 @@ describe("Golden Coast Phase 13 HADI intercompany account planner", () => {
     expect(plan.repairs.map((repair) => repair.field)).toEqual(["accountType", "isHidden", "active", "deletedAt"]);
   });
 
+  it("prefers a live legacy account over a soft-deleted canonical duplicate", () => {
+    const deletedCanonical = row({ id: 10, active: false, deletedAt: "2026-08-01" });
+    const liveLegacy = row({ id: 11, subType: null, active: true, deletedAt: null });
+    const plan = planGoldenCoastPhase13IntercompanyAccount({
+      companyId: 7,
+      definition: defs.golden_coast_hadi,
+      accounts: [deletedCanonical, liveLegacy],
+    });
+
+    expect(plan.action).toBe("adopt");
+    expect(plan.accountId).toBe(11);
+    expect(plan.repairs).toContainEqual({ field: "subType", from: null, to: "sp_hadi_intercompany" });
+    expect(plan.repairs.some((repair) => repair.field === "deletedAt")).toBe(false);
+  });
+
   it("provisions the HADI-side reciprocal account with the same repair rules", () => {
     const hadiRow = row({
       id: 20,
