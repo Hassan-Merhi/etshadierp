@@ -32,8 +32,8 @@ describe("Golden Coast Phase 11 monthly close route surface", () => {
     expect(routeSource).toContain("v.company_id = ${companyId}");
     expect(routeSource).toContain("COALESCE(v.optional, false) = false");
     expect(routeSource).toContain("v.deleted_at IS NULL");
-    expect(routeSource).toContain("sales.credit").and.toBeTruthy();
-    expect(routeSource).toContain("cogs.debit").and.toBeTruthy();
+    expect(routeSource).toContain("sales.credit");
+    expect(routeSource).toContain("cogs.debit");
   });
 
   it("serializes the close and checks Profit Pending Distribution before and after posting", () => {
