@@ -16,6 +16,7 @@ import {
   Receipt,
   Search,
   BookOpen,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -37,6 +38,8 @@ import type { InsuranceMember } from "./factoryinsurance/types";
 import { MONTHS, YEARS } from "./factoryinsurance/utils";
 import { MemberFormDialog } from "./factoryinsurance/components/MemberFormDialog";
 import { MemberStatementDrawer } from "./factoryinsurance/components/MemberStatementDrawer";
+import { InsuranceImportDialog } from "./factoryinsurance/components/InsuranceImportDialog";
+import { InsuranceClearDialog } from "./factoryinsurance/components/InsuranceClearDialog";
 export default function FactoryInsurance() {
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
@@ -49,6 +52,8 @@ export default function FactoryInsurance() {
   const [statementMember, setStatementMember] = useState<InsuranceMember | null>(null);
   const [deleteMember, setDeleteMember] = useState<InsuranceMember | null>(null);
   const [search, setSearch] = useState("");
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showClearDialog, setShowClearDialog] = useState(false);
 
   const [showGenDialog, setShowGenDialog] = useState(false);
   const [genMonth, setGenMonth] = useState(new Date().getMonth() + 1);
@@ -226,12 +231,27 @@ export default function FactoryInsurance() {
     const totalAmount = active.reduce((s, m) => s + parseFloat(m.amount || "0"), 0);
     return { total: members.length, active: active.length, inactive: inactive.length, totalAmount };
   }, [members]);
+  const canClearInsurance = selectedCompany?.role === "Admin" || selectedCompany?.role === "Developer";
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <PageHeader title="Insurance" subtitle="Manage insurance members and generate monthly entries" />
         <div className="flex items-center gap-2 flex-wrap">
+          {canClearInsurance && (
+            <Button
+              variant="destructive"
+              onClick={() => setShowClearDialog(true)}
+              data-testid="button-clear-all-insurance"
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Clear All
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => setShowImportDialog(true)} data-testid="button-import-insurance">
+            <FileSpreadsheet className="h-4 w-4 mr-1" />
+            Import Excel
+          </Button>
           <Button variant="outline" onClick={() => setShowExtraCharges(true)} data-testid="button-extra-charges">
             <Receipt className="h-4 w-4 mr-1" />
             Add Extra Charges
@@ -455,6 +475,13 @@ export default function FactoryInsurance() {
 
       {/* Member Statement Drawer */}
       {statementMember && <MemberStatementDrawer member={statementMember} onClose={() => setStatementMember(null)} />}
+
+      <InsuranceImportDialog open={showImportDialog} onClose={() => setShowImportDialog(false)} />
+      <InsuranceClearDialog
+        open={showClearDialog}
+        companyName={selectedCompany?.name}
+        onClose={() => setShowClearDialog(false)}
+      />
 
       {/* Add / Edit Member Dialog */}
       {(showAddDialog || editMember) && (

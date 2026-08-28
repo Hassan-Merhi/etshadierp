@@ -30,3 +30,30 @@ export interface LedgerEntry {
   creditAmount: string | null;
   narration: string | null;
 }
+
+export interface InsuranceImportRow {
+  sheetName: string;
+  monthStart: string;
+  name: string;
+  amount: string;
+  startDate: string;
+  nationality?: string;
+  positionWorking?: string;
+  insuranceNumber?: string;
+  dob?: string;
+  notes?: string;
+}
+
+export interface InsuranceImportIssue {
+  sheetName: string;
+  row?: number;
+  message: string;
+}
+
+export interface InsuranceImportPreview {
+  rows: InsuranceImportRow[];
+  errors: InsuranceImportIssue[];
+  warnings: InsuranceImportIssue[];
+  recognizedSheets: Array<{ sheetName: string; monthStart: string; rowCount: number }>;
+  ignoredSheets: string[];
+}
