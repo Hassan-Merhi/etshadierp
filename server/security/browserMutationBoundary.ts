@@ -1,6 +1,7 @@
 import type { Request, RequestHandler, Response } from "express";
 
 import { logger } from "../lib/logger";
+import { isTrustedOriginHost } from "./originHostPolicy";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const MUTATION_EXEMPT_PATHS = new Set([
@@ -22,7 +23,7 @@ function rejectBrowserMutation(res: Response, statusCode: number, code: string, 
 }
 
 function browserSourceAllowed(
-  req: Request
+  req: Request,
 ):
   | { browserRequest: false }
   | { browserRequest: true; allowed: true }
@@ -49,7 +50,7 @@ function browserSourceAllowed(
   }
 
   const requestHost = req.headers.host;
-  if (!requestHost || sourceHost !== requestHost) {
+  if (!requestHost || !isTrustedOriginHost(sourceHost, requestHost)) {
     return {
       browserRequest: true,
       allowed: false,
@@ -117,7 +118,7 @@ export const browserMutationFailClosedBoundary: RequestHandler = (req, res, next
       res,
       403,
       "CSRF_TOKEN_REQUIRED",
-      "CSRF token must be established before an authenticated browser mutation."
+      "CSRF token must be established before an authenticated browser mutation.",
     );
   }
 
