@@ -6,6 +6,7 @@ import type { VoucherEntryInsertFields, VoucherInsertFields, VoucherWithEntries 
 import { insertVoucherWithEntriesTx } from "./voucherPostingService";
 import { assertTransactionCompanyScope } from "../security/transactionCompanyScope";
 import { resultRows } from "../../lib/queryResult";
+import { GOLDEN_COAST_PHASE11_SOURCE_TYPE as GOLDEN_COAST_MONTHLY_CLOSE_SOURCE_TYPE } from "./goldenCoastPhase11CloseIdentity";
 
 const TARGET_FIELDS = [
   "ledgerAccountId",
@@ -17,7 +18,7 @@ const TARGET_FIELDS = [
   "factorySupplierId",
 ] as const;
 
-const GOLDEN_COAST_MONTHLY_CLOSE_SOURCE_TYPE = "golden-coast-phase11-monthly-close";
+
 
 type TargetField = (typeof TARGET_FIELDS)[number];
 

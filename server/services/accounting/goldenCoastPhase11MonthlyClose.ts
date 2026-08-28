@@ -4,8 +4,9 @@ import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import type { CentralPostingRequest, PostingActor } from "./centralPostingEngine";
 import { buildGenericVoucherPostingRequest } from "./genericVoucherPosting";
 import { GOLDEN_COAST_CUTOVER_DATE } from "./goldenCoastPhase4CutoverFifo";
+import { GOLDEN_COAST_PHASE11_SOURCE_TYPE } from "./goldenCoastPhase11CloseIdentity";
 
-export const GOLDEN_COAST_PHASE11_SOURCE_TYPE = "golden-coast-phase11-monthly-close";
+export { GOLDEN_COAST_PHASE11_SOURCE_TYPE } from "./goldenCoastPhase11CloseIdentity";
 export const GOLDEN_COAST_PHASE11_SPLIT_PCT = "50.00";
 const MONTH_PATTERN = /^\d{4}-\d{2}$/;
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]+$/;
