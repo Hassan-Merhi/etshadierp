@@ -1,9 +1,11 @@
 import type { DbTransaction } from "../../db";
 import { createHash } from "crypto";
+import { sql } from "drizzle-orm";
 import Decimal from "decimal.js";
 import type { VoucherEntryInsertFields, VoucherInsertFields, VoucherWithEntries } from "./accountingTypes";
 import { insertVoucherWithEntriesTx } from "./voucherPostingService";
 import { assertTransactionCompanyScope } from "../security/transactionCompanyScope";
+import { resultRows } from "../../lib/queryResult";
 
 const TARGET_FIELDS = [
   "ledgerAccountId",
@@ -14,6 +16,8 @@ const TARGET_FIELDS = [
   "customerId",
   "factorySupplierId",
 ] as const;
+
+const GOLDEN_COAST_MONTHLY_CLOSE_SOURCE_TYPE = "golden-coast-phase11-monthly-close";
 
 type TargetField = (typeof TARGET_FIELDS)[number];
 
@@ -130,6 +134,44 @@ function normalizedDecimal(value: string | null | undefined): string | null {
 function normalizedText(value: string | null | undefined): string | null {
   if (value == null) return null;
   return String(value);
+}
+
+function accountingPeriod(request: CentralPostingRequest): string {
+  const accountingDate = String(request.voucher.effectiveDate ?? request.voucher.voucherDate ?? "");
+  return accountingDate.slice(0, 7);
+}
+
+async function assertPostingPeriodOpen(
+  tx: DbTransaction,
+  companyId: number,
+  request: CentralPostingRequest
+): Promise<void> {
+  const periodMonth = accountingPeriod(request);
+  if (!/^\d{4}-\d{2}$/.test(periodMonth)) return;
+
+  const closeKey = `${GOLDEN_COAST_MONTHLY_CLOSE_SOURCE_TYPE}:${companyId}:${periodMonth}`;
+  const result = await tx.execute(sql`
+    SELECT 1 AS finalized
+    FROM sp_profit_splits s
+    WHERE s.company_id = ${companyId}
+      AND s.period_month = ${periodMonth}
+      AND s.finalized_at IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM accounting_posting_requests apr
+        WHERE apr.company_id = s.company_id
+          AND apr.source_type = ${GOLDEN_COAST_MONTHLY_CLOSE_SOURCE_TYPE}
+          AND apr.idempotency_key = ${closeKey}
+      )
+    LIMIT 1
+  `);
+
+  if (resultRows(result)[0]) {
+    throw new PostingValidationError(
+      "POSTING_PERIOD_FINALIZED",
+      `Accounting period ${periodMonth} is finalized by the Golden Coast monthly close and cannot accept new voucher postings`
+    );
+  }
 }
 
 /**
@@ -292,6 +334,8 @@ export async function postBalancedVoucherTx(
     requestFingerprint,
   });
   if (existing) return { ...existing, replayed: true };
+
+  await assertPostingPeriodOpen(tx, companyId, request);
 
   await dependencies.ownership.validateVoucherOwnership({
     tx,
