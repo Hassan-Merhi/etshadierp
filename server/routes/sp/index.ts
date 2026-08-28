@@ -1,6 +1,5 @@
 import type { Express } from "express";
 import { logger } from "../../lib/logger";
-import { runWithDatabaseMaintenanceScope } from "../../services/security/databaseScopeRuntimeContext";
 import { registerSpAccessControl } from "./spAccessControl";
 import { registerSpPermissionRoutes } from "./spPermissionRoutes";
 import { registerSpSetupRoutes } from "./spSetupRoutes";
@@ -11,6 +10,7 @@ import { registerSpGoldenCoastPhase6PosSaleRoutes } from "./spGoldenCoastPhase6P
 import { registerSpGoldenCoastPhase7HadiTransferRoutes } from "./spGoldenCoastPhase7HadiTransferRoutes";
 import { registerSpGoldenCoastPhase8ContainerOffloadRoutes } from "./spGoldenCoastPhase8ContainerOffloadRoutes";
 import { registerSpGoldenCoastPhase9HassanSavingsWithdrawalRoutes } from "./spGoldenCoastPhase9HassanSavingsWithdrawalRoutes";
+import { registerSpGoldenCoastPhase10SalesCashSettlementRoutes } from "./spGoldenCoastPhase10SalesCashSettlementRoutes";
 import { registerSpContainerRoutes } from "./spContainerRoutes";
 import { registerSpLifecycleGuards } from "./spLifecycleGuards";
 import { registerSpReoffloadPreparationGuard } from "./spReoffloadPreparationGuard";
@@ -54,13 +54,13 @@ export function registerSpRoutes(app: Express) {
     });
   });
 
-  void runWithDatabaseMaintenanceScope("sp-supplier-voucher-startup-sync", async () => {
+  void (async () => {
     await ensureSpSupplierVoucherSyncTrigger();
     const repairedCount = await repairSpSupplierVoucherLinks();
     if (repairedCount > 0) {
       logger.info("[SP] Repaired Goods-OTW voucher supplier links", { repairedCount });
     }
-  }).catch((error) => {
+  })().catch((error) => {
     logger.warn("[SP] Supplier voucher synchronization deferred until Setup", {
       error: error instanceof Error ? error.message : String(error),
     });
@@ -78,6 +78,7 @@ export function registerSpRoutes(app: Express) {
   registerSpGoldenCoastPhase7HadiTransferRoutes(app);
   registerSpGoldenCoastPhase8ContainerOffloadRoutes(app);
   registerSpGoldenCoastPhase9HassanSavingsWithdrawalRoutes(app);
+  registerSpGoldenCoastPhase10SalesCashSettlementRoutes(app);
   registerSpLifecycleGuards(app);
   registerSpContainerRoutes(app);
   registerSpReoffloadPreparationGuard(app);
