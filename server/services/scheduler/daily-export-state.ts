@@ -45,7 +45,7 @@ export async function checkAndRecoverDailyExport(): Promise<void> {
   return runWithDatabaseMaintenanceScope("daily-export-recovery", async () => {
     try {
       const r = await pool.query(
-        `SELECT schedule_enabled, schedule_hour, schedule_timezone FROM export_settings WHERE id = 1`,
+        `SELECT schedule_enabled, schedule_hour, schedule_timezone FROM export_settings WHERE id = 1`
       );
       if (!r.rows.length) return;
       const row = r.rows[0];
@@ -62,7 +62,7 @@ export async function checkAndRecoverDailyExport(): Promise<void> {
 
       if (currentHour < configuredHour) {
         logger.info(
-          `[DailyExport] Recovery check: current hour (${currentHour}:xx ${tz}) is before scheduled hour (${configuredHour}:00) — skipping.`,
+          `[DailyExport] Recovery check: current hour (${currentHour}:xx ${tz}) is before scheduled hour (${configuredHour}:00) — skipping.`
         );
         return;
       }
