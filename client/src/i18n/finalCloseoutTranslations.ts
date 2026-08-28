@@ -1,6 +1,11 @@
 import type { ApplicationLanguage } from "@shared/applicationLanguageContract";
 
 const FINAL_CLOSEOUT_TRANSLATIONS: Record<string, { ar: string; fr: string }> = {
+  "Golden Coast": { ar: "غولدن كوست", fr: "Golden Coast" },
+  "Phase 7": { ar: "المرحلة 7", fr: "Phase 7" },
+  "Phase 9": { ar: "المرحلة 9", fr: "Phase 9" },
+  "Phase 10": { ar: "المرحلة 10", fr: "Phase 10" },
+  "Phase 11": { ar: "المرحلة 11", fr: "Phase 11" },
   "Enter new name": { ar: "أدخل الاسم الجديد", fr: "Saisir le nouveau nom" },
   "Search groups...": { ar: "ابحث عن المجموعات...", fr: "Rechercher des groupes..." },
   "Rename Location": { ar: "إعادة تسمية الموقع", fr: "Renommer l’emplacement" },

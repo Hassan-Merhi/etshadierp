@@ -9,6 +9,7 @@ import {
   boolean,
   timestamp,
   index,
+  uniqueIndex,
   jsonb,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -249,6 +250,31 @@ export const insertInsuranceMemberSchema = createInsertSchema(insuranceMembers)
 
 export type InsertInsuranceMember = z.infer<typeof insertInsuranceMemberSchema>;
 export type InsuranceMember = typeof insuranceMembers.$inferSelect;
+
+export const insuranceMemberMonthlyAmounts = pgTable(
+  "insurance_member_monthly_amounts",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull(),
+    memberId: integer("member_id")
+      .notNull()
+      .references(() => insuranceMembers.id, { onDelete: "cascade" }),
+    monthStart: date("month_start").notNull(),
+    amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    companyMonthIdx: index("insurance_member_monthly_amounts_company_month_idx").on(t.companyId, t.monthStart),
+    memberMonthUnique: uniqueIndex("insurance_member_monthly_amounts_member_month_unique").on(
+      t.companyId,
+      t.memberId,
+      t.monthStart
+    ),
+  })
+);
+
+export type InsuranceMemberMonthlyAmount = typeof insuranceMemberMonthlyAmounts.$inferSelect;
 
 // ─── Factory Container Receipts ───────────────────────────────────────────────
 // Records each individual partial-receipt event for a container.

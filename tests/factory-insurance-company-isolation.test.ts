@@ -35,9 +35,11 @@ describe("factory insurance company isolation", () => {
   });
 
   it("keeps reads, writes, toggles, deletion, and generation scoped", () => {
-    expect(routeSource.match(/resolveRequestCompanyId\(req\)/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
+    expect(routeSource.match(/resolveRequestCompanyId\(req\)/g)?.length ?? 0).toBeGreaterThanOrEqual(9);
     expect(routeSource).toContain("eq(insuranceMembers.companyId, companyId)");
     expect(routeSource).toContain("eq(vouchers.companyId, companyId)");
+    expect(routeSource).toContain('"/api/insurance/admin/clear-all"');
+    expect(routeSource).toContain('requireRole("Admin", "Developer")');
   });
 
   it("routes insurance voucher creation through the central posting service", () => {

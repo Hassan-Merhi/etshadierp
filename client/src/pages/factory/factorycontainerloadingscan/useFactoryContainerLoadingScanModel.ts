@@ -180,7 +180,9 @@ export function useFactoryContainerLoadingScanModel() {
       if (!res.ok) throw new Error("Failed to fetch removal log");
       return res.json();
     },
-    enabled: !!orderId && showRemovalLog,
+    // Load the log while the order is active so the collapsed section can
+    // discover that it has entries and render itself.
+    enabled: !!orderId,
     staleTime: 30_000,
   });
 

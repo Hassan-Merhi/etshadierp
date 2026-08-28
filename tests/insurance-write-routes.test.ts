@@ -27,6 +27,7 @@
  */
 import request from "supertest";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import ExcelJS from "exceljs";
 
 import { pool } from "../server/db";
 import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
@@ -256,11 +257,210 @@ describe("POST /api/insurance/generate", () => {
   });
 });
 
+describe("Insurance multi-sheet Excel import", () => {
+  it("downloads a blank workbook with reusable month sheets and supported headers", async () => {
+    const response = await agent
+      .get("/api/insurance/import/template")
+      .buffer(true)
+      .parse((_res, callback) => {
+        const chunks: Buffer[] = [];
+        (_res as any).on("data", (chunk: Buffer) => chunks.push(chunk));
+        (_res as any).on("end", () => callback(null, Buffer.concat(chunks)));
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("spreadsheetml.sheet");
+    expect(response.headers["content-disposition"]).toContain("Insurance_Import_Template.xlsx");
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(response.body as Buffer);
+    expect(workbook.worksheets.map((worksheet) => worksheet.name)).toEqual([
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ]);
+
+    for (const worksheet of workbook.worksheets) {
+      expect(worksheet.getRow(1).values.slice(1)).toEqual([
+        "Name",
+        "Monthly Amount",
+        "Start Date",
+        "Insurance Number",
+        "Nationality",
+        "Position",
+        "Date of Birth",
+        "Notes",
+      ]);
+      expect(worksheet.rowCount).toBe(1);
+    }
+  });
+
+  it("previews month-named sheets and applies monthly amounts", async () => {
+    await deactivateAllMembers();
+    const workbook = new ExcelJS.Workbook();
+    const january = workbook.addWorksheet("January");
+    january.addRow(["Name", "Monthly Amount", "Nationality"]);
+    january.addRow([`${TEST_PREFIX} Import A`, 25, "Congolese"]);
+    january.addRow([`${TEST_PREFIX} Import B`, 75, "Congolese"]);
+    const february = workbook.addWorksheet("2026-02");
+    february.addRow(["Name", "Amount"]);
+    february.addRow([`${TEST_PREFIX} Import A`, 35]);
+    february.addRow([`${TEST_PREFIX} Import B`, 85]);
+    const instructions = workbook.addWorksheet("Instructions");
+    instructions.addRow(["Read me"]);
+    instructions.addRow(["This sheet is ignored"]);
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
+    const preview = await agent.post("/api/insurance/import/preview").field("year", "2026").attach("file", buffer, {
+      filename: "insurance-import.xlsx",
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    expect(preview.status).toBe(200);
+    expect(preview.body.rows).toHaveLength(4);
+    expect(preview.body.recognizedSheets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ sheetName: "January", monthStart: "2026-01-01", rowCount: 2 }),
+        expect.objectContaining({ sheetName: "2026-02", monthStart: "2026-02-01", rowCount: 2 }),
+      ])
+    );
+    expect(preview.body.ignoredSheets).toContain("Instructions");
+    expect(preview.body.errors).toHaveLength(0);
+
+    const applied = await agent.post("/api/insurance/import/apply").send({ rows: preview.body.rows });
+    expect(applied.status).toBe(200);
+    expect(applied.body).toMatchObject({
+      createdMembers: 2,
+      updatedMembers: 0,
+      monthlyAmountsUpserted: 4,
+    });
+
+    const imported = await pool.query<{ id: number; name: string; amount: string; nationality: string }>(
+      `SELECT id, name, amount, nationality
+       FROM insurance_members
+       WHERE company_id = $1 AND name LIKE $2
+       ORDER BY name`,
+      [ctx.companyId, `${TEST_PREFIX} Import%`]
+    );
+    expect(imported.rowCount).toBe(2);
+    expect(imported.rows.map((row) => Number(row.amount))).toEqual([35, 85]);
+    expect(imported.rows.every((row) => row.nationality === "Congolese")).toBe(true);
+
+    const overrides = await pool.query<{ month_start: string; amount: string }>(
+      `SELECT month_start::text, amount
+       FROM insurance_member_monthly_amounts
+       WHERE company_id = $1
+       ORDER BY month_start, amount`,
+      [ctx.companyId]
+    );
+    expect(overrides.rows.map((row) => [row.month_start, Number(row.amount)])).toEqual([
+      ["2026-01-01", 25],
+      ["2026-01-01", 75],
+      ["2026-02-01", 35],
+      ["2026-02-01", 85],
+    ]);
+
+    const januaryPosting = await agent.post("/api/insurance/generate").send({ month: 1, year: 2026 });
+    expect(januaryPosting.status).toBe(200);
+    expect(Number(januaryPosting.body.totalAmount)).toBeCloseTo(100, 2);
+    const februaryPosting = await agent.post("/api/insurance/generate").send({ month: 2, year: 2026 });
+    expect(februaryPosting.status).toBe(200);
+    expect(Number(februaryPosting.body.totalAmount)).toBeCloseTo(120, 2);
+  });
+
+  it("reports duplicate members and rejects non-xlsx files", async () => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("March 2026");
+    sheet.addRow(["Name", "Monthly Amount"]);
+    sheet.addRow([`${TEST_PREFIX} Duplicate`, 10]);
+    sheet.addRow([`${TEST_PREFIX} Duplicate`, 20]);
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
+    const duplicatePreview = await agent
+      .post("/api/insurance/import/preview")
+      .field("year", "2026")
+      .attach("file", buffer, {
+        filename: "duplicates.xlsx",
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+    expect(duplicatePreview.status).toBe(200);
+    expect(duplicatePreview.body.errors).toEqual([
+      expect.objectContaining({ sheetName: "March 2026", row: 3, message: expect.stringContaining("Duplicate") }),
+    ]);
+
+    const wrongFile = await agent
+      .post("/api/insurance/import/preview")
+      .field("year", "2026")
+      .attach("file", Buffer.from("not an excel workbook"), { filename: "insurance.csv", contentType: "text/csv" });
+    expect(wrongFile.status).toBe(400);
+    expect(wrongFile.body.message).toContain(".xlsx");
+  });
+});
+
 describe("POST /api/insurance/admin/repair-reversed-journals", () => {
   it("defaults to a dry run", async () => {
     const response = await agent.post("/api/insurance/admin/repair-reversed-journals").send({});
     expect(response.status).toBe(200);
     expect(response.body.dryRun).toBe(true);
     expect(response.body.confirmationRequired).toBe("REPAIR_REVERSED_INSURANCE_JOURNALS");
+  });
+});
+
+describe("POST /api/insurance/admin/clear-all", () => {
+  it("requires confirmation and removes only Insurance-owned records and vouchers", async () => {
+    const before = await pool.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM insurance_members WHERE company_id = $1`,
+      [ctx.companyId]
+    );
+    expect(Number(before.rows[0].count)).toBeGreaterThan(0);
+
+    const rejected = await agent.post("/api/insurance/admin/clear-all").send({ confirmation: "CLEAR" });
+    expect(rejected.status).toBe(400);
+    expect(rejected.body.confirmationRequired).toBe("CLEAR ALL INSURANCE");
+
+    const unrelatedNumber = `${TEST_PREFIX}-UNRELATED-${ctx.companyId}`;
+    const unrelated = await pool.query<{ id: number }>(
+      `INSERT INTO vouchers
+         (company_id, voucher_number, voucher_type, voucher_date, total_amount, source_module, optional)
+       VALUES ($1, $2, 'Journal', '2026-01-01', 0, 'ERP', false)
+       RETURNING id`,
+      [ctx.companyId, unrelatedNumber]
+    );
+
+    const cleared = await agent.post("/api/insurance/admin/clear-all").send({ confirmation: "CLEAR ALL INSURANCE" });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.membersDeleted).toBeGreaterThan(0);
+    expect(cleared.body.vouchersDeleted).toBeGreaterThan(0);
+    expect(cleared.body.ledgerAccountsArchived).toBeGreaterThan(0);
+
+    const remainingMembers = await pool.query(`SELECT id FROM insurance_members WHERE company_id = $1`, [
+      ctx.companyId,
+    ]);
+    const remainingOverrides = await pool.query(
+      `SELECT id FROM insurance_member_monthly_amounts WHERE company_id = $1`,
+      [ctx.companyId]
+    );
+    const remainingInsuranceVouchers = await pool.query(
+      `SELECT id FROM vouchers WHERE company_id = $1 AND voucher_number ILIKE 'INS-%'`,
+      [ctx.companyId]
+    );
+    const unrelatedStillExists = await pool.query(`SELECT id FROM vouchers WHERE id = $1 AND company_id = $2`, [
+      unrelated.rows[0].id,
+      ctx.companyId,
+    ]);
+    expect(remainingMembers.rowCount).toBe(0);
+    expect(remainingOverrides.rowCount).toBe(0);
+    expect(remainingInsuranceVouchers.rowCount).toBe(0);
+    expect(unrelatedStillExists.rowCount).toBe(1);
+
+    await pool.query(`DELETE FROM vouchers WHERE id = $1`, [unrelated.rows[0].id]);
   });
 });

@@ -85,3 +85,4 @@
 - [Express 5 routing compatibility](express5-routing-compatibility.md) — named wildcards, app.router stack access, and registration-time mount capture are required after the Express 5 upgrade.
 - [Replit preview HMR](replit-preview-hmr.md) — Replit's preview proxy can reject Vite websocket upgrades; disable HMR only in Replit preview and keep local HMR enabled.
 - [Duplicate posting audit](duplicate-posting-audit.md) — financial retries need stable company-scoped identity; timestamps, payload hashes, and display numbers are not identities.
+- [Insurance workbook month names](insurance-workbook-month-names.md) — plain month sheet names use the selected workbook year; sheets with an explicit year retain that year.
