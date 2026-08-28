@@ -12,21 +12,17 @@ describe("SP supplier voucher startup scope", () => {
       expect(maintenanceActive).toBe(true);
       return 4;
     });
-    const runMaintenanceScope = vi.fn(
-      async (reason: string, callback: () => Promise<number>) => {
-        expect(reason).toBe("sp-supplier-voucher-sync-startup");
-        maintenanceActive = true;
-        try {
-          return await callback();
-        } finally {
-          maintenanceActive = false;
-        }
-      },
-    );
+    const runMaintenanceScope = vi.fn(async (reason: string, callback: () => Promise<number>) => {
+      expect(reason).toBe("sp-supplier-voucher-sync-startup");
+      maintenanceActive = true;
+      try {
+        return await callback();
+      } finally {
+        maintenanceActive = false;
+      }
+    });
 
-    await expect(
-      runSpSupplierVoucherStartup({ ensureTrigger, repairLinks, runMaintenanceScope }),
-    ).resolves.toBe(4);
+    await expect(runSpSupplierVoucherStartup({ ensureTrigger, repairLinks, runMaintenanceScope })).resolves.toBe(4);
 
     expect(ensureTrigger).toHaveBeenCalledTimes(1);
     expect(repairLinks).toHaveBeenCalledTimes(1);
@@ -45,7 +41,7 @@ describe("SP supplier voucher startup scope", () => {
         ensureTrigger: vi.fn(async () => undefined),
         repairLinks,
         runMaintenanceScope: async (_reason, callback) => callback(),
-      }),
+      })
     ).rejects.toBe(failure);
 
     expect(repairLinks).toHaveBeenCalledTimes(1);
