@@ -23,6 +23,7 @@ import { logger } from "./lib/logger";
 import { startupMigrations, ensureCanonicalStockMovementJournal, ensureFinancialOperationRequests } from "./startup-schema";
 import { registerProcessErrorHandlers } from "./startup/registerProcessErrorHandlers";
 import { runStartupMigrations, warmupDb } from "./startup/runServerStartupMigrations";
+import { isTrustedOriginHost } from "./security/originHostPolicy";
 
 registerProcessErrorHandlers();
 
@@ -265,8 +266,8 @@ app.use((req, res, next) => {
 // Rejects state-changing API requests whose Origin (or Referer fallback) host
 // does not match the request host. Blocks classic cross-site form-post CSRF
 // attacks regardless of cookie SameSite setting. GET/HEAD/OPTIONS pass through.
-// Allowlist: same-origin only. Replit dev URLs naturally satisfy this since
-// the browser sends them as Origin and Express sees the same Host.
+// Allowlist: exact same-origin plus explicitly enumerated production host aliases.
+// Replit dev URLs naturally satisfy the exact-host rule.
 const ORIGIN_GUARD_EXEMPT_PATHS = new Set<string>([
   "/api/health",
   "/api/health/db",
@@ -302,7 +303,7 @@ app.use((req, res, next) => {
   // typically omit both headers — allow them since they cannot be CSRF'd.
   if (!sourceHost) return next();
 
-  if (sourceHost === host) return next();
+  if (isTrustedOriginHost(sourceHost, host)) return next();
 
   // Capacitor WebView origins — cannot be spoofed by web-based CSRF attacks.
   // iOS:     capacitor://localhost
