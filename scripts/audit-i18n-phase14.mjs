@@ -70,6 +70,7 @@ const compatibilityTranslationFiles = [
   "client/src/i18n/remoteSupportPhase5Translations.ts",
   "client/src/i18n/remoteSupportPhase6Translations.ts",
   "client/src/i18n/factoryProductionPlannerTranslations.ts",
+  "client/src/i18n/factoryInsuranceTranslations.ts",
 ];
 
 const reviewedTechnicalValues = new Set([
