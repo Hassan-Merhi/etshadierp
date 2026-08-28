@@ -6,6 +6,7 @@ import { requireAuth } from "../../../auth";
 
 import { ledgerAccounts, voucherEntries, employees, factoryWorkers, vouchers } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { findOrCreateLedger } from "../../payroll/core/_helpers";
 
 export function registerEmployeeAdvancesBonusRoutes(app: Express) {
   app.get("/api/factory/employee-advances", requireAuth, async (req: Request, res: Response) => {
@@ -352,9 +353,9 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
         .where(and(eq(ledgerAccounts.id, cashId), eq(ledgerAccounts.companyId, companyId)));
       if (!cashAcc) return res.status(400).json({ message: "Cash account not found for this company" });
 
-      // Fetch the bonus and worker city for accounting
+      // Fetch the bonus and worker name for accounting.
       const bonusRows = await db.execute(sql`
-        SELECT wb.*, fw.city, fw.full_name
+        SELECT wb.*, fw.full_name
         FROM worker_bonuses wb
         JOIN factory_workers fw ON fw.id = wb.worker_id
         WHERE wb.id = ${parseInt(req.params.id)} AND wb.company_id = ${companyId} AND wb.status = 'pending'
@@ -362,35 +363,24 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
       if (!bonusRows.rows.length) return res.status(404).json({ message: "Bonus not found or already paid" });
       const wb = bonusRows.rows[0] as any;
       const amt = parseFloat(wb.amount || "0");
+      const workerName = (wb.full_name as string | null)?.trim() || `Worker #${wb.worker_id}`;
 
-      // Determine the city-split bonus expense account
-      const city = (wb.city as string | null)?.trim() || "";
-      const capCity = city ? city.charAt(0).toUpperCase() + city.slice(1).toLowerCase() : "";
-      const accName = city ? `Bonus Expense - ${capCity}` : "Factory Worker Payroll";
-
-      // Get or create the expense account
-      let [expAcc] = await db
-        .select({ id: ledgerAccounts.id })
-        .from(ledgerAccounts)
-        .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, accName)));
-      if (!expAcc) {
-        const maxCode = await db.execute(sql`
-          SELECT MAX(CAST(code AS INTEGER)) as m FROM ledger_accounts
-          WHERE company_id = ${companyId} AND code ~ '^[0-9]+$'
-        `);
-        const nextCode = String(((maxCode.rows[0] as any)?.m || 0) + 1);
-        [expAcc] = await db
-          .insert(ledgerAccounts)
-          .values({
-            companyId,
-            code: nextCode,
-            name: accName,
-            accountType: "Expense",
-            active: true,
-            openingBalance: "0",
-          })
-          .returning({ id: ledgerAccounts.id });
-      }
+      // Bonus expense is tracked by worker, not location. Keep every worker account
+      // grouped under the shared Bonus Expense - Workers header.
+      const bonusGroup = await findOrCreateLedger(companyId, "Bonus Expense - Workers", "Expense", {
+        subType: "Group",
+      });
+      await db.execute(sql`
+        UPDATE ledger_accounts SET sub_type = 'Group'
+        WHERE id = ${bonusGroup.id} AND (sub_type IS NULL OR sub_type <> 'Group')
+      `);
+      const expAcc = await findOrCreateLedger(companyId, `Bonus Expense - ${workerName}`, "Expense", {
+        parentId: bonusGroup.id,
+      });
+      await db.execute(sql`
+        UPDATE ledger_accounts SET parent_id = ${bonusGroup.id}
+        WHERE id = ${expAcc.id} AND (parent_id IS NULL OR parent_id <> ${bonusGroup.id})
+      `);
 
       // Mark bonus as paid and create journal entry in a transaction
       await db.transaction(async (tx) => {
@@ -400,7 +390,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
         `);
 
         if (amt > 0) {
-          const narration = wb.notes || `Bonus for ${wb.full_name}`;
+          const narration = wb.notes || `Bonus for ${workerName}`;
           const [bVoucher] = await tx
             .insert(vouchers)
             .values({
@@ -420,7 +410,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
               ledgerAccountId: expAcc.id,
               debitAmount: amt.toFixed(2),
               creditAmount: "0",
-              narration: city ? `Bonus expense - ${capCity}: ${narration}` : narration,
+              narration: `Bonus - ${workerName}: ${narration}`,
             },
             {
               voucherId: bVoucher.id,
