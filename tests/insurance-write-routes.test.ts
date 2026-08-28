@@ -320,13 +320,10 @@ describe("Insurance multi-sheet Excel import", () => {
     instructions.addRow(["This sheet is ignored"]);
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
-    const preview = await agent
-      .post("/api/insurance/import/preview")
-      .field("year", "2026")
-      .attach("file", buffer, {
-        filename: "insurance-import.xlsx",
-        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
+    const preview = await agent.post("/api/insurance/import/preview").field("year", "2026").attach("file", buffer, {
+      filename: "insurance-import.xlsx",
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
     expect(preview.status).toBe(200);
     expect(preview.body.rows).toHaveLength(4);
     expect(preview.body.recognizedSheets).toEqual(
@@ -438,18 +435,15 @@ describe("POST /api/insurance/admin/clear-all", () => {
       [ctx.companyId, unrelatedNumber]
     );
 
-    const cleared = await agent
-      .post("/api/insurance/admin/clear-all")
-      .send({ confirmation: "CLEAR ALL INSURANCE" });
+    const cleared = await agent.post("/api/insurance/admin/clear-all").send({ confirmation: "CLEAR ALL INSURANCE" });
     expect(cleared.status).toBe(200);
     expect(cleared.body.membersDeleted).toBeGreaterThan(0);
     expect(cleared.body.vouchersDeleted).toBeGreaterThan(0);
     expect(cleared.body.ledgerAccountsArchived).toBeGreaterThan(0);
 
-    const remainingMembers = await pool.query(
-      `SELECT id FROM insurance_members WHERE company_id = $1`,
-      [ctx.companyId]
-    );
+    const remainingMembers = await pool.query(`SELECT id FROM insurance_members WHERE company_id = $1`, [
+      ctx.companyId,
+    ]);
     const remainingOverrides = await pool.query(
       `SELECT id FROM insurance_member_monthly_amounts WHERE company_id = $1`,
       [ctx.companyId]
@@ -458,10 +452,10 @@ describe("POST /api/insurance/admin/clear-all", () => {
       `SELECT id FROM vouchers WHERE company_id = $1 AND voucher_number ILIKE 'INS-%'`,
       [ctx.companyId]
     );
-    const unrelatedStillExists = await pool.query(
-      `SELECT id FROM vouchers WHERE id = $1 AND company_id = $2`,
-      [unrelated.rows[0].id, ctx.companyId]
-    );
+    const unrelatedStillExists = await pool.query(`SELECT id FROM vouchers WHERE id = $1 AND company_id = $2`, [
+      unrelated.rows[0].id,
+      ctx.companyId,
+    ]);
     expect(remainingMembers.rowCount).toBe(0);
     expect(remainingOverrides.rowCount).toBe(0);
     expect(remainingInsuranceVouchers.rowCount).toBe(0);

@@ -98,34 +98,32 @@ export function createInsuranceImportTemplate() {
   return workbook;
 }
 
-const MONTHS = new Map<string, number>(
-  [
-    ["jan", 1],
-    ["january", 1],
-    ["feb", 2],
-    ["february", 2],
-    ["mar", 3],
-    ["march", 3],
-    ["apr", 4],
-    ["april", 4],
-    ["may", 5],
-    ["jun", 6],
-    ["june", 6],
-    ["jul", 7],
-    ["july", 7],
-    ["aug", 8],
-    ["august", 8],
-    ["sep", 9],
-    ["sept", 9],
-    ["september", 9],
-    ["oct", 10],
-    ["october", 10],
-    ["nov", 11],
-    ["november", 11],
-    ["dec", 12],
-    ["december", 12],
-  ] as const
-);
+const MONTHS = new Map<string, number>([
+  ["jan", 1],
+  ["january", 1],
+  ["feb", 2],
+  ["february", 2],
+  ["mar", 3],
+  ["march", 3],
+  ["apr", 4],
+  ["april", 4],
+  ["may", 5],
+  ["jun", 6],
+  ["june", 6],
+  ["jul", 7],
+  ["july", 7],
+  ["aug", 8],
+  ["august", 8],
+  ["sep", 9],
+  ["sept", 9],
+  ["september", 9],
+  ["oct", 10],
+  ["october", 10],
+  ["nov", 11],
+  ["november", 11],
+  ["dec", 12],
+  ["december", 12],
+] as const);
 
 function monthStart(year: number, month: number): string | null {
   if (!Number.isInteger(year) || year < 2000 || year > 2100 || month < 1 || month > 12) return null;
@@ -201,8 +199,7 @@ export function parseInsuranceWorkbook(workbook: ExcelWorkbook, defaultYear?: nu
       preview.ignoredSheets.push(sheetName);
       preview.warnings.push({
         sheetName,
-        message:
-          'Sheet name is not a recognized month. Use "January", "January 2026", or "2026-01".',
+        message: 'Sheet name is not a recognized month. Use "January", "January 2026", or "2026-01".',
       });
       continue;
     }
@@ -244,9 +241,10 @@ export function parseInsuranceWorkbook(workbook: ExcelWorkbook, defaultYear?: nu
       duplicateKeys.set(duplicateKey, rowNumber);
 
       const requestedStartDate = findValue(sourceRow, ["start date", "startdate"]);
-      const startDate = requestedStartDate == null || cellText(requestedStartDate) === ""
-        ? parsedMonth
-        : normalizeDate(requestedStartDate);
+      const startDate =
+        requestedStartDate == null || cellText(requestedStartDate) === ""
+          ? parsedMonth
+          : normalizeDate(requestedStartDate);
       if (!startDate) {
         preview.errors.push({ sheetName, row: rowNumber, message: "Start Date is invalid." });
         return;

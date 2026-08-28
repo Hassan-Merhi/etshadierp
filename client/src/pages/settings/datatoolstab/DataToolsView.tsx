@@ -350,9 +350,7 @@ export function DataToolsView({ model }: Props) {
                   disabled={recalculateCostsMutation.isPending}
                   data-testid="button-fix-cost-prices"
                 >
-                  <RefreshCw
-                    className={`mr-2 h-4 w-4 ${recalculateCostsMutation.isPending ? "animate-spin" : ""}`}
-                  />
+                  <RefreshCw className={`mr-2 h-4 w-4 ${recalculateCostsMutation.isPending ? "animate-spin" : ""}`} />
                   {recalculateCostsMutation.isPending ? "Updating..." : "Fix Cost Prices"}
                 </Button>
               }

@@ -43,7 +43,10 @@ const insuranceImportApplySchema = z.object({
         nationality: z.string().max(500).optional(),
         positionWorking: z.string().max(500).optional(),
         insuranceNumber: z.string().max(500).optional(),
-        dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        dob: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .optional(),
         notes: z.string().max(5000).optional(),
       })
     )
@@ -97,7 +100,9 @@ async function findOrCreateLedgerTx(
   const [existing] = await tx
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
-    .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name), isNull(ledgerAccounts.deletedAt)))
+    .where(
+      and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name), isNull(ledgerAccounts.deletedAt))
+    )
     .limit(1);
   if (existing) return existing;
 
@@ -319,30 +324,25 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     }
   });
 
-  app.post(
-    "/api/insurance/import/preview",
-    requireAuth,
-    upload.single("file"),
-    async (req: Request, res: Response) => {
-      try {
-        resolveRequestCompanyId(req);
-        if (!req.file) return res.status(400).json({ message: "Choose an .xlsx workbook first" });
-        if (!req.file.originalname.toLowerCase().endsWith(".xlsx")) {
-          return res.status(400).json({ message: "Only .xlsx workbooks are supported" });
-        }
-        const defaultYear = Number(req.body?.year);
-        if (!Number.isInteger(defaultYear) || defaultYear < 2000 || defaultYear > 2100) {
-          return res.status(400).json({ message: "Choose a valid workbook year" });
-        }
-        const workbook = await readExcel(req.file.buffer);
-        const preview = parseInsuranceWorkbook(workbook, defaultYear);
-        return res.json(preview);
-      } catch (error: unknown) {
-        logger.error("POST /api/insurance/import/preview error:", { error });
-        sendRouteError(res, error, "Failed to read Insurance workbook");
+  app.post("/api/insurance/import/preview", requireAuth, upload.single("file"), async (req: Request, res: Response) => {
+    try {
+      resolveRequestCompanyId(req);
+      if (!req.file) return res.status(400).json({ message: "Choose an .xlsx workbook first" });
+      if (!req.file.originalname.toLowerCase().endsWith(".xlsx")) {
+        return res.status(400).json({ message: "Only .xlsx workbooks are supported" });
       }
+      const defaultYear = Number(req.body?.year);
+      if (!Number.isInteger(defaultYear) || defaultYear < 2000 || defaultYear > 2100) {
+        return res.status(400).json({ message: "Choose a valid workbook year" });
+      }
+      const workbook = await readExcel(req.file.buffer);
+      const preview = parseInsuranceWorkbook(workbook, defaultYear);
+      return res.json(preview);
+    } catch (error: unknown) {
+      logger.error("POST /api/insurance/import/preview error:", { error });
+      sendRouteError(res, error, "Failed to read Insurance workbook");
     }
-  );
+  });
 
   app.post("/api/insurance/import/apply", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -363,10 +363,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
 
       const result = await db.transaction(async (tx) => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"insurance-import:" + companyId}))`);
-        const existingRows = await tx
-          .select()
-          .from(insuranceMembers)
-          .where(eq(insuranceMembers.companyId, companyId));
+        const existingRows = await tx.select().from(insuranceMembers).where(eq(insuranceMembers.companyId, companyId));
         const existingByName = new Map<string, typeof existingRows>();
         for (const member of existingRows) {
           const key = normalizedMemberName(member.name);
@@ -374,7 +371,9 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         }
         for (const [name, matches] of existingByName) {
           if (matches.length > 1) {
-            throw new Error(`Existing Insurance data has duplicate member name "${name}". Resolve it before importing.`);
+            throw new Error(
+              `Existing Insurance data has duplicate member name "${name}". Resolve it before importing.`
+            );
           }
         }
 
@@ -525,22 +524,16 @@ export function registerFactoryInsuranceRoutes(app: Express) {
           const accountIds = Array.from(
             new Set([
               ...insuranceAccounts.map((account) => account.id),
-              ...members
-                .map((member) => member.ledgerAccountId)
-                .filter((id): id is number => typeof id === "number"),
+              ...members.map((member) => member.ledgerAccountId).filter((id): id is number => typeof id === "number"),
             ])
           );
 
           if (voucherIds.length > 0) {
             await tx.delete(accountingPostingRequests).where(inArray(accountingPostingRequests.voucherId, voucherIds));
             await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, voucherIds));
-            await tx
-              .delete(vouchers)
-              .where(and(eq(vouchers.companyId, companyId), inArray(vouchers.id, voucherIds)));
+            await tx.delete(vouchers).where(and(eq(vouchers.companyId, companyId), inArray(vouchers.id, voucherIds)));
           }
-          await tx
-            .delete(insuranceMemberMonthlyAmounts)
-            .where(eq(insuranceMemberMonthlyAmounts.companyId, companyId));
+          await tx.delete(insuranceMemberMonthlyAmounts).where(eq(insuranceMemberMonthlyAmounts.companyId, companyId));
           await tx.delete(insuranceMembers).where(eq(insuranceMembers.companyId, companyId));
           if (accountIds.length > 0) {
             await tx
