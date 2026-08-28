@@ -315,176 +315,195 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     }
   });
 
-  app.get("/api/insurance/import/template", privilegedReadRateLimit, requireAuth, async (_req: Request, res: Response) => {
-    try {
-      const buffer = await writeWorkbook(createInsuranceImportTemplate());
-      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", 'attachment; filename="Insurance_Import_Template.xlsx"');
-      res.setHeader("Cache-Control", "no-store, max-age=0");
-      res.setHeader("Pragma", "no-cache");
-      return res.send(buffer);
-    } catch (error: unknown) {
-      logger.error("GET /api/insurance/import/template error:", { error });
-      return sendRouteError(res, error, "Failed to create Insurance import template");
+  app.get(
+    "/api/insurance/import/template",
+    privilegedReadRateLimit,
+    requireAuth,
+    async (_req: Request, res: Response) => {
+      try {
+        const buffer = await writeWorkbook(createInsuranceImportTemplate());
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        res.setHeader("Content-Disposition", 'attachment; filename="Insurance_Import_Template.xlsx"');
+        res.setHeader("Cache-Control", "no-store, max-age=0");
+        res.setHeader("Pragma", "no-cache");
+        return res.send(buffer);
+      } catch (error: unknown) {
+        logger.error("GET /api/insurance/import/template error:", { error });
+        return sendRouteError(res, error, "Failed to create Insurance import template");
+      }
     }
-  });
+  );
 
-  app.post("/api/insurance/import/preview", privilegedMutationRateLimit, requireAuth, upload.single("file"), async (req: Request, res: Response) => {
-    try {
-      resolveRequestCompanyId(req);
-      if (!req.file) return res.status(400).json({ message: "Choose an .xlsx workbook first" });
-      if (!req.file.originalname.toLowerCase().endsWith(".xlsx")) {
-        return res.status(400).json({ message: "Only .xlsx workbooks are supported" });
+  app.post(
+    "/api/insurance/import/preview",
+    privilegedMutationRateLimit,
+    requireAuth,
+    upload.single("file"),
+    async (req: Request, res: Response) => {
+      try {
+        resolveRequestCompanyId(req);
+        if (!req.file) return res.status(400).json({ message: "Choose an .xlsx workbook first" });
+        if (!req.file.originalname.toLowerCase().endsWith(".xlsx")) {
+          return res.status(400).json({ message: "Only .xlsx workbooks are supported" });
+        }
+        const defaultYear = Number(req.body?.year);
+        if (!Number.isInteger(defaultYear) || defaultYear < 2000 || defaultYear > 2100) {
+          return res.status(400).json({ message: "Choose a valid workbook year" });
+        }
+        const workbook = await readExcel(req.file.buffer);
+        const preview = parseInsuranceWorkbook(workbook, defaultYear);
+        return res.json(preview);
+      } catch (error: unknown) {
+        logger.error("POST /api/insurance/import/preview error:", { error });
+        sendRouteError(res, error, "Failed to read Insurance workbook");
       }
-      const defaultYear = Number(req.body?.year);
-      if (!Number.isInteger(defaultYear) || defaultYear < 2000 || defaultYear > 2100) {
-        return res.status(400).json({ message: "Choose a valid workbook year" });
-      }
-      const workbook = await readExcel(req.file.buffer);
-      const preview = parseInsuranceWorkbook(workbook, defaultYear);
-      return res.json(preview);
-    } catch (error: unknown) {
-      logger.error("POST /api/insurance/import/preview error:", { error });
-      sendRouteError(res, error, "Failed to read Insurance workbook");
     }
-  });
+  );
 
-  app.post("/api/insurance/import/apply", privilegedMutationRateLimit, requireAuth, async (req: Request, res: Response) => {
-    try {
-      const parsed = insuranceImportApplySchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid import data", errors: parsed.error.issues });
-      }
-      const companyId = resolveRequestCompanyId(req);
-      const rows = parsed.data.rows as InsuranceImportRow[];
-      const duplicateKeys = new Set<string>();
-      for (const row of rows) {
-        const key = `${row.monthStart}:${normalizedMemberName(row.name)}`;
-        if (duplicateKeys.has(key)) {
-          return res.status(400).json({ message: `Duplicate member ${row.name} for ${row.monthStart}` });
+  app.post(
+    "/api/insurance/import/apply",
+    privilegedMutationRateLimit,
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const parsed = insuranceImportApplySchema.safeParse(req.body);
+        if (!parsed.success) {
+          return res.status(400).json({ message: "Invalid import data", errors: parsed.error.issues });
         }
-        duplicateKeys.add(key);
-      }
-
-      const result = await db.transaction(async (tx) => {
-        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"insurance-import:" + companyId}))`);
-        const existingRows = await tx.select().from(insuranceMembers).where(eq(insuranceMembers.companyId, companyId));
-        const existingByName = new Map<string, typeof existingRows>();
-        for (const member of existingRows) {
-          const key = normalizedMemberName(member.name);
-          existingByName.set(key, [...(existingByName.get(key) ?? []), member]);
-        }
-        for (const [name, matches] of existingByName) {
-          if (matches.length > 1) {
-            throw new Error(
-              `Existing Insurance data has duplicate member name "${name}". Resolve it before importing.`
-            );
-          }
-        }
-
-        const rowsByMember = new Map<string, InsuranceImportRow[]>();
+        const companyId = resolveRequestCompanyId(req);
+        const rows = parsed.data.rows as InsuranceImportRow[];
+        const duplicateKeys = new Set<string>();
         for (const row of rows) {
-          const key = normalizedMemberName(row.name);
-          rowsByMember.set(key, [...(rowsByMember.get(key) ?? []), row]);
+          const key = `${row.monthStart}:${normalizedMemberName(row.name)}`;
+          if (duplicateKeys.has(key)) {
+            return res.status(400).json({ message: `Duplicate member ${row.name} for ${row.monthStart}` });
+          }
+          duplicateKeys.add(key);
         }
 
-        let createdMembers = 0;
-        let updatedMembers = 0;
-        let monthlyAmountsUpserted = 0;
-        for (const [memberKey, memberRows] of rowsByMember) {
-          memberRows.sort((a, b) => a.monthStart.localeCompare(b.monthStart));
-          let member = existingByName.get(memberKey)?.[0];
-          if (!member) {
-            const firstRow = memberRows[0];
-            const earliestStartDate = memberRows.reduce(
-              (earliest, row) => (row.startDate < earliest ? row.startDate : earliest),
-              firstRow.startDate
-            );
-            const ledger = await findOrCreateLedgerTx(tx, companyId, `Insurance - ${firstRow.name}`, "Liability");
-            const [inserted] = await tx
-              .insert(insuranceMembers)
-              .values({
-                companyId,
-                name: firstRow.name,
-                nationality: firstRow.nationality ?? null,
-                positionWorking: firstRow.positionWorking ?? null,
-                insuranceNumber: firstRow.insuranceNumber ?? null,
-                startDate: earliestStartDate,
-                amount: memberRows[memberRows.length - 1].amount,
-                dob: firstRow.dob ?? null,
-                notes: firstRow.notes ?? null,
-                active: true,
-                ledgerAccountId: ledger.id,
-              })
-              .returning();
-            if (!inserted) throw new Error(`Failed to create Insurance member ${firstRow.name}`);
-            member = inserted;
-            existingByName.set(memberKey, [member]);
-            createdMembers += 1;
-          } else {
-            updatedMembers += 1;
+        const result = await db.transaction(async (tx) => {
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"insurance-import:" + companyId}))`);
+          const existingRows = await tx
+            .select()
+            .from(insuranceMembers)
+            .where(eq(insuranceMembers.companyId, companyId));
+          const existingByName = new Map<string, typeof existingRows>();
+          for (const member of existingRows) {
+            const key = normalizedMemberName(member.name);
+            existingByName.set(key, [...(existingByName.get(key) ?? []), member]);
+          }
+          for (const [name, matches] of existingByName) {
+            if (matches.length > 1) {
+              throw new Error(
+                `Existing Insurance data has duplicate member name "${name}". Resolve it before importing.`
+              );
+            }
           }
 
-          for (const row of memberRows) {
-            await tx
-              .insert(insuranceMemberMonthlyAmounts)
-              .values({
-                companyId,
-                memberId: member.id,
-                monthStart: row.monthStart,
-                amount: row.amount,
-              })
-              .onConflictDoUpdate({
-                target: [
-                  insuranceMemberMonthlyAmounts.companyId,
-                  insuranceMemberMonthlyAmounts.memberId,
-                  insuranceMemberMonthlyAmounts.monthStart,
-                ],
-                set: { amount: row.amount, updatedAt: new Date() },
-              });
-            monthlyAmountsUpserted += 1;
+          const rowsByMember = new Map<string, InsuranceImportRow[]>();
+          for (const row of rows) {
+            const key = normalizedMemberName(row.name);
+            rowsByMember.set(key, [...(rowsByMember.get(key) ?? []), row]);
           }
 
-          const [latestAmount] = await tx
-            .select({ amount: insuranceMemberMonthlyAmounts.amount })
-            .from(insuranceMemberMonthlyAmounts)
-            .where(
-              and(
-                eq(insuranceMemberMonthlyAmounts.companyId, companyId),
-                eq(insuranceMemberMonthlyAmounts.memberId, member.id)
+          let createdMembers = 0;
+          let updatedMembers = 0;
+          let monthlyAmountsUpserted = 0;
+          for (const [memberKey, memberRows] of rowsByMember) {
+            memberRows.sort((a, b) => a.monthStart.localeCompare(b.monthStart));
+            let member = existingByName.get(memberKey)?.[0];
+            if (!member) {
+              const firstRow = memberRows[0];
+              const earliestStartDate = memberRows.reduce(
+                (earliest, row) => (row.startDate < earliest ? row.startDate : earliest),
+                firstRow.startDate
+              );
+              const ledger = await findOrCreateLedgerTx(tx, companyId, `Insurance - ${firstRow.name}`, "Liability");
+              const [inserted] = await tx
+                .insert(insuranceMembers)
+                .values({
+                  companyId,
+                  name: firstRow.name,
+                  nationality: firstRow.nationality ?? null,
+                  positionWorking: firstRow.positionWorking ?? null,
+                  insuranceNumber: firstRow.insuranceNumber ?? null,
+                  startDate: earliestStartDate,
+                  amount: memberRows[memberRows.length - 1].amount,
+                  dob: firstRow.dob ?? null,
+                  notes: firstRow.notes ?? null,
+                  active: true,
+                  ledgerAccountId: ledger.id,
+                })
+                .returning();
+              if (!inserted) throw new Error(`Failed to create Insurance member ${firstRow.name}`);
+              member = inserted;
+              existingByName.set(memberKey, [member]);
+              createdMembers += 1;
+            } else {
+              updatedMembers += 1;
+            }
+
+            for (const row of memberRows) {
+              await tx
+                .insert(insuranceMemberMonthlyAmounts)
+                .values({
+                  companyId,
+                  memberId: member.id,
+                  monthStart: row.monthStart,
+                  amount: row.amount,
+                })
+                .onConflictDoUpdate({
+                  target: [
+                    insuranceMemberMonthlyAmounts.companyId,
+                    insuranceMemberMonthlyAmounts.memberId,
+                    insuranceMemberMonthlyAmounts.monthStart,
+                  ],
+                  set: { amount: row.amount, updatedAt: new Date() },
+                });
+              monthlyAmountsUpserted += 1;
+            }
+
+            const [latestAmount] = await tx
+              .select({ amount: insuranceMemberMonthlyAmounts.amount })
+              .from(insuranceMemberMonthlyAmounts)
+              .where(
+                and(
+                  eq(insuranceMemberMonthlyAmounts.companyId, companyId),
+                  eq(insuranceMemberMonthlyAmounts.memberId, member.id)
+                )
               )
-            )
-            .orderBy(desc(insuranceMemberMonthlyAmounts.monthStart))
-            .limit(1);
-          if (latestAmount) {
-            await tx
-              .update(insuranceMembers)
-              .set({ amount: latestAmount.amount })
-              .where(and(eq(insuranceMembers.companyId, companyId), eq(insuranceMembers.id, member.id)));
+              .orderBy(desc(insuranceMemberMonthlyAmounts.monthStart))
+              .limit(1);
+            if (latestAmount) {
+              await tx
+                .update(insuranceMembers)
+                .set({ amount: latestAmount.amount })
+                .where(and(eq(insuranceMembers.companyId, companyId), eq(insuranceMembers.id, member.id)));
+            }
           }
-        }
 
-        await tx.insert(auditLog).values({
-          userId: String(req.session.userId ?? "system"),
-          username: req.session.username ?? "unknown",
-          companyId,
-          action: "import",
-          tableName: "insurance_members",
-          recordIdentifier: "multi-sheet-excel-import",
-          changes: {
-            createdMembers: { old: null, new: createdMembers },
-            updatedMembers: { old: null, new: updatedMembers },
-            monthlyAmountsUpserted: { old: null, new: monthlyAmountsUpserted },
-          },
+          await tx.insert(auditLog).values({
+            userId: String(req.session.userId ?? "system"),
+            username: req.session.username ?? "unknown",
+            companyId,
+            action: "import",
+            tableName: "insurance_members",
+            recordIdentifier: "multi-sheet-excel-import",
+            changes: {
+              createdMembers: { old: null, new: createdMembers },
+              updatedMembers: { old: null, new: updatedMembers },
+              monthlyAmountsUpserted: { old: null, new: monthlyAmountsUpserted },
+            },
+          });
+          return { createdMembers, updatedMembers, monthlyAmountsUpserted };
         });
-        return { createdMembers, updatedMembers, monthlyAmountsUpserted };
-      });
-      return res.json(result);
-    } catch (error: unknown) {
-      logger.error("POST /api/insurance/import/apply error:", { error });
-      sendRouteError(res, error, "Failed to import Insurance workbook");
+        return res.json(result);
+      } catch (error: unknown) {
+        logger.error("POST /api/insurance/import/apply error:", { error });
+        sendRouteError(res, error, "Failed to import Insurance workbook");
+      }
     }
-  });
+  );
 
   app.post(
     "/api/insurance/admin/clear-all",
