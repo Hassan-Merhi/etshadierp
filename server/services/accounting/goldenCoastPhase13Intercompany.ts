@@ -29,7 +29,7 @@ export interface GoldenCoastPhase13IntercompanyRepair {
 
 export interface GoldenCoastPhase13IntercompanyPlan {
   definition: GoldenCoastPhase13IntercompanyDefinition;
-  action: "create" | "repair" | "none";
+  action: "create" | "adopt" | "repair" | "none";
   accountId: number | null;
   repairs: GoldenCoastPhase13IntercompanyRepair[];
 }
@@ -109,11 +109,40 @@ function isLive(row: GoldenCoastPhase13LedgerRow): boolean {
   return row.active === true && row.deletedAt == null;
 }
 
+function selectCandidate(input: {
+  companyId: number;
+  definition: GoldenCoastPhase13IntercompanyDefinition;
+  accounts: readonly GoldenCoastPhase13LedgerRow[];
+}): { selected: GoldenCoastPhase13LedgerRow | null; adopted: boolean } {
+  const canonical = input.accounts.filter((row) => row.subType === input.definition.subType).sort(byId);
+  const liveCanonical = canonical.filter(isLive);
+  if (liveCanonical.length > 1) {
+    throw new GoldenCoastPhase13IntercompanyError(
+      `Company ${input.companyId} has ${liveCanonical.length} active ${input.definition.subType} accounts; repair duplicates before Golden Coast setup`
+    );
+  }
+  const canonicalSelected = liveCanonical[0] ?? canonical[0] ?? null;
+  if (canonicalSelected) return { selected: canonicalSelected, adopted: false };
+
+  // Older installs sometimes created the reciprocal account by its stable code
+  // or default name but never stamped the Phase 7 subtype. Adopt that row rather
+  // than creating a duplicate account and breaking historical voucher links.
+  const legacy = input.accounts
+    .filter((row) => row.code === input.definition.code || row.name === input.definition.name)
+    .sort(byId);
+  const liveLegacy = legacy.filter(isLive);
+  if (liveLegacy.length > 1) {
+    throw new GoldenCoastPhase13IntercompanyError(
+      `Company ${input.companyId} has multiple live legacy candidates for ${input.definition.subType}; repair duplicates before Golden Coast setup`
+    );
+  }
+  return { selected: liveLegacy[0] ?? legacy[0] ?? null, adopted: legacy.length > 0 };
+}
+
 /**
  * Plans one side of the Golden Coast ↔ HADI pair. Canonical subtype is the
- * identity. A missing row is created; an inactive/deleted/wrong-type row is
- * repaired in place so historical voucher links keep the same account id.
- * Multiple live rows are never guessed between and must be repaired manually.
+ * durable identity. A missing row is created; a legacy/wrong/inactive row is
+ * adopted or repaired in place so historical voucher links keep the same id.
  */
 export function planGoldenCoastPhase13IntercompanyAccount(input: {
   companyId: number;
@@ -123,15 +152,7 @@ export function planGoldenCoastPhase13IntercompanyAccount(input: {
   const companyId = positiveId(input.companyId, "companyId");
   const accounts = input.accounts ?? [];
   assertScoped(companyId, accounts);
-  const matches = accounts.filter((row) => row.subType === input.definition.subType).sort(byId);
-  const live = matches.filter(isLive);
-  if (live.length > 1) {
-    throw new GoldenCoastPhase13IntercompanyError(
-      `Company ${companyId} has ${live.length} active ${input.definition.subType} accounts; repair duplicates before Golden Coast setup`
-    );
-  }
-
-  const selected = live[0] ?? matches[0] ?? null;
+  const { selected, adopted } = selectCandidate({ companyId, definition: input.definition, accounts });
   if (!selected) {
     return { definition: input.definition, action: "create", accountId: null, repairs: [] };
   }
@@ -149,7 +170,7 @@ export function planGoldenCoastPhase13IntercompanyAccount(input: {
 
   return {
     definition: input.definition,
-    action: repairs.length > 0 ? "repair" : "none",
+    action: adopted ? "adopt" : repairs.length > 0 ? "repair" : "none",
     accountId: selected.id,
     repairs,
   };
@@ -161,50 +182,49 @@ export function summarizeGoldenCoastPhase13IntercompanyAccount(input: {
   accounts: readonly GoldenCoastPhase13LedgerRow[];
 }): GoldenCoastPhase13IntercompanyStatus {
   const companyId = positiveId(input.companyId, "companyId");
-  assertScoped(companyId, input.accounts ?? []);
-  const matches = (input.accounts ?? [])
-    .filter((row) => row.subType === input.definition.subType)
-    .sort(byId);
-  const live = matches.filter(isLive);
-  if (live.length > 1) {
+  const accounts = input.accounts ?? [];
+  assertScoped(companyId, accounts);
+  try {
+    const plan = planGoldenCoastPhase13IntercompanyAccount({ companyId, definition: input.definition, accounts });
+    const selected = plan.accountId == null ? null : accounts.find((row) => row.id === plan.accountId) ?? null;
+    if (!selected) {
+      return {
+        role: input.definition.role,
+        companyId,
+        subType: input.definition.subType,
+        expectedName: input.definition.name,
+        status: "missing",
+        accountId: null,
+        name: null,
+        accountType: null,
+        issues: ["Required intercompany account is missing"],
+      };
+    }
     return {
       role: input.definition.role,
       companyId,
       subType: input.definition.subType,
       expectedName: input.definition.name,
-      status: "ambiguous",
-      accountId: null,
-      name: null,
-      accountType: null,
-      issues: [`${live.length} active accounts share ${input.definition.subType}`],
+      status: plan.repairs.length > 0 ? "needs_repair" : "ok",
+      accountId: selected.id,
+      name: selected.name,
+      accountType: selected.accountType,
+      issues: plan.repairs.map((repair) => `${repair.field} must be ${String(repair.to)}`),
     };
+  } catch (error) {
+    if (error instanceof GoldenCoastPhase13IntercompanyError && /duplicate|multiple/.test(error.message)) {
+      return {
+        role: input.definition.role,
+        companyId,
+        subType: input.definition.subType,
+        expectedName: input.definition.name,
+        status: "ambiguous",
+        accountId: null,
+        name: null,
+        accountType: null,
+        issues: [error.message],
+      };
+    }
+    throw error;
   }
-
-  const selected = live[0] ?? matches[0] ?? null;
-  if (!selected) {
-    return {
-      role: input.definition.role,
-      companyId,
-      subType: input.definition.subType,
-      expectedName: input.definition.name,
-      status: "missing",
-      accountId: null,
-      name: null,
-      accountType: null,
-      issues: ["Required intercompany account is missing"],
-    };
-  }
-
-  const plan = planGoldenCoastPhase13IntercompanyAccount({ companyId, definition: input.definition, accounts: input.accounts });
-  return {
-    role: input.definition.role,
-    companyId,
-    subType: input.definition.subType,
-    expectedName: input.definition.name,
-    status: plan.repairs.length > 0 ? "needs_repair" : "ok",
-    accountId: selected.id,
-    name: selected.name,
-    accountType: selected.accountType,
-    issues: plan.repairs.map((repair) => `${repair.field} must be ${String(repair.to)}`),
-  };
 }
