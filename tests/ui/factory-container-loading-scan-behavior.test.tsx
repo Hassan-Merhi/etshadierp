@@ -205,6 +205,7 @@ describe("factory container loading scan behavior", () => {
     render(<FactoryContainerLoadingScan />);
     fireEvent.click(await screen.findByTestId("button-ignore-proforma"));
     expect(screen.getByTestId("button-ignore-proforma")).toHaveTextContent("Ignore Proforma: ON");
+    expect(screen.getByTestId("button-ignore-proforma")).toHaveAttribute("aria-pressed", "true");
     const input = screen.getByTestId("input-scan-code");
     fireEvent.change(input, { target: { value: "EXTRA-1" } });
     fireEvent.keyDown(input, { key: "Enter" });

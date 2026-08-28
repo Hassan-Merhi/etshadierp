@@ -11,6 +11,7 @@ import { parseId } from "../../../../lib/parseId";
 import { db } from "../../../../db";
 import { requireAuth } from "../../../../auth";
 import { recalculateOrderTotals } from "../../_helpers";
+import { shouldEnforceProformaOverload } from "./proformaScanPolicy";
 import {
   factoryBaleProducts,
   factoryBales,
@@ -18,7 +19,7 @@ import {
   customerOrders,
   customerOrderBales,
 } from "@shared/schema";
-import { eq, and, or, sql, inArray } from "drizzle-orm";
+import { eq, and, or, sql, inArray, isNull, ne } from "drizzle-orm";
 import { resultRows, firstRow } from "../../../../lib/queryResult";
 
 export function registerOrderBaleBulkImportRoutes(app: Express) {
@@ -31,6 +32,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
 
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { locationId, items, refNumbers: refNumbersRaw } = req.body;
+      const ignoreProforma = req.body.allowBypassProforma === true;
       const hasRefNumbers = Array.isArray(refNumbersRaw) && refNumbersRaw.length > 0;
       const hasItems = Array.isArray(items) && items.length > 0;
       if (!locationId || (!hasItems && !hasRefNumbers)) {
@@ -119,7 +121,11 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
             if (!bale) return { kind: "notFound" as const };
             if (alreadyAddedBaleIds.has(bale.id)) return { kind: "skipDuplicate" as const };
 
-            if (order.proformaIdUsed && bale.articleCode) {
+            if (
+              order.proformaIdUsed &&
+              bale.articleCode &&
+              shouldEnforceProformaOverload({ ignoreProforma, allowBypassOverload: false })
+            ) {
               const [proformaLine] = await tx
                 .select({ quantity: customerProformaLines.quantity })
                 .from(customerProformaLines)
@@ -138,7 +144,8 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
                     and(
                       eq(customerOrders.companyId, companyId),
                       eq(customerOrders.proformaIdUsed, order.proformaIdUsed),
-                      sql`${customerOrders.status} != 'CANCELLED'`,
+                      ne(customerOrders.status, "CANCELLED"),
+                      isNull(customerOrders.deletedAt),
                       sql`LOWER(TRIM(COALESCE(${customerOrderBales.articleCode}, ''))) = LOWER(TRIM(${bale.articleCode}))`
                     )
                   );
@@ -324,7 +331,11 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
               if (firstRow(v5DupCheck)) continue;
             }
 
-            if (order.proformaIdUsed && bale.articleCode) {
+            if (
+              order.proformaIdUsed &&
+              bale.articleCode &&
+              shouldEnforceProformaOverload({ ignoreProforma, allowBypassOverload: false })
+            ) {
               const [proformaLine] = await tx
                 .select({ quantity: customerProformaLines.quantity })
                 .from(customerProformaLines)
@@ -343,7 +354,8 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
                     and(
                       eq(customerOrders.companyId, companyId),
                       eq(customerOrders.proformaIdUsed, order.proformaIdUsed),
-                      sql`${customerOrders.status} != 'CANCELLED'`,
+                      ne(customerOrders.status, "CANCELLED"),
+                      isNull(customerOrders.deletedAt),
                       sql`LOWER(TRIM(COALESCE(${customerOrderBales.articleCode}, ''))) = LOWER(TRIM(${bale.articleCode}))`
                     )
                   );

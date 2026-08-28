@@ -73,6 +73,17 @@ function normaliseDate(raw: string): string | null {
     }
   }
 
+  // Excel serial date (for example, 46273 = 2026-09-08). CSV exports from
+  // spreadsheets may contain the underlying numeric value instead of the
+  // formatted date displayed in Excel.
+  const serial = Number(value);
+  if (Number.isInteger(serial) && serial > 1000 && serial < 200000) {
+    const date = new Date(Date.UTC(1899, 11, 30) + serial * 24 * 60 * 60 * 1000);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toISOString().slice(0, 10);
+    }
+  }
+
   return null;
 }
 

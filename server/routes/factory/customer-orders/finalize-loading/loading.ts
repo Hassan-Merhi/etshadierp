@@ -13,6 +13,7 @@ import { getClientDate } from "../../../../lib/dateUtils";
 import { db } from "../../../../db";
 import { requireAuth } from "../../../../auth";
 import { writeDaybookEntry } from "../../_helpers";
+import { syncProformaReservations } from "../../_stockReservationHelper";
 import {
   factoryBales,
   customerOrders,
@@ -86,7 +87,10 @@ export function registerOrderLoadingRoutes(app: Express) {
 
       const orderId = parseId(req.params.id);
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
-      const createContinuation = req.body?.createContinuation === true;
+      // Keep accepting the legacy flag so an older browser bundle still gets
+      // the new carried-over-proforma behavior after the server is deployed.
+      const createCarryoverProforma =
+        req.body?.createCarryoverProforma === true || req.body?.createContinuation === true;
 
       const finalized = await db.transaction(async (tx) => {
         const [order] = await tx
@@ -100,12 +104,21 @@ export function registerOrderLoadingRoutes(app: Express) {
         const bales = await tx.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
         if (bales.length === 0) throw new Error("Order has no bales scanned");
 
-        let continuationOrder: typeof order | null = null;
-        if (createContinuation && order.proformaIdUsed) {
+        let carriedOverProforma: typeof customerProformas.$inferSelect | null = null;
+        if (createCarryoverProforma && order.proformaIdUsed) {
           const [proforma] = await tx
-            .select({ id: customerProformas.id })
+            .select()
             .from(customerProformas)
-            .where(and(eq(customerProformas.id, order.proformaIdUsed), eq(customerProformas.companyId, companyId)));
+            .where(
+              and(
+                eq(customerProformas.id, order.proformaIdUsed),
+                eq(customerProformas.companyId, companyId),
+                eq(customerProformas.customerId, order.customerId),
+                eq(customerProformas.isActive, true),
+                isNull(customerProformas.deletedAt)
+              )
+            )
+            .for("update");
           const proformaLines = proforma
             ? await tx
                 .select()
@@ -113,7 +126,7 @@ export function registerOrderLoadingRoutes(app: Express) {
                 .where(eq(customerProformaLines.proformaId, order.proformaIdUsed))
             : [];
           const relatedOrders = await tx
-            .select({ id: customerOrders.id })
+            .select({ id: customerOrders.id, status: customerOrders.status })
             .from(customerOrders)
             .where(
               and(
@@ -123,6 +136,12 @@ export function registerOrderLoadingRoutes(app: Express) {
                 isNull(customerOrders.deletedAt)
               )
             );
+          const activeRelatedOrder = relatedOrders.find(
+            (related) => related.id !== orderId && ["DRAFT", "LOADING", "PENDING_VERIFICATION"].includes(related.status)
+          );
+          if (activeRelatedOrder) {
+            throw new Error(`Cannot move remaining while loading #${activeRelatedOrder.id} still uses this proforma`);
+          }
           const relatedOrderIds = relatedOrders.map((related) => related.id);
           const relatedBales =
             relatedOrderIds.length > 0
@@ -131,40 +150,72 @@ export function registerOrderLoadingRoutes(app: Express) {
                   .from(customerOrderBales)
                   .where(inArray(customerOrderBales.orderId, relatedOrderIds))
               : [];
+          const normalizeArticleCode = (value: string | null | undefined) => (value || "").trim().toLowerCase();
           const loadedByArticle = new Map<string, number>();
           for (const bale of relatedBales) {
-            if (bale.articleCode) {
-              loadedByArticle.set(bale.articleCode, (loadedByArticle.get(bale.articleCode) || 0) + 1);
-            }
+            const articleCode = normalizeArticleCode(bale.articleCode);
+            if (!articleCode) continue;
+            loadedByArticle.set(articleCode, (loadedByArticle.get(articleCode) || 0) + 1);
           }
-          const remainingTotal = proformaLines.reduce(
-            (sum, line) => sum + Math.max(0, line.quantity - (loadedByArticle.get(line.articleCode) || 0)),
-            0
-          );
+          // Apply loaded bales once across duplicate/case-variant article lines,
+          // retaining each source line's own pricing for whatever remains.
+          const unallocatedLoadedByArticle = new Map(loadedByArticle);
+          const remainingLines = proformaLines.flatMap((line) => {
+            const articleCode = normalizeArticleCode(line.articleCode);
+            const loaded = unallocatedLoadedByArticle.get(articleCode) || 0;
+            const appliedLoaded = Math.min(line.quantity, loaded);
+            unallocatedLoadedByArticle.set(articleCode, loaded - appliedLoaded);
+            const quantity = line.quantity - appliedLoaded;
+            return quantity > 0 ? [{ line, quantity }] : [];
+          });
+          const remainingTotal = remainingLines.reduce((sum, { quantity }) => sum + quantity, 0);
 
-          if (remainingTotal > 0) {
-            [continuationOrder] = await tx
-              .insert(customerOrders)
+          if (proforma && remainingTotal > 0) {
+            const carriedOverName = `${proforma.name} - ${remainingTotal} Remaining - Carried Over`;
+            [carriedOverProforma] = await tx
+              .insert(customerProformas)
               .values({
                 companyId,
                 customerId: order.customerId,
-                proformaIdUsed: order.proformaIdUsed,
-                locationId: order.locationId,
-                orderDate: order.orderDate,
-                status: "LOADING",
-                totalQtyBales: remainingTotal,
-                containerNotes: order.containerNotes,
-                loadingStartedAt: new Date(),
+                name: carriedOverName,
+                isActive: true,
+                status: "ACTIVE",
               })
               .returning();
-            await writeDaybookEntry(tx, {
-              companyId,
-              txDate: order.orderDate,
-              txType: "LOADING_CREATED",
-              referenceId: continuationOrder.id,
-              referenceTable: "customer_orders",
-              description: `Continuation loading created from order #${orderId}`,
-            });
+
+            await tx.insert(customerProformaLines).values(
+              remainingLines.map(({ line, quantity }) => ({
+                proformaId: carriedOverProforma!.id,
+                articleCode: line.articleCode,
+                productName: line.productName,
+                quantity,
+                pricePerBale: line.pricePerBale,
+                productionPricePerBale: line.productionPricePerBale,
+                priceFixed: line.priceFixed,
+                pricingMode: line.pricingMode,
+                pricePerKg: line.pricePerKg,
+              }))
+            );
+
+            // The carried-over proforma replaces the original document's
+            // outstanding commitment. Release the original reservation and
+            // reserve only the copied remaining quantities, atomically.
+            await tx
+              .update(customerProformas)
+              .set({
+                isActive: false,
+                status: "PARTIALLY_DISPATCHED",
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(customerProformas.id, proforma.id),
+                  eq(customerProformas.companyId, companyId),
+                  eq(customerProformas.customerId, order.customerId)
+                )
+              );
+            await syncProformaReservations(tx, companyId, proforma.id);
+            await syncProformaReservations(tx, companyId, carriedOverProforma.id);
           }
         }
 
@@ -240,7 +291,7 @@ export function registerOrderLoadingRoutes(app: Express) {
           updated,
           customerName: loadingCustomer?.legalName || "customer",
           baleCount: bales.length,
-          continuationOrder,
+          carriedOverProforma,
         };
       });
 
@@ -257,7 +308,7 @@ export function registerOrderLoadingRoutes(app: Express) {
 
       res.json({
         ...finalized.updated,
-        ...(finalized.continuationOrder ? { continuationOrder: finalized.continuationOrder } : {}),
+        ...(finalized.carriedOverProforma ? { carriedOverProforma: finalized.carriedOverProforma } : {}),
       });
     } catch (error: unknown) {
       logger.error("Error finalizing loading:", { error: error });
