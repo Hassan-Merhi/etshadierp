@@ -23,6 +23,11 @@ const rejectStaticImport = (source, specifier, message) => {
     failures.push(message);
   }
 };
+const requireDynamicImport = (source, specifier, message) => {
+  const escaped = specifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`import\\s*\\(\\s*["']${escaped}["']\\s*\\)`);
+  if (!pattern.test(source)) failures.push(message);
+};
 
 // server/index.ts may keep its stable scheduler API, but the scheduler barrel
 // itself must no longer evaluate every job module at process startup.
@@ -51,19 +56,19 @@ rejectText(
   'export * from "./maintenance"',
   "scheduler entrypoint must not eagerly re-export maintenance",
 );
-requireText(
+requireDynamicImport(
   schedulerIndex,
-  'await import("./location-stock-report")',
+  "./location-stock-report",
   "per-minute location-stock work must lazy-load its implementation",
 );
-requireText(
+requireDynamicImport(
   schedulerIndex,
-  'await import("./daily-export-state")',
+  "./daily-export-state",
   "startup recovery must use the lightweight recovery probe",
 );
-requireText(
+requireDynamicImport(
   schedulerIndex,
-  'await import("./maintenance")',
+  "./maintenance",
   "manual WhatsApp scheduler API must lazy-load maintenance",
 );
 
@@ -80,9 +85,9 @@ for (const [specifier, label] of [
     specifier,
     `${label} implementation must not be a static scheduled-jobs import`,
   );
-  requireText(
+  requireDynamicImport(
     scheduledJobs,
-    `import("${specifier}")`,
+    specifier,
     `${label} implementation must remain dynamically loaded by its tick`,
   );
 }
@@ -108,9 +113,9 @@ requireText(
 
 // The recovery probe itself must stay small and only cross into the heavy
 // export graph when a missed/failed run really needs execution.
-requireText(
+requireDynamicImport(
   recoveryState,
-  'await import("./daily-export")',
+  "./daily-export",
   "daily export must load only after recovery state checks pass",
 );
 for (const heavyMarker of [
