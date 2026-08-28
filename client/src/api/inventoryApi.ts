@@ -1,8 +1,12 @@
 import { apiRequest, keyStartsWith, queryClient } from "@/lib/queryClient";
 
 export function locationInventoryFullUrl(locationId: number, search = ""): string {
-  const suffix = search ? (search.startsWith("?") ? search : `?${search}`) : "";
-  return `/api/locations/${locationId}/inventory${suffix}`;
+  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  // The Location Inventory page consumes the reporting/view fields, not transport
+  // metadata such as lastUpdated/barcode/selling-price. Keep the historical helper
+  // name for cache compatibility while opting the UI into the compact view contract.
+  params.set("profile", "view");
+  return `/api/locations/${locationId}/inventory?${params.toString()}`;
 }
 
 export function locationInventoryLightUrl(locationId: number, includePricing = false): string {
