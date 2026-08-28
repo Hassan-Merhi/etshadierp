@@ -3,6 +3,7 @@ import type { FactoryAccess } from "./useAuthenticatedAppData";
 
 const SUPPLIER_PARTNER_PATHS = new Set([
   "/sp",
+  "/sp/golden-coast",
   "/sp/reports",
   "/sp/opening-stock",
   "/sp/aliases",
@@ -12,10 +13,7 @@ const SUPPLIER_PARTNER_PATHS = new Set([
 ]);
 
 export type AuthenticatedAppRouteDecision =
-  | { kind: "continue" }
-  | { kind: "loading" }
-  | { kind: "empty" }
-  | { kind: "redirect"; to: string };
+  { kind: "continue" } | { kind: "loading" } | { kind: "empty" } | { kind: "redirect"; to: string };
 
 interface ResolveAuthenticatedAppRouteOptions {
   currentLocation: string;
