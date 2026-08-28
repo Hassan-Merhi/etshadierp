@@ -29,7 +29,6 @@
  *
  * Exits non-zero when there is any error, or when warnings exceed the ceiling.
  */
-import { execFileSync } from "node:child_process";
 import { loadESLint } from "eslint";
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, resolve } from "path";
@@ -113,22 +112,6 @@ if (warnings > warningCeiling) {
       `config/lint-warning-ratchet.json — it is a one-way ratchet and may only fall.`
   );
   process.exit(quiet ? 0 : 1);
-}
-
-if (process.env.GITHUB_HEAD_REF === "chatgpt/golden-coast-phase12-frontend-integration") {
-  const targets = [
-    "client/src/app/authenticatedAppRouteGuard.ts",
-    "client/src/pages/sp/SpGoldenCoast.tsx",
-  ];
-  execFileSync(process.execPath, ["node_modules/prettier/bin/prettier.cjs", "--write", ...targets], {
-    stdio: "inherit",
-  });
-  for (const target of targets) {
-    console.log(`<<<BEGIN_PHASE12_FORMATTED:${target}>>>`);
-    console.log(readFileSync(resolve(ROOT, target), "utf8"));
-    console.log(`<<<END_PHASE12_FORMATTED:${target}>>>`);
-  }
-  process.exit(1);
 }
 
 if (warnings <= warningCeiling - step) {

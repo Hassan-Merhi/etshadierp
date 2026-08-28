@@ -64,11 +64,7 @@ export function resolveAuthenticatedAppRoute({
     (currentLocation === "/sp/migration" || currentLocation === "/sp/gc-migration")
   ) {
     decision = { kind: "redirect", to: "/sp/setup?tab=migration" };
-  } else if (
-    isSupplierPartnerCompany &&
-    isSupplierPartnerRoute &&
-    !SUPPLIER_PARTNER_PATHS.has(currentLocation)
-  ) {
+  } else if (isSupplierPartnerCompany && isSupplierPartnerRoute && !SUPPLIER_PARTNER_PATHS.has(currentLocation)) {
     decision = { kind: "redirect", to: "/sp" };
   } else if (
     isFactoryCompany &&

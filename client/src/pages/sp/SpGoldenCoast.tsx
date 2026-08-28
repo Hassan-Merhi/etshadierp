@@ -345,8 +345,8 @@ export default function SpGoldenCoast() {
 
   const phase7Maximum =
     phase7Operation === "collect_via_hadi"
-      ? phase7?.balances?.gcSalesCashDebitBalanceUsd ?? "0"
-      : phase7?.balances?.outstandingHadiCollectionsUsd ?? "0";
+      ? (phase7?.balances?.gcSalesCashDebitBalanceUsd ?? "0")
+      : (phase7?.balances?.outstandingHadiCollectionsUsd ?? "0");
   const phase7HadiChoice = selectedAccount(phase7HadiAccount, phase7?.hadiCashAccounts ?? []);
   const phase7GcChoice = selectedAccount(phase7GcAccount, phase7?.goldenCoastCashAccounts ?? []);
   const phase7CanSubmit =
@@ -436,9 +436,7 @@ export default function SpGoldenCoast() {
   const phase10 = phase10Query.data;
   const phase10Choice = selectedAccount(phase10ReceiptAccount, phase10?.receiptAccounts ?? []);
   const phase10CanSubmit =
-    phase10?.ready === true &&
-    phase10Choice != null &&
-    allowedAmount(phase10Amount, phase10.collectibleSalesCashUsd);
+    phase10?.ready === true && phase10Choice != null && allowedAmount(phase10Amount, phase10.collectibleSalesCashUsd);
 
   const phase10Mutation = useMutation({
     mutationFn: async () => {
@@ -507,7 +505,9 @@ export default function SpGoldenCoast() {
       {
         phase: "Phase 6",
         title: releaseDebtEnglish("POS sales"),
-        description: releaseDebtEnglish("Use the existing POS sale flow. Phase 6 owns Golden Coast sale, FIFO, and COGS posting."),
+        description: releaseDebtEnglish(
+          "Use the existing POS sale flow. Phase 6 owns Golden Coast sale, FIFO, and COGS posting."
+        ),
         icon: ShoppingCart,
         href: "/pos",
         tab: null,
@@ -515,7 +515,9 @@ export default function SpGoldenCoast() {
       {
         phase: "Phase 7",
         title: releaseDebtEnglish("HADI cash routing"),
-        description: releaseDebtEnglish("Collect Golden Coast sales cash through HADI or remit collected cash back to Golden Coast."),
+        description: releaseDebtEnglish(
+          "Collect Golden Coast sales cash through HADI or remit collected cash back to Golden Coast."
+        ),
         icon: ArrowRightLeft,
         href: null,
         tab: "hadi" as GoldenCoastTab,
@@ -523,7 +525,9 @@ export default function SpGoldenCoast() {
       {
         phase: "Phase 9",
         title: releaseDebtEnglish("Hassan Savings withdrawal"),
-        description: releaseDebtEnglish("Withdraw only from the live Hassan Savings balance into an approved Golden Coast cash or bank account."),
+        description: releaseDebtEnglish(
+          "Withdraw only from the live Hassan Savings balance into an approved Golden Coast cash or bank account."
+        ),
         icon: WalletCards,
         href: null,
         tab: "savings" as GoldenCoastTab,
@@ -531,7 +535,9 @@ export default function SpGoldenCoast() {
       {
         phase: "Phase 10",
         title: releaseDebtEnglish("GC Sales Cash settlement"),
-        description: releaseDebtEnglish("Settle all or part of the current collectible GC Sales Cash balance directly into Golden Coast cash or bank."),
+        description: releaseDebtEnglish(
+          "Settle all or part of the current collectible GC Sales Cash balance directly into Golden Coast cash or bank."
+        ),
         icon: CircleDollarSign,
         href: null,
         tab: "sales-cash" as GoldenCoastTab,
@@ -539,7 +545,9 @@ export default function SpGoldenCoast() {
       {
         phase: "Phase 11",
         title: releaseDebtEnglish("Monthly 50/50 close"),
-        description: releaseDebtEnglish("Review server-derived monthly results and finalize the protected 50/50 profit or loss close."),
+        description: releaseDebtEnglish(
+          "Review server-derived monthly results and finalize the protected 50/50 profit or loss close."
+        ),
         icon: CalendarCheck2,
         href: null,
         tab: "monthly-close" as GoldenCoastTab,
@@ -644,7 +652,9 @@ export default function SpGoldenCoast() {
                     <ArrowRightLeft className="h-5 w-5" /> {releaseDebtEnglish("HADI cash routing")}
                   </CardTitle>
                   <CardDescription>
-                    {releaseDebtEnglish("Phase 7 validates both companies, live balances, cash accounts, and intercompany routing on the server.")}
+                    {releaseDebtEnglish(
+                      "Phase 7 validates both companies, live balances, cash accounts, and intercompany routing on the server."
+                    )}
                   </CardDescription>
                 </div>
                 <Badge variant="secondary">{releaseDebtEnglish("Phase 7")}</Badge>
@@ -668,11 +678,15 @@ export default function SpGoldenCoast() {
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-md border p-3">
                   <p className="text-xs text-muted-foreground">{releaseDebtEnglish("GC Sales Cash")}</p>
-                  <p className="mt-1 font-semibold tabular-nums">{money(phase7?.balances?.gcSalesCashDebitBalanceUsd)}</p>
+                  <p className="mt-1 font-semibold tabular-nums">
+                    {money(phase7?.balances?.gcSalesCashDebitBalanceUsd)}
+                  </p>
                 </div>
                 <div className="rounded-md border p-3">
                   <p className="text-xs text-muted-foreground">{releaseDebtEnglish("Outstanding with HADI")}</p>
-                  <p className="mt-1 font-semibold tabular-nums">{money(phase7?.balances?.outstandingHadiCollectionsUsd)}</p>
+                  <p className="mt-1 font-semibold tabular-nums">
+                    {money(phase7?.balances?.outstandingHadiCollectionsUsd)}
+                  </p>
                 </div>
                 <div className="rounded-md border p-3 sm:col-span-2">
                   <p className="text-xs text-muted-foreground">{releaseDebtEnglish("Company pair")}</p>
@@ -697,8 +711,12 @@ export default function SpGoldenCoast() {
                     }}
                     className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   >
-                    <option value="collect_via_hadi">{releaseDebtEnglish("HADI collects Golden Coast sales cash")}</option>
-                    <option value="remit_from_hadi">{releaseDebtEnglish("HADI remits collected cash to Golden Coast")}</option>
+                    <option value="collect_via_hadi">
+                      {releaseDebtEnglish("HADI collects Golden Coast sales cash")}
+                    </option>
+                    <option value="remit_from_hadi">
+                      {releaseDebtEnglish("HADI remits collected cash to Golden Coast")}
+                    </option>
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -786,7 +804,11 @@ export default function SpGoldenCoast() {
                 disabled={!phase7CanSubmit || phase7Mutation.isPending}
                 data-testid="button-gc-phase7-submit"
               >
-                {phase7Mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Banknote className="mr-2 h-4 w-4" />}
+                {phase7Mutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Banknote className="mr-2 h-4 w-4" />
+                )}
                 {phase7Operation === "collect_via_hadi"
                   ? releaseDebtEnglish("Post HADI collection")
                   : releaseDebtEnglish("Post HADI remittance")}
@@ -804,7 +826,9 @@ export default function SpGoldenCoast() {
                     <WalletCards className="h-5 w-5" /> {releaseDebtEnglish("Hassan Savings withdrawal")}
                   </CardTitle>
                   <CardDescription>
-                    {releaseDebtEnglish("Phase 9 pays out only from the live credit balance of the canonical Hassan Savings account.")}
+                    {releaseDebtEnglish(
+                      "Phase 9 pays out only from the live credit balance of the canonical Hassan Savings account."
+                    )}
                   </CardDescription>
                 </div>
                 <Badge variant="secondary">{releaseDebtEnglish("Phase 9")}</Badge>
@@ -816,7 +840,9 @@ export default function SpGoldenCoast() {
                 error={phase9Query.error}
                 ready={phase9?.ready === true}
                 readyText={releaseDebtEnglish("Hassan Savings is ready for a controlled withdrawal.")}
-                blockedText={releaseDebtEnglish("Withdrawal is not ready. Refresh after resolving the server-reported account state.")}
+                blockedText={releaseDebtEnglish(
+                  "Withdrawal is not ready. Refresh after resolving the server-reported account state."
+                )}
               />
               <div className="rounded-md border p-4">
                 <p className="text-xs text-muted-foreground">{releaseDebtEnglish("Available Hassan Savings")}</p>
@@ -914,7 +940,8 @@ export default function SpGoldenCoast() {
                     data-testid="input-gc-phase9-confirmation"
                   />
                   <p className="text-xs text-muted-foreground">
-                    {releaseDebtEnglish("Type exactly")}: <span className="font-mono">{HASSAN_SAVINGS_CONFIRMATION}</span>
+                    {releaseDebtEnglish("Type exactly")}:{" "}
+                    <span className="font-mono">{HASSAN_SAVINGS_CONFIRMATION}</span>
                   </p>
                 </div>
               </div>
@@ -923,7 +950,11 @@ export default function SpGoldenCoast() {
                 disabled={!phase9CanSubmit || phase9Mutation.isPending}
                 data-testid="button-gc-phase9-submit"
               >
-                {phase9Mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <WalletCards className="mr-2 h-4 w-4" />}
+                {phase9Mutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <WalletCards className="mr-2 h-4 w-4" />
+                )}
                 {releaseDebtEnglish("Withdraw Hassan Savings")}
               </Button>
             </CardContent>
@@ -939,7 +970,9 @@ export default function SpGoldenCoast() {
                     <CircleDollarSign className="h-5 w-5" /> {releaseDebtEnglish("GC Sales Cash settlement")}
                   </CardTitle>
                   <CardDescription>
-                    {releaseDebtEnglish("Phase 10 clears only the server-calculated collectible GC Sales Cash balance into an approved Golden Coast cash or bank account.")}
+                    {releaseDebtEnglish(
+                      "Phase 10 clears only the server-calculated collectible GC Sales Cash balance into an approved Golden Coast cash or bank account."
+                    )}
                   </CardDescription>
                 </div>
                 <Badge variant="secondary">{releaseDebtEnglish("Phase 10")}</Badge>
@@ -951,7 +984,9 @@ export default function SpGoldenCoast() {
                 error={phase10Query.error}
                 ready={phase10?.ready === true}
                 readyText={releaseDebtEnglish("Direct GC Sales Cash settlement is ready.")}
-                blockedText={releaseDebtEnglish("Settlement is not ready. Refresh after resolving the server-reported account state.")}
+                blockedText={releaseDebtEnglish(
+                  "Settlement is not ready. Refresh after resolving the server-reported account state."
+                )}
               />
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-md border p-4">
@@ -960,7 +995,9 @@ export default function SpGoldenCoast() {
                 </div>
                 <div className="rounded-md border p-4">
                   <p className="text-xs text-muted-foreground">{releaseDebtEnglish("Raw debit balance")}</p>
-                  <p className="mt-1 text-2xl font-semibold tabular-nums">{money(phase10?.rawSalesCashDebitBalanceUsd)}</p>
+                  <p className="mt-1 text-2xl font-semibold tabular-nums">
+                    {money(phase10?.rawSalesCashDebitBalanceUsd)}
+                  </p>
                 </div>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
@@ -1030,7 +1067,11 @@ export default function SpGoldenCoast() {
                 disabled={!phase10CanSubmit || phase10Mutation.isPending}
                 data-testid="button-gc-phase10-submit"
               >
-                {phase10Mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CircleDollarSign className="mr-2 h-4 w-4" />}
+                {phase10Mutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <CircleDollarSign className="mr-2 h-4 w-4" />
+                )}
                 {releaseDebtEnglish("Post direct settlement")}
               </Button>
             </CardContent>
@@ -1046,7 +1087,9 @@ export default function SpGoldenCoast() {
                     <CalendarCheck2 className="h-5 w-5" /> {releaseDebtEnglish("Monthly 50/50 close")}
                   </CardTitle>
                   <CardDescription>
-                    {releaseDebtEnglish("Phase 11 derives revenue, COGS, shared charges, and both 50/50 shares from posted ledger activity. The UI never supplies accounting totals or split percentages.")}
+                    {releaseDebtEnglish(
+                      "Phase 11 derives revenue, COGS, shared charges, and both 50/50 shares from posted ledger activity. The UI never supplies accounting totals or split percentages."
+                    )}
                   </CardDescription>
                 </div>
                 <Badge variant="secondary">{releaseDebtEnglish("Phase 11")}</Badge>
@@ -1098,8 +1141,12 @@ export default function SpGoldenCoast() {
               ) : null}
               {phase11?.profitPendingDistributionBalanceUsd != null ? (
                 <div className="rounded-md border p-3 text-sm">
-                  <span className="text-muted-foreground">{releaseDebtEnglish("Profit Pending Distribution balance")}: </span>
-                  <span className="font-semibold tabular-nums">{money(phase11.profitPendingDistributionBalanceUsd)}</span>
+                  <span className="text-muted-foreground">
+                    {releaseDebtEnglish("Profit Pending Distribution balance")}:{" "}
+                  </span>
+                  <span className="font-semibold tabular-nums">
+                    {money(phase11.profitPendingDistributionBalanceUsd)}
+                  </span>
                 </div>
               ) : null}
               <div className="grid gap-4 md:grid-cols-2">
@@ -1148,7 +1195,8 @@ export default function SpGoldenCoast() {
                     data-testid="input-gc-phase11-confirmation"
                   />
                   <p className="text-xs text-muted-foreground">
-                    {releaseDebtEnglish("Type exactly")}: <span className="font-mono">{MONTHLY_CLOSE_CONFIRMATION}</span>
+                    {releaseDebtEnglish("Type exactly")}:{" "}
+                    <span className="font-mono">{MONTHLY_CLOSE_CONFIRMATION}</span>
                   </p>
                 </div>
               </div>
@@ -1157,7 +1205,11 @@ export default function SpGoldenCoast() {
                 disabled={!phase11CanSubmit || phase11Mutation.isPending}
                 data-testid="button-gc-phase11-submit"
               >
-                {phase11Mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarCheck2 className="mr-2 h-4 w-4" />}
+                {phase11Mutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <CalendarCheck2 className="mr-2 h-4 w-4" />
+                )}
                 {releaseDebtEnglish("Finalize monthly close")}
               </Button>
             </CardContent>
