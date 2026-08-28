@@ -7,7 +7,7 @@ on:
       - ".github/workflows/codeql-phase2-validation.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -31,6 +31,21 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --no-audit --bin-links=true
+
+      - name: Format changed files
+        shell: bash
+        run: |
+          set -euo pipefail
+          node node_modules/prettier/bin/prettier.cjs --write server/routes/accountStatementRoutes.ts server/routes/inventory-movement/movement.ts server/routes/sp/spExportRoutes.ts tests/account-statement-routes-behavior.test.ts tests/codeql-phase2-query-boundaries.test.ts
+          if git diff --quiet; then
+            echo "No formatting changes required."
+          else
+            git config user.name "ets-ci-repair[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add server/routes/accountStatementRoutes.ts server/routes/inventory-movement/movement.ts server/routes/sp/spExportRoutes.ts tests/account-statement-routes-behavior.test.ts tests/codeql-phase2-query-boundaries.test.ts
+            git commit -m "style: format Phase 2 security repairs"
+            git push origin HEAD:${GITHUB_REF_NAME}
+          fi
 
       - name: Type-check
         run: npm run check
