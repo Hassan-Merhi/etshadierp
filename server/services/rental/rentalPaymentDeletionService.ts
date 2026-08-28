@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, like, notInArray, or, sql } from "drizzle-orm";
 import { db } from "../../db";
 import {
   interCompanyTransfers,
@@ -114,9 +114,6 @@ export async function deleteRentalPaymentGroup(input: DeleteRentalPaymentInput):
       const fromVoucherId = transfer.fromVoucherId;
       const toVoucherId = transfer.toVoucherId;
       await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, transfer.id));
-      // Each leg of an intercompany transfer is removed outright, so a Daybook
-      // mirror left behind would reference a voucher that no longer exists in
-      // any company.
       if (fromVoucherId) {
         await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, fromVoucherId));
         await tx.delete(vouchers).where(eq(vouchers.id, fromVoucherId));
@@ -138,8 +135,6 @@ export async function deleteRentalPaymentGroup(input: DeleteRentalPaymentInput):
 
       if (!outsideReference) {
         await tx.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, voucherId));
-        // Cancelling the rent payment withdraws its Daybook mirror with it, the
-        // same way the central Payment/Receipt cancellation does.
         await removeFactoryDaybookMirrorTx({ tx, companyId: input.companyId, voucherId });
         await tx
           .update(vouchers)
@@ -197,6 +192,45 @@ export async function deleteRentalPaymentGroup(input: DeleteRentalPaymentInput):
         .update(propertyContracts)
         .set({ guaranteePostedToStatement: false })
         .where(inArray(propertyContracts.id, guaranteeContractIds));
+    }
+
+    // Legacy prepaid repair vouchers are derived from the exact payment set for a
+    // ledger row. Deleting any contributing payment invalidates those derived
+    // postings, so clear them atomically and let the normal daily accrual/repair
+    // pass rebuild the correct state from the remaining posted payments.
+    for (const ledgerRowId of ledgerRowIds) {
+      const legacyRepairVouchers = await tx
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(
+          and(
+            eq(vouchers.companyId, input.companyId),
+            isNull(vouchers.deletedAt),
+            or(
+              eq(vouchers.voucherNumber, `LEGACY-PREPAID-REC-${input.companyId}-${ledgerRowId}`),
+              like(vouchers.voucherNumber, `LEGACY-PREPAID-RECLASS-${input.companyId}-${ledgerRowId}%`)
+            )
+          )
+        )
+        .for("update");
+
+      const legacyVoucherIds = legacyRepairVouchers.map((voucher) => voucher.id);
+      for (const legacyVoucherId of legacyVoucherIds) {
+        await tx.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, legacyVoucherId));
+        await removeFactoryDaybookMirrorTx({ tx, companyId: input.companyId, voucherId: legacyVoucherId });
+      }
+
+      if (legacyVoucherIds.length > 0) {
+        await tx
+          .update(propertyMonthlyLedger)
+          .set({ accrualVoucherId: null, usedPrepaidAccount: false, usedAdvanceAccount: false })
+          .where(
+            and(
+              eq(propertyMonthlyLedger.id, ledgerRowId),
+              inArray(propertyMonthlyLedger.accrualVoucherId, legacyVoucherIds)
+            )
+          );
+      }
     }
 
     await tx.delete(propertyPayments).where(inArray(propertyPayments.id, paymentIds));
