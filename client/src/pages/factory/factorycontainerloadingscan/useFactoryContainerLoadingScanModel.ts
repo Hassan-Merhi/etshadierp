@@ -530,14 +530,7 @@ export function useFactoryContainerLoadingScanModel() {
         allowBypassOverload: isBypassOverload || undefined,
       });
     },
-    [
-      scanCode,
-      orderId,
-      selectedLocationId,
-      pendingBypassBaleRef,
-      pendingBypassOverloadRef,
-      addBaleMutation,
-    ]
+    [scanCode, orderId, selectedLocationId, pendingBypassBaleRef, pendingBypassOverloadRef, addBaleMutation]
   );
 
   const handleImportFile = useCallback(

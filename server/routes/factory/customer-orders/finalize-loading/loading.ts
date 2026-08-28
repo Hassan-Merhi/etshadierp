@@ -137,13 +137,10 @@ export function registerOrderLoadingRoutes(app: Express) {
               )
             );
           const activeRelatedOrder = relatedOrders.find(
-            (related) =>
-              related.id !== orderId && ["DRAFT", "LOADING", "PENDING_VERIFICATION"].includes(related.status)
+            (related) => related.id !== orderId && ["DRAFT", "LOADING", "PENDING_VERIFICATION"].includes(related.status)
           );
           if (activeRelatedOrder) {
-            throw new Error(
-              `Cannot move remaining while loading #${activeRelatedOrder.id} still uses this proforma`
-            );
+            throw new Error(`Cannot move remaining while loading #${activeRelatedOrder.id} still uses this proforma`);
           }
           const relatedOrderIds = relatedOrders.map((related) => related.id);
           const relatedBales =

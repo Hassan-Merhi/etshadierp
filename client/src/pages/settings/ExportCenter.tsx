@@ -3,23 +3,11 @@ import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  Zap,
-  Download,
-  MessageCircle,
-  Building2,
-} from "lucide-react";
+import { Zap, Download, MessageCircle, Building2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-import {
-  Recipient,
-  ExportSettings,
-  Company,
-  BackupStatus,
-  WaSettings,
-  WaRecipient,
-} from "./ExportCenterTypes";
+import { Recipient, ExportSettings, Company, BackupStatus, WaSettings, WaRecipient } from "./ExportCenterTypes";
 import { ExportProgressDialog } from "./ExportProgressDialog";
 import { DailyExportTab } from "./DailyExportTab";
 import { RecipientsTab } from "./RecipientsTab";
@@ -223,7 +211,6 @@ export function ExportCenter() {
         <TabsContent value="wa-groups">
           <PosWhatsAppSection />
         </TabsContent>
-
       </Tabs>
 
       {activeJobId && (

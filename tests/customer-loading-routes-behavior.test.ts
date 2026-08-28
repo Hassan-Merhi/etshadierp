@@ -81,7 +81,12 @@ vi.mock("@shared/schema", () => ({
     updatedAt: "customerOrders.updatedAt",
     grandTotal: "customerOrders.grandTotal",
   },
-  customerOrderBales: { orderId: "customerOrderBales.orderId", articleCode: "customerOrderBales.articleCode", baleId: "customerOrderBales.baleId", priceUsed: "customerOrderBales.priceUsed" },
+  customerOrderBales: {
+    orderId: "customerOrderBales.orderId",
+    articleCode: "customerOrderBales.articleCode",
+    baleId: "customerOrderBales.baleId",
+    priceUsed: "customerOrderBales.priceUsed",
+  },
   customerProformas: {
     id: "customerProformas.id",
     companyId: "customerProformas.companyId",
@@ -89,8 +94,15 @@ vi.mock("@shared/schema", () => ({
     name: "customerProformas.name",
     deletedAt: "customerProformas.deletedAt",
   },
-  customerProformaLines: { proformaId: "customerProformaLines.proformaId", articleCode: "customerProformaLines.articleCode" },
-  factoryDaybookEntries: { companyId: "factoryDaybookEntries.companyId", txType: "factoryDaybookEntries.txType", referenceId: "factoryDaybookEntries.referenceId" },
+  customerProformaLines: {
+    proformaId: "customerProformaLines.proformaId",
+    articleCode: "customerProformaLines.articleCode",
+  },
+  factoryDaybookEntries: {
+    companyId: "factoryDaybookEntries.companyId",
+    txType: "factoryDaybookEntries.txType",
+    referenceId: "factoryDaybookEntries.referenceId",
+  },
   customers: {
     id: "customers.id",
     legalName: "customers.legalName",
@@ -326,14 +338,16 @@ describe("customer loading intelligence route", () => {
       pricingMode: "per_kg",
       pricePerKg: "0.250000",
     };
-    const setup = (overrides: {
-      order?: any;
-      bales?: any[];
-      proforma?: any;
-      lines?: any[];
-      relatedOrders?: any[];
-      relatedBales?: any[];
-    } = {}) => {
+    const setup = (
+      overrides: {
+        order?: any;
+        bales?: any[];
+        proforma?: any;
+        lines?: any[];
+        relatedOrders?: any[];
+        relatedBales?: any[];
+      } = {}
+    ) => {
       harness.selectResults.push(
         [overrides.order ?? order],
         overrides.bales ?? [bale],
@@ -353,7 +367,8 @@ describe("customer loading intelligence route", () => {
       setup();
       const response = resHarness();
       await routes.get("POST /api/factory/customer-orders/:id/finalize-loading")!(
-        req({ body: { createCarryoverProforma: true }, params: { id: "10" } }), response
+        req({ body: { createCarryoverProforma: true }, params: { id: "10" } }),
+        response
       );
       expect(response.statusCode).toBe(200);
       const proformaInsert = harness.db.insert.mock.results[0]?.value;
@@ -389,7 +404,10 @@ describe("customer loading intelligence route", () => {
           { ...line, quantity: 3 },
           { ...line, articleCode: " a ", productName: "Product A second price", quantity: 3, pricePerBale: "12.00" },
         ],
-        relatedBales: [{ ...bale, articleCode: "A" }, { ...bale, articleCode: "a" }],
+        relatedBales: [
+          { ...bale, articleCode: "A" },
+          { ...bale, articleCode: "a" },
+        ],
       });
       harness.mutationResults[0] = [
         { id: 2, companyId: 4, customerId: 12, name: "August Proforma - 4 Remaining - Carried Over" },
@@ -413,7 +431,8 @@ describe("customer loading intelligence route", () => {
       setup();
       const response = resHarness();
       await routes.get("POST /api/factory/customer-orders/:id/finalize-loading")!(
-        req({ body: { createCarryoverProforma: false }, params: { id: "10" } }), response
+        req({ body: { createCarryoverProforma: false }, params: { id: "10" } }),
+        response
       );
       expect(response.statusCode).toBe(200);
       expect(harness.db.insert).not.toHaveBeenCalled();
@@ -445,7 +464,8 @@ describe("customer loading intelligence route", () => {
       setup({ relatedBales: [{ articleCode: "A" }, { articleCode: "A" }, { articleCode: "A" }] });
       const fullResponse = resHarness();
       await routes.get("POST /api/factory/customer-orders/:id/finalize-loading")!(
-        req({ body: { createCarryoverProforma: true }, params: { id: "10" } }), fullResponse
+        req({ body: { createCarryoverProforma: true }, params: { id: "10" } }),
+        fullResponse
       );
       expect(harness.db.insert).not.toHaveBeenCalled();
       expect(fullResponse.body).not.toHaveProperty("carriedOverProforma");
@@ -456,7 +476,8 @@ describe("customer loading intelligence route", () => {
       setup({ order: { ...order, proformaIdUsed: null } });
       const noProformaResponse = resHarness();
       await routes.get("POST /api/factory/customer-orders/:id/finalize-loading")!(
-        req({ body: { createCarryoverProforma: true }, params: { id: "10" } }), noProformaResponse
+        req({ body: { createCarryoverProforma: true }, params: { id: "10" } }),
+        noProformaResponse
       );
       expect(harness.db.insert).not.toHaveBeenCalled();
       expect(noProformaResponse.body).not.toHaveProperty("carriedOverProforma");
@@ -467,7 +488,8 @@ describe("customer loading intelligence route", () => {
       harness.db.transaction.mockRejectedValueOnce(new Error("daybook write failed"));
       const response = resHarness();
       await routes.get("POST /api/factory/customer-orders/:id/finalize-loading")!(
-        req({ body: { createCarryoverProforma: true }, params: { id: "10" } }), response
+        req({ body: { createCarryoverProforma: true }, params: { id: "10" } }),
+        response
       );
       expect(response.statusCode).toBe(400);
       expect(harness.db.update).not.toHaveBeenCalled();

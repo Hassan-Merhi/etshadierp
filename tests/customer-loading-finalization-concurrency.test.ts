@@ -149,9 +149,7 @@ describe("customer loading finalization concurrency", () => {
        WHERE proforma_id = $1`,
       [carriedOverProformas.rows[0].id]
     );
-    expect(carriedOverLines.rows).toEqual([
-      { article_code: "PARTIAL-A", quantity: 2, price_per_bale: "10.00" },
-    ]);
+    expect(carriedOverLines.rows).toEqual([{ article_code: "PARTIAL-A", quantity: 2, price_per_bale: "10.00" }]);
 
     const reservations = await pool.query<{
       proforma_id: number;
@@ -330,12 +328,7 @@ describe("customer loading finalization concurrency", () => {
          AND customer_id = $2
          AND name = $3
          AND id <> $4`,
-      [
-        ctx.companyId,
-        customerId,
-        `${TEST_PREFIX} Multi Loading Proforma - 2 Remaining - Carried Over`,
-        multiProformaId,
-      ]
+      [ctx.companyId, customerId, `${TEST_PREFIX} Multi Loading Proforma - 2 Remaining - Carried Over`, multiProformaId]
     );
     expect(carryovers.rows).toEqual([]);
   });
