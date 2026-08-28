@@ -24,7 +24,7 @@ import { describe, expect, it } from "vitest";
 import { startupMigrations } from "../server/startup-schema";
 
 /** Statement count of the reviewed composed array. */
-const EXPECTED_STATEMENT_COUNT = 1343;
+const EXPECTED_STATEMENT_COUNT = 1346;
 
 /**
  * sha256 of JSON.stringify(startupMigrations) for the reviewed composed array.
@@ -69,6 +69,10 @@ const EXPECTED_STATEMENT_COUNT = 1343;
  * created_at, taking the count from 1338 to 1343. The five statements were
  * appended after stage 023, so no earlier startup statement moved.
  *
+ * Re-pinned again when startup stage 025 added the Insurance monthly-amount
+ * table and its two indexes for multi-sheet workbook imports, taking the count
+ * from 1343 to 1346.
+ *
  * Re-pinned again when three VALIDATE statements were removed from
  * 007-schema-catchup-may-2026.ts, taking the count from 1288 to 1285. They
  * validated factory_raw_stock, factory_fx_allocations and
@@ -78,7 +82,7 @@ const EXPECTED_STATEMENT_COUNT = 1343;
  * parent table and raised foreign_key_violation on every boot of a database
  * holding factory rows. Only those three were deleted and no statement moved.
  */
-const EXPECTED_CONTENT_HASH = "dfa619ee0427ffd38679ea4500b86960449556df67c999fb097e28361da9d3c7";
+const EXPECTED_CONTENT_HASH = "27e03f62db703dd9d1ab4dfc57248237e67d31bfd0ed17eb25e534af2c753660";
 
 function contentHash(statements: string[]): string {
   return crypto.createHash("sha256").update(JSON.stringify(statements)).digest("hex");

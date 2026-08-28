@@ -21,6 +21,7 @@ import {
   translatePhase7BackendMessageText,
 } from "@/i18n/backendMessagesPhase7Translations";
 import { translateFactoryProductionPlannerText } from "@/i18n/factoryProductionPlannerTranslations";
+import { translateFactoryInsuranceText } from "@/i18n/factoryInsuranceTranslations";
 
 const HARD_EXCLUDED_SELECTOR = [
   "code",
@@ -114,6 +115,7 @@ export function translateApprovedInterfaceText(value: string, language: Applicat
     translateVoucherKpiText(value, language) ??
     translatePhase7BackendMessageText(value, language) ??
     translateFactoryProductionPlannerText(value, language) ??
+    translateFactoryInsuranceText(value, language) ??
     translatePhase6ReportsExportsText(value, language) ??
     translatePhase5PropertiesRentalsText(value, language) ??
     translatePhase4SupplierPartnerText(value, language) ??

@@ -49,7 +49,7 @@ export function useTransactionJournalModel() {
     hasActiveFilters,
   } = usePaginatedFilterState<TransactionJournalFilters>({
     createInitialFilters: createTransactionJournalFilters,
-    storageKey: "erp-transaction-journal-filters-v1",
+    storageKey: "erp-transaction-journal-filters-v2",
   });
   const { periodFilter, selectedCos, voucherType, currency, optionalFilter, includeFactory, searchInput, search } =
     journalFilters;
