@@ -1,28 +1,24 @@
 /**
  * Behavioural coverage for the worker bonus write routes.
  *
- * All three were guard-only. A bonus is recorded pending, paid later against a
- * cash account, and the payment posts Dr bonus expense / Cr cash. Deleting a
+ * A bonus is recorded pending, paid later against a cash account, and the
+ * payment posts Dr the individual worker's bonus expense / Cr cash. Deleting a
  * paid bonus reverses the posting by removing the voucher it created.
  *
  * What is pinned here:
  *
- *   - **The expense side is split by the worker's city.** `Bonus Expense -
- *     <City>` is created on first use, and a worker with no city falls back to
- *     `Factory Worker Payroll`. The whole point of the split is that each
- *     city's bonus spend is separable; collapsing it silently is invisible in
- *     the trial balance because the totals still agree.
+ *   - **The expense side is split by worker name, never location.** Every paid
+ *     worker bonus posts to `Bonus Expense - <Worker Name>` under the shared
+ *     `Bonus Expense - Workers` group, including workers with no city.
  *   - **Paying is idempotent by status.** `/pay` only matches a bonus that is
  *     still `pending`, so paying twice cannot post the expense twice.
  *   - **Deleting a paid bonus takes its voucher with it.** There is no
  *     `voucher_id` column — the voucher is found by the `WBONUS-<id>-` naming
  *     convention — so a delete that missed it would leave the expense and the
  *     cash credit standing against a bonus that no longer exists.
- *   - **Both cross-company doors are shut.** The bonus row's worker id was
- *     never checked against the company, and the worker is only reached later
- *     through a join that does not scope by company either; and `/pay` took
- *     whatever cash account id it was handed. Either one lets a bonus post
- *     against another company's books.
+ *   - **Both cross-company doors are shut.** The bonus row's worker id is
+ *     checked against the company, and `/pay` also validates the nominated
+ *     cash account belongs to the same company.
  */
 import request from "supertest";
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
@@ -73,9 +69,9 @@ async function bonusVoucherCount(bonusId: number): Promise<number> {
   return Number(result.rows[0].count);
 }
 
-async function accountNamed(name: string): Promise<{ id: number; account_type: string } | null> {
-  const result = await pool.query<{ id: number; account_type: string }>(
-    `SELECT id, account_type FROM ledger_accounts WHERE company_id = $1 AND name = $2`,
+async function accountNamed(name: string): Promise<{ id: number; account_type: string; parent_id: number | null } | null> {
+  const result = await pool.query<{ id: number; account_type: string; parent_id: number | null }>(
+    `SELECT id, account_type, parent_id FROM ledger_accounts WHERE company_id = $1 AND name = $2`,
     [ctx.companyId, name]
   );
   return result.rows[0] ?? null;
@@ -167,15 +163,12 @@ describe("POST /api/factory/worker-bonuses", () => {
       .post("/api/factory/worker-bonuses")
       .send({ workerId: foreign.rows[0].id, bonusDate: "2026-05-12", amount: "10" });
 
-    // The worker is only read later, through a join that does not scope by
-    // company, so an unchecked id here posts this company's bonus expense
-    // against somebody else's employee.
     expect(response.status).toBe(404);
   });
 });
 
 describe("POST /api/factory/worker-bonuses/:id/pay", () => {
-  it("posts Dr Bonus Expense - <City> / Cr cash and marks the bonus paid", async () => {
+  it("posts Dr Bonus Expense - <Worker Name> / Cr cash and groups the worker account", async () => {
     const bonusId = await createBonus(cityWorkerId, "90.00", `${TEST_PREFIX} payout`);
 
     const response = await agent
@@ -188,11 +181,13 @@ describe("POST /api/factory/worker-bonuses/:id/pay", () => {
     expect(row?.cash_account_id).toBe(ctx.cashAccountId);
     expect(row?.paid_date).toBe("2026-05-20");
 
-    // The city is title-cased into the account name; the split only means
-    // anything if each city keeps its own expense account.
-    const expenseAccount = await accountNamed("Bonus Expense - Tripoli");
+    const group = await accountNamed("Bonus Expense - Workers");
+    const expenseAccount = await accountNamed(`Bonus Expense - ${TEST_PREFIX} City Worker`);
+    expect(group).not.toBeNull();
     expect(expenseAccount).not.toBeNull();
     expect(expenseAccount?.account_type).toBe("Expense");
+    expect(expenseAccount?.parent_id).toBe(group?.id);
+    expect(await accountNamed("Bonus Expense - Tripoli")).toBeNull();
 
     const legs = await bonusLegs(bonusId);
     expect(legs).toHaveLength(2);
@@ -202,7 +197,7 @@ describe("POST /api/factory/worker-bonuses/:id/pay", () => {
     expect(Number(cashLeg?.credit_amount)).toBeCloseTo(90, 2);
   });
 
-  it("falls back to Factory Worker Payroll for a worker with no city", async () => {
+  it("uses the worker name even when the worker has no city", async () => {
     const bonusId = await createBonus(cityLessWorkerId, "40.00");
 
     const response = await agent
@@ -210,9 +205,10 @@ describe("POST /api/factory/worker-bonuses/:id/pay", () => {
       .send({ cashAccountId: ctx.cashAccountId });
     expect(response.status).toBe(200);
 
-    const fallback = await accountNamed("Factory Worker Payroll");
+    const expenseAccount = await accountNamed(`Bonus Expense - ${TEST_PREFIX} Cityless Worker`);
     const legs = await bonusLegs(bonusId);
-    expect(legs.find((leg) => leg.ledger_account_id === fallback?.id)).toBeTruthy();
+    expect(expenseAccount).not.toBeNull();
+    expect(legs.find((leg) => leg.ledger_account_id === expenseAccount?.id)).toBeTruthy();
   });
 
   it("will not pay the same bonus twice", async () => {
@@ -242,8 +238,6 @@ describe("POST /api/factory/worker-bonuses/:id/pay", () => {
       const response = await agent
         .post(`/api/factory/worker-bonuses/${bonusId}/pay`)
         .send({ cashAccountId: foreign.rows[0].id });
-      // The credit leg lands on whatever account is named, so a foreign one
-      // would draw this payment out of another company's cash book.
       expect(response.status).toBe(400);
     }
 
