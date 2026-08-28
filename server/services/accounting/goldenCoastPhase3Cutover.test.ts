@@ -246,7 +246,7 @@ describe("Golden Coast Phase 3 opening-balance cutover hardened by Phase 13", ()
     );
   });
 
-  it("rejects a negative residual cash position instead of manufacturing a credit cash line", () => {
+  it("rejects over-allocation before a negative residual cash line can be manufactured", () => {
     expect(() =>
       buildGoldenCoastPhase3CutoverPlan(
         input({
@@ -256,7 +256,7 @@ describe("Golden Coast Phase 3 opening-balance cutover hardened by Phase 13", ()
           freshStartContributedStockOtwUsd: "100000",
         })
       )
-    ).toThrow(/Opening non-cash assets exceed partner equity/);
+    ).toThrow(/Hassan cash-funded inventory plus Container Reserve exceeds the 100000.00 funding balance/);
   });
 
   it("rejects duplicate canonical role ids", () => {
