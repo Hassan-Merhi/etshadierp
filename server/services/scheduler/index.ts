@@ -28,7 +28,7 @@ export function startScheduler(): void {
       const { checkAndRunLocationStockReports } = await import("./location-stock-report");
       await checkAndRunLocationStockReports();
     },
-    { quiet: true },
+    { quiet: true }
   );
 
   cron.schedule("* * * * *", locationStockTick);
@@ -53,7 +53,7 @@ export async function checkAndRecoverDailyExport(): Promise<void> {
 /** Preserve the existing public scheduler API used by the WhatsApp route. */
 export async function triggerDailyWhatsAppSendNow(
   fromDate?: string,
-  toDate?: string,
+  toDate?: string
 ): Promise<{ message: string }> {
   const maintenance = await import("./maintenance");
   return maintenance.triggerDailyWhatsAppSendNow(fromDate, toDate);

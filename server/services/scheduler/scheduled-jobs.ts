@@ -11,7 +11,7 @@ async function checkAndRunScheduledDailyExport(): Promise<void> {
   try {
     const { hasTodayExportSucceeded, isTodayExportRunning } = await import("./daily-export-state");
     const r = await pool.query(
-      `SELECT schedule_enabled, schedule_hour, schedule_timezone FROM export_settings WHERE id = 1`,
+      `SELECT schedule_enabled, schedule_hour, schedule_timezone FROM export_settings WHERE id = 1`
     );
     if (!r.rows.length) return;
     const row = r.rows[0];
@@ -76,10 +76,7 @@ async function runMonthlyRentalAccrual() {
     for (const { id: companyId } of rows) {
       for (const { module, income, expense } of modules) {
         try {
-          await ensureMonthlyForCompany(
-            companyId,
-            module as unknown as Parameters<typeof ensureMonthlyForCompany>[1],
-          );
+          await ensureMonthlyForCompany(companyId, module as unknown as Parameters<typeof ensureMonthlyForCompany>[1]);
           const { accrued } = await postRentAccrualForCompany(companyId, expense, module, income);
           totalAccrued += accrued;
         } catch (err: unknown) {
@@ -104,7 +101,9 @@ export function startScheduler() {
       const { runMonthlyWhatsAppNetPosition } = await import("./net-position");
       await runMonthlyWhatsAppNetPosition();
     }),
-    { timezone: "America/New_York" },
+    {
+      timezone: "America/New_York",
+    }
   );
 
   // Run on the 2nd of every month at 6:00 AM EST — auto-post rent accrual vouchers
@@ -124,7 +123,9 @@ export function startScheduler() {
       const { checkAndRunContainersWhatsApp } = await import("./maintenance");
       await checkAndRunContainersWhatsApp();
     }),
-    { timezone: "America/New_York" },
+    {
+      timezone: "America/New_York",
+    }
   );
 
   // Wave I: every day at 3:30 AM ET, reconcile accounting/inventory evidence
@@ -139,7 +140,9 @@ export function startScheduler() {
       );
       await runScheduledConvergenceReconciliation();
     }),
-    { timezone: "America/New_York" },
+    {
+      timezone: "America/New_York",
+    }
   );
 
   // Overdue customer payment reminder — runs every day at 9:00 AM EST
@@ -149,7 +152,9 @@ export function startScheduler() {
       const { checkOverdueCustomers } = await import("./net-position");
       await checkOverdueCustomers();
     }),
-    { timezone: "America/New_York" },
+    {
+      timezone: "America/New_York",
+    }
   );
 
   // Purge soft-deleted items older than 30 days — runs daily at 2:00 AM EST
@@ -159,7 +164,9 @@ export function startScheduler() {
       const { purgeOldSoftDeletes } = await import("./maintenance");
       await purgeOldSoftDeletes();
     }),
-    { timezone: "America/New_York" },
+    {
+      timezone: "America/New_York",
+    }
   );
 
   // Container auto-tracking — runs every 6 hours (00:00, 06:00, 12:00, 18:00 EST)
@@ -181,7 +188,9 @@ export function startScheduler() {
       const { trackDueFactoryContainers } = await import("../factory-container-tracking");
       await trackDueFactoryContainers();
     }),
-    { timezone: "America/New_York" },
+    {
+      timezone: "America/New_York",
+    }
   );
 
   logger.info("All scheduled jobs registered", {
