@@ -65,6 +65,34 @@ describe("browser mutation fail-closed boundary", () => {
     expect(response.body).toEqual({ ok: true });
   });
 
+  it("allows the explicitly trusted HMD apex/www alias pair at the final boundary", async () => {
+    const response = await request(buildApp())
+      .post("/api/test-mutation")
+      .set("Host", "www.hmdinternationalgroup.com")
+      .set("X-Test-User", "security-test-user")
+      .set("X-Test-Session-Csrf", TEST_CSRF_TOKEN)
+      .set("Origin", "https://hmdinternationalgroup.com")
+      .set("X-CSRF-Token", TEST_CSRF_TOKEN)
+      .send({ value: 1 });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ ok: true });
+  });
+
+  it("still rejects unrelated cross-origin mutations", async () => {
+    const response = await request(buildApp())
+      .post("/api/test-mutation")
+      .set("Host", "www.hmdinternationalgroup.com")
+      .set("X-Test-User", "security-test-user")
+      .set("X-Test-Session-Csrf", TEST_CSRF_TOKEN)
+      .set("Origin", "https://example.com")
+      .set("X-CSRF-Token", TEST_CSRF_TOKEN)
+      .send({ value: 1 });
+
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe("CSRF_ORIGIN_MISMATCH");
+  });
+
   it("keeps authenticated native clients compatible when Origin and Referer are absent", async () => {
     const response = await request(buildApp())
       .post("/api/test-mutation")

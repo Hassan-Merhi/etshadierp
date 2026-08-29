@@ -1,6 +1,7 @@
 import type { Request, RequestHandler, Response } from "express";
 
 import { logger } from "../lib/logger";
+import { isTrustedOriginHost } from "./originHostPolicy";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const MUTATION_EXEMPT_PATHS = new Set([
@@ -49,7 +50,7 @@ function browserSourceAllowed(
   }
 
   const requestHost = req.headers.host;
-  if (!requestHost || sourceHost !== requestHost) {
+  if (!requestHost || !isTrustedOriginHost(sourceHost, requestHost)) {
     return {
       browserRequest: true,
       allowed: false,
