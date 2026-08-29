@@ -19,13 +19,13 @@
  */
 
 import type { HTTPResponse } from "puppeteer";
-import { existsSync } from "fs";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "./logger";
 import { execSync } from "child_process";
 import { createRequire } from "module";
 import type { ParcelsAppShipment } from "./parcelsAppClient";
 import { acquirePuppeteerSlot } from "./puppeteerSemaphore";
+import { existingStringPath } from "./puppeteerPath";
 
 // createRequire lets us use require() from an ESM / "type":"module" context.
 const _require = createRequire(import.meta.url);
@@ -38,24 +38,26 @@ const _require = createRequire(import.meta.url);
  */
 function getChromiumPath(): string | null {
   // 1. Explicit env override
-  const envPath = process.env.PUPPETEER_EXECUTABLE_PATH;
-  if (envPath && existsSync(envPath)) return envPath;
+  const envPath = existingStringPath(process.env.PUPPETEER_EXECUTABLE_PATH);
+  if (envPath) return envPath;
 
   // 2. System Nix / PATH binaries
   for (const cmd of ["chromium", "chromium-browser", "google-chrome", "google-chrome-stable"]) {
     try {
-      const p = execSync(`which ${cmd} 2>/dev/null`, { encoding: "utf8", timeout: 3000 }).trim();
-      if (p && existsSync(p)) return p;
+      const p = existingStringPath(execSync(`which ${cmd} 2>/dev/null`, { encoding: "utf8", timeout: 3000 }).trim());
+      if (p) return p;
     } catch {
       /* not found, try next */
     }
   }
 
-  // 3. Puppeteer bundled Chrome
+  // 3. Puppeteer bundled Chrome. Puppeteer 25+ returns a Promise here; this
+  // synchronous availability probe intentionally ignores non-string candidates.
   try {
     const puppeteer = _require("puppeteer");
-    const p: string = typeof puppeteer.executablePath === "function" ? puppeteer.executablePath() : "";
-    if (p && existsSync(p)) return p;
+    const p = typeof puppeteer.executablePath === "function" ? puppeteer.executablePath() : "";
+    const bundledPath = existingStringPath(p);
+    if (bundledPath) return bundledPath;
   } catch {
     /* puppeteer not installed */
   }
@@ -114,8 +116,9 @@ export async function ensureChromiumInstalled(): Promise<void> {
 
   try {
     const puppeteer = _require("puppeteer");
-    const p: string = typeof puppeteer.executablePath === "function" ? puppeteer.executablePath() : "";
-    if (p && existsSync(p)) return;
+    const candidate = typeof puppeteer.executablePath === "function" ? puppeteer.executablePath() : "";
+    const p = await Promise.resolve(candidate);
+    if (existingStringPath(p)) return;
 
     logger.info("[Puppeteer] Chrome not found — downloading…");
     execSync("npx puppeteer browsers install chrome", {
@@ -123,7 +126,7 @@ export async function ensureChromiumInstalled(): Promise<void> {
       timeout: 300_000,
     });
     const chromePath = getChromiumPath();
-    if (chromePath && existsSync(chromePath)) {
+    if (existingStringPath(chromePath)) {
       logger.info("[Puppeteer] Chrome download complete — scraper ready.");
     } else {
       logger.warn("[Puppeteer] Chrome still not found after download — scraper unavailable.");
