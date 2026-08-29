@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -300,7 +301,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
-          if [ "${{ github.event_name }}" = "pull_request" ]; then base_sha="$PR_BASE_SHA"; else base_sha="$PUSH_BASE_SHA"; if [ -z "$base_sha" ] || [ "$base_sha" = "0000000000000000000000000000000000000000" ]; then base_sha="HEAD^"; fi; fi
+          if [ "${{ github.event_name }}" = "pull_request" ]; then base_sha="$PR_BASE_SHA"; else base_sha="$PUSH_BASE_SHA"; if [ -z "$base_sha" ] || [ "$base_sha" = "0000000000000000000000000000000000000000" ]; then base_sha="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}" --jq '.parents[0].sha // empty')"; fi; fi
+          if [ -z "$base_sha" ]; then echo "No base commit to compare against; skipping the changed-file formatting check." | tee "$RUNNER_TEMP/format-errors-ci.txt"; exit 0; fi
           mapfile -t changed_files < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/compare/${base_sha}...${GITHUB_SHA}" --jq '.files[] | select(.status != "removed") | .filename' | grep -E '^(client/src|server|shared|tests|scripts)/.*\.(ts|tsx|css|mjs)$' || true)
           if [ "${#changed_files[@]}" -eq 0 ]; then echo "No changed TypeScript, TSX, or CSS source files require formatting checks." | tee "$RUNNER_TEMP/format-errors-ci.txt"; exit 0; fi
           printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}" | tee "$RUNNER_TEMP/format-errors-ci.txt"
