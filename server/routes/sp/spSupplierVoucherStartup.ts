@@ -1,8 +1,5 @@
 import { runWithDatabaseMaintenanceScope } from "../../services/security/databaseScopeRuntimeContext";
-import {
-  ensureSpSupplierVoucherSyncTrigger,
-  repairSpSupplierVoucherLinks,
-} from "./spSupplierVoucherSync";
+import { ensureSpSupplierVoucherSyncTrigger, repairSpSupplierVoucherLinks } from "./spSupplierVoucherSync";
 
 type SpSupplierVoucherStartupDependencies = {
   ensureTrigger: () => Promise<void>;
