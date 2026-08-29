@@ -22,31 +22,32 @@
  */
 
 import type { HTTPResponse } from "puppeteer";
-import { existsSync } from "fs";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "./logger";
 import { execSync } from "child_process";
 import { createRequire } from "module";
 import type { CarrierTrackResult, TrackingEvent } from "./trackingProviders/types";
 import { acquirePuppeteerSlot } from "./puppeteerSemaphore";
+import { existingStringPath } from "./puppeteerPath";
 
 const _require = createRequire(import.meta.url);
 
 function getChromiumPath(): string | null {
-  const envPath = process.env.PUPPETEER_EXECUTABLE_PATH;
-  if (envPath && existsSync(envPath)) return envPath;
+  const envPath = existingStringPath(process.env.PUPPETEER_EXECUTABLE_PATH);
+  if (envPath) return envPath;
   for (const cmd of ["chromium", "chromium-browser", "google-chrome", "google-chrome-stable"]) {
     try {
-      const p = execSync(`which ${cmd} 2>/dev/null`, { encoding: "utf8", timeout: 3000 }).trim();
-      if (p && existsSync(p)) return p;
+      const p = existingStringPath(execSync(`which ${cmd} 2>/dev/null`, { encoding: "utf8", timeout: 3000 }).trim());
+      if (p) return p;
     } catch {
       /* not found */
     }
   }
   try {
     const puppeteer = _require("puppeteer");
-    const p: string = typeof puppeteer.executablePath === "function" ? puppeteer.executablePath() : "";
-    if (p && existsSync(p)) return p;
+    const candidate = typeof puppeteer.executablePath === "function" ? puppeteer.executablePath() : "";
+    const bundledPath = existingStringPath(candidate);
+    if (bundledPath) return bundledPath;
   } catch {
     /* not installed */
   }
