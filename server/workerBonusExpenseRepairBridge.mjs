@@ -6,6 +6,7 @@ import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 const { Client } = pg;
 const INSTALL_KEY = Symbol.for("erp.worker-bonus-expense-name-repair.applied");
 const STARTUP_LOCK_KEY = 741_220_262;
+const REQUIRED_TABLES = ["worker_bonuses", "factory_workers", "vouchers", "voucher_entries", "ledger_accounts"];
 
 function resolveConnectionString() {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
@@ -62,6 +63,21 @@ export async function ensureHistoricalWorkerBonusExpenseNames() {
          set_config('app.current_company_id', '', true),
          set_config('app.authorized_company_ids', '', true)`
     );
+
+    const tableCheck = await client.query(
+      `SELECT table_name
+         FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = ANY($1::text[])`,
+      [REQUIRED_TABLES]
+    );
+    const presentTables = new Set(tableCheck.rows.map((row) => row.table_name));
+    const missingTables = REQUIRED_TABLES.filter((tableName) => !presentTables.has(tableName));
+    if (missingTables.length > 0) {
+      await client.query("COMMIT");
+      log("INFO", "Worker bonus expense repair deferred until required tables exist", { missingTables });
+      return;
+    }
 
     await client.query(migrationSql);
 
