@@ -5,14 +5,7 @@ import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 const { Client } = pg;
 const INSTALL_KEY = Symbol.for("erp.stock-item-schema-repair.applied");
 const STARTUP_LOCK_KEY = 741_220_263;
-
-const REQUIRED_COLUMNS = [
-  ["reorder_level", "numeric(15,3) DEFAULT 0"],
-  ["selling_price", "numeric(15,2) DEFAULT 0"],
-  ["active", "boolean NOT NULL DEFAULT true"],
-  ["deleted_at", "timestamp"],
-  ["created_at", "timestamp NOT NULL DEFAULT now()"],
-];
+const REQUIRED_COLUMNS = ["reorder_level", "selling_price", "active", "deleted_at", "created_at"];
 
 function resolveConnectionString() {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
@@ -34,6 +27,18 @@ function log(level, message, extra = {}) {
       ...extra,
     })
   );
+}
+
+async function readPresentColumns(client) {
+  const result = await client.query(
+    `SELECT column_name
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'stock_items'
+        AND column_name = ANY($1::text[])`,
+    [REQUIRED_COLUMNS]
+  );
+  return new Set(result.rows.map((row) => row.column_name));
 }
 
 export async function ensureStockItemSchemaReadiness() {
@@ -72,33 +77,31 @@ export async function ensureStockItemSchemaReadiness() {
          set_config('app.authorized_company_ids', '', true)`
     );
 
-    for (const [columnName, columnDefinition] of REQUIRED_COLUMNS) {
-      const exists = await client.query(
-        `SELECT 1
-           FROM information_schema.columns
-          WHERE table_schema = 'public'
-            AND table_name = 'stock_items'
-            AND column_name = $1`,
-        [columnName]
-      );
-      if (exists.rowCount) continue;
+    const before = await readPresentColumns(client);
 
-      // Both the identifier and definition come exclusively from the static
-      // REQUIRED_COLUMNS list above; no request/user input reaches this DDL.
-      await client.query(`ALTER TABLE stock_items ADD COLUMN ${columnName} ${columnDefinition}`);
-      log("INFO", "Added missing stock_items column", { columnName });
+    if (!before.has("reorder_level")) {
+      await client.query("ALTER TABLE stock_items ADD COLUMN reorder_level numeric(15,3) DEFAULT 0");
+      log("INFO", "Added missing stock_items column", { columnName: "reorder_level" });
+    }
+    if (!before.has("selling_price")) {
+      await client.query("ALTER TABLE stock_items ADD COLUMN selling_price numeric(15,2) DEFAULT 0");
+      log("INFO", "Added missing stock_items column", { columnName: "selling_price" });
+    }
+    if (!before.has("active")) {
+      await client.query("ALTER TABLE stock_items ADD COLUMN active boolean NOT NULL DEFAULT true");
+      log("INFO", "Added missing stock_items column", { columnName: "active" });
+    }
+    if (!before.has("deleted_at")) {
+      await client.query("ALTER TABLE stock_items ADD COLUMN deleted_at timestamp");
+      log("INFO", "Added missing stock_items column", { columnName: "deleted_at" });
+    }
+    if (!before.has("created_at")) {
+      await client.query("ALTER TABLE stock_items ADD COLUMN created_at timestamp NOT NULL DEFAULT now()");
+      log("INFO", "Added missing stock_items column", { columnName: "created_at" });
     }
 
-    const readiness = await client.query(
-      `SELECT column_name
-         FROM information_schema.columns
-        WHERE table_schema = 'public'
-          AND table_name = 'stock_items'
-          AND column_name = ANY($1::text[])`,
-      [REQUIRED_COLUMNS.map(([name]) => name)]
-    );
-    const present = new Set(readiness.rows.map((row) => row.column_name));
-    const missing = REQUIRED_COLUMNS.map(([name]) => name).filter((name) => !present.has(name));
+    const after = await readPresentColumns(client);
+    const missing = REQUIRED_COLUMNS.filter((name) => !after.has(name));
     if (missing.length > 0) {
       throw new Error(`stock_items schema is still missing required columns: ${missing.join(", ")}`);
     }
