@@ -205,7 +205,7 @@ function isPostgresDeadlock(error: unknown): boolean {
     error &&
       typeof error === "object" &&
       "code" in error &&
-      (error as { code?: unknown }).code === POSTGRES_DEADLOCK_SQLSTATE,
+      (error as { code?: unknown }).code === POSTGRES_DEADLOCK_SQLSTATE
   );
 }
 
@@ -224,14 +224,11 @@ async function runReclassificationWithDeadlockRetry(): Promise<void> {
         throw error;
       }
 
-      logger.warn(
-        "[RentalIncome] Deadlock during deferred-rent reclassification; retrying",
-        {
-          attempt: attempt + 1,
-          nextAttempt: attempt + 2,
-          retryDelayMs,
-        },
-      );
+      logger.warn("[RentalIncome] Deadlock during deferred-rent reclassification; retrying", {
+        attempt: attempt + 1,
+        nextAttempt: attempt + 2,
+        retryDelayMs,
+      });
       await wait(retryDelayMs);
     }
   }
@@ -251,7 +248,7 @@ async function runReclassificationWithDeadlockRetry(): Promise<void> {
  * tenant scope, and each successfully repaired tenant becomes a process no-op.
  */
 export function reclassifyLegacyDeferredRentForProperties(
-  origin: DeferredRentReclassificationOrigin = "startup",
+  origin: DeferredRentReclassificationOrigin = "startup"
 ): Promise<void> {
   const scope = getDatabaseScopeRuntimeContext();
   if (completed) return Promise.resolve();
@@ -262,13 +259,12 @@ export function reclassifyLegacyDeferredRentForProperties(
   }
 
   if (!inFlight) {
-    const tenantCompanyId =
-      origin === "request" && scope?.kind === "tenant" ? scope.companyId : null;
+    const tenantCompanyId = origin === "request" && scope?.kind === "tenant" ? scope.companyId : null;
     const reclassificationPromise =
       origin === "startup"
         ? runWithDatabaseMaintenanceScope(
             "properties-deferred-rent-reclassification",
-            runReclassificationWithDeadlockRetry,
+            runReclassificationWithDeadlockRetry
           )
         : runReclassificationWithDeadlockRetry();
 
@@ -279,23 +275,17 @@ export function reclassifyLegacyDeferredRentForProperties(
         } else if (tenantCompanyId !== null) {
           completedTenantCompanies.add(tenantCompanyId);
         }
-        logger.info(
-          "[RentalIncome] Properties deferred-rent reclassification completed",
-          {
-            origin,
-            tenantCompanyId,
-          },
-        );
+        logger.info("[RentalIncome] Properties deferred-rent reclassification completed", {
+          origin,
+          tenantCompanyId,
+        });
       })
       .catch((error: unknown) => {
-        logger.error(
-          "[RentalIncome] Properties deferred-rent reclassification failed",
-          {
-            error: getErrorMessage(error),
-            origin,
-            tenantCompanyId,
-          },
-        );
+        logger.error("[RentalIncome] Properties deferred-rent reclassification failed", {
+          error: getErrorMessage(error),
+          origin,
+          tenantCompanyId,
+        });
         throw error;
       })
       .finally(() => {
