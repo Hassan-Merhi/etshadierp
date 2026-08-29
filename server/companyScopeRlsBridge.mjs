@@ -172,3 +172,7 @@ if (!globalThis[INSTALL_KEY]) {
   globalThis[INSTALL_KEY] = true;
   await ensureCompanyScopeRlsReadiness();
 }
+
+// Historical worker-bonus account repair must run after the RLS helper functions
+// above exist so its dedicated transaction can enter explicit maintenance scope.
+await import("./workerBonusExpenseRepairBridge.mjs");

@@ -27,6 +27,28 @@ import { fetchInternalBuffer, getCompanyId } from "./_helpers";
 type ShippingZipEntry = { name: string; data: Buffer };
 
 /**
+ * Concatenate ZIP chunks without Buffer.concat(). The process-wide export
+ * bridge intentionally replaces large application-owned Buffer.concat() calls
+ * on ZIP/PDF download routes with zero-length deferred marker buffers. That is
+ * correct for final HTTP delivery, but this route must inspect the completed
+ * archive before it sets response headers, so a deferred marker looks like a
+ * broken 0-byte ZIP. Copying into the final buffer directly keeps ZIP assembly
+ * local and lets the response bridge handle only the finished response.
+ */
+function concatShippingZipChunks(chunks: Buffer[]): Buffer {
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  if (totalLength === 0) return Buffer.alloc(0);
+
+  const combined = Buffer.allocUnsafe(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    chunk.copy(combined, offset);
+    offset += chunk.length;
+  }
+  return combined;
+}
+
+/**
  * Build the entire archive before touching the HTTP response.
  *
  * Use a write-only sink rather than a PassThrough/readable collector. The ZIP
@@ -61,7 +83,7 @@ export async function buildShippingZipBuffer(entries: ShippingZipEntry[]): Promi
   const finalizePromise = archive.finalize();
   await Promise.all([finalizePromise, outputFinished]);
 
-  const zipBuffer = Buffer.concat(chunks);
+  const zipBuffer = concatShippingZipChunks(chunks);
   if (zipBuffer.length === 0) {
     logger.error("shipping_zip_zero_bytes", {
       entryCount: entries.length,

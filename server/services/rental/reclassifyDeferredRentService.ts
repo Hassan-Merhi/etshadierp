@@ -12,6 +12,9 @@ let inFlight: Promise<void> | null = null;
 let completed = false;
 const completedTenantCompanies = new Set<number>();
 
+const POSTGRES_DEADLOCK_SQLSTATE = "40P01";
+const DEADLOCK_RETRY_DELAYS_MS = [100, 250, 500] as const;
+
 const RECLASSIFY_DEFERRED_RENT_SQL = `
 DO $reclass$
 DECLARE
@@ -22,6 +25,10 @@ DECLARE
   transfer_amount NUMERIC;
   created_voucher_id INTEGER;
 BEGIN
+  -- Serialize this one-time repair across overlapping app instances/deploys.
+  -- The per-company lock below still protects each tenant from request retries.
+  PERFORM pg_advisory_xact_lock(734209999);
+
   FOR company_row IN
     SELECT id, name
     FROM companies
@@ -193,11 +200,47 @@ END
 $reclass$;
 `;
 
+function isPostgresDeadlock(error: unknown): boolean {
+  return Boolean(
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    (error as { code?: unknown }).code === POSTGRES_DEADLOCK_SQLSTATE
+  );
+}
+
+function wait(delayMs: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+async function runReclassificationWithDeadlockRetry(): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await pool.query(RECLASSIFY_DEFERRED_RENT_SQL);
+      return;
+    } catch (error: unknown) {
+      const retryDelayMs = DEADLOCK_RETRY_DELAYS_MS[attempt];
+      if (!isPostgresDeadlock(error) || retryDelayMs === undefined) {
+        throw error;
+      }
+
+      logger.warn("[RentalIncome] Deadlock during deferred-rent reclassification; retrying", {
+        attempt: attempt + 1,
+        nextAttempt: attempt + 2,
+        retryDelayMs,
+      });
+      await wait(retryDelayMs);
+    }
+  }
+}
+
 /**
  * Reclassifies the remaining Properties-mode Deferred Rent Revenue balance into
  * the existing Rental Income account. The SQL block is atomic and idempotent:
  * it locks each Properties company, journals only the current remaining balance,
  * hides the obsolete deferred account, and clears legacy landlord prepaid flags.
+ * PostgreSQL deadlocks are retried as a whole statement, so a failed transaction
+ * is fully rolled back before the next attempt and cannot create a partial journal.
  *
  * Startup work is explicitly marked and may enter maintenance scope to repair all
  * Properties companies. Request-triggered retries never elevate an unscoped HTTP
@@ -217,11 +260,13 @@ export function reclassifyLegacyDeferredRentForProperties(
 
   if (!inFlight) {
     const tenantCompanyId = origin === "request" && scope?.kind === "tenant" ? scope.companyId : null;
-    const runReclassification = () => pool.query(RECLASSIFY_DEFERRED_RENT_SQL).then(() => undefined);
     const reclassificationPromise =
       origin === "startup"
-        ? runWithDatabaseMaintenanceScope("properties-deferred-rent-reclassification", runReclassification)
-        : runReclassification();
+        ? runWithDatabaseMaintenanceScope(
+            "properties-deferred-rent-reclassification",
+            runReclassificationWithDeadlockRetry
+          )
+        : runReclassificationWithDeadlockRetry();
 
     inFlight = reclassificationPromise
       .then(() => {
