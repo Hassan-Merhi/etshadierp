@@ -4,7 +4,12 @@ import { companies, userCompanyRoles } from "@shared/schema";
 
 import { db } from "../db";
 import { logger } from "../lib/logger";
-import { assertCompaniesAccess, CompanyAccessError, sendCompanyAccessError } from "../security/companyAccessBoundary";
+import {
+  assertCompaniesAccess,
+  CompanyAccessError,
+  getAccessibleCompanyIds,
+  sendCompanyAccessError,
+} from "../security/companyAccessBoundary";
 import {
   ActiveCompanyPermissionContextError,
   getActiveCompanyPermissionContext,
@@ -51,6 +56,10 @@ function isContextOptionalPath(path: string): boolean {
     return path !== "/api/auth/set-company";
   }
   return false;
+}
+
+function isAuthorizedCrossCompanyPath(path: string): boolean {
+  return path === "/api/global/transactions" || path.startsWith("/api/global/transactions/");
 }
 
 async function ensurePinnedFactoryCompany(req: Request): Promise<void> {
@@ -252,7 +261,19 @@ export async function tenantIsolationBoundary(req: Request, res: Response, next:
       await assertCompaniesAccess(context.userId, secondaryCompanyIds);
     }
 
-    const databaseScope = createTenantDatabaseScope(context.companyId, secondaryCompanyIds);
+    // The All Daybook/global-transactions surface is intentionally cross-company.
+    // Its RLS widening comes only from the server-owned access boundary, never
+    // from client-supplied company IDs. All other requests remain active-company
+    // scoped even when they carry verified intercompany helper fields.
+    const useAuthorizedCompanyScope = isAuthorizedCrossCompanyPath(req.path);
+    const databaseAuthorizedCompanyIds = useAuthorizedCompanyScope
+      ? [...(await getAccessibleCompanyIds(context.userId))]
+      : secondaryCompanyIds;
+    const databaseScope = createTenantDatabaseScope(
+      context.companyId,
+      databaseAuthorizedCompanyIds,
+      useAuthorizedCompanyScope ? "authorized-companies" : "active-company"
+    );
 
     return runWithCompanyRequestRuntimeContext(
       {
