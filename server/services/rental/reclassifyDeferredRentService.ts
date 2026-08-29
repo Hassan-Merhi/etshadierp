@@ -205,7 +205,7 @@ function isPostgresDeadlock(error: unknown): boolean {
     error &&
       typeof error === "object" &&
       "code" in error &&
-      (error as { code?: unknown }).code === POSTGRES_DEADLOCK_SQLSTATE
+      (error as { code?: unknown }).code === POSTGRES_DEADLOCK_SQLSTATE,
   );
 }
 
@@ -248,7 +248,7 @@ async function runReclassificationWithDeadlockRetry(): Promise<void> {
  * tenant scope, and each successfully repaired tenant becomes a process no-op.
  */
 export function reclassifyLegacyDeferredRentForProperties(
-  origin: DeferredRentReclassificationOrigin = "startup"
+  origin: DeferredRentReclassificationOrigin = "startup",
 ): Promise<void> {
   const scope = getDatabaseScopeRuntimeContext();
   if (completed) return Promise.resolve();
@@ -265,7 +265,7 @@ export function reclassifyLegacyDeferredRentForProperties(
       origin === "startup"
         ? runWithDatabaseMaintenanceScope(
             "properties-deferred-rent-reclassification",
-            runReclassificationWithDeadlockRetry
+            runReclassificationWithDeadlockRetry,
           )
         : runReclassificationWithDeadlockRetry();
 
