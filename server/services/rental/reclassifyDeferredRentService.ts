@@ -224,11 +224,14 @@ async function runReclassificationWithDeadlockRetry(): Promise<void> {
         throw error;
       }
 
-      logger.warn("[RentalIncome] Deadlock during deferred-rent reclassification; retrying", {
-        attempt: attempt + 1,
-        nextAttempt: attempt + 2,
-        retryDelayMs,
-      });
+      logger.warn(
+        "[RentalIncome] Deadlock during deferred-rent reclassification; retrying",
+        {
+          attempt: attempt + 1,
+          nextAttempt: attempt + 2,
+          retryDelayMs,
+        },
+      );
       await wait(retryDelayMs);
     }
   }
@@ -276,17 +279,23 @@ export function reclassifyLegacyDeferredRentForProperties(
         } else if (tenantCompanyId !== null) {
           completedTenantCompanies.add(tenantCompanyId);
         }
-        logger.info("[RentalIncome] Properties deferred-rent reclassification completed", {
-          origin,
-          tenantCompanyId,
-        });
+        logger.info(
+          "[RentalIncome] Properties deferred-rent reclassification completed",
+          {
+            origin,
+            tenantCompanyId,
+          },
+        );
       })
       .catch((error: unknown) => {
-        logger.error("[RentalIncome] Properties deferred-rent reclassification failed", {
-          error: getErrorMessage(error),
-          origin,
-          tenantCompanyId,
-        });
+        logger.error(
+          "[RentalIncome] Properties deferred-rent reclassification failed",
+          {
+            error: getErrorMessage(error),
+            origin,
+            tenantCompanyId,
+          },
+        );
         throw error;
       })
       .finally(() => {
