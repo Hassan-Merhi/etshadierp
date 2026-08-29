@@ -203,9 +203,9 @@ $reclass$;
 function isPostgresDeadlock(error: unknown): boolean {
   return Boolean(
     error &&
-      typeof error === "object" &&
-      "code" in error &&
-      (error as { code?: unknown }).code === POSTGRES_DEADLOCK_SQLSTATE
+    typeof error === "object" &&
+    "code" in error &&
+    (error as { code?: unknown }).code === POSTGRES_DEADLOCK_SQLSTATE
   );
 }
 
