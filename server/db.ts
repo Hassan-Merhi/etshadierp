@@ -1,5 +1,6 @@
 import "./startupMigrationCoordinator";
 import "./companyScopeRlsBridge.mjs";
+import "./stockItemSchemaRepairBridge.mjs";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool, type PoolClient } from "pg";
 import * as schema from "@shared/schema";
