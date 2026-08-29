@@ -22,7 +22,7 @@ const defaultDependencies: SpSupplierVoucherStartupDependencies = {
  * to use their verified tenant scope and never pass through this helper.
  */
 export async function runSpSupplierVoucherStartup(
-  dependencies: SpSupplierVoucherStartupDependencies = defaultDependencies
+  dependencies: SpSupplierVoucherStartupDependencies = defaultDependencies,
 ): Promise<number> {
   return dependencies.runMaintenanceScope("sp-supplier-voucher-sync-startup", async () => {
     await dependencies.ensureTrigger();
