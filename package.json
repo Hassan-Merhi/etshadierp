@@ -143,7 +143,7 @@
     "input-otp": "^1.4.2",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
-    "lucide-react": "^0.577.0",
+    "lucide-react": "^1.33.0",
     "memorystore": "^1.6.7",
     "motion": "^13.0.0",
     "multer": "^2.0.2",
