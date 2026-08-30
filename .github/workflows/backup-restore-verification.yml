@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify:
     name: Verify database backup can restore
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
@@ -30,9 +30,6 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Keep verification inert until backup source is configured
         if: env.BACKUP_DATABASE_URL == ''
         run: echo "BACKUP_DATABASE_URL is not configured; restore verification is skipped safely."
