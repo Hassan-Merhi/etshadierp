@@ -1,0 +1,22 @@
+name: Maintenance - PR Labeler
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  label:
+    if: startsWith(github.head_ref, 'dependabot/') || startsWith(github.head_ref, 'chore/maintenance')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add maintenance label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: gh pr edit "$PR_NUMBER" --repo "$REPO" --add-label maintenance || true
