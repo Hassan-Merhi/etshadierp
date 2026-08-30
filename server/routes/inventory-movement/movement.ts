@@ -9,6 +9,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { eq } from "drizzle-orm";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
+import { privilegedReadRateLimit } from "../../middleware/privilegedEndpointSecurity";
 import { calculateHistoricalLocationInventory } from "../helpers/inventoryHistoryHelpers";
 import { stockItems } from "@shared/schema";
 
@@ -16,7 +17,7 @@ import { MONTH_NAMES_INV, dayBefore, fetchStockMovements } from "./_helpers";
 
 export function registerInventoryMovementReportRoutes(app: Express) {
   // GET /api/inventory/movement — monthly summary
-  app.get("/api/inventory/movement", requireAuth, async (req, res) => {
+  app.get("/api/inventory/movement", privilegedReadRateLimit, requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -166,7 +167,7 @@ export function registerInventoryMovementReportRoutes(app: Express) {
   });
 
   // GET /api/inventory/movement/drill — transaction-level drill for one month
-  app.get("/api/inventory/movement/drill", requireAuth, async (req, res) => {
+  app.get("/api/inventory/movement/drill", privilegedReadRateLimit, requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
