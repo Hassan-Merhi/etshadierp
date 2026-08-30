@@ -1,25 +1,14 @@
 import type { Express, Request, Response } from "express";
+import { and, eq } from "drizzle-orm";
+import { companies, ledgerAccounts, locations } from "@shared/schema";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
-import { sql } from "drizzle-orm";
 import { generateSpSalesFormExcel } from "../../services/sp-sales-form";
 import { generateSpSalesFormExcelV2 } from "../../services/spSalesFormExportV2";
 import { requireSpCompany } from "./spHelpers";
 import { validateStatementDateRange } from "../../lib/accountStatementExportSafety";
-
-type QueryRecord = Record<string, unknown>;
-type QueryResultLike = { rows: QueryRecord[] };
-
-function firstQueryRow(result: QueryResultLike | QueryRecord[]): QueryRecord | undefined {
-  return Array.isArray(result) ? result[0] : result.rows[0];
-}
-
-function readString(row: QueryRecord | undefined, key: string): string {
-  const value = row?.[key];
-  return typeof value === "string" ? value : "";
-}
 
 // ── Sales Form Excel Export (V1 legacy + V2) ─────────────────────────────────
 
@@ -56,18 +45,26 @@ export function registerSpExportRoutes(app: Express) {
       const fromDate = fromDateRaw;
       const toDate = toDateRaw;
 
-      // Fetch location and company name for the filename
+      // Fetch tenant-scoped location and company names for the filename.
       let locationName = "";
       let companyName = "";
       try {
-        const locRows = await db.execute(sql`SELECT name FROM locations WHERE id = ${locId} LIMIT 1`);
-        locationName = readString(firstQueryRow(locRows), "name");
+        if (locId) {
+          const [locationRow] = await db
+            .select({ name: locations.name })
+            .from(locations)
+            .where(and(eq(locations.id, locId), eq(locations.companyId, companyId)));
+          locationName = locationRow?.name ?? "";
+        }
       } catch {
         // Failure here is non-fatal and the surrounding flow continues deliberately.
       }
       try {
-        const coRows = await db.execute(sql`SELECT name FROM companies WHERE id = ${companyId} LIMIT 1`);
-        companyName = readString(firstQueryRow(coRows), "name");
+        const [companyRow] = await db
+          .select({ name: companies.name })
+          .from(companies)
+          .where(eq(companies.id, companyId));
+        companyName = companyRow?.name ?? "";
       } catch {
         // Failure here is non-fatal and the surrounding flow continues deliberately.
       }
@@ -148,11 +145,11 @@ export function registerSpExportRoutes(app: Express) {
       // Validate the cash account belongs to this company; ignore silently if not.
       if (cashId) {
         try {
-          const r = await db.execute(
-            sql`SELECT id FROM accounts WHERE id = ${cashId} AND company_id = ${companyId} LIMIT 1`
-          );
-          const found = firstQueryRow(r);
-          if (!found) {
+          const [accountRow] = await db
+            .select({ id: ledgerAccounts.id })
+            .from(ledgerAccounts)
+            .where(and(eq(ledgerAccounts.id, cashId), eq(ledgerAccounts.companyId, companyId)));
+          if (!accountRow) {
             logger.warn(
               `[/api/sp/sales-form/export-v2] cashAccountId=${cashId} not found for companyId=${companyId}; ignoring`
             );
@@ -168,15 +165,21 @@ export function registerSpExportRoutes(app: Express) {
       let companyName = "";
       try {
         if (locId) {
-          const r = await db.execute(sql`SELECT name FROM locations WHERE id = ${locId} LIMIT 1`);
-          locationName = readString(firstQueryRow(r), "name");
+          const [locationRow] = await db
+            .select({ name: locations.name })
+            .from(locations)
+            .where(and(eq(locations.id, locId), eq(locations.companyId, companyId)));
+          locationName = locationRow?.name ?? "";
         }
       } catch {
         // Failure here is non-fatal and the surrounding flow continues deliberately.
       }
       try {
-        const r = await db.execute(sql`SELECT name FROM companies WHERE id = ${companyId} LIMIT 1`);
-        companyName = readString(firstQueryRow(r), "name");
+        const [companyRow] = await db
+          .select({ name: companies.name })
+          .from(companies)
+          .where(eq(companies.id, companyId));
+        companyName = companyRow?.name ?? "";
       } catch {
         // Failure here is non-fatal and the surrounding flow continues deliberately.
       }
