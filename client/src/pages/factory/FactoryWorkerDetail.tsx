@@ -24,15 +24,12 @@ function installWorkerBalesProfilePatch(): () => void {
         return originalFetch(input, init);
       }
 
-      const rawUrl =
-        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      const rawUrl = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
       try {
         const parsed = new URL(rawUrl, window.location.origin);
         if (/^\/api\/factory\/workers\/\d+\/bales$/.test(parsed.pathname)) {
           parsed.searchParams.set("profile", "worker-bales-summary");
-          const profiledUrl = rawUrl.startsWith("http")
-            ? parsed.toString()
-            : `${parsed.pathname}${parsed.search}`;
+          const profiledUrl = rawUrl.startsWith("http") ? parsed.toString() : `${parsed.pathname}${parsed.search}`;
           const requestInput = input instanceof Request ? new Request(profiledUrl, input) : profiledUrl;
           return originalFetch(requestInput, init);
         }
