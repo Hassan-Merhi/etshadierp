@@ -10,6 +10,7 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 10
+    rebase-strategy: auto
     groups:
       production-dependencies:
         dependency-type: production
@@ -21,5 +22,23 @@ updates:
         update-types:
           - minor
           - patch
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:30"
+      timezone: Africa/Lubumbashi
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    rebase-strategy: auto
+    groups:
+      github-actions:
+        patterns:
+          - "*"
     labels:
       - dependencies
