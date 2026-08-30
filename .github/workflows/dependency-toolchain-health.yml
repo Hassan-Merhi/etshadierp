@@ -1,0 +1,109 @@
+name: Dependency and Toolchain Health
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - package.json
+      - package-lock.json
+      - .node-version
+      - .nvmrc
+      - .replit
+      - render.yaml
+      - .circleci/config.yml
+      - .github/dependabot.yml
+      - .github/workflows/**
+      - scripts/audit-toolchain-coherence.mjs
+      - scripts/verify-dependency-audit.mjs
+      - scripts/verify-lockfile-registry.mjs
+  push:
+    branches: [main]
+    paths:
+      - package.json
+      - package-lock.json
+      - .node-version
+      - .nvmrc
+      - .replit
+      - render.yaml
+      - .circleci/config.yml
+      - .github/dependabot.yml
+      - .github/workflows/**
+      - scripts/audit-toolchain-coherence.mjs
+      - scripts/verify-dependency-audit.mjs
+      - scripts/verify-lockfile-registry.mjs
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-toolchain-health-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  production-health:
+    name: Production dependency / toolchain health
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Harden Runner (audit mode)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24.19.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24.19.0"
+          cache: npm
+
+      - name: Install exact lockfile
+        env:
+          SKIP_GIT_HOOKS: "1"
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Verify lockfile registry policy
+        run: npm run verify:lockfile
+
+      - name: Verify toolchain coherence
+        run: npm run audit:toolchain
+
+      - name: Block high or critical production advisories
+        run: npm run verify:dependency-audit
+
+  full-tooling-audit:
+    name: Full dependency audit including dev tooling
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Harden Runner (audit mode)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24.19.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24.19.0"
+          cache: npm
+
+      - name: Install exact lockfile
+        env:
+          SKIP_GIT_HOOKS: "1"
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Block high or critical advisories in all dependencies
+        run: node scripts/verify-dependency-audit.mjs --include-dev
