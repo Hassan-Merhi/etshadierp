@@ -11,7 +11,7 @@ Do **not** publish credentials, customer data, exploit details, or other sensiti
 For a suspected vulnerability:
 
 1. Use GitHub's private vulnerability reporting for this repository when that option is available.
-2. If private vulnerability reporting is unavailable, contact the repository owner privately through an established project communication channel.
+2. If private vulnerability reporting is unavailable, email the repository maintainer at `hassmerhi.etshadi@gmail.com` with the subject `ETS HADI ERP security report`.
 3. Include the affected area, reproduction steps, expected impact, and the minimum evidence needed to validate the report. Redact secrets and personal/customer data.
 
 Please allow the maintainer to validate and remediate the issue before public disclosure.
