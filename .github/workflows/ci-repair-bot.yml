@@ -179,10 +179,32 @@ jobs:
           # Prefer the bot PAT, whose pushes do trigger workflows. Fall back to
           # the workflow token when the secret is absent so this job keeps
           # behaving exactly as before rather than failing.
-          export GH_TOKEN="${CI_REPAIR_BOT_TOKEN:-$WORKFLOW_TOKEN}"
-          if [[ -z "${CI_REPAIR_BOT_TOKEN:-}" ]]; then
+          #
+          # A present-but-unusable PAT must not be adopted silently: GH_TOKEN
+          # takes precedence over every other gh credential, so an expired or
+          # under-scoped secret would make each `gh pr merge` fail into its
+          # `|| true` and the job would report success having neither enabled
+          # auto-merge nor, for a ci-repair-blocked pull request, disabled it.
+          # Prove the token can read this repository's pull requests first.
+          if [[ -n "${CI_REPAIR_BOT_TOKEN:-}" ]]; then
+            if GH_TOKEN="$CI_REPAIR_BOT_TOKEN" \
+              gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=1" >/dev/null 2>&1; then
+              export GH_TOKEN="$CI_REPAIR_BOT_TOKEN"
+            else
+              echo "::error title=CI_REPAIR_BOT_TOKEN is unusable::The secret is set but cannot read pull requests on $GITHUB_REPOSITORY. It is probably expired or missing repo/pull-request scope. Refusing to run with it, because a silent failure would leave ci-repair-blocked pull requests on auto-merge."
+              exit 1
+            fi
+          else
+            export GH_TOKEN="$WORKFLOW_TOKEN"
             echo "::warning title=Auto-merge will not trigger CI::CI_REPAIR_BOT_TOKEN is unset, so merges use GITHUB_TOKEN and main will receive no CI run."
           fi
+
+          # Read the list through a command substitution rather than a process
+          # substitution: `done < <(gh api ...)` hides a listing failure from
+          # `set -e`, leaving an empty loop and a green job.
+          pr_list="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100" --jq '.[] | @base64')"
+
+          merge_failures=0
           while IFS= read -r encoded_pr; do
             [[ -n "$encoded_pr" ]] || continue
             pr_json="$(printf '%s' "$encoded_pr" | base64 --decode)"
@@ -193,7 +215,8 @@ jobs:
             author_association="$(jq -r '.author_association // ""' <<<"$pr_json")"
             blocked="$(jq -r '[.labels[].name] | any(. == "ci-repair-blocked")' <<<"$pr_json")"
             if [[ "$blocked" == true ]]; then
-              gh pr merge "$pr_number" --repo "$GITHUB_REPOSITORY" --disable-auto >/dev/null 2>&1 || true
+              gh pr merge "$pr_number" --repo "$GITHUB_REPOSITORY" --disable-auto >/dev/null 2>&1 ||
+                merge_failures=$((merge_failures + 1))
               continue
             fi
             [[ "$draft" == false && "$head_repo" == "$GITHUB_REPOSITORY" ]] || continue
@@ -202,10 +225,16 @@ jobs:
               OWNER|MEMBER|COLLABORATOR) ;;
               *) continue ;;
             esac
-            gh pr merge "$pr_number" --repo "$GITHUB_REPOSITORY" --auto --squash >/dev/null 2>&1 || true
-          done < <(
-            gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100" --jq '.[] | @base64'
-          )
+            gh pr merge "$pr_number" --repo "$GITHUB_REPOSITORY" --auto --squash >/dev/null 2>&1 ||
+              merge_failures=$((merge_failures + 1))
+          done <<<"$pr_list"
+
+          # A single failure is ordinary — a pull request can simply not be
+          # auto-mergeable yet — so this warns rather than failing. It exists so
+          # a systemic problem leaves a trace instead of nothing at all.
+          if (( merge_failures > 0 )); then
+            echo "::warning title=Auto-merge upkeep incomplete::${merge_failures} auto-merge call(s) failed. Individual failures are expected for pull requests that cannot carry auto-merge; a persistent count points at token scope."
+          fi
 
   sync-main:
     name: Sync latest main before repair
