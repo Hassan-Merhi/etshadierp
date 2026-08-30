@@ -96,11 +96,14 @@ export function registerInventoryMovementReportRoutes(app: Express) {
 
       periodMovements.sort((a, b) => a.date.localeCompare(b.date));
 
-      // Build list of months in the range
-      const startY = parseInt(sd.slice(0, 4)),
-        startM = parseInt(sd.slice(5, 7));
-      const endY = parseInt(ed.slice(0, 4)),
-        endM = parseInt(ed.slice(5, 7));
+      // Build list of months in the range. The date format is already validated above,
+      // so split the scalar strings instead of using String/Array-ambiguous slice calls.
+      const [startYearPart, startMonthPart] = sd.split("-");
+      const [endYearPart, endMonthPart] = ed.split("-");
+      const startY = Number.parseInt(startYearPart, 10),
+        startM = Number.parseInt(startMonthPart, 10);
+      const endY = Number.parseInt(endYearPart, 10),
+        endM = Number.parseInt(endMonthPart, 10);
       const months: { year: number; month: number; monthName: string }[] = [];
       let y = startY,
         m = startM;
