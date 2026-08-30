@@ -87,7 +87,7 @@ export function usePosQueries({
   });
 
   const { data: allLedgerAccounts = [] } = useQuery<any[]>({
-    queryKey: ["/api/ledger-accounts"],
+    queryKey: ["/api/ledger-accounts?profile=picker"],
     enabled: !!activeLocation,
   });
 
