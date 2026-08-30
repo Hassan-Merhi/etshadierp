@@ -70,7 +70,7 @@ export default function FactoryWorkerDetail() {
       cleanupRef.current?.();
       cleanupRef.current = null;
     },
-    [],
+    []
   );
 
   return <FactoryWorkerDetailView model={model} />;
