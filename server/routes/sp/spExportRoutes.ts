@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { rateLimit } from "express-rate-limit";
 import { and, eq } from "drizzle-orm";
 import { companies, ledgerAccounts, locations } from "@shared/schema";
 import { getErrorMessage } from "../../lib/httpHandlers";
@@ -10,10 +11,17 @@ import { generateSpSalesFormExcelV2 } from "../../services/spSalesFormExportV2";
 import { requireSpCompany } from "./spHelpers";
 import { validateStatementDateRange } from "../../lib/accountStatementExportSafety";
 
+const spExportLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // ── Sales Form Excel Export (V1 legacy + V2) ─────────────────────────────────
 
 export function registerSpExportRoutes(app: Express) {
-  app.get("/api/sp/sales-form/export", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/sp/sales-form/export", requireAuth, spExportLimiter, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -93,7 +101,7 @@ export function registerSpExportRoutes(app: Express) {
   });
 
   // ── V2: from-scratch ExcelJS export (matches system inventory) ────────────
-  app.get("/api/sp/sales-form/export-v2", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/sp/sales-form/export-v2", requireAuth, spExportLimiter, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
