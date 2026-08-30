@@ -19,6 +19,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          # Temporary Phase 2 diagnostic; removed after the live alert set is identified.
           set -euo pipefail
           gh api --paginate --method GET \
             "repos/${GITHUB_REPOSITORY}/code-scanning/alerts" \
