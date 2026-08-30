@@ -1,9 +1,12 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
+export type TenantDatabaseScopeMode = "active-company" | "authorized-companies";
+
 export type TenantDatabaseScopeRuntimeContext = {
   kind: "tenant";
   companyId: number;
   authorizedCompanyIds: readonly number[];
+  scopeMode: TenantDatabaseScopeMode;
 };
 
 export type MaintenanceDatabaseScopeRuntimeContext = {
@@ -25,7 +28,8 @@ function positiveCompanyId(value: unknown): number {
 
 export function createTenantDatabaseScope(
   companyIdValue: unknown,
-  authorizedCompanyIdValues: readonly unknown[] = []
+  authorizedCompanyIdValues: readonly unknown[] = [],
+  scopeMode: TenantDatabaseScopeMode = "active-company"
 ): TenantDatabaseScopeRuntimeContext {
   const companyId = positiveCompanyId(companyIdValue);
   const authorizedCompanyIds = [...new Set(authorizedCompanyIdValues.map(positiveCompanyId))]
@@ -36,6 +40,7 @@ export function createTenantDatabaseScope(
     kind: "tenant",
     companyId,
     authorizedCompanyIds,
+    scopeMode,
   };
 }
 
