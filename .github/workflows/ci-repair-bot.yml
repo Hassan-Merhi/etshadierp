@@ -254,7 +254,7 @@ jobs:
       EXPECTED_HEAD_SHA: ${{ needs.inspect.outputs.head_sha }}
     steps:
       - name: Checkout exact PR head without credentials
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.inspect.outputs.head_sha }}
           fetch-depth: 0
@@ -363,7 +363,7 @@ jobs:
 
       - name: Checkout exact PR head without credentials
         if: steps.credentials.outputs.ready == 'true'
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.inspect.outputs.head_sha }}
           fetch-depth: 0
@@ -428,7 +428,7 @@ jobs:
         id: codex
         if: steps.credentials.outputs.ready == 'true'
         continue-on-error: true
-        uses: openai/codex-action@5c3f4ccdb2b8790f73d6b21751ac00e602aa0c02 # v1.7
+        uses: openai/codex-action@86365089eb2b84e0a8fb0717b304f8bdcb13b20e # v1.12
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           permission-profile: ':workspace'
@@ -541,7 +541,7 @@ jobs:
       FAILED_CHECK_NAME: ${{ needs.inspect.outputs.failed_check_name }}
     steps:
       - name: Checkout exact PR head without credentials
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.inspect.outputs.head_sha }}
           fetch-depth: 0
