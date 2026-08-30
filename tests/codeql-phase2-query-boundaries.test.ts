@@ -40,10 +40,14 @@ vi.mock("../server/routes/sp/spHelpers", () => ({ requireSpCompany: harness.requ
 vi.mock("../server/services/sp-sales-form", () => ({ generateSpSalesFormExcel: harness.generateV1 }));
 vi.mock("../server/services/spSalesFormExportV2", () => ({ generateSpSalesFormExcelV2: harness.generateV2 }));
 vi.mock("drizzle-orm", () => ({
+  and: (...conditions: unknown[]) => ({ conditions }),
   eq: (column: unknown, value: unknown) => ({ column, value }),
   sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }),
 }));
 vi.mock("@shared/schema", () => ({
+  companies: { id: "companies.id", name: "companies.name" },
+  ledgerAccounts: { id: "accounts.id", companyId: "accounts.companyId" },
+  locations: { id: "locations.id", companyId: "locations.companyId", name: "locations.name" },
   stockItems: { id: "stock.id", openingQty: "stock.openingQty", openingRate: "stock.openingRate" },
 }));
 
