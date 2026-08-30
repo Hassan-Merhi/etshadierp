@@ -256,11 +256,7 @@ if (!globalThis[INSTALL_KEY]) {
       return compactLedgerPicker(body);
     }
 
-    if (
-      /^\/api\/locations\/\d+\/inventory$/.test(pathname) &&
-      profile === "view" &&
-      Array.isArray(body)
-    ) {
+    if (/^\/api\/locations\/\d+\/inventory$/.test(pathname) && profile === "view" && Array.isArray(body)) {
       return compactLocationInventoryView(body);
     }
 
