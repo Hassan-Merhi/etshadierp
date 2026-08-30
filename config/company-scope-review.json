@@ -49,6 +49,7 @@
     { "path": "server/services/pos/deductSaleInventory.ts", "reason": "POS inventory deduction runs inside the assigned POS company transaction." },
     { "path": "server/services/scheduler/maintenance.ts", "reason": "Maintenance jobs select their company scope before running data repairs." },
     { "path": "server/startup/runServerStartupMigrations.ts", "reason": "Startup migrations and one-time repairs run in controlled process-level maintenance context across all companies, outside request handling and without caller-supplied tenant identity." },
+    { "path": "server/stockItemSchemaRepairBridge.mjs", "reason": "Startup stock_items schema repair reads column names from information_schema and issues ADD COLUMN DDL under the explicit maintenance capability; it never reads or writes a stock_items row." },
     { "path": "server/startup-schema/005-orphan-fk-repairs.ts", "reason": "Startup orphan repair is controlled maintenance, not caller-driven data access." },
     { "path": "server/startup-schema/010-security-notifications-and-precision.ts", "reason": "Startup schema maintenance is controlled and idempotent, not caller-driven data access." },
     { "path": "server/storage/accounting/voucher-writes.ts", "reason": "Voucher storage writes execute inside the caller's company-scoped transaction." },

@@ -1,5 +1,6 @@
 import "./startupMigrationCoordinator";
 import "./companyScopeRlsBridge.mjs";
+import "./stockItemSchemaRepairBridge.mjs";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool, type PoolClient } from "pg";
 import * as schema from "@shared/schema";
@@ -102,15 +103,21 @@ function desiredDatabaseScope(): {
   }
 
   if (context?.kind === "tenant") {
+    const authorizedCompanyIds =
+      context.scopeMode === "authorized-companies" ? context.authorizedCompanyIds.join(",") : "";
+
     return {
-      // The pooled session-wide boundary is intentionally the active company
-      // only. Verified secondary companies stay in the request context for
-      // explicit intercompany transaction helpers; blindly widening every query
-      // because a request supplied targetCompanyId would defeat fail-closed RLS.
-      signature: `tenant:${context.companyId}`,
+      // Ordinary tenant requests stay pinned to the active company. Only
+      // server-trusted cross-company surfaces may opt into the already-verified
+      // authorized company list; caller-supplied secondary IDs alone never widen
+      // the pooled RLS boundary.
+      signature:
+        context.scopeMode === "authorized-companies"
+          ? `tenant-authorized:${context.companyId}:${authorizedCompanyIds}`
+          : `tenant:${context.companyId}`,
       maintenance: "off",
       companyId: String(context.companyId),
-      authorizedCompanyIds: "",
+      authorizedCompanyIds,
     };
   }
 
