@@ -206,10 +206,7 @@ if (!globalThis[INSTALL_KEY]) {
     if (!body || typeof body !== "object" || !Array.isArray(body.accounts)) return body;
 
     const accounts = body.accounts
-      .filter(
-        (account) =>
-          account?.type === "ledger" || account?.type === "bank" || account?.type === "fixedAsset"
-      )
+      .filter((account) => account?.type === "ledger" || account?.type === "bank" || account?.type === "fixedAsset")
       .map((account) => ({
         id: account?.id,
         accountId: account?.accountId,
