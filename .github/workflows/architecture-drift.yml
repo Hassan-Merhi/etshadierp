@@ -11,28 +11,29 @@ permissions:
 jobs:
   drift:
     name: Detect dependency and repository drift
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Node.js 24.19.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: 20
+          node-version: "24.19.0"
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit --bin-links=true
 
-      - name: Verify lockfile is reproducible
-        run: git diff --exit-code -- package-lock.json
-
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+      - name: Verify repository dependency policy
+        run: |
+          npm run verify:lockfile
+          npm run verify:dependency-audit
+          npm run audit:toolchain
 
       - name: Detect outdated dependencies
         shell: bash
@@ -45,17 +46,5 @@ jobs:
           fi
           echo "npm outdated exit status $status is informational for scheduled drift reporting."
 
-      - name: Check migration naming collisions
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -d migrations ]; then
-            duplicates=$(find migrations -maxdepth 1 -type f -printf '%f\n' | sed -E 's/^([0-9]+).*/\1/' | sort | uniq -d)
-            if [ -n "$duplicates" ]; then
-              echo "Duplicate migration sequence prefixes detected:"
-              echo "$duplicates"
-              exit 1
-            fi
-          else
-            echo "No top-level migrations directory; skipping migration-prefix check."
-          fi
+      - name: Verify migration registry
+        run: npm run verify:migrations
