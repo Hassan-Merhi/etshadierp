@@ -536,7 +536,7 @@ export function registerAccountStatementRoutes(app: Express) {
       sheet.mergeCells(`A${rTitle.number}:F${rTitle.number}`);
 
       const rAcct = sheet.addRow([
-        `Account: ${accountName}   |   Type: ${accountType.charAt(0).toUpperCase() + accountType.slice(1)}`,
+        `Account: ${accountName}   |   Type: ${accountType.charAt(0).toUpperCase() + accountType.substring(1)}`,
       ]);
       sheet.mergeCells(`A${rAcct.number}:F${rAcct.number}`);
 
