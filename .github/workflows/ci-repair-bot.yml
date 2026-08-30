@@ -164,9 +164,25 @@ jobs:
       - name: Enable protected auto-merge for trusted PRs
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          CI_REPAIR_BOT_TOKEN: ${{ secrets.CI_REPAIR_BOT_TOKEN }}
+          WORKFLOW_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # GitHub records auto-merge against whoever enables it and performs
+          # the merge push as that identity. Pushes made with GITHUB_TOKEN do
+          # not start workflow runs, so a merge enabled with it lands a commit
+          # on main that never gets a CI run. `ci/circleci: github-ci-gate`
+          # then polls for that run 60 times at 120s and fails closed, which
+          # leaves a required status red on every merged commit regardless of
+          # what the code does.
+          #
+          # Prefer the bot PAT, whose pushes do trigger workflows. Fall back to
+          # the workflow token when the secret is absent so this job keeps
+          # behaving exactly as before rather than failing.
+          export GH_TOKEN="${CI_REPAIR_BOT_TOKEN:-$WORKFLOW_TOKEN}"
+          if [[ -z "${CI_REPAIR_BOT_TOKEN:-}" ]]; then
+            echo "::warning title=Auto-merge will not trigger CI::CI_REPAIR_BOT_TOKEN is unset, so merges use GITHUB_TOKEN and main will receive no CI run."
+          fi
           while IFS= read -r encoded_pr; do
             [[ -n "$encoded_pr" ]] || continue
             pr_json="$(printf '%s' "$encoded_pr" | base64 --decode)"
