@@ -6,15 +6,28 @@
  * Replit-internal registry URLs. Exits with status 1 if any are found so the
  * build fails before any esbuild/vite step runs.
  *
- * The desktop workspace has its own lockfile and its own `npm ci`, so it needs
- * the same guarantee: package-firewall.replit.local does not resolve outside
- * Replit, and an unresolvable `resolved` host fails the install rather than
- * falling back to the public registry.
+ * Every workspace with its own lockfile gets its own `npm ci`, so each one
+ * needs the same guarantee: package-firewall.replit.local does not resolve
+ * outside Replit, and an unresolvable `resolved` host fails the install rather
+ * than falling back to the public registry.
+ *
+ * Lockfiles are discovered by walking the tree rather than from a fixed list,
+ * so a new workspace is covered the day it is added. The walk is used instead
+ * of `git ls-files` because CI jobs unpack a source tarball and have no git
+ * repository to query.
  */
-import { existsSync, readFileSync } from "fs";
-import { resolve } from "path";
+import { readFileSync, readdirSync } from "fs";
+import { join, relative, resolve, sep } from "path";
 
-const LOCKFILES = ["package-lock.json", "desktop/package-lock.json"];
+const SKIP_DIRECTORIES = new Set([
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  "coverage",
+  ".next",
+  ".turbo",
+]);
 
 const BLOCKED_PATTERNS = [
   "package-firewall.replit.local",
@@ -23,23 +36,33 @@ const BLOCKED_PATTERNS = [
 ];
 
 const root = process.cwd();
-const checked = [];
+
+function findLockfiles(directory) {
+  const found = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      if (SKIP_DIRECTORIES.has(entry.name)) continue;
+      found.push(...findLockfiles(join(directory, entry.name)));
+    } else if (entry.isFile() && entry.name === "package-lock.json") {
+      found.push(join(directory, entry.name));
+    }
+  }
+  return found;
+}
+
+const lockfiles = findLockfiles(root)
+  .map((absolute) => relative(root, absolute).split(sep).join("/"))
+  .sort();
+
+if (!lockfiles.includes("package-lock.json")) {
+  console.error("❌  package-lock.json not found. Run npm install first.");
+  process.exit(1);
+}
+
 let failed = false;
 
-for (const lockfile of LOCKFILES) {
-  const lockPath = resolve(root, lockfile);
-
-  if (!existsSync(lockPath)) {
-    if (lockfile === "package-lock.json") {
-      console.error("❌  package-lock.json not found. Run npm install first.");
-      process.exit(1);
-    }
-    // A workspace lockfile that is not present simply has nothing to check.
-    continue;
-  }
-
-  const content = readFileSync(lockPath, "utf8");
-  checked.push(lockfile);
+for (const lockfile of lockfiles) {
+  const content = readFileSync(resolve(root, lockfile), "utf8");
 
   for (const pattern of BLOCKED_PATTERNS) {
     if (content.includes(pattern)) {
@@ -67,4 +90,6 @@ if (failed) {
   process.exit(1);
 }
 
-console.log(`✅  Lockfile registry check passed — no Replit-internal URLs found in ${checked.join(", ")}.`);
+console.log(
+  `✅  Lockfile registry check passed — no Replit-internal URLs found in ${lockfiles.length} lockfile(s): ${lockfiles.join(", ")}.`
+);
