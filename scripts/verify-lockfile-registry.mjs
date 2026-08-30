@@ -11,13 +11,13 @@
  * outside Replit, and an unresolvable `resolved` host fails the install rather
  * than falling back to the public registry.
  *
- * Lockfiles are discovered by walking the tree rather than from a fixed list,
- * so a new workspace is covered the day it is added. The walk is used instead
- * of `git ls-files` because CI jobs unpack a source tarball and have no git
- * repository to query.
+ * Lockfiles are discovered rather than listed, so a new workspace is covered
+ * the day it is added. Discovery uses fs.globSync instead of `git ls-files`
+ * because CI jobs unpack a source tarball and have no git repository to query,
+ * and the returned paths stay relative to the working directory so no path is
+ * ever assembled from a directory entry.
  */
-import { readFileSync, readdirSync } from "fs";
-import { join, relative, resolve, sep } from "path";
+import { globSync, readFileSync } from "fs";
 
 const SKIP_DIRECTORIES = new Set([
   "node_modules",
@@ -35,23 +35,16 @@ const BLOCKED_PATTERNS = [
   // Add other Replit-only registry hostnames here if they ever appear
 ];
 
-const root = process.cwd();
-
-function findLockfiles(directory) {
-  const found = [];
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    if (entry.isDirectory()) {
-      if (SKIP_DIRECTORIES.has(entry.name)) continue;
-      found.push(...findLockfiles(join(directory, entry.name)));
-    } else if (entry.isFile() && entry.name === "package-lock.json") {
-      found.push(join(directory, entry.name));
-    }
-  }
-  return found;
+// fs.globSync hands `exclude` either a path string or a Dirent depending on the
+// Node release, so read the final segment from whichever shape arrives.
+function basenameOf(entry) {
+  return typeof entry === "string" ? entry.split(/[\\/]/).pop() : entry.name;
 }
 
-const lockfiles = findLockfiles(root)
-  .map((absolute) => relative(root, absolute).split(sep).join("/"))
+const lockfiles = globSync("**/package-lock.json", {
+  exclude: (entry) => SKIP_DIRECTORIES.has(basenameOf(entry)),
+})
+  .map((lockfile) => lockfile.split("\\").join("/"))
   .sort();
 
 if (!lockfiles.includes("package-lock.json")) {
@@ -62,7 +55,7 @@ if (!lockfiles.includes("package-lock.json")) {
 let failed = false;
 
 for (const lockfile of lockfiles) {
-  const content = readFileSync(resolve(root, lockfile), "utf8");
+  const content = readFileSync(lockfile, "utf8");
 
   for (const pattern of BLOCKED_PATTERNS) {
     if (content.includes(pattern)) {
