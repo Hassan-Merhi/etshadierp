@@ -81,8 +81,8 @@ export function registerSpExportRoutes(app: Express) {
         supplierName: companyName,
       });
 
-      const from = fromDate.slice(5).replace("-", "");
-      const to = toDate.slice(5).replace("-", "");
+      const from = fromDate.substring(5, 7) + fromDate.substring(8, 10);
+      const to = toDate.substring(5, 7) + toDate.substring(8, 10);
       const safeLoc = locationName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
       const safeCo = companyName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
       const filename = `${safeLoc} ${safeCo} sales form ${from}-${to}.xlsx`.replace(/\s+/g, " ").trim();
@@ -191,8 +191,8 @@ export function registerSpExportRoutes(app: Express) {
         cashAccountId: cashId,
       });
 
-      const from = fromDate.slice(5).replace("-", "");
-      const to = toDate.slice(5).replace("-", "");
+      const from = fromDate.substring(5, 7) + fromDate.substring(8, 10);
+      const to = toDate.substring(5, 7) + toDate.substring(8, 10);
       const safeLoc = locationName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
       const safeCo = companyName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
       const filename = `${safeLoc} ${safeCo} system sales form ${from}-${to}.xlsx`.replace(/\s+/g, " ").trim();
