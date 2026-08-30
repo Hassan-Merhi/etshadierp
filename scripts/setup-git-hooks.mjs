@@ -8,16 +8,44 @@
  *  - Only sets core.hooksPath; never overwrites existing hook files.
  */
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const hooksDir = "scripts/git-hooks";
 
-// CI checkouts are disposable and monitored for source writes. Hook wiring is
-// a local developer convenience, so do not mutate checkout metadata in CI.
+// Temporary CI-only diagnostic: ask the exact installed Prettier to print the
+// unified diff for the two files the formatting gate reports. This is removed
+// immediately after the runner exposes the canonical formatting changes.
 if (process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true") {
+  const prettier = await import("prettier");
+  const targets = ["client/src/pages/factory/FactoryWorkerDetail.tsx", "server/apiPaginationBridge.mjs"];
+  const scratch = mkdtempSync(join(tmpdir(), "erp-prettier-diagnostic-"));
+
+  try {
+    for (const target of targets) {
+      const source = readFileSync(join(repoRoot, target), "utf8");
+      const config = (await prettier.resolveConfig(join(repoRoot, target))) ?? {};
+      const formatted = await prettier.format(source, { ...config, filepath: join(repoRoot, target) });
+      if (formatted === source) continue;
+
+      const formattedPath = join(scratch, target.replaceAll("/", "__"));
+      writeFileSync(formattedPath, formatted, "utf8");
+      try {
+        execFileSync("diff", ["-u", target, formattedPath], {
+          cwd: repoRoot,
+          stdio: ["ignore", "inherit", "inherit"],
+        });
+      } catch {
+        // diff exits 1 when files differ; the printed unified diff is the diagnostic output.
+      }
+    }
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+
   process.exit(0);
 }
 
