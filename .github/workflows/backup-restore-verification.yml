@@ -1,0 +1,72 @@
+name: Maintenance - Backup Restore Verification
+
+on:
+  schedule:
+    - cron: '11 3 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify database backup can restore
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: restore_verify
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Keep verification inert until backup source is configured
+        if: env.BACKUP_DATABASE_URL == ''
+        run: echo "BACKUP_DATABASE_URL is not configured; restore verification is skipped safely."
+
+      - name: Install PostgreSQL client
+        if: env.BACKUP_DATABASE_URL != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Create fresh logical backup
+        if: env.BACKUP_DATABASE_URL != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg_dump "$BACKUP_DATABASE_URL" --format=custom --no-owner --no-acl --file="$RUNNER_TEMP/backup.dump"
+          test -s "$RUNNER_TEMP/backup.dump"
+          size=$(stat -c%s "$RUNNER_TEMP/backup.dump")
+          echo "Backup size: $size bytes"
+          if [ "$size" -lt 10240 ]; then
+            echo "Backup is suspiciously small."
+            exit 1
+          fi
+
+      - name: Restore into isolated PostgreSQL service
+        if: env.BACKUP_DATABASE_URL != ''
+        env:
+          PGPASSWORD: postgres
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg_restore --host=localhost --port=5432 --username=postgres --dbname=restore_verify \
+            --no-owner --no-acl --exit-on-error "$RUNNER_TEMP/backup.dump"
+          table_count=$(psql --host=localhost --port=5432 --username=postgres --dbname=restore_verify \
+            --tuples-only --no-align --command="SELECT count(*) FROM information_schema.tables WHERE table_schema='public';")
+          echo "Restored public table count: $table_count"
+          if [ "${table_count:-0}" -lt 1 ]; then
+            echo "Restore completed but no public tables were found."
+            exit 1
+          fi
