@@ -63,7 +63,13 @@ export function useSupplierProfitCheckSafeModel() {
   const selectedSupplier = scopedSuppliers.find((supplier) => String(supplier.id) === base.supplierId);
 
   useEffect(() => {
-    if (!base.supplierId) return;
+    if (
+      !base.supplierId ||
+      (base.sourceType === "proforma" && !base.proformaId) ||
+      (base.sourceType === "otw_containers" && base.otwContainerIds.length === 0)
+    ) {
+      return;
+    }
     const initialQty: Record<number, string> = {};
     for (const row of base.rows) {
       if (row.proformaQty != null && row.proformaQty > 0) {
