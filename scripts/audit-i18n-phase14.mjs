@@ -65,6 +65,7 @@ const compatibilityTranslationFiles = [
   "client/src/i18n/backendMessagesPhase7Translations.part9.ts",
   "client/src/i18n/backendMessagesPhase7Translations.part10.ts",
   "client/src/i18n/backendMessagesPhase7Translations.part11.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part12.ts",
   "client/src/i18n/currentMainSupplierPartnerTranslations.ts",
   "client/src/i18n/remoteSupportPhase4Translations.ts",
   "client/src/i18n/remoteSupportPhase5Translations.ts",
