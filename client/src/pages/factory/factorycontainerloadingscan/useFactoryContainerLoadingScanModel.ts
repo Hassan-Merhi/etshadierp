@@ -573,7 +573,7 @@ export function useFactoryContainerLoadingScanModel() {
                 articleCode: String(
                   r["Article Code"] ?? r.articleCode ?? r.article_code ?? r.ArticleCode ?? r.ARTICLECODE ?? ""
                 ).trim(),
-                qty: parseInt(r.Qty ?? r.qty ?? r.QTY ?? r.Quantity ?? r.quantity ?? 0) || 0,
+                qty: parseInt(String(r.Qty ?? r.qty ?? r.QTY ?? r.Quantity ?? r.quantity ?? 0), 10) || 0,
               }))
               .filter((r) => r.articleCode && r.qty > 0);
             if (parsed.length === 0) {
