@@ -39,9 +39,14 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: harness.invalidateQueries }),
   useQuery: ({ queryKey }: any) => {
     const root = queryKey?.[0];
+    // React Query keys are hierarchical, and several supplier queries share the
+    // "/api/suppliers" root. Match the whole key so the company-scoped supplier
+    // list is not confused with a supplier's proforma list.
     if (root === "/api/suppliers-all-spc") return { data: suppliers };
     if (root === "/api/stock-groups") return { data: stockGroups };
-    if (root === "/api/suppliers") return { data: proformas };
+    if (root === "/api/suppliers") {
+      return queryKey[queryKey.length - 1] === "proformas" ? { data: proformas } : { data: suppliers };
+    }
     if (root === "/api/supplier-profit-check/location-groups") return { data: locationGroups };
     if (root === "/api/supplier-profit-check/otw-containers") return { data: noRows, isLoading: false };
     if (root === "/api/supplier-profit-check/analyze") return { data: analysisRows, isLoading: false };
