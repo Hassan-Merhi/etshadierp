@@ -61,23 +61,31 @@ export function useSupplierProfitCheckSafeModel() {
     staleTime: 5 * 60 * 1000,
   });
   const selectedSupplier = scopedSuppliers.find((supplier) => String(supplier.id) === base.supplierId);
+  const {
+    supplierId: activeSupplierId,
+    sourceType: activeSourceType,
+    proformaId: activeProformaId,
+    otwContainerIds: activeOtwContainerIds,
+    rows: analysisRows,
+    setQtyMap: setOrderQuantities,
+  } = base;
 
   useEffect(() => {
     if (
-      !base.supplierId ||
-      (base.sourceType === "proforma" && !base.proformaId) ||
-      (base.sourceType === "otw_containers" && base.otwContainerIds.length === 0)
+      !activeSupplierId ||
+      (activeSourceType === "proforma" && !activeProformaId) ||
+      (activeSourceType === "otw_containers" && activeOtwContainerIds.length === 0)
     ) {
       return;
     }
     const initialQty: Record<number, string> = {};
-    for (const row of base.rows) {
+    for (const row of analysisRows) {
       if (row.proformaQty != null && row.proformaQty > 0) {
         initialQty[row.stockItemId] = String(row.proformaQty);
       }
     }
-    base.setQtyMap(initialQty);
-  }, [base.supplierId, base.sourceType, base.proformaId, base.otwContainerIds, base.rows, base.setQtyMap]);
+    setOrderQuantities(initialQty);
+  }, [activeSupplierId, activeSourceType, activeProformaId, activeOtwContainerIds, analysisRows, setOrderQuantities]);
 
   const derived = useMemo(
     () =>
