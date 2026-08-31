@@ -36,13 +36,8 @@ export function usePosQueries({
   showStockPrompt,
   isSpCompany,
 }: PosQueriesParams) {
-  const {
-    data: goldenCoastReadiness,
-    isLoading: goldenCoastReadinessLoading,
-  } = useQuery<GoldenCoastPosReadiness>({
-    queryKey: companyId
-      ? ["/api/sp/golden-coast/phase6/pos-sale/readiness", companyId]
-      : [],
+  const { data: goldenCoastReadiness, isLoading: goldenCoastReadinessLoading } = useQuery<GoldenCoastPosReadiness>({
+    queryKey: companyId ? ["/api/sp/golden-coast/phase6/pos-sale/readiness", companyId] : [],
     enabled: !!isSpCompany && !!companyId,
     retry: false,
     queryFn: async () => {

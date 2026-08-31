@@ -38,9 +38,7 @@ export async function resolveParentCompanyId(companyId?: number | null): Promise
 
     // A root company is identified safely by an explicit child link, never by
     // its numeric ID or position in the company list.
-    const linkedChild = (await storage.getAllCompanies()).some(
-      (company) => company.parentCompanyId === companyId
-    );
+    const linkedChild = (await storage.getAllCompanies()).some((company) => company.parentCompanyId === companyId);
     if (linkedChild) return companyId;
   }
 

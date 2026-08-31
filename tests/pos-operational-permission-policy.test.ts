@@ -15,21 +15,19 @@ describe("POS operational permission policy", () => {
   });
 
   it("accepts matching location identifiers and rejects conflicts", () => {
-    expect(
-      resolveExplicitPosLocation({ bodyLocationId: 4, queryLocationId: "4" })
-    ).toEqual({ locationId: 4, conflict: false });
-    expect(
-      resolveExplicitPosLocation({ bodyLocationId: 4, queryLocationId: 5 })
-    ).toEqual({ locationId: 4, conflict: true });
+    expect(resolveExplicitPosLocation({ bodyLocationId: 4, queryLocationId: "4" })).toEqual({
+      locationId: 4,
+      conflict: false,
+    });
+    expect(resolveExplicitPosLocation({ bodyLocationId: 4, queryLocationId: 5 })).toEqual({
+      locationId: 4,
+      conflict: true,
+    });
   });
 
   it("blocks mutations for view-only POS accounts but allows reads", () => {
-    expect(
-      isPosMutationAllowed({ method: "POST", role: "POS", posViewOnly: true })
-    ).toBe(false);
-    expect(
-      isPosMutationAllowed({ method: "GET", role: "POS", posViewOnly: true })
-    ).toBe(true);
+    expect(isPosMutationAllowed({ method: "POST", role: "POS", posViewOnly: true })).toBe(false);
+    expect(isPosMutationAllowed({ method: "GET", role: "POS", posViewOnly: true })).toBe(true);
   });
 
   it("recognizes sale creation and edit paths exactly", () => {

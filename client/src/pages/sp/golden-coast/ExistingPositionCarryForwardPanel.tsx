@@ -67,7 +67,9 @@ export function ExistingPositionCarryForwardPanel({ companyKey }: { companyKey: 
       queryClient.invalidateQueries({ queryKey: ["/api/sp/golden-coast/phase6/pos-sale/readiness"] });
       toast({
         title: releaseDebtEnglish("Golden Coast existing position carried forward"),
-        description: releaseDebtEnglish("FIFO opening lots are ready. POS sales can now use the Golden Coast accounting flow."),
+        description: releaseDebtEnglish(
+          "FIFO opening lots are ready. POS sales can now use the Golden Coast accounting flow."
+        ),
       });
     },
     onError: (error: Error) =>

@@ -31,10 +31,7 @@ const readinessAlertSource = readFileSync(
   resolve(process.cwd(), "client/src/pages/pos/pos-components/GoldenCoastPosReadinessAlert.tsx"),
   "utf8"
 );
-const spSetupSource = readFileSync(
-  resolve(process.cwd(), "client/src/pages/sp/SpSetupPanel.tsx"),
-  "utf8"
-);
+const spSetupSource = readFileSync(resolve(process.cwd(), "client/src/pages/sp/SpSetupPanel.tsx"), "utf8");
 
 describe("Golden Coast POS Phase 6 frontend contract", () => {
   it("builds the strict Phase 6 request and keeps the request identity", () => {

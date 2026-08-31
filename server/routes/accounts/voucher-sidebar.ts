@@ -58,20 +58,20 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
         storage.getAllBankAccounts(companyId),
         storage.getAllFixedAssets(companyId),
         storage.getAllEmployees(companyId),
-        isFactoryCompany || isPropertiesCompany ? Promise.resolve(([])) : storage.getAllSuppliers(),
+        isFactoryCompany || isPropertiesCompany ? Promise.resolve([]) : storage.getAllSuppliers(),
         isFactoryCompany
           ? db
               .select()
               .from(factorySuppliers)
               .where(eq(factorySuppliers.companyId, companyId))
               .orderBy(factorySuppliers.name)
-          : Promise.resolve(([])),
+          : Promise.resolve([]),
         isFactoryCompany
           ? db.select().from(factoryContainers).where(eq(factoryContainers.companyId, companyId))
-          : Promise.resolve(([])),
+          : Promise.resolve([]),
         isFactoryCompany
           ? db.select().from(factorySupplierPayments).where(eq(factorySupplierPayments.companyId, companyId))
-          : Promise.resolve(([])),
+          : Promise.resolve([]),
         db
           .select({
             id: vouchers.id,
@@ -98,14 +98,11 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
       // FACTORY-PAY-* voucher IDs — excluded when computing factory supplier voucher-paid amounts
       // to prevent double-counting with fPayments (factorySupplierPayments).
       const factoryPayVoucherIds = new Set(
-        ((companyVouchers)).filter((v) => (v.voucherNumber || "").startsWith("FACTORY-PAY-")).map((v) => v.id)
+        companyVouchers.filter((v) => (v.voucherNumber || "").startsWith("FACTORY-PAY-")).map((v) => v.id)
       );
       // Map from voucherId -> {currency, exchangeRate} for USD conversion of factory supplier entries
       const voucherCurrencyMap = new Map<number, { currency: string; exchangeRate: string }>(
-        ((companyVouchers)).map((v) => [
-          v.id,
-          { currency: v.currency || "USD", exchangeRate: v.exchangeRate || "1" },
-        ])
+        companyVouchers.map((v) => [v.id, { currency: v.currency || "USD", exchangeRate: v.exchangeRate || "1" }])
       );
 
       // allEntries already fetched in parallel above (see Promise.all)
@@ -329,10 +326,7 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
 
           // Total paid via factorySupplierPayments (in USD) — aggregated across all linked IDs
           const supplierPayments = fPayments.filter((p) => aggregateIds.includes(p.supplierId));
-          const totalPaidUsd = supplierPayments.reduce(
-            (sum: number, p) => sum + parseFloat(p.amountUsd || "0"),
-            0
-          );
+          const totalPaidUsd = supplierPayments.reduce((sum: number, p) => sum + parseFloat(p.amountUsd || "0"), 0);
 
           // Total paid via non-FACTORY-PAY-* ERP voucher entries (aggregated across linked IDs)
           const voucherPaidUsd = aggregateIds.reduce((sum, sid) => sum + (factorySupplierBalances.get(sid) || 0), 0);

@@ -292,30 +292,29 @@ export async function createPosSale(
         });
       }
 
-        goldenCoastSaleDetected =
-          isGoldenCoast || (isSpCompany && (await isGoldenCoastPosCompany(tx, currentCompanyId)));
-        if (goldenCoastSaleDetected && !isCreditSale) {
-         const payableAmount = Math.max(
-           0,
-           Number((grandTotal - spCtx.spPosTotalQtySold * spCtx.spPosDeductionPerQty).toFixed(2))
-         );
-         await postGoldenCoastPosAccountingTx({
-           tx,
-           companyId: currentCompanyId,
-           locationId: parsedLocationId,
-           clientSaleId: clientSaleId || "",
-           revision: "create",
-           saleDate: voucherDate,
-           amountUsd: grandTotal,
-           paymentAccountType: accountType === "bank" ? "bank" : "cash",
-           paymentAccountId: accountId,
-           supplierPayableAccountId: spCtx.spPosPayableAccountId!,
-           payableAmountUsd: payableAmount,
-           actor: { userId, username, reason: "Golden Coast itemized POS sale settlement" },
-         });
-       }
+      goldenCoastSaleDetected = isGoldenCoast || (isSpCompany && (await isGoldenCoastPosCompany(tx, currentCompanyId)));
+      if (goldenCoastSaleDetected && !isCreditSale) {
+        const payableAmount = Math.max(
+          0,
+          Number((grandTotal - spCtx.spPosTotalQtySold * spCtx.spPosDeductionPerQty).toFixed(2))
+        );
+        await postGoldenCoastPosAccountingTx({
+          tx,
+          companyId: currentCompanyId,
+          locationId: parsedLocationId,
+          clientSaleId: clientSaleId || "",
+          revision: "create",
+          saleDate: voucherDate,
+          amountUsd: grandTotal,
+          paymentAccountType: accountType === "bank" ? "bank" : "cash",
+          paymentAccountId: accountId,
+          supplierPayableAccountId: spCtx.spPosPayableAccountId!,
+          payableAmountUsd: payableAmount,
+          actor: { userId, username, reason: "Golden Coast itemized POS sale settlement" },
+        });
+      }
 
-       return { voucher: txVoucher, saleItems: txSaleItems, replayed: false };
+      return { voucher: txVoucher, saleItems: txSaleItems, replayed: false };
     });
   } catch (error: unknown) {
     const committedRetry = await checkIdempotentSale(currentCompanyId, clientSaleId);

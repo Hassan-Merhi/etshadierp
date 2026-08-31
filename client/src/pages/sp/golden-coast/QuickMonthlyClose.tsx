@@ -29,14 +29,7 @@ import {
   type MutationResult,
   type Phase11Readiness,
 } from "./contracts";
-import {
-  ReadinessState,
-  errorMessage,
-  makeRequestId,
-  money,
-  readJson,
-  useReadinessInvalidation,
-} from "./shared";
+import { ReadinessState, errorMessage, makeRequestId, money, readJson, useReadinessInvalidation } from "./shared";
 
 function monthLabel(periodMonth: string): string {
   const [year, month] = periodMonth.split("-").map(Number);
@@ -48,13 +41,7 @@ function monthLabel(periodMonth: string): string {
   });
 }
 
-export function QuickMonthlyClose({
-  periodMonth,
-  companyKey,
-}: {
-  periodMonth: string;
-  companyKey: CompanyKey;
-}) {
+export function QuickMonthlyClose({ periodMonth, companyKey }: { periodMonth: string; companyKey: CompanyKey }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const invalidateReadiness = useReadinessInvalidation();
@@ -191,7 +178,9 @@ export function QuickMonthlyClose({
       <Dialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{releaseDebtEnglish("Split")} {monthLabel(periodMonth)}?</DialogTitle>
+            <DialogTitle>
+              {releaseDebtEnglish("Split")} {monthLabel(periodMonth)}?
+            </DialogTitle>
             <DialogDescription>
               {releaseDebtEnglish(
                 "This posts the protected ledger-derived 50/50 monthly close. Type the exact confirmation phrase to continue."

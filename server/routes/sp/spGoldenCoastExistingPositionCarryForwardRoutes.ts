@@ -23,7 +23,10 @@ import {
   type ExistingPositionInventoryRow,
   type ExistingPositionOtwContainerRow,
 } from "../../services/accounting/goldenCoastExistingPositionCarryForward";
-import { GOLDEN_COAST_CUTOVER_DATE, GOLDEN_COAST_CUTOVER_FIFO_SOURCE } from "../../services/accounting/goldenCoastPhase4CutoverFifo";
+import {
+  GOLDEN_COAST_CUTOVER_DATE,
+  GOLDEN_COAST_CUTOVER_FIFO_SOURCE,
+} from "../../services/accounting/goldenCoastPhase4CutoverFifo";
 import { requireSpCompany } from "./spHelpers";
 import { isGoldenCoastCompany } from "./spGoldenCoastPhase4CutoverFifoRoutes";
 
@@ -79,7 +82,10 @@ async function loadAccounts(conn: typeof db | DatabaseTransaction, companyId: nu
   return activeAccountMap(rows.map((row) => ({ id: Number(row.id), subType: row.subType })));
 }
 
-async function loadInventory(conn: typeof db | DatabaseTransaction, companyId: number): Promise<ExistingPositionInventoryRow[]> {
+async function loadInventory(
+  conn: typeof db | DatabaseTransaction,
+  companyId: number
+): Promise<ExistingPositionInventoryRow[]> {
   const rows = await conn.execute(sql`
     SELECT inv.id AS inventory_id,
            inv.location_id,
@@ -160,19 +166,22 @@ async function loadExistingBridge(conn: typeof db | DatabaseTransaction, company
   const rows = await conn
     .select()
     .from(spStockMovements)
-    .where(and(eq(spStockMovements.companyId, companyId), eq(spStockMovements.sourceType, GOLDEN_COAST_CUTOVER_FIFO_SOURCE)));
+    .where(
+      and(eq(spStockMovements.companyId, companyId), eq(spStockMovements.sourceType, GOLDEN_COAST_CUTOVER_FIFO_SOURCE))
+    );
   return rows;
 }
 
 async function buildState(conn: typeof db | DatabaseTransaction, companyId: number) {
-  const [accounts, inventory, otwContainers, existingVoucher, existingPhase3Voucher, existingBridge] = await Promise.all([
-    loadAccounts(conn, companyId),
-    loadInventory(conn, companyId),
-    loadOtwContainers(conn, companyId),
-    loadExistingVoucher(conn, companyId),
-    loadExistingPhase3Voucher(conn, companyId),
-    loadExistingBridge(conn, companyId),
-  ]);
+  const [accounts, inventory, otwContainers, existingVoucher, existingPhase3Voucher, existingBridge] =
+    await Promise.all([
+      loadAccounts(conn, companyId),
+      loadInventory(conn, companyId),
+      loadOtwContainers(conn, companyId),
+      loadExistingVoucher(conn, companyId),
+      loadExistingPhase3Voucher(conn, companyId),
+      loadExistingBridge(conn, companyId),
+    ]);
 
   let plan: ReturnType<typeof buildGoldenCoastExistingPositionCarryForwardPlan> | null = null;
   const blockers: string[] = [];
@@ -183,10 +192,14 @@ async function buildState(conn: typeof db | DatabaseTransaction, companyId: numb
   }
 
   if (existingVoucher && existingBridge.length === 0) {
-    blockers.push("Carry-forward journal exists but its FIFO bridge is missing; repair this partial state before retrying.");
+    blockers.push(
+      "Carry-forward journal exists but its FIFO bridge is missing; repair this partial state before retrying."
+    );
   }
   if (!existingVoucher && existingBridge.length > 0) {
-    blockers.push("Golden Coast FIFO bridge exists without the carry-forward journal; repair this partial state before retrying.");
+    blockers.push(
+      "Golden Coast FIFO bridge exists without the carry-forward journal; repair this partial state before retrying."
+    );
   }
   if (existingPhase3Voucher) {
     blockers.push(
@@ -267,7 +280,10 @@ async function handleStatus(req: Request, res: Response): Promise<void> {
     res.json(await buildState(db, companyId));
   } catch (error) {
     if (error instanceof CarryForwardRouteError || error instanceof GoldenCoastExistingPositionCarryForwardError) {
-      res.status(409).json({ code: error instanceof CarryForwardRouteError ? error.code : "GC_CARRY_FORWARD_INVALID", message: error.message });
+      res.status(409).json({
+        code: error instanceof CarryForwardRouteError ? error.code : "GC_CARRY_FORWARD_INVALID",
+        message: error.message,
+      });
       return;
     }
     logger.error("Golden Coast existing-position carry-forward status failed", { error });
@@ -294,7 +310,10 @@ async function handleApply(req: Request, res: Response): Promise<void> {
       }
       const state = await buildState(tx, selectedCompany);
       if (state.posted && state.existingVoucher) {
-        const entries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, state.existingVoucher.id));
+        const entries = await tx
+          .select()
+          .from(voucherEntries)
+          .where(eq(voucherEntries.voucherId, state.existingVoucher.id));
         await recordCarryForwardAudit(tx, req, selectedCompany, state.existingVoucher.id, true);
         return { posted: { voucher: state.existingVoucher, entries } as PersistedPostingResult, state, replayed: true };
       }
@@ -344,7 +363,10 @@ async function handleApply(req: Request, res: Response): Promise<void> {
     });
   } catch (error) {
     if (error instanceof CarryForwardRouteError || error instanceof GoldenCoastExistingPositionCarryForwardError) {
-      res.status(409).json({ code: error instanceof CarryForwardRouteError ? error.code : "GC_CARRY_FORWARD_INVALID", message: error.message });
+      res.status(409).json({
+        code: error instanceof CarryForwardRouteError ? error.code : "GC_CARRY_FORWARD_INVALID",
+        message: error.message,
+      });
       return;
     }
     logger.error("Golden Coast existing-position carry-forward failed", {

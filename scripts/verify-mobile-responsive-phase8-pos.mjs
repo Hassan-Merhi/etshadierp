@@ -73,7 +73,7 @@ for (const [name, contents] of [
 }
 
 if (!mobile.includes("onClick={handleSaveSale}")) failures.push("Mobile checkout no longer calls the existing save handler");
-if (!mobile.includes("disabled={saveMutation?.isPending || !hasValidItems}")) {
+if (!mobile.includes("disabled={saveMutation?.isPending || !hasValidItems || disableSave}")) {
   failures.push("Mobile checkout lost the existing pending/valid-items safeguard");
 }
 if (!transfers.includes('fetch(`/api/stock-transfers/list?${params}`')) {

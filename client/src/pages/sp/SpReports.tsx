@@ -373,11 +373,11 @@ export default function SpReports() {
                   supplier template with your data (18-day max, formula-based).
                 </p>
                 <p className="text-xs text-muted-foreground">
-                   <span className="font-medium text-foreground">Export System Sales Form</span> — clean from-scratch
-                   workbook built from your live system data. Opening &amp; closing stock match the Location Inventory
-                   page. Supports any date range. Three sheets: ENTRY (visible) plus Costing and Sales (hidden).
-                   Items with no opening, closing, or sales activity are omitted. Optionally select an Opening Cash
-                   Account to auto-fill day-1 cash from the ledger balance.
+                  <span className="font-medium text-foreground">Export System Sales Form</span> — clean from-scratch
+                  workbook built from your live system data. Opening &amp; closing stock match the Location Inventory
+                  page. Supports any date range. Three sheets: ENTRY (visible) plus Costing and Sales (hidden). Items
+                  with no opening, closing, or sales activity are omitted. Optionally select an Opening Cash Account to
+                  auto-fill day-1 cash from the ledger balance.
                 </p>
               </div>
             </CardContent>

@@ -190,30 +190,36 @@ describe("item registry", () => {
     const active = itemRow({ stockItemId: 503, itemCode: "IT-503", itemName: "Active item" });
     const result = buildItemRegistry(
       new Map([
-        [inactive.stockItemId, {
-          stockItemId: inactive.stockItemId,
-          stockItemCode: inactive.itemCode,
-          stockItemName: inactive.itemName,
-          stockGroupName: inactive.groupName,
-          stockItemUom: inactive.itemUom,
-          quantity: 0,
-          averageRate: 0,
-          totalValue: 0,
-        }],
-        [active.stockItemId, {
-          stockItemId: active.stockItemId,
-          stockItemCode: active.itemCode,
-          stockItemName: active.itemName,
-          stockGroupName: active.groupName,
-          stockItemUom: active.itemUom,
-          quantity: active.openQty,
-          averageRate: active.openRate,
-          totalValue: active.openValue,
-        }],
+        [
+          inactive.stockItemId,
+          {
+            stockItemId: inactive.stockItemId,
+            stockItemCode: inactive.itemCode,
+            stockItemName: inactive.itemName,
+            stockGroupName: inactive.groupName,
+            stockItemUom: inactive.itemUom,
+            quantity: 0,
+            averageRate: 0,
+            totalValue: 0,
+          },
+        ],
+        [
+          active.stockItemId,
+          {
+            stockItemId: active.stockItemId,
+            stockItemCode: active.itemCode,
+            stockItemName: active.itemName,
+            stockGroupName: active.groupName,
+            stockItemUom: active.itemUom,
+            quantity: active.openQty,
+            averageRate: active.openRate,
+            totalValue: active.openValue,
+          },
+        ],
       ]),
       new Map(),
       [],
-      DATES.length,
+      DATES.length
     );
 
     expect(result.map((item) => item.itemName)).toEqual(["Active item"]);

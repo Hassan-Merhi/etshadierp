@@ -11,9 +11,10 @@ export function parsePositiveId(value: unknown): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-export function resolveExplicitPosLocation(
-  input: PosOperationalLocationInput
-): { locationId: number | null; conflict: boolean } {
+export function resolveExplicitPosLocation(input: PosOperationalLocationInput): {
+  locationId: number | null;
+  conflict: boolean;
+} {
   const ids = [
     parsePositiveId(input.bodyLocationId),
     parsePositiveId(input.queryLocationId),
@@ -28,11 +29,7 @@ export function resolveExplicitPosLocation(
   };
 }
 
-export function isPosMutationAllowed(input: {
-  method: string;
-  role: string;
-  posViewOnly: boolean;
-}): boolean {
+export function isPosMutationAllowed(input: { method: string; role: string; posViewOnly: boolean }): boolean {
   const method = input.method.toUpperCase();
   if (["GET", "HEAD", "OPTIONS"].includes(method)) return true;
   if (input.role === "View Only") return false;

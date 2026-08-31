@@ -7,7 +7,7 @@ const reportsSource = fs.readFileSync(reportsPath, "utf8");
 
 describe("Supplier Partner report tab navigation", () => {
   it("uses validated URL-backed tab state", () => {
-    expect(reportsSource).toContain('useHubQueryState<ReportTab>');
+    expect(reportsSource).toContain("useHubQueryState<ReportTab>");
     expect(reportsSource).toContain('const REPORT_TABS = ["profit", "sales-form"] as const');
     expect(reportsSource).toContain('defaultValue: "profit"');
     expect(reportsSource).toContain("omitDefault: true");

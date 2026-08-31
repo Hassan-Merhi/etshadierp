@@ -345,10 +345,12 @@ export async function buildEntrySheet(
         pL = colLetter(b + 1),
         prL = colLetter(b + 2);
       const qtyTot = Math.round(gb.items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.qty ?? 0), 0));
-       const salTot = r2(gb.items.reduce((s, i) => {
-         const ds = i.salesByDate.get(dates[d]);
-         return s + (ds?.totalSales ?? 0) - (ds?.totalDeduction ?? 0);
-       }, 0));
+      const salTot = r2(
+        gb.items.reduce((s, i) => {
+          const ds = i.salesByDate.get(dates[d]);
+          return s + (ds?.totalSales ?? 0) - (ds?.totalDeduction ?? 0);
+        }, 0)
+      );
       const cstTot = r2(gb.items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.totalCost ?? 0), 0));
       const profTot = r2(salTot - cstTot);
 
@@ -427,14 +429,16 @@ export async function buildEntrySheet(
     for (let d = 0; d < dayCount; d++) {
       const b = dayBase + d * COLS_PER_DAY;
       const qtyTot = Math.round(items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.qty ?? 0), 0));
-       const salTot = r2(items.reduce((s, i) => {
-         const ds = i.salesByDate.get(dates[d]);
-         return s + (ds?.totalSales ?? 0) - (ds?.totalDeduction ?? 0);
-       }, 0));
+      const salTot = r2(
+        items.reduce((s, i) => {
+          const ds = i.salesByDate.get(dates[d]);
+          return s + (ds?.totalSales ?? 0) - (ds?.totalDeduction ?? 0);
+        }, 0)
+      );
       const profTot = r2(
         items.reduce((s, i) => {
           const ds = i.salesByDate.get(dates[d]);
-           return s + (ds?.totalSales ?? 0) - (ds?.totalDeduction ?? 0) - (ds?.totalCost ?? 0);
+          return s + (ds?.totalSales ?? 0) - (ds?.totalDeduction ?? 0) - (ds?.totalCost ?? 0);
         }, 0)
       );
 

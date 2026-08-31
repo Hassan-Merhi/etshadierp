@@ -80,7 +80,7 @@ describe("Golden Coast Phase 3 cutover route surface hardened by Phase 13", () =
 
   it("treats the existing-position carry-forward as a valid completed opening state", () => {
     expect(routeSource).toContain("existingPositionCarryForwardVoucher");
-    expect(routeSource).toContain('openingMode: existingPositionCarryForwardVoucher');
+    expect(routeSource).toContain("openingMode: existingPositionCarryForwardVoucher");
     expect(routeSource).toContain("!existingPositionCarryForwardVoucher");
   });
 });

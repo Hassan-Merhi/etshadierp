@@ -111,7 +111,10 @@ export function buildGoldenCoastExistingPositionCarryForwardPlan(input: {
 
   const seenInventoryIds = new Set<number>();
   const seenItemLocations = new Set<string>();
-  const locationTotals = new Map<number, { locationName: string; quantity: Decimal; value: Decimal; rowCount: number }>();
+  const locationTotals = new Map<
+    number,
+    { locationName: string; quantity: Decimal; value: Decimal; rowCount: number }
+  >();
   const fifoMovements: ExistingPositionFifoMovement[] = [];
   let stockInHand = new Decimal(0);
 
@@ -128,7 +131,9 @@ export function buildGoldenCoastExistingPositionCarryForwardPlan(input: {
     }
     const itemLocationKey = `${stockItemId}:${locationId}`;
     if (seenItemLocations.has(itemLocationKey)) {
-      throw new GoldenCoastExistingPositionCarryForwardError(`duplicate stock item/location snapshot ${itemLocationKey}`);
+      throw new GoldenCoastExistingPositionCarryForwardError(
+        `duplicate stock item/location snapshot ${itemLocationKey}`
+      );
     }
     seenInventoryIds.add(inventoryId);
     seenItemLocations.add(itemLocationKey);

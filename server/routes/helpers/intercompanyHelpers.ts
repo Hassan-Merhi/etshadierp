@@ -1,13 +1,7 @@
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import {
-  intercompanyPosConfigs,
-  companies,
-  ledgerAccounts,
-  vouchers,
-  voucherEntries,
-} from "@shared/schema";
+import { intercompanyPosConfigs, companies, ledgerAccounts, vouchers, voucherEntries } from "@shared/schema";
 import { eq, and, sql, ilike, isNull } from "drizzle-orm";
 
 // ─── Intercompany POS ─────────────────────────────────────────────────────────

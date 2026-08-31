@@ -211,12 +211,7 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
       }
       const payableAmount = Math.max(
         0,
-        Number(
-          (
-            rebuildResult.grandTotal -
-            rebuildResult.totalQtySoldEdit * editSpDeductionPerQty
-          ).toFixed(2)
-        )
+        Number((rebuildResult.grandTotal - rebuildResult.totalQtySoldEdit * editSpDeductionPerQty).toFixed(2))
       );
       await postGoldenCoastPosAccountingTx({
         tx,

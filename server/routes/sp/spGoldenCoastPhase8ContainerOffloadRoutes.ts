@@ -51,10 +51,7 @@ import {
   type GoldenCoastPhase8RoleAccounts,
 } from "../../services/accounting/goldenCoastPhase8ContainerOffload";
 import { adjustSpInventoryAtomic, respondToSpInventoryIntegrityError } from "../../services/sp/spInventoryIntegrity";
-import {
-  isGoldenCoastCompany,
-  type DbLike,
-} from "./spGoldenCoastPhase4CutoverFifoRoutes";
+import { isGoldenCoastCompany, type DbLike } from "./spGoldenCoastPhase4CutoverFifoRoutes";
 import { requireSpCompany } from "./spHelpers";
 
 const postingDependencies = createDatabasePostingDependencies();

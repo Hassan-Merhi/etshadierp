@@ -116,7 +116,7 @@ export function usePosCheckout({
         title: "Golden Coast POS unavailable",
         description:
           goldenCoastReadinessBlockers?.[0] ||
-            "Resolve the Golden Coast accounting setup issue before sales can be posted.",
+          "Resolve the Golden Coast accounting setup issue before sales can be posted.",
         variant: "destructive",
       });
       return;

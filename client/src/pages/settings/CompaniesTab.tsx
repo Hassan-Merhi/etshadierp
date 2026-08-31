@@ -122,9 +122,7 @@ export function CompaniesTab() {
   const activeParentCompanies = companies.filter(
     (company) => company.active && Number(company.id) !== editingCompanyId
   );
-  const selectedParentCompany = companies.find(
-    (company) => Number(company.id) === Number(selectedParentCompanyId)
-  );
+  const selectedParentCompany = companies.find((company) => Number(company.id) === Number(selectedParentCompanyId));
   const parentCompanyOptions =
     selectedParentCompany &&
     !activeParentCompanies.some((company) => Number(company.id) === Number(selectedParentCompanyId))
@@ -319,13 +317,8 @@ export function CompaniesTab() {
                           <SelectContent>
                             <SelectItem value="none">No parent company</SelectItem>
                             {parentCompanyOptions.map((company) => (
-                              <SelectItem
-                                key={company.id}
-                                value={String(company.id)}
-                                disabled={!company.active}
-                              >
-                                {company.name} ({company.code})
-                                {!company.active ? " — inactive" : ""}
+                              <SelectItem key={company.id} value={String(company.id)} disabled={!company.active}>
+                                {company.name} ({company.code}){!company.active ? " — inactive" : ""}
                               </SelectItem>
                             ))}
                           </SelectContent>

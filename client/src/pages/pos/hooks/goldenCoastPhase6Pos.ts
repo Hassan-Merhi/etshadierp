@@ -14,13 +14,58 @@ export interface GoldenCoastPhase6SaleRequest {
   }>;
 }
 
+export interface GoldenCoastPhase6SaleItem {
+  stockItemId: number | string;
+  quantity: number | string;
+  rate: number | string;
+  stockItemName?: string | null;
+  stockItemCode?: string | null;
+  configuredPrice?: number | string | null;
+}
+
+export interface GoldenCoastPhase6SaleData {
+  locationId: number | string;
+  voucherDate: string;
+  notes?: string | null;
+  items: GoldenCoastPhase6SaleItem[];
+}
+
+interface GoldenCoastPhase6ResponseVoucher {
+  id?: number | null;
+  voucherNumber?: string;
+  description?: string | null;
+  [key: string]: unknown;
+}
+
+interface GoldenCoastPhase6ResponsePosting {
+  role?: string;
+  voucher?: GoldenCoastPhase6ResponseVoucher | null;
+}
+
+interface GoldenCoastPhase6ResponseLine {
+  stockItemId?: number | string;
+  qty?: number | string;
+  unitPriceUsd?: number | string;
+  revenueUsd?: number | string | null;
+}
+
+export interface GoldenCoastPhase6SaleResponse {
+  postings?: GoldenCoastPhase6ResponsePosting[] | null;
+  lines?: GoldenCoastPhase6ResponseLine[] | null;
+  revenueUsd?: number | string | null;
+  cogsUsd?: number | string | null;
+  grossProfitUsd?: number | string | null;
+  specialLocationDeductionUsd?: number | string | null;
+  replayed?: boolean;
+}
+
 /**
  * Converts the shared POS sale model into the strict Phase 6 contract.
  * Payment-account fields are intentionally not included: Phase 6 owns the
  * canonical GC Sales Cash posting and rejects sale-side overrides.
  */
 export function buildGoldenCoastPhase6SaleRequest(
-  saleData: any,
+  saleData: GoldenCoastPhase6SaleData,
   clientRequestId: string
 ): GoldenCoastPhase6SaleRequest {
   return {
@@ -29,7 +74,7 @@ export function buildGoldenCoastPhase6SaleRequest(
     customerName: (saleData.notes || "").trim() || "Walk-in Customer",
     clientRequestId,
     notes: saleData.notes || undefined,
-    lines: saleData.items.map((item: any) => ({
+    lines: saleData.items.map((item) => ({
       stockItemId: Number(item.stockItemId),
       qty: String(item.quantity),
       unitPriceUsd: Number(item.rate).toFixed(2),
@@ -49,21 +94,19 @@ export function goldenCoastPhase6SaleFingerprint(request: GoldenCoastPhase6SaleR
  * by the existing receipt, print, WhatsApp, and cache-invalidation flows.
  */
 export function normalizeGoldenCoastPhase6Sale(
-  raw: any,
-  saleData: any,
+  raw: GoldenCoastPhase6SaleResponse,
+  saleData: GoldenCoastPhase6SaleData,
   activeLocation: Location | null
 ) {
-  const revenuePosting = (raw.postings || []).find((posting: any) => posting.role === "revenue");
+  const revenuePosting = (raw.postings ?? []).find((posting) => posting.role === "revenue");
   const revenueVoucher = revenuePosting?.voucher;
   if (!revenueVoucher?.id) {
     throw new Error("Golden Coast sale was posted without a revenue voucher");
   }
 
-  const phase6Lines = Array.isArray(raw.lines) ? raw.lines : [];
-  const items = saleData.items.map((item: any) => {
-    const line = phase6Lines.find(
-      (candidate: any) => Number(candidate.stockItemId) === Number(item.stockItemId)
-    );
+  const phase6Lines: GoldenCoastPhase6ResponseLine[] = Array.isArray(raw.lines) ? raw.lines : [];
+  const items = saleData.items.map((item) => {
+    const line = phase6Lines.find((candidate) => Number(candidate.stockItemId) === Number(item.stockItemId));
     const quantity = String(line?.qty ?? item.quantity);
     const rate = String(line?.unitPriceUsd ?? Number(item.rate).toFixed(2));
     const amount = line?.revenueUsd ?? (Number(quantity) * Number(rate)).toFixed(2);
@@ -79,7 +122,7 @@ export function normalizeGoldenCoastPhase6Sale(
       amount: String(amount),
     };
   });
-  const localTotal = items.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
+  const localTotal = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
   return {
     voucher: {

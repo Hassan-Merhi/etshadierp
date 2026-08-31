@@ -30,11 +30,7 @@ import ExcelJS from "exceljs";
 import { logger } from "../lib/logger";
 import { SpSalesFormV2Params } from "./sp-sales-form-v2/types";
 import { toUtcDate, addDays, dateStr } from "./sp-sales-form-v2/dateHelpers";
-import {
-  fetchInventory,
-  fetchSalesData,
-  fetchCashAccountBalance,
-} from "./sp-sales-form-v2/dataFetchers";
+import { fetchInventory, fetchSalesData, fetchCashAccountBalance } from "./sp-sales-form-v2/dataFetchers";
 import { buildItemRegistry } from "./sp-sales-form-v2/itemRegistry";
 import { buildCostingSheet } from "./sp-sales-form-v2/buildCostingSheet";
 import { buildSalesSheet } from "./sp-sales-form-v2/buildSalesSheet";

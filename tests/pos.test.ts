@@ -53,12 +53,7 @@ async function deleteSalesVouchersForCompany() {
   const vouchers = await db
     .select({ id: schema.vouchers.id })
     .from(schema.vouchers)
-    .where(
-      and(
-        eq(schema.vouchers.companyId, ctx.companyId),
-        eq(schema.vouchers.voucherType, "Sales"),
-      ),
-    );
+    .where(and(eq(schema.vouchers.companyId, ctx.companyId), eq(schema.vouchers.voucherType, "Sales")));
   for (const v of vouchers) {
     await db.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, v.id));
     await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, v.id));
@@ -116,9 +111,7 @@ describe("POS Sale — Core Flow", () => {
     const beforeCount = await db
       .select()
       .from(schema.vouchers)
-      .where(
-        and(eq(schema.vouchers.companyId, ctx.companyId), eq(schema.vouchers.voucherType, "Sales")),
-      );
+      .where(and(eq(schema.vouchers.companyId, ctx.companyId), eq(schema.vouchers.voucherType, "Sales")));
 
     await agent.post("/api/pos/sales").send({
       locationId: ctx.locationId,
@@ -131,9 +124,7 @@ describe("POS Sale — Core Flow", () => {
     const afterCount = await db
       .select()
       .from(schema.vouchers)
-      .where(
-        and(eq(schema.vouchers.companyId, ctx.companyId), eq(schema.vouchers.voucherType, "Sales")),
-      );
+      .where(and(eq(schema.vouchers.companyId, ctx.companyId), eq(schema.vouchers.voucherType, "Sales")));
 
     expect(afterCount.length).toBe(beforeCount.length + 1);
   });
@@ -156,10 +147,7 @@ describe("POS Sale — Core Flow", () => {
     const voucherId = res.body?.voucher?.id ?? res.body?.voucherId ?? res.body?.id;
     expect(voucherId).toBeDefined();
 
-    const items = await db
-      .select()
-      .from(schema.salesItems)
-      .where(eq(schema.salesItems.voucherId, voucherId));
+    const items = await db.select().from(schema.salesItems).where(eq(schema.salesItems.voucherId, voucherId));
 
     expect(items.length).toBe(2);
   });

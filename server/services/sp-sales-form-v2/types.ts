@@ -2,8 +2,8 @@
 export interface SpSalesFormV2Params {
   companyId: number;
   locationId?: number;
-  fromDate: string;      // YYYY-MM-DD
-  toDate: string;        // YYYY-MM-DD
+  fromDate: string; // YYYY-MM-DD
+  toDate: string; // YYYY-MM-DD
   locationName?: string;
   supplierName?: string;
   cashAccountId?: number; // optional: opening cash from ledger as-of dayBefore(fromDate)
@@ -29,21 +29,21 @@ export interface InvEntry {
 }
 
 export interface ItemRow {
-  stockItemId  : number;
-  itemCode     : string;
-  itemName     : string;
-  groupName    : string;
-  itemUom      : string;
-  openQty      : number;
-  openRate     : number;
-  openValue    : number;
-  salesByDate  : Map<string, DaySale>;
-  closeQty     : number;
-  closeRate    : number;
-  closeValue   : number;
+  stockItemId: number;
+  itemCode: string;
+  itemName: string;
+  groupName: string;
+  itemUom: string;
+  openQty: number;
+  openRate: number;
+  openValue: number;
+  salesByDate: Map<string, DaySale>;
+  closeQty: number;
+  closeRate: number;
+  closeValue: number;
   // computed
-  totalQty     : number;
-  totalSales   : number;
-  totalCost    : number;
+  totalQty: number;
+  totalSales: number;
+  totalCost: number;
   avgMonthlyQty: number;
 }

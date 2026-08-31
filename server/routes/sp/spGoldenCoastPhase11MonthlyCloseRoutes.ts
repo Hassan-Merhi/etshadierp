@@ -33,10 +33,7 @@ import {
   planGoldenCoastPhase11MonthlyClose,
   type GoldenCoastPhase11Accounts,
 } from "../../services/accounting/goldenCoastPhase11MonthlyClose";
-import {
-  isGoldenCoastCompany,
-  type DbLike,
-} from "./spGoldenCoastPhase4CutoverFifoRoutes";
+import { isGoldenCoastCompany, type DbLike } from "./spGoldenCoastPhase4CutoverFifoRoutes";
 import { requireSpCompany } from "./spHelpers";
 
 const postingDependencies = createDatabasePostingDependencies();

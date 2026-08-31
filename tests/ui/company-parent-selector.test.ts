@@ -2,14 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const companiesTab = fs.readFileSync(
-  path.resolve(process.cwd(), "client/src/pages/settings/CompaniesTab.tsx"),
-  "utf8"
-);
-const setupPanel = fs.readFileSync(
-  path.resolve(process.cwd(), "client/src/pages/sp/SpSetupPanel.tsx"),
-  "utf8"
-);
+const companiesTab = fs.readFileSync(path.resolve(process.cwd(), "client/src/pages/settings/CompaniesTab.tsx"), "utf8");
+const setupPanel = fs.readFileSync(path.resolve(process.cwd(), "client/src/pages/sp/SpSetupPanel.tsx"), "utf8");
 
 describe("Supplier Partner parent company selector", () => {
   it("renders the selector for Supplier Partner configuration and excludes the edited company", () => {

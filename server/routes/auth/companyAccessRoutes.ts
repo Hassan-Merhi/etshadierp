@@ -180,9 +180,7 @@ export function registerCompanyAccessRoutes(app: Express) {
     try {
       const companyId = await resolveAuthorizedCompanyId(req, req.params.id);
       const payload = await prepareCompanyPayload(req.body, companyId);
-      res.json(
-        await storage.updateCompany(companyId, payload as Parameters<typeof storage.updateCompany>[1])
-      );
+      res.json(await storage.updateCompany(companyId, payload as Parameters<typeof storage.updateCompany>[1]));
     } catch (error: unknown) {
       if (error instanceof CompanyAccessError) return sendCompanyAccessError(res, error);
       res.status(400).json({ message: getErrorMessage(error) });

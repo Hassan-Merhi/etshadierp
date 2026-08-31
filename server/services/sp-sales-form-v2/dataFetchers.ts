@@ -23,9 +23,7 @@ export async function fetchInventory(
   if (locationId) {
     locationIds = [locationId];
   } else {
-    const res = await db.execute(
-      sql`SELECT id FROM locations WHERE company_id = ${companyId} AND deleted_at IS NULL`
-    );
+    const res = await db.execute(sql`SELECT id FROM locations WHERE company_id = ${companyId} AND deleted_at IS NULL`);
     locationIds = queryRows(res).map((r) => Number(r.id));
   }
 
@@ -197,11 +195,7 @@ export async function fetchAgeingData(
 }
 
 // ── Cash account opening balance ─────────────────────────────────────────────
-export async function fetchCashAccountBalance(
-  accountId: number,
-  companyId: number,
-  asOfDate: string
-): Promise<number> {
+export async function fetchCashAccountBalance(accountId: number, companyId: number, asOfDate: string): Promise<number> {
   const res = await db.execute(sql`
     SELECT COALESCE(SUM(ve.debit_amount - ve.credit_amount), 0) AS balance
     FROM   voucher_entries ve

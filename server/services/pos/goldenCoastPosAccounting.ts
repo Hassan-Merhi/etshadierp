@@ -281,9 +281,13 @@ export async function postGoldenCoastPosAccountingTx(input: {
     "GC Sales Cash",
     getGoldenCoastAccountDefinition("gc_sales_cash").acceptedAccountTypes
   );
-  const gcIntercompany = await activeSingleAccount(tx, companyId, "sp_hadi_intercompany", "Golden Coast HADI intercompany account", [
-    "Intercompany",
-  ]);
+  const gcIntercompany = await activeSingleAccount(
+    tx,
+    companyId,
+    "sp_hadi_intercompany",
+    "Golden Coast HADI intercompany account",
+    ["Intercompany"]
+  );
 
   await assertTransactionCompanyScope(tx, parentCompanyId);
   const hadiCash = await findMatchingHadiCashTarget(tx, parentCompanyId, sourceCash.name);
@@ -391,7 +395,10 @@ export async function postGoldenCoastPosAccountingTx(input: {
   await assertTransactionCompanyScope(tx, companyId);
 }
 
-function sourceLabel(sourceIdValue: string, clientSaleId: string): { digest: string; revision: string; role: SettlementRole } | null {
+function sourceLabel(
+  sourceIdValue: string,
+  clientSaleId: string
+): { digest: string; revision: string; role: SettlementRole } | null {
   const prefix = `${clientSaleId}:`;
   if (!sourceIdValue.startsWith(prefix)) return null;
   const parts = sourceIdValue.slice(prefix.length).split(":");
@@ -423,7 +430,7 @@ export async function reverseGoldenCoastPosAccountingTx(input: {
   const markers: Array<{
     markerCompanyId: number;
     voucher: typeof vouchers.$inferSelect;
-    entries: typeof voucherEntries.$inferSelect[];
+    entries: (typeof voucherEntries.$inferSelect)[];
     source: { digest: string; revision: string; role: SettlementRole };
   }> = [];
 
@@ -442,7 +449,10 @@ export async function reverseGoldenCoastPosAccountingTx(input: {
           ilike(accountingPostingRequests.sourceId, `${clientSaleId}:%`)
         )
       );
-    const latest = new Map<SettlementRole, { voucherId: number; source: { digest: string; revision: string; role: SettlementRole } }>();
+    const latest = new Map<
+      SettlementRole,
+      { voucherId: number; source: { digest: string; revision: string; role: SettlementRole } }
+    >();
     for (const row of rows) {
       const parsed = sourceLabel(String(row.sourceId), clientSaleId);
       if (!parsed) continue;
@@ -451,15 +461,50 @@ export async function reverseGoldenCoastPosAccountingTx(input: {
         latest.set(parsed.role, { voucherId: Number(row.voucherId), source: parsed });
       }
     }
-    for (const item of latest.values()) {
-      const [voucher] = await tx
-        .select()
-        .from(vouchers)
-        .where(and(eq(vouchers.id, item.voucherId), eq(vouchers.companyId, markerCompanyId), isNull(vouchers.deletedAt)))
-        .limit(1);
+    const items = [...latest.values()];
+    if (items.length === 0) continue;
+
+    // One round trip per marker company, not per settlement role: the reversal
+    // reads every latest voucher and its entries in a single batched query.
+    const voucherRows = await tx
+      .select()
+      .from(vouchers)
+      .where(
+        and(
+          inArray(
+            vouchers.id,
+            items.map((item) => item.voucherId)
+          ),
+          eq(vouchers.companyId, markerCompanyId),
+          isNull(vouchers.deletedAt)
+        )
+      );
+    const voucherById = new Map(voucherRows.map((voucher) => [voucher.id, voucher]));
+    const entryRows = await tx
+      .select()
+      .from(voucherEntries)
+      .where(
+        inArray(
+          voucherEntries.voucherId,
+          voucherRows.map((voucher) => voucher.id)
+        )
+      );
+    const entriesByVoucherId = new Map<number, (typeof voucherEntries.$inferSelect)[]>();
+    for (const entry of entryRows) {
+      const bucket = entriesByVoucherId.get(entry.voucherId);
+      if (bucket) bucket.push(entry);
+      else entriesByVoucherId.set(entry.voucherId, [entry]);
+    }
+
+    for (const item of items) {
+      const voucher = voucherById.get(item.voucherId);
       if (!voucher) throw new Error(`Golden Coast POS settlement voucher ${item.voucherId} is missing`);
-      const entries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id));
-      markers.push({ markerCompanyId, voucher, entries, source: item.source });
+      markers.push({
+        markerCompanyId,
+        voucher,
+        entries: entriesByVoucherId.get(voucher.id) ?? [],
+        source: item.source,
+      });
     }
   }
 

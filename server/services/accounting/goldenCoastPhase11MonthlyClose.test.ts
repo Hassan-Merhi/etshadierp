@@ -122,6 +122,14 @@ describe("Golden Coast Phase 11 monthly close", () => {
         totalCogsUsd: "0",
         totalSharedChargesUsd: "0",
       })
+    ).toThrowError(GoldenCoastPhase11CloseError);
+    expect(() =>
+      planGoldenCoastPhase11MonthlyClose({
+        close: close(),
+        totalRevenueUsd: "0",
+        totalCogsUsd: "0",
+        totalSharedChargesUsd: "0",
+      })
     ).toThrowError(/no closeable Golden Coast activity/i);
   });
 

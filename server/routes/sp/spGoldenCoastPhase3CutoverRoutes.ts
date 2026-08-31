@@ -290,7 +290,11 @@ async function readiness(tx: DatabaseTransaction | typeof db, companyId: number)
     existingVoucher,
     existingPositionCarryForwardVoucher,
     posted: !!existingVoucher || !!existingPositionCarryForwardVoucher,
-    openingMode: existingPositionCarryForwardVoucher ? "existing-position-carry-forward" : existingVoucher ? "standard" : null,
+    openingMode: existingPositionCarryForwardVoucher
+      ? "existing-position-carry-forward"
+      : existingVoucher
+        ? "standard"
+        : null,
     blockers,
     canPreview: phase2.isConfigured,
     canPost: phase2.isConfigured && blockers.length === 0 && !existingVoucher && !existingPositionCarryForwardVoucher,

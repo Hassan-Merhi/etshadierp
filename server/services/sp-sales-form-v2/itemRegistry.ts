@@ -13,11 +13,22 @@ export function buildItemRegistry(
   function ensure(id: number, code: string, name: string, group: string, uom: string): ItemRow {
     if (!registry.has(id)) {
       registry.set(id, {
-        stockItemId: id, itemCode: code, itemName: name, groupName: group, itemUom: uom,
-        openQty: 0, openRate: 0, openValue: 0,
+        stockItemId: id,
+        itemCode: code,
+        itemName: name,
+        groupName: group,
+        itemUom: uom,
+        openQty: 0,
+        openRate: 0,
+        openValue: 0,
         salesByDate: new Map(),
-        closeQty: 0, closeRate: 0, closeValue: 0,
-        totalQty: 0, totalSales: 0, totalCost: 0, avgMonthlyQty: 0,
+        closeQty: 0,
+        closeRate: 0,
+        closeValue: 0,
+        totalQty: 0,
+        totalSales: 0,
+        totalCost: 0,
+        avgMonthlyQty: 0,
       });
     }
     const row = registry.get(id)!;
@@ -29,11 +40,15 @@ export function buildItemRegistry(
 
   for (const [id, inv] of openMap) {
     const row = ensure(id, inv.stockItemCode, inv.stockItemName, inv.stockGroupName, inv.stockItemUom);
-    row.openQty = inv.quantity; row.openRate = inv.averageRate; row.openValue = inv.totalValue;
+    row.openQty = inv.quantity;
+    row.openRate = inv.averageRate;
+    row.openValue = inv.totalValue;
   }
   for (const [id, inv] of closeMap) {
     const row = ensure(id, inv.stockItemCode, inv.stockItemName, inv.stockGroupName, inv.stockItemUom);
-    row.closeQty = inv.quantity; row.closeRate = inv.averageRate; row.closeValue = inv.totalValue;
+    row.closeQty = inv.quantity;
+    row.closeRate = inv.averageRate;
+    row.closeValue = inv.totalValue;
     if (!row.openRate && inv.averageRate) row.openRate = inv.averageRate;
   }
   for (const sale of salesRows) {
@@ -49,9 +64,9 @@ export function buildItemRegistry(
   // Compute totals + avgMonthly
   for (const [, row] of registry) {
     for (const ds of row.salesByDate.values()) {
-      row.totalQty   += ds.qty;
+      row.totalQty += ds.qty;
       row.totalSales += ds.totalSales;
-      row.totalCost  += ds.totalCost;
+      row.totalCost += ds.totalCost;
     }
     row.avgMonthlyQty = dayCount > 0 ? (row.totalQty / dayCount) * 30 : 0;
     // If openRate is still 0 but closeRate is set, use closeRate as cost basis
@@ -61,14 +76,15 @@ export function buildItemRegistry(
   // Do not carry completely inactive items into the workbook. Inventory
   // snapshots commonly include every stock master item, even when it had no
   // opening stock, closing stock, or sales in the requested period.
-  const activeItems = Array.from(registry.values()).filter((item) =>
-    item.openQty !== 0 ||
-    item.openValue !== 0 ||
-    item.totalQty !== 0 ||
-    item.totalSales !== 0 ||
-    item.totalCost !== 0 ||
-    item.closeQty !== 0 ||
-    item.closeValue !== 0
+  const activeItems = Array.from(registry.values()).filter(
+    (item) =>
+      item.openQty !== 0 ||
+      item.openValue !== 0 ||
+      item.totalQty !== 0 ||
+      item.totalSales !== 0 ||
+      item.totalCost !== 0 ||
+      item.closeQty !== 0 ||
+      item.closeValue !== 0
   );
 
   // Sort by group, then item name
