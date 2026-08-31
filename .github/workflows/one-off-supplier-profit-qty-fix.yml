@@ -1,0 +1,112 @@
+name: One-off Supplier Profit Check quantity fix
+
+on:
+  push:
+    branches:
+      - fix/supplier-profit-check-full-integrity
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: fix/supplier-profit-check-full-integrity
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24.19.0'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit
+
+      - name: Move quantity initialization to the base model
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          base_path = Path("client/src/pages/supplierprofitcheck/useSupplierProfitCheckModel.tsx")
+          base_source = base_path.read_text()
+          old_base = '''  useEffect(() => {
+            const initialQty: Record<number, string> = {};
+            for (const row of rows)
+              if (row.proformaQty != null && row.proformaQty > 0) initialQty[row.stockItemId] = String(row.proformaQty);
+            setQtyMap(initialQty);
+            setSavedProforma(null);
+            setAutosaveStatus("idle");
+          }, [rows]);'''.replace("          ", "")
+          new_base = '''  useEffect(() => {
+            if (!queryEnabled) {
+              setQtyMap({});
+              setSavedProforma(null);
+              setAutosaveStatus("idle");
+              return;
+            }
+            const initialQty: Record<number, string> = {};
+            for (const row of rows)
+              if (row.proformaQty != null && row.proformaQty > 0) initialQty[row.stockItemId] = String(row.proformaQty);
+            setQtyMap(initialQty);
+            setSavedProforma(null);
+            setAutosaveStatus("idle");
+          }, [rows, queryEnabled]);'''.replace("          ", "")
+          if old_base not in base_source:
+              raise SystemExit("base quantity initialization block not found")
+          base_path.write_text(base_source.replace(old_base, new_base, 1))
+
+          safe_path = Path("client/src/pages/supplierprofitcheck/useSupplierProfitCheckSafeModel.tsx")
+          safe_source = safe_path.read_text()
+          safe_source = safe_source.replace(
+              'import { useCallback, useEffect, useMemo } from "react";',
+              'import { useCallback, useMemo } from "react";',
+              1,
+          )
+          old_safe = '''  useEffect(() => {
+            if (
+              !base.supplierId ||
+              (base.sourceType === "proforma" && !base.proformaId) ||
+              (base.sourceType === "otw_containers" && base.otwContainerIds.length === 0)
+            ) {
+              return;
+            }
+            const initialQty: Record<number, string> = {};
+            for (const row of base.rows) {
+              if (row.proformaQty != null && row.proformaQty > 0) {
+                initialQty[row.stockItemId] = String(row.proformaQty);
+              }
+            }
+            base.setQtyMap(initialQty);
+          }, [base.supplierId, base.sourceType, base.proformaId, base.otwContainerIds, base.rows, base.setQtyMap]);
+
+'''.replace("          ", "")
+          if old_safe not in safe_source:
+              raise SystemExit("safe quantity initialization block not found")
+          safe_path.write_text(safe_source.replace(old_safe, "", 1))
+          PY
+
+      - name: Format changed models
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/pages/supplierprofitcheck/useSupplierProfitCheckModel.tsx \
+            client/src/pages/supplierprofitcheck/useSupplierProfitCheckSafeModel.tsx
+
+      - name: Commit repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            client/src/pages/supplierprofitcheck/useSupplierProfitCheckModel.tsx \
+            client/src/pages/supplierprofitcheck/useSupplierProfitCheckSafeModel.tsx
+          git commit -m 'fix(profit-check): initialize quantities in base model'
+          git push origin HEAD:fix/supplier-profit-check-full-integrity
