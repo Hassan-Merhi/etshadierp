@@ -4,6 +4,7 @@ import { requireAuth, requireRole } from "../../auth";
 import { db, pool } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
+import { privilegedMutationRateLimit } from "../../middleware/privilegedEndpointSecurity";
 import {
   CompanyAccessError,
   getAccessibleCompanyIds,
@@ -155,7 +156,7 @@ export function registerCompanyAccessRoutes(app: Express) {
     }
   });
 
-  app.post("/api/companies", requireAuth, requireRole("Admin"), async (req, res) => {
+  app.post("/api/companies", privilegedMutationRateLimit, requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       const payload = await prepareCompanyPayload(req.body);
       res.status(201).json(await storage.createCompany(payload as Parameters<typeof storage.createCompany>[0]));
@@ -176,7 +177,7 @@ export function registerCompanyAccessRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/companies/:id", requireAuth, requireRole("Admin"), async (req, res) => {
+  app.patch("/api/companies/:id", privilegedMutationRateLimit, requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       const companyId = await resolveAuthorizedCompanyId(req, req.params.id);
       const payload = await prepareCompanyPayload(req.body, companyId);
@@ -187,7 +188,7 @@ export function registerCompanyAccessRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/companies/:id", requireAuth, requireRole("Admin"), async (req, res) => {
+  app.delete("/api/companies/:id", privilegedMutationRateLimit, requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       const companyId = await resolveAuthorizedCompanyId(req, req.params.id);
       await storage.deleteCompany(companyId);
