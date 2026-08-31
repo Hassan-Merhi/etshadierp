@@ -87,4 +87,21 @@ describe("normalizeProformaImportLines", () => {
     expect(result.errors.join(" ")).toContain("Weight per Bale is not a valid number");
     expect(result.errors.join(" ")).toContain("Price per Bale is too large");
   });
+
+  it("rejects values that only overflow the column once rounded to scale", () => {
+    // 9999999999999.999 fits numeric(15,2)'s 13 integer digits until toFixed(2)
+    // carries it to 10000000000000.00, which PostgreSQL would reject with a 500.
+    const result = normalizeProformaImportLines([
+      {
+        barcode: "MJS31006",
+        itemName: "CHILDREN BOOT CREME 20 KGS",
+        qty: 1,
+        weightPerBale: "0",
+        pricePerBale: "9999999999999.999",
+      },
+    ]);
+
+    expect(result.lines).toEqual([]);
+    expect(result.errors.join(" ")).toContain("Price per Bale is too large");
+  });
 });

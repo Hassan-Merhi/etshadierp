@@ -66,13 +66,17 @@ function parseDecimal(
     return { error: `Row ${rowNumber}: ${label} must be zero or greater` };
   }
 
-  const [integerPart] = normalized.replace(/^[+-]/, "").split(".");
+  // Measure the rounded value, not the input: rounding to `scale` can carry into
+  // an extra integer digit (9999999999999.999 -> 10000000000000.00), which would
+  // otherwise pass this check and then be rejected by PostgreSQL as a 500.
+  const formatted = numeric.toFixed(scale);
+  const [integerPart] = formatted.replace(/^[+-]/, "").split(".");
   const significantIntegerDigits = integerPart.replace(/^0+(?=\d)/, "").length;
   if (significantIntegerDigits > maxIntegerDigits) {
     return { error: `Row ${rowNumber}: ${label} is too large` };
   }
 
-  return { value: numeric.toFixed(scale) };
+  return { value: formatted };
 }
 
 export function normalizeProformaImportLines(input: unknown[]): ProformaImportValidationResult {

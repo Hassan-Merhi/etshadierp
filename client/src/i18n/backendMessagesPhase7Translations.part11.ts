@@ -242,4 +242,9 @@ export const backendMessagesPhase7TranslationsPart11: readonly Phase7BackendMess
     ar: "تعذر حفظ الاستيراد. لم يتم استيراد أي صفوف. تحقق من قيم الجدول وحاول مرة أخرى.",
     fr: "L’import n’a pas pu être enregistré. Aucune ligne n’a été importée. Vérifiez les valeurs du tableur et réessayez.",
   },
+  {
+    en: "The rows were imported but the proforma could not be reloaded. Refresh the page instead of importing again.",
+    ar: "تم استيراد الصفوف لكن تعذر إعادة تحميل الفاتورة المبدئية. حدّث الصفحة بدلاً من الاستيراد مرة أخرى.",
+    fr: "Les lignes ont été importées mais le proforma n’a pas pu être rechargé. Actualisez la page au lieu de relancer l’import.",
+  },
 ];

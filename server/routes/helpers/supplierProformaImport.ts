@@ -40,6 +40,9 @@ export async function importSupplierProformaLines(req: Request, res: Response): 
   const companyId = req.session.currentCompanyId;
   const supplierId = parseId(req.params.supplierId);
   const proformaId = parseId(req.params.proformaId);
+  // Tracks whether the line insert reached COMMIT, so a later failure never
+  // tells the user their rows were rolled back and invites a duplicating retry.
+  let linesCommitted = false;
 
   try {
     if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -89,6 +92,7 @@ export async function importSupplierProformaLines(req: Request, res: Response): 
 
     try {
       await insertAtomically(lineValues);
+      linesCommitted = true;
     } catch (bulkError: unknown) {
       // The first transaction is rolled back before this fallback. Retrying
       // one row at a time avoids oversized multi-row parameter payloads while
@@ -101,6 +105,7 @@ export async function importSupplierProformaLines(req: Request, res: Response): 
         errorType: bulkError instanceof Error ? bulkError.name : typeof bulkError,
       });
       await insertAtomicallyOneByOne(lineValues);
+      linesCommitted = true;
     }
 
     await db.update(supplierProformas).set({ updatedAt: new Date() }).where(eq(supplierProformas.id, proformaId));
@@ -116,7 +121,14 @@ export async function importSupplierProformaLines(req: Request, res: Response): 
       supplierId,
       proformaId,
       errorType: error instanceof Error ? error.name : typeof error,
+      linesCommitted,
     });
+    if (linesCommitted) {
+      return res.status(500).json({
+        message:
+          "The rows were imported but the proforma could not be reloaded. Refresh the page instead of importing again.",
+      });
+    }
     return res.status(500).json({
       message: "Import could not be saved. No rows were imported. Check the spreadsheet values and try again.",
     });
