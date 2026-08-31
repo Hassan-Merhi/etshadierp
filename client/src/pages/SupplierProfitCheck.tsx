@@ -1,9 +1,9 @@
 import { useCompany } from "@/contexts/CompanyContext";
 import { SupplierProfitCheckView } from "./supplierprofitcheck/SupplierProfitCheckView";
-import { useSupplierProfitCheckModel } from "./supplierprofitcheck/useSupplierProfitCheckModel";
+import { useSupplierProfitCheckSafeModel } from "./supplierprofitcheck/useSupplierProfitCheckSafeModel";
 
 function SupplierProfitCheckForCompany() {
-  const model = useSupplierProfitCheckModel();
+  const model = useSupplierProfitCheckSafeModel();
   return <SupplierProfitCheckView model={model} />;
 }
 
