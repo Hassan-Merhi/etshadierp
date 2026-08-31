@@ -5,6 +5,40 @@ import { invalidateLocationInventoryQueries } from "@/api/inventoryApi";
 import { removePosDraftSummary, upsertPosDraftSummary } from "@/api/posApi";
 import type { SaleRow, Location } from "../pos-components/posTypes";
 
+const GOLDEN_COAST_PHASE6_READINESS = "/api/sp/golden-coast/phase6/pos-sale/readiness";
+const GOLDEN_COAST_PHASE6_SALE = "/api/sp/golden-coast/phase6/pos-sale";
+const GOLDEN_COAST_PHASE7_READINESS = "/api/sp/golden-coast/phase7/sales-cash-transfer/readiness";
+
+interface GoldenCoastPhase6ReadinessResponse {
+  automaticHadiPair?: { hadiCompanyId?: number | string | null } | null;
+  code?: string;
+  message?: string;
+}
+
+interface PosSaleItemPayload {
+  stockItemId: number;
+  quantity: string | number;
+  rate: string | number;
+}
+
+interface GoldenCoastPhase6Posting {
+  role?: string;
+  voucher?: { voucherNumber?: string };
+}
+
+interface GoldenCoastPhase6SaleResponse {
+  postings?: GoldenCoastPhase6Posting[];
+  revenueUsd?: string | number | null;
+  automaticHadiCollection?: unknown;
+}
+
+interface Phase6PosSaleData {
+  voucherDate: string;
+  notes?: string;
+  clientSaleId?: string;
+  items: PosSaleItemPayload[];
+}
+
 interface UsePosMutationsParams {
   activeLocation: Location | null;
   editVoucherId?: string;
@@ -29,6 +63,52 @@ interface UsePosMutationsParams {
   setStockWaStatus: (s: "idle" | "sending" | "sent" | "failed" | "not_configured") => void;
   toast: (opts: { title: string; description?: string; variant?: "destructive" | "default" }) => void;
   refetchDrafts?: () => void;
+}
+
+async function readOptionalJson<T>(response: Response): Promise<T | null> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+function phase6PosResult(
+  raw: GoldenCoastPhase6SaleResponse,
+  saleData: Phase6PosSaleData,
+  activeLocation: Location | null,
+  rows: SaleRow[]
+) {
+  const revenuePosting = raw.postings?.find((posting) => posting.role === "revenue") ?? null;
+  const voucher = revenuePosting?.voucher ?? null;
+  const grandTotal = Number(raw.revenueUsd ?? 0);
+
+  return {
+    voucher,
+    location: activeLocation,
+    items: saleData.items.map((item) => {
+      const sourceRow = rows.find((row) => Number(row.stockItemId) === Number(item.stockItemId));
+      const quantity = String(item.quantity);
+      const rate = Number(item.rate).toFixed(2);
+      return {
+        stockItemId: item.stockItemId,
+        stockItemName: sourceRow?.itemName || "",
+        stockItemCode: sourceRow?.stockItemCode || "",
+        quantity,
+        rate,
+        rateUSD: rate,
+        sellingPrice: rate,
+        configuredPrice: sourceRow?.configuredPrice,
+        amount: (Number(quantity) * Number(rate)).toFixed(2),
+      };
+    }),
+    grandTotal: Number.isFinite(grandTotal) ? grandTotal.toFixed(2) : "0.00",
+    voucherNumber: voucher?.voucherNumber ?? "",
+    saleDate: saleData.voucherDate,
+    isCreditSale: false,
+    customer: { id: null, code: null, name: (saleData.notes || "").trim() || "Walk-in Customer" },
+    automaticHadiCollection: raw.automaticHadiCollection ?? null,
+  };
 }
 
 export function usePosMutations({
@@ -78,6 +158,52 @@ export function usePosMutations({
       }
 
       if (isSpCompany) {
+        // Supplier Partner is a shared company type, so determine whether this
+        // company is Golden Coast from the server-owned accounting setup. A
+        // Golden Coast response also gives us the configured HADI parent id;
+        // sending it as targetCompanyId lets the global tenant boundary verify
+        // membership before the atomic cross-company sale starts.
+        const readinessResponse = await fetch(GOLDEN_COAST_PHASE6_READINESS, { credentials: "include" });
+        const readiness = await readOptionalJson<GoldenCoastPhase6ReadinessResponse>(readinessResponse);
+
+        if (readinessResponse.ok) {
+          const hadiCompanyId = Number(readiness?.automaticHadiPair?.hadiCompanyId ?? 0);
+          if (!Number.isInteger(hadiCompanyId) || hadiCompanyId <= 0) {
+            throw new Error("Golden Coast POS is not ready for automatic HADI cash routing.");
+          }
+          if (!saleData.clientSaleId) {
+            throw new Error("Golden Coast POS requires a stable client sale id.");
+          }
+
+          const phase6Body = {
+            locationId: saleData.locationId,
+            saleDate: saleData.voucherDate,
+            customerName: (saleData.notes || "").trim() || "Walk-in Customer",
+            clientRequestId: String(saleData.clientSaleId),
+            notes: saleData.notes || undefined,
+            lines: (saleData.items as PosSaleItemPayload[]).map((item) => ({
+              stockItemId: item.stockItemId,
+              qty: String(item.quantity),
+              unitPriceUsd: Number(item.rate).toFixed(2),
+            })),
+          };
+          const res = await apiRequest(
+            "POST",
+            `${GOLDEN_COAST_PHASE6_SALE}?targetCompanyId=${encodeURIComponent(String(hadiCompanyId))}`,
+            phase6Body
+          );
+          const raw = (await res.json()) as GoldenCoastPhase6SaleResponse;
+          return phase6PosResult(raw, saleData, activeLocation, rows);
+        }
+
+        // A 409 with this exact code means the Supplier Partner is not Golden
+        // Coast and should continue using the generic SP sales workflow. Every
+        // other readiness error is fail-closed so Golden Coast can never drift
+        // back to legacy accounting because setup/HADI is unhealthy.
+        if (readinessResponse.status !== 409 || readiness?.code !== "GC_PHASE6_NOT_CONFIGURED") {
+          throw new Error(readiness?.message || "Unable to verify Golden Coast POS accounting readiness.");
+        }
+
         const spBody = {
           saleDate: saleData.voucherDate,
           customerName: (saleData.notes || "").trim() || "Walk-in Customer",
@@ -125,8 +251,10 @@ export function usePosMutations({
       if (!editVoucherId) setSaleJustCompleted(true);
 
       const locationId = activeLocation?.id || data.location?.id || editVoucher?.locationId;
-      if (isSpCompany) queryClient.invalidateQueries({ queryKey: ["/api/sp/stock"] });
-      else invalidateLocationInventoryQueries(locationId);
+      if (isSpCompany) {
+        queryClient.invalidateQueries({ queryKey: ["/api/sp/stock"] });
+        queryClient.invalidateQueries({ queryKey: [GOLDEN_COAST_PHASE7_READINESS] });
+      } else invalidateLocationInventoryQueries(locationId);
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       if (editVoucherId) queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${editVoucherId}`] });
       invalidateCustomerBalances(data?.voucher?.customerId ?? undefined);

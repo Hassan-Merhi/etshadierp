@@ -94,6 +94,6 @@ jobs:
           inputs: .github
           version: "v1.29.0"
           persona: regular
-          min-severity: medium
+          min-severity: low
           min-confidence: medium
           online-audits: true

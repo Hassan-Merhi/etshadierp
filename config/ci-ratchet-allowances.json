@@ -36,7 +36,8 @@
     "GET /api/insurance/import/template [<anonymous> > requireAuth > <anonymous>]",
     "POST /api/insurance/import/preview [<anonymous> > requireAuth > multerMiddleware > <anonymous>]",
     "POST /api/insurance/import/apply [<anonymous> > requireAuth > <anonymous>]",
-    "POST /api/insurance/admin/clear-all [<anonymous> > requireAuth > <anonymous> > <anonymous>]"
+    "POST /api/insurance/admin/clear-all [<anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "PUT /api/supplier-profit-check/po-overrides/bulk [requireAuth > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/v5/stock-allocation [<anonymous>]",
@@ -56,7 +57,8 @@
     "USE /api/factory/customer-orders/:id/verification-summary [<anonymous>]",
     "USE /api/factory/customer-orders/:id/verification-summary [requireAuth]",
     "USE /api/factory/customer-orders/:id/verification-summary [authoritativeVerificationStockMiddleware]",
-    "USE / [browserMutationFailClosedBoundary]"
+    "USE / [browserMutationFailClosedBoundary]",
+    "USE /api/sp/sales [<anonymous>]"
   ],
   "routeManifestReplacements": [
     {
@@ -129,8 +131,9 @@
       "tests/stock-item-name-update-by-code.test.ts",
       "server/lib/reportPrecision.test.ts",
       "tests/remote-support-phase4-hardening.test.ts",
-      "tests/formatting-gate-parity.test.ts"
+      "tests/formatting-gate-parity.test.ts",
+      "tests/supplier-profit-check-integrity.test.ts"
     ],
-    "maxAdditionalTextAssertions": 626
+    "maxAdditionalTextAssertions": 646
   }
 }

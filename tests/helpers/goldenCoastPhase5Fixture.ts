@@ -40,6 +40,16 @@ export const GOLDEN_COAST_PHASE5_SALE_URL = "/api/sp/golden-coast/phase6/pos-sal
 /** On or after the September 1, 2026 cutover, which Phase 5 requires. */
 export const GOLDEN_COAST_PHASE5_SALE_DATE = "2026-09-05";
 
+/**
+ * The sale URL a POS client must actually call. Posting a Golden Coast sale now
+ * also posts HADI's side of the automatic collection, so the request has to name
+ * the parent as a secondary company and let the tenant boundary verify access
+ * before anything is written — the route refuses with 403 otherwise.
+ */
+export function goldenCoastPhase5SaleUrl(fixture: GoldenCoastPhase5Fixture): string {
+  return `${GOLDEN_COAST_PHASE5_SALE_URL}?targetCompanyId=${fixture.hadiCompanyId}`;
+}
+
 export interface GoldenCoastPhase5Fixture {
   prefix: string;
   ctx: TestContext;
@@ -55,6 +65,10 @@ export interface GoldenCoastPhase5Fixture {
   plainStockItemId: number;
   plainPayableAccountId: number;
   plainCashAccountId: number;
+  hadiCompanyId: number;
+  hadiCashAccountId: number;
+  goldenCoastHadiIntercompanyAccountId: number;
+  hadiGoldenCoastIntercompanyAccountId: number;
 }
 
 async function insertLedgerAccount(input: {
@@ -199,6 +213,52 @@ export async function setupGoldenCoastPhase5Fixture(prefix: string): Promise<Gol
     subType: "Cash",
   });
 
+  // Phase 6 routes every Golden Coast sale's cash to HADI inside the same
+  // transaction, so a Golden Coast company without a parent can no longer post
+  // a sale at all. Seed the parent and the reciprocal intercompany pair the
+  // collection needs, plus exactly one active HADI Cash ledger — the automatic
+  // destination is deliberately ambiguous, and therefore fatal, with two.
+  const hadiCompanyCode = stableFixtureCode(prefix, "HDI");
+  const [hadiCompany] = await db
+    .insert(schema.companies)
+    .values({
+      code: hadiCompanyCode,
+      name: `${prefix}_Hadi`,
+      companyType: "trading",
+      baseCurrency: "USD",
+    })
+    .returning();
+
+  await db.insert(schema.userCompanyRoles).values({
+    userId: ctx.userId,
+    companyId: hadiCompany.id,
+    role: "Admin",
+  });
+
+  await pool.query(`UPDATE companies SET parent_company_id = $1 WHERE id = $2`, [hadiCompany.id, ctx.companyId]);
+
+  const goldenCoastHadiIntercompanyAccountId = await insertLedgerAccount({
+    companyId: ctx.companyId,
+    code: "GC-IC-HADI",
+    name: "HADI Intercompany",
+    accountType: "Intercompany",
+    subType: "sp_hadi_intercompany",
+  });
+  const hadiGoldenCoastIntercompanyAccountId = await insertLedgerAccount({
+    companyId: hadiCompany.id,
+    code: "HADI-IC-GC",
+    name: "Golden Coast Intercompany",
+    accountType: "Intercompany",
+    subType: "hadi_sp_intercompany",
+  });
+  const hadiCashAccountId = await insertLedgerAccount({
+    companyId: hadiCompany.id,
+    code: "HADI-CASH",
+    name: "HADI Cash",
+    accountType: "Cash",
+    subType: "Cash",
+  });
+
   // Keep ERP inventory comfortably positive so a suite never creates shortage
   // layers, which the shared teardown does not know how to clear.
   await pool.query(`UPDATE inventory SET quantity = '1000.000', total_value = '10000.00' WHERE company_id = $1`, [
@@ -228,6 +288,10 @@ export async function setupGoldenCoastPhase5Fixture(prefix: string): Promise<Gol
     plainStockItemId: plainStockItem.id,
     plainPayableAccountId,
     plainCashAccountId,
+    hadiCompanyId: hadiCompany.id,
+    hadiCashAccountId,
+    goldenCoastHadiIntercompanyAccountId,
+    hadiGoldenCoastIntercompanyAccountId,
   };
 
   await selectCompany(fixture, ctx.companyId);
@@ -242,7 +306,12 @@ export async function selectCompany(fixture: GoldenCoastPhase5Fixture, companyId
 }
 
 export async function teardownGoldenCoastPhase5Fixture(fixture: GoldenCoastPhase5Fixture): Promise<void> {
-  const companyIds = [fixture.ctx.companyId, fixture.plainCompanyId];
+  const companyIds = [fixture.ctx.companyId, fixture.plainCompanyId, fixture.hadiCompanyId];
+  // Drop the parent link before the shared cleanup, which deletes companies by
+  // prefix and would otherwise trip the self-referential foreign key.
+  await pool.query(`UPDATE companies SET parent_company_id = NULL WHERE parent_company_id = $1`, [
+    fixture.hadiCompanyId,
+  ]);
   // The shared teardown does not know about shortage layers, and an oversold
   // item would otherwise hold stock_items down on the next run.
   await pool.query(

@@ -1,62 +1,104 @@
 /**
- * supplierProfitCheckRoutes: SupplierProfitAddStockItem endpoints.
+ * Add a stock item from Supplier Profit Check.
  *
- * Registered by ./index.ts in the original order; Express resolves
- * first-match, so that order is behaviour.
+ * The supplier and optional stock group must belong to the active company, and
+ * item creation plus initial overrides commit or roll back together.
  */
 import type { Express, Request, Response, RequestHandler } from "express";
+import { pool } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { pool } from "../../db";
 
 export function registerSupplierProfitAddStockItemRoutes(app: Express, requireAuth: RequestHandler) {
   app.post("/api/supplier-profit-check/add-stock-item", requireAuth, async (req: Request, res: Response) => {
+    const companyId = req.session.currentCompanyId;
+    if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+    const { code, name, stockGroupId: rawStockGroupId, supplierId: rawSupplierId, dubaiPrice, avgSellPrice } = req.body;
+    const normalizedCode = String(code ?? "")
+      .trim()
+      .toUpperCase();
+    const normalizedName = String(name ?? "").trim();
+    const supplierId = Number(rawSupplierId);
+    const stockGroupId = rawStockGroupId ? Number(rawStockGroupId) : null;
+    if (!normalizedCode || !normalizedName) return res.status(400).json({ message: "Code and name are required" });
+    if (!Number.isInteger(supplierId) || supplierId <= 0)
+      return res.status(400).json({ message: "supplierId required" });
+    if (stockGroupId !== null && (!Number.isInteger(stockGroupId) || stockGroupId <= 0)) {
+      return res.status(400).json({ message: "Invalid stockGroupId" });
+    }
+
+    const client = await pool.connect();
     try {
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      await client.query("BEGIN");
 
-      const { code, name, stockGroupId, supplierId, dubaiPrice, avgSellPrice } = req.body;
-      if (!code?.trim() || !name?.trim()) return res.status(400).json({ message: "Code and name are required" });
-
-      // Duplicate check
-      const existing = await pool.query(
-        `SELECT id FROM stock_items WHERE company_id = $1 AND lower(code) = lower($2) AND deleted_at IS NULL`,
-        [companyId, code.trim()]
+      const supplier = await client.query(
+        `SELECT id FROM suppliers WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
+        [supplierId, companyId]
       );
-      if (existing.rows.length > 0)
-        return res.status(409).json({ message: `Item with code "${code.trim()}" already exists` });
+      if (supplier.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Supplier not found" });
+      }
 
-      // Insert the stock item (default uom = Bale, as used throughout this ERP)
-      const result = await pool.query(
+      if (stockGroupId !== null) {
+        const group = await client.query(`SELECT id FROM stock_groups WHERE id = $1 AND company_id = $2`, [
+          stockGroupId,
+          companyId,
+        ]);
+        if (group.rows.length === 0) {
+          await client.query("ROLLBACK");
+          return res.status(404).json({ message: "Stock group not found" });
+        }
+      }
+
+      const existing = await client.query(
+        `SELECT id FROM stock_items WHERE company_id = $1 AND lower(code) = lower($2) AND deleted_at IS NULL`,
+        [companyId, normalizedCode]
+      );
+      if (existing.rows.length > 0) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({ message: `Item with code "${normalizedCode}" already exists` });
+      }
+
+      const result = await client.query(
         `
         INSERT INTO stock_items (company_id, code, name, stock_group_id, uom, active, created_at)
         VALUES ($1, $2, $3, $4, 'Bale', true, now())
         RETURNING id, code, name, stock_group_id
       `,
-        [companyId, code.trim().toUpperCase(), name.trim(), stockGroupId || null]
+        [companyId, normalizedCode, normalizedName, stockGroupId]
       );
-
       const item = result.rows[0];
 
-      // Persist Dubai / avg sell price overrides if provided
-      const hasDubai = dubaiPrice && Number(dubaiPrice) > 0;
-      const hasAvg = avgSellPrice && Number(avgSellPrice) > 0;
-      if ((hasDubai || hasAvg) && supplierId) {
-        await pool.query(
-          `INSERT INTO supplier_profit_po_overrides (supplier_id, stock_item_id, po_price, avg_price, updated_at)
-           VALUES ($1, $2, $3, $4, now())
-           ON CONFLICT (supplier_id, stock_item_id) DO UPDATE SET
-             po_price  = COALESCE(EXCLUDED.po_price,  supplier_profit_po_overrides.po_price),
-             avg_price = COALESCE(EXCLUDED.avg_price, supplier_profit_po_overrides.avg_price),
-             updated_at = now()`,
-          [supplierId, item.id, hasDubai ? Number(dubaiPrice) : null, hasAvg ? Number(avgSellPrice) : null]
+      const parsedDubai = Number(dubaiPrice);
+      const parsedAvg = Number(avgSellPrice);
+      const hasDubai = Number.isFinite(parsedDubai) && parsedDubai > 0;
+      const hasAvg = Number.isFinite(parsedAvg) && parsedAvg > 0;
+      if (hasDubai || hasAvg) {
+        await client.query(
+          `
+          INSERT INTO supplier_profit_po_overrides
+            (supplier_id, stock_item_id, po_price, avg_price, updated_at)
+          VALUES ($1, $2, $3, $4, now())
+          ON CONFLICT (supplier_id, stock_item_id)
+          DO UPDATE SET
+            po_price = EXCLUDED.po_price,
+            avg_price = EXCLUDED.avg_price,
+            updated_at = now()
+        `,
+          [supplierId, item.id, hasDubai ? parsedDubai : null, hasAvg ? parsedAvg : null]
         );
       }
 
+      await client.query("COMMIT");
       res.json({ id: item.id, code: item.code, name: item.name, stockGroupId: item.stock_group_id });
     } catch (err: unknown) {
+      await client.query("ROLLBACK").catch(() => undefined);
       logger.error("[supplier-profit-check/add-stock-item]", { error: getErrorMessage(err) });
       res.status(500).json({ message: getErrorMessage(err) });
+    } finally {
+      client.release();
     }
   });
 }

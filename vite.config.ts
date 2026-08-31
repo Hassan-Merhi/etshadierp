@@ -75,6 +75,12 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // Vite 8 changed the default CSS minifier from esbuild to Lightning CSS.
+    // Tailwind 3 can emit inert pseudo-element selector combinations from our
+    // custom utility layer that browsers/esbuild tolerate but Lightning CSS
+    // rejects during minification. Keep the Vite 6 CSS-minification behavior
+    // while the application remains on Tailwind 3.
+    cssMinify: "esbuild",
     // Spreadsheet/export libraries are intentionally isolated into lazy vendor
     // chunks. Fortune Sheet is large by design; warning on that known lazy
     // boundary obscures actionable build diagnostics.

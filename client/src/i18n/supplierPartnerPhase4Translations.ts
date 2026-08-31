@@ -1,5 +1,6 @@
 import type { ApplicationLanguage } from "@shared/applicationLanguageContract";
 import type { Phase4SupplierPartnerEntry } from "./supplierPartnerPhase4TranslationTypes";
+import { currentMainSupplierPartnerTranslations } from "./currentMainSupplierPartnerTranslations";
 import { supplierPartnerPhase4TranslationsPart1 } from "./supplierPartnerPhase4Translations.part1";
 import { supplierPartnerPhase4TranslationsPart2 } from "./supplierPartnerPhase4Translations.part2";
 import { supplierPartnerPhase4TranslationsPart3 } from "./supplierPartnerPhase4Translations.part3";
@@ -10,6 +11,7 @@ export const supplierPartnerPhase4Translations: readonly Phase4SupplierPartnerEn
   ...supplierPartnerPhase4TranslationsPart2,
   ...supplierPartnerPhase4TranslationsPart3,
   ...supplierPartnerPhase4TranslationsPart4,
+  ...currentMainSupplierPartnerTranslations,
 ];
 
 const languages = ["en", "ar", "fr"] as const;
