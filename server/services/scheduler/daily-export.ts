@@ -1,5 +1,5 @@
 import { getErrorMessage, getErrorStack } from "../../lib/httpHandlers";
-import archiver from "archiver";
+import { ZipArchive } from "archiver";
 import { PassThrough } from "stream";
 import { logger } from "../../lib/logger";
 import { fetchAllCompanies } from "../export-data";
@@ -27,7 +27,7 @@ export function getTodayLabel(): string {
 export async function buildNetPositionZip(companies: any[], startDate: string, endDate: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    const arc = archiver("zip", { zlib: { level: 6 } });
+    const arc = new ZipArchive({ zlib: { level: 6 } });
     arc.on("data", (chunk: Buffer) => chunks.push(chunk));
     arc.on("end", () => resolve(Buffer.concat(chunks)));
     arc.on("error", reject);
