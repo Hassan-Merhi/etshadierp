@@ -6,6 +6,7 @@
  * an explicit reset value; omitted fields retain their previous value.
  */
 import type { Express, Request, Response, RequestHandler } from "express";
+import type { PoolClient } from "pg";
 import { pool } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 
@@ -30,6 +31,90 @@ async function stockItemBelongsToCompany(stockItemId: number, companyId: number)
     [stockItemId, companyId]
   );
   return result.rows.length > 0;
+}
+
+interface BulkOverrideRow {
+  stockItemId: number;
+  hasPoPrice: boolean;
+  hasAvgPrice: boolean;
+  poPrice: number | null;
+  avgPrice: number | null;
+}
+
+async function upsertBulkRows(client: PoolClient, supplierId: number, rows: BulkOverrideRow[]) {
+  const both = rows.filter((row) => row.hasPoPrice && row.hasAvgPrice);
+  const poOnly = rows.filter((row) => row.hasPoPrice && !row.hasAvgPrice);
+  const avgOnly = rows.filter((row) => !row.hasPoPrice && row.hasAvgPrice);
+
+  if (both.length > 0) {
+    const values: unknown[] = [];
+    const placeholders: string[] = [];
+    let parameter = 1;
+    for (const row of both) {
+      values.push(supplierId, row.stockItemId, row.poPrice, row.avgPrice);
+      placeholders.push(`($${parameter},$${parameter + 1},$${parameter + 2},$${parameter + 3},now())`);
+      parameter += 4;
+    }
+    await client.query(
+      `
+      INSERT INTO supplier_profit_po_overrides
+        (supplier_id, stock_item_id, po_price, avg_price, updated_at)
+      VALUES ${placeholders.join(",")}
+      ON CONFLICT (supplier_id, stock_item_id)
+      DO UPDATE SET
+        po_price = EXCLUDED.po_price,
+        avg_price = EXCLUDED.avg_price,
+        updated_at = now()
+    `,
+      values
+    );
+  }
+
+  if (poOnly.length > 0) {
+    const values: unknown[] = [];
+    const placeholders: string[] = [];
+    let parameter = 1;
+    for (const row of poOnly) {
+      values.push(supplierId, row.stockItemId, row.poPrice);
+      placeholders.push(`($${parameter},$${parameter + 1},$${parameter + 2},NULL,now())`);
+      parameter += 3;
+    }
+    await client.query(
+      `
+      INSERT INTO supplier_profit_po_overrides
+        (supplier_id, stock_item_id, po_price, avg_price, updated_at)
+      VALUES ${placeholders.join(",")}
+      ON CONFLICT (supplier_id, stock_item_id)
+      DO UPDATE SET
+        po_price = EXCLUDED.po_price,
+        updated_at = now()
+    `,
+      values
+    );
+  }
+
+  if (avgOnly.length > 0) {
+    const values: unknown[] = [];
+    const placeholders: string[] = [];
+    let parameter = 1;
+    for (const row of avgOnly) {
+      values.push(supplierId, row.stockItemId, row.avgPrice);
+      placeholders.push(`($${parameter},$${parameter + 1},NULL,$${parameter + 2},now())`);
+      parameter += 3;
+    }
+    await client.query(
+      `
+      INSERT INTO supplier_profit_po_overrides
+        (supplier_id, stock_item_id, po_price, avg_price, updated_at)
+      VALUES ${placeholders.join(",")}
+      ON CONFLICT (supplier_id, stock_item_id)
+      DO UPDATE SET
+        avg_price = EXCLUDED.avg_price,
+        updated_at = now()
+    `,
+      values
+    );
+  }
 }
 
 export function registerSupplierProfitPoOverrideRoutes(app: Express, requireAuth: RequestHandler) {
@@ -82,16 +167,23 @@ export function registerSupplierProfitPoOverrideRoutes(app: Express, requireAuth
       }
       if (overrides.length === 0) return res.json({ ok: true });
 
-      const normalized = new Map<number, { stockItemId: number; poPrice: number | null; avgPrice: number | null }>();
+      const normalized = new Map<number, BulkOverrideRow>();
       for (const row of overrides) {
         const stockItemId = Number(row?.stockItemId);
         if (!Number.isInteger(stockItemId) || stockItemId <= 0) {
           return res.status(400).json({ message: "Invalid stockItemId in overrides" });
         }
+        const hasPoPrice = Object.prototype.hasOwnProperty.call(row, "poPrice");
+        const hasAvgPrice = Object.prototype.hasOwnProperty.call(row, "avgPrice");
+        if (!hasPoPrice && !hasAvgPrice) {
+          return res.status(400).json({ message: "Each override requires poPrice and/or avgPrice" });
+        }
         normalized.set(stockItemId, {
           stockItemId,
-          poPrice: normalizeNullablePrice(row?.poPrice),
-          avgPrice: normalizeNullablePrice(row?.avgPrice),
+          hasPoPrice,
+          hasAvgPrice,
+          poPrice: hasPoPrice ? normalizeNullablePrice(row.poPrice) : null,
+          avgPrice: hasAvgPrice ? normalizeNullablePrice(row.avgPrice) : null,
         });
       }
 
@@ -110,38 +202,27 @@ export function registerSupplierProfitPoOverrideRoutes(app: Express, requireAuth
         return res.status(400).json({ message: "One or more stock items are invalid for the active company" });
       }
 
-      const values: unknown[] = [];
-      const placeholders: string[] = [];
-      let parameter = 1;
-      for (const row of normalized.values()) {
-        values.push(supplierId, row.stockItemId, row.poPrice, row.avgPrice);
-        placeholders.push(`($${parameter},$${parameter + 1},$${parameter + 2},$${parameter + 3},now())`);
-        parameter += 4;
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await upsertBulkRows(client, supplierId, [...normalized.values()]);
+        await client.query(
+          `
+          DELETE FROM supplier_profit_po_overrides
+          WHERE supplier_id = $1
+            AND stock_item_id = ANY($2::int[])
+            AND po_price IS NULL
+            AND avg_price IS NULL
+        `,
+          [supplierId, stockItemIds]
+        );
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
       }
-
-      await pool.query(
-        `
-        INSERT INTO supplier_profit_po_overrides
-          (supplier_id, stock_item_id, po_price, avg_price, updated_at)
-        VALUES ${placeholders.join(",")}
-        ON CONFLICT (supplier_id, stock_item_id)
-        DO UPDATE SET
-          po_price = EXCLUDED.po_price,
-          avg_price = EXCLUDED.avg_price,
-          updated_at = now()
-      `,
-        values
-      );
-      await pool.query(
-        `
-        DELETE FROM supplier_profit_po_overrides
-        WHERE supplier_id = $1
-          AND stock_item_id = ANY($2::int[])
-          AND po_price IS NULL
-          AND avg_price IS NULL
-      `,
-        [supplierId, stockItemIds]
-      );
       res.json({ ok: true });
     } catch (err: unknown) {
       const message = getErrorMessage(err);
