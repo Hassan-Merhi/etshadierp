@@ -75,13 +75,13 @@ export function registerSupplierProfitExportRoutes(app: Express, requireAuth: Re
           WITH resolved AS (
             SELECT
               si.id AS stock_item_id,
-              si.code AS barcode,
-              si.name AS item_name,
+              COALESCE(si.code, spl.barcode) AS barcode,
+              COALESCE(si.name, spl.item_name) AS item_name,
               spl.qty::numeric AS qty,
               spl.price_per_bale::numeric AS price_per_bale
             FROM supplier_proforma_lines spl
             JOIN supplier_proformas sp ON sp.id = spl.proforma_id
-            JOIN LATERAL (
+            LEFT JOIN LATERAL (
               SELECT candidate.id, candidate.code, candidate.name
               FROM stock_items candidate
               WHERE candidate.company_id = $2
@@ -262,6 +262,12 @@ export function registerSupplierProfitExportRoutes(app: Express, requireAuth: Re
       header.eachCell(applyHeader);
       header.height = 28;
 
+      let orderedItemCount = 0;
+      let totalQtyOrdered = 0;
+      let totalLandingCostSum = 0;
+      let totalEstimatedSales = 0;
+      let totalEstimatedProfit = 0;
+
       for (const raw of rows) {
         const qty = Math.max(0, numberOrNull(raw.qty) ?? 0);
         const effectiveSell = numberOrNull(raw.effectiveSellPrice ?? raw.avgSellingPrice);
@@ -292,6 +298,12 @@ export function registerSupplierProfitExportRoutes(app: Express, requireAuth: Re
         const totalLandingCost = landingCost != null ? qty * landingCost : 0;
         const estimatedSales = effectiveSell != null ? qty * effectiveSell : 0;
         const estimatedProfit = costProfit != null ? qty * costProfit : 0;
+
+        if (qty > 0) orderedItemCount += 1;
+        totalQtyOrdered += qty;
+        totalLandingCostSum += totalLandingCost;
+        totalEstimatedSales += estimatedSales;
+        totalEstimatedProfit += estimatedProfit;
 
         const row = sheet.addRow([
           raw.code,
@@ -338,6 +350,36 @@ export function registerSupplierProfitExportRoutes(app: Express, requireAuth: Re
         }
         row.getCell(9).numFmt = '0.00"%"';
         row.getCell(11).numFmt = "#,##0";
+      }
+
+      // Reconciliation totals for the ordered quantities, using the same
+      // effective landing-cost and sell-price values as the detail rows so the
+      // workbook agrees with the totals shown on the analysis page.
+      sheet.addRow([]);
+      const summary = sheet.addRow([
+        "TOTALS",
+        `${orderedItemCount} items`,
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        totalQtyOrdered,
+        totalLandingCostSum,
+        totalEstimatedSales,
+        totalEstimatedProfit,
+      ]);
+      summary.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: WHITE } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
+        cell.border = { top: { style: "double", color: { argb: GOLD } } };
+      });
+      summary.getCell(11).numFmt = "#,##0";
+      for (const column of [12, 13, 14]) {
+        summary.getCell(column).numFmt = "#,##0.00";
       }
 
       await sendWorkbook(res, workbook, `profit-analysis-${proformaRef || "export"}.xlsx`);

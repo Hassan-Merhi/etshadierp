@@ -10,8 +10,10 @@ vi.mock("../server/db", () => ({
   pool: { query: harness.query },
 }));
 
+import ExcelJS from "exceljs";
 import { registerSupplierProfitAnalyzeRoutes } from "../server/routes/supplier-profit-check/analyze";
 import { consolidateProfitSourceItems } from "../server/routes/supplier-profit-check/analysis-core";
+import { registerSupplierProfitExportRoutes } from "../server/routes/supplier-profit-check/export";
 
 type Handler = (req: any, res: any) => unknown;
 
@@ -45,6 +47,34 @@ function responseHarness() {
 
 function result(rows: unknown[]) {
   return Promise.resolve({ rows });
+}
+
+function exportRoutes() {
+  const routes = new Map<string, Handler>();
+  const app: any = {
+    get: (routePath: string, ...handlers: Handler[]) => routes.set(`GET ${routePath}`, handlers.at(-1)!),
+    post: (routePath: string, ...handlers: Handler[]) => routes.set(`POST ${routePath}`, handlers.at(-1)!),
+  };
+  registerSupplierProfitExportRoutes(app, ((_req: any, _res: any, next: any) => next()) as any);
+  return routes;
+}
+
+function workbookResponseHarness() {
+  const res: any = {
+    statusCode: 200,
+    sent: undefined as Buffer | undefined,
+    setHeader: vi.fn(),
+    status: vi.fn((statusCode: number) => {
+      res.statusCode = statusCode;
+      return res;
+    }),
+    json: vi.fn(),
+    send: vi.fn((body: Buffer) => {
+      res.sent = body;
+      return res;
+    }),
+  };
+  return res;
 }
 
 describe("Supplier Profit Check integrity", () => {
@@ -137,5 +167,54 @@ describe("Supplier Profit Check integrity", () => {
     expect(exportSource).toContain("effectiveSellPrice");
     expect(exportSource).toContain("effectivePoPrice");
     expect(exportSource).toContain("landingCost");
+  });
+
+  it("keeps proforma lines whose barcode no longer resolves to a stock item", async () => {
+    const handler = exportRoutes().get("GET /api/supplier-profit-check/proforma/:proformaId/export-supplier")!;
+    harness.query
+      .mockReturnValueOnce(result([{ id: 31, reference: "PF-31", notes: "", supplier_name: "Supplier A" }]))
+      .mockReturnValueOnce(result([]));
+
+    const res = workbookResponseHarness();
+    await handler({ session: { currentCompanyId: 4 }, params: { proformaId: "31" } }, res);
+
+    // An inner lateral join silently drops a saved line when its barcode was
+    // renamed without an alias or its stock item was deleted, so the supplier
+    // workbook and its grand total would omit legitimately ordered items.
+    const linesQuery = String(harness.query.mock.calls[1]?.[0]);
+    expect(linesQuery).toContain("LEFT JOIN LATERAL");
+    expect(linesQuery).toContain("COALESCE(si.code, spl.barcode)");
+    expect(linesQuery).toContain("COALESCE(si.name, spl.item_name)");
+  });
+
+  it("writes reconciliation totals at the end of the internal export", async () => {
+    const handler = exportRoutes().get("POST /api/supplier-profit-check/export-internal")!;
+    const res = workbookResponseHarness();
+    await handler(
+      {
+        session: { currentCompanyId: 4 },
+        body: {
+          rows: [
+            { code: "SH-1", name: "Shirts", qty: 3, effectiveSellPrice: 20, effectivePoPrice: 12, extraCostPerBale: 0 },
+            { code: "SH-2", name: "Pants", qty: 2, effectiveSellPrice: 30, effectivePoPrice: 25, extraCostPerBale: 0 },
+          ],
+          supplierName: "Supplier A",
+        },
+      },
+      res
+    );
+
+    expect(res.sent).toBeInstanceOf(Buffer);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(res.sent!);
+    const sheet = workbook.getWorksheet("Analysis")!;
+    const totalsRow = sheet.getRow(sheet.rowCount);
+
+    expect(totalsRow.getCell(1).value).toBe("TOTALS");
+    expect(totalsRow.getCell(2).value).toBe("2 items");
+    expect(totalsRow.getCell(11).value).toBe(5); // qty ordered
+    expect(totalsRow.getCell(12).value).toBe(86); // 3*12 + 2*25 landing cost
+    expect(totalsRow.getCell(13).value).toBe(120); // 3*20 + 2*30 estimated sales
+    expect(totalsRow.getCell(14).value).toBe(34); // 3*8 + 2*5 cost profit
   });
 });
