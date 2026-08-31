@@ -72,10 +72,10 @@ export interface GoldenCoastPhase5Fixture {
 }
 
 export interface GoldenCoastNormalPosFixture extends GoldenCoastPhase5Fixture {
-  hadiCompanyId: number;
   hadiLocationId: number;
-  hadiCashAccountId: number;
+  /** Alias of hadiGoldenCoastIntercompanyAccountId, kept for the POS suites. */
   hadiIntercompanyAccountId: number;
+  /** Alias of goldenCoastHadiIntercompanyAccountId, kept for the POS suites. */
   goldenCoastIntercompanyAccountId: number;
   deductionClearingAccountId: number;
 }
@@ -260,10 +260,14 @@ export async function setupGoldenCoastPhase5Fixture(prefix: string): Promise<Gol
     accountType: "Intercompany",
     subType: "hadi_sp_intercompany",
   });
+  // Named to match the Golden Coast payment account: the itemized POS
+  // settlement mirrors the sale's cash account name into HADI, while the
+  // Phase 6 automatic collection only requires this to be the one active
+  // HADI Cash ledger. One account satisfies both.
   const hadiCashAccountId = await insertLedgerAccount({
     companyId: hadiCompany.id,
     code: "HADI-CASH",
-    name: "HADI Cash",
+    name: "Cash Account",
     accountType: "Cash",
     subType: "Cash",
   });
@@ -317,56 +321,21 @@ export async function setupGoldenCoastPhase5Fixture(prefix: string): Promise<Gol
  */
 export async function setupGoldenCoastNormalPosFixture(prefix: string): Promise<GoldenCoastNormalPosFixture> {
   const fixture = await setupGoldenCoastPhase5Fixture(prefix);
-  const hadiCompanyCode = stableFixtureCode(prefix, "HADI");
-  const [hadiCompany] = await db
-    .insert(schema.companies)
-    .values({
-      code: hadiCompanyCode,
-      name: `${prefix}_HadiCompany`,
-      companyType: "erp",
-      baseCurrency: "USD",
-    })
-    .returning();
 
-  await pool.query(`UPDATE companies SET parent_company_id = $1 WHERE id = $2`, [
-    hadiCompany.id,
-    fixture.ctx.companyId,
-  ]);
-  await db.insert(schema.userCompanyRoles).values({
-    userId: fixture.ctx.userId,
-    companyId: hadiCompany.id,
-    role: "Admin",
-  });
-
+  // The Phase 5 fixture already seeds the HADI parent, the reciprocal
+  // intercompany pair, and the single active HADI Cash ledger. Reuse them: a
+  // second active sp_hadi_intercompany account on the Golden Coast company
+  // makes the settlement account ambiguous, which the POS path rejects.
+  const hadiCompanyCode = stableFixtureCode(prefix, "HDI");
   const [hadiLocation] = await db
     .insert(schema.locations)
     .values({
-      companyId: hadiCompany.id,
+      companyId: fixture.hadiCompanyId,
       code: `${hadiCompanyCode}-WH1`,
       name: `${prefix}_HadiWarehouse`,
     })
     .returning();
-  const hadiCashAccountId = await insertLedgerAccount({
-    companyId: hadiCompany.id,
-    code: "HADI-CASH",
-    name: "Cash Account",
-    accountType: "Cash",
-    subType: "Cash",
-  });
-  const hadiIntercompanyAccountId = await insertLedgerAccount({
-    companyId: hadiCompany.id,
-    code: "HADI-SP-IC",
-    name: `${prefix}_TestCompany — Intercompany`,
-    accountType: "Intercompany",
-    subType: "hadi_sp_intercompany",
-  });
-  const goldenCoastIntercompanyAccountId = await insertLedgerAccount({
-    companyId: fixture.ctx.companyId,
-    code: "GC-HADI-IC",
-    name: `${prefix}_HadiCompany — Intercompany`,
-    accountType: "Intercompany",
-    subType: "sp_hadi_intercompany",
-  });
+
   const deductionClearingAccountId = await insertLedgerAccount({
     companyId: fixture.ctx.companyId,
     code: "SP-PAYDDC",
@@ -387,11 +356,9 @@ export async function setupGoldenCoastNormalPosFixture(prefix: string): Promise<
 
   return {
     ...fixture,
-    hadiCompanyId: hadiCompany.id,
     hadiLocationId: hadiLocation.id,
-    hadiCashAccountId,
-    hadiIntercompanyAccountId,
-    goldenCoastIntercompanyAccountId,
+    hadiIntercompanyAccountId: fixture.hadiGoldenCoastIntercompanyAccountId,
+    goldenCoastIntercompanyAccountId: fixture.goldenCoastHadiIntercompanyAccountId,
     deductionClearingAccountId,
   };
 }

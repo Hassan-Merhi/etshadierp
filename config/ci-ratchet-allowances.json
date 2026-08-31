@@ -37,7 +37,9 @@
     "POST /api/insurance/import/preview [<anonymous> > requireAuth > multerMiddleware > <anonymous>]",
     "POST /api/insurance/import/apply [<anonymous> > requireAuth > <anonymous>]",
     "POST /api/insurance/admin/clear-all [<anonymous> > requireAuth > <anonymous> > <anonymous>]",
-    "PUT /api/supplier-profit-check/po-overrides/bulk [requireAuth > <anonymous>]"
+    "PUT /api/supplier-profit-check/po-overrides/bulk [requireAuth > <anonymous>]",
+    "GET /api/sp/golden-coast/cutover/existing-position-carry-forward [<anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "POST /api/sp/golden-coast/cutover/existing-position-carry-forward [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/v5/stock-allocation [<anonymous>]",
@@ -88,6 +90,18 @@
     {
       "expected": "POST /api/sp/migration/rollback [requireAuth > <anonymous> > <anonymous>]",
       "actual": "POST /api/sp/migration/rollback [requireAuth > <anonymous> > <anonymous> > <anonymous> > <anonymous> > <anonymous>]"
+    },
+    {
+      "expected": "POST /api/companies [requireAuth > <anonymous> > <anonymous>]",
+      "actual": "POST /api/companies [<anonymous> > requireAuth > <anonymous> > <anonymous>]"
+    },
+    {
+      "expected": "PATCH /api/companies/:id [requireAuth > <anonymous> > <anonymous>]",
+      "actual": "PATCH /api/companies/:id [<anonymous> > requireAuth > <anonymous> > <anonymous>]"
+    },
+    {
+      "expected": "DELETE /api/companies/:id [requireAuth > <anonymous> > <anonymous>]",
+      "actual": "DELETE /api/companies/:id [<anonymous> > requireAuth > <anonymous> > <anonymous>]"
     }
   ],
   "sourceTextAssertionDelta": {
@@ -132,8 +146,10 @@
       "server/lib/reportPrecision.test.ts",
       "tests/remote-support-phase4-hardening.test.ts",
       "tests/formatting-gate-parity.test.ts",
-      "tests/supplier-profit-check-integrity.test.ts"
+      "tests/supplier-profit-check-integrity.test.ts",
+      "tests/ui/company-parent-selector.test.ts",
+      "tests/ui/golden-coast-pos-phase6-contract.test.ts"
     ],
-    "maxAdditionalTextAssertions": 646
+    "maxAdditionalTextAssertions": 659
   }
 }
