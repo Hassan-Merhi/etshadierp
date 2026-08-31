@@ -116,11 +116,31 @@ async function applyLanguage(page, language) {
   await waitForSettledUi(page);
 }
 
+async function waitForRouteUi(page) {
+  await page.waitForFunction(
+    () => {
+      if (window.location.pathname === "/login") {
+        return Boolean(
+          document.querySelector('[data-testid="input-username"]') &&
+            document.querySelector('[data-testid="input-password"]') &&
+            document.querySelector('[data-testid="button-login"]'),
+        );
+      }
+
+      return Boolean(
+        document.getElementById("main-content") && document.querySelector('[data-slot="sidebar-wrapper"]'),
+      );
+    },
+    { timeout: TIMEOUT_MS },
+  );
+}
+
 async function openRoute(page, route) {
   const response = await page.goto(`${BASE_URL}${route}`, {
     waitUntil: "domcontentloaded",
     timeout: TIMEOUT_MS,
   });
+  await waitForRouteUi(page);
   await waitForSettledUi(page);
   return response?.status() ?? null;
 }
