@@ -12,6 +12,7 @@ import { registerSpGoldenCoastPhase8ContainerOffloadRoutes } from "./spGoldenCoa
 import { registerSpGoldenCoastPhase9HassanSavingsWithdrawalRoutes } from "./spGoldenCoastPhase9HassanSavingsWithdrawalRoutes";
 import { registerSpGoldenCoastPhase10SalesCashSettlementRoutes } from "./spGoldenCoastPhase10SalesCashSettlementRoutes";
 import { registerSpGoldenCoastPhase11MonthlyCloseRoutes } from "./spGoldenCoastPhase11MonthlyCloseRoutes";
+import { registerSpGoldenCoastLegacySalesGuard } from "./spGoldenCoastLegacySalesGuard";
 import { registerSpContainerRoutes } from "./spContainerRoutes";
 import { registerSpLifecycleGuards } from "./spLifecycleGuards";
 import { registerSpReoffloadPreparationGuard } from "./spReoffloadPreparationGuard";
@@ -92,6 +93,9 @@ export function registerSpRoutes(app: Express) {
   registerSpChargeReconciliationRoutes(app);
   registerSpFullReconciliationRoutes(app);
   registerSpProductionClosureRoutes(app);
+  // Fail closed before the generic SP sales route: Golden Coast must stay on
+  // the Phase 6 atomic sale + HADI collection path even for stale clients.
+  registerSpGoldenCoastLegacySalesGuard(app);
   registerSpSalesRoutes(app);
   registerSpLifecycleRoutes(app);
   registerSpOpeningStockRoutes(app);
