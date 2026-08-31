@@ -1,0 +1,126 @@
+import type { Express, Request, RequestHandler, Response } from "express";
+import { and, eq } from "drizzle-orm";
+
+import { db } from "../db";
+import { parseId } from "../lib/parseId";
+import { logger } from "../lib/logger";
+import { supplierProformaLines, supplierProformas } from "@shared/schema";
+import { buildAliasMap, resolveBarcode } from "./helpers/proformaBarcodeHelpers";
+import { normalizeProformaImportLines, type NormalizedProformaImportLine } from "./helpers/proformaImportValidation";
+
+const MAX_IMPORT_LINES = 10_000;
+const BULK_CHUNK_SIZE = 50;
+
+type InsertableLine = NormalizedProformaImportLine & { proformaId: number };
+
+async function insertAtomically(lines: InsertableLine[]): Promise<void> {
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < lines.length; i += BULK_CHUNK_SIZE) {
+      await tx.insert(supplierProformaLines).values(lines.slice(i, i + BULK_CHUNK_SIZE));
+    }
+  });
+}
+
+async function insertAtomicallyOneByOne(lines: InsertableLine[]): Promise<void> {
+  await db.transaction(async (tx) => {
+    for (const line of lines) {
+      await tx.insert(supplierProformaLines).values(line);
+    }
+  });
+}
+
+/**
+ * Registers the hardened supplier-proforma import before the legacy supplier
+ * proforma registrar. Express stops at this handler after a response is sent,
+ * so all other supplier-proforma endpoints keep their existing implementation.
+ */
+export function registerSupplierProformaImportRoutes(app: Express, requireAuth: RequestHandler): void {
+  app.post(
+    "/api/suppliers/:supplierId/proformas/:proformaId/import-lines",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const supplierId = parseId(req.params.supplierId);
+      const proformaId = parseId(req.params.proformaId);
+      if (supplierId === null || proformaId === null) {
+        return res.status(400).json({ message: "Invalid supplier or proforma id" });
+      }
+
+      const [proforma] = await db
+        .select({ id: supplierProformas.id })
+        .from(supplierProformas)
+        .where(
+          and(
+            eq(supplierProformas.id, proformaId),
+            eq(supplierProformas.supplierId, supplierId),
+            eq(supplierProformas.companyId, companyId)
+          )
+        );
+      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+
+      const rawLines = req.body?.lines;
+      if (!Array.isArray(rawLines) || rawLines.length === 0) {
+        return res.status(400).json({ message: "No lines to import" });
+      }
+      if (rawLines.length > MAX_IMPORT_LINES) {
+        return res.status(400).json({ message: `Import is limited to ${MAX_IMPORT_LINES.toLocaleString()} lines at a time` });
+      }
+
+      const validation = normalizeProformaImportLines(rawLines);
+      if (validation.errors.length > 0 || validation.lines.length !== rawLines.length) {
+        const firstErrors = validation.errors.slice(0, 5);
+        const remaining = Math.max(0, validation.errors.length - firstErrors.length);
+        return res.status(400).json({
+          message: `Import stopped: ${firstErrors.join("; ")}${remaining ? `; plus ${remaining} more issue${remaining === 1 ? "" : "s"}` : ""}`,
+          errors: validation.errors,
+        });
+      }
+
+      const { map: aliasMap } = await buildAliasMap(companyId);
+      const lineValues: InsertableLine[] = validation.lines.map((line) => ({
+        ...line,
+        proformaId,
+        barcode: resolveBarcode(line.barcode, aliasMap),
+      }));
+
+      try {
+        await insertAtomically(lineValues);
+      } catch (bulkError: unknown) {
+        // Some PostgreSQL proxies/drivers are more restrictive with large multi-row
+        // parameter sets. The first transaction is rolled back, so retrying each row
+        // in one fresh transaction preserves all-or-nothing semantics.
+        logger.warn("Supplier proforma bulk import insert failed; retrying row-by-row", {
+          companyId,
+          supplierId,
+          proformaId,
+          rowCount: lineValues.length,
+          errorType: bulkError instanceof Error ? bulkError.name : typeof bulkError,
+        });
+        try {
+          await insertAtomicallyOneByOne(lineValues);
+        } catch (rowError: unknown) {
+          logger.error("Supplier proforma import failed", {
+            companyId,
+            supplierId,
+            proformaId,
+            rowCount: lineValues.length,
+            errorType: rowError instanceof Error ? rowError.name : typeof rowError,
+          });
+          return res.status(500).json({
+            message: "Import could not be saved. No rows were imported. Check the spreadsheet values and try again.",
+          });
+        }
+      }
+
+      await db.update(supplierProformas).set({ updatedAt: new Date() }).where(eq(supplierProformas.id, proformaId));
+      const allLines = await db
+        .select()
+        .from(supplierProformaLines)
+        .where(eq(supplierProformaLines.proformaId, proformaId));
+
+      return res.json({ imported: lineValues.length, lines: allLines });
+    }
+  );
+}
