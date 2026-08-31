@@ -9,6 +9,36 @@ const GOLDEN_COAST_PHASE6_READINESS = "/api/sp/golden-coast/phase6/pos-sale/read
 const GOLDEN_COAST_PHASE6_SALE = "/api/sp/golden-coast/phase6/pos-sale";
 const GOLDEN_COAST_PHASE7_READINESS = "/api/sp/golden-coast/phase7/sales-cash-transfer/readiness";
 
+interface GoldenCoastPhase6ReadinessResponse {
+  automaticHadiPair?: { hadiCompanyId?: number | string | null } | null;
+  code?: string;
+  message?: string;
+}
+
+interface PosSaleItemPayload {
+  stockItemId: number;
+  quantity: string | number;
+  rate: string | number;
+}
+
+interface GoldenCoastPhase6Posting {
+  role?: string;
+  voucher?: { voucherNumber?: string };
+}
+
+interface GoldenCoastPhase6SaleResponse {
+  postings?: GoldenCoastPhase6Posting[];
+  revenueUsd?: string | number | null;
+  automaticHadiCollection?: unknown;
+}
+
+interface Phase6PosSaleData {
+  voucherDate: string;
+  notes?: string;
+  clientSaleId?: string;
+  items: PosSaleItemPayload[];
+}
+
 interface UsePosMutationsParams {
   activeLocation: Location | null;
   editVoucherId?: string;
@@ -35,21 +65,28 @@ interface UsePosMutationsParams {
   refetchDrafts?: () => void;
 }
 
-async function readOptionalJson(response: Response): Promise<any> {
-  return response.json().catch(() => null);
+async function readOptionalJson<T>(response: Response): Promise<T | null> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
 }
 
-function phase6PosResult(raw: any, saleData: any, activeLocation: Location | null, rows: SaleRow[]) {
-  const revenuePosting = Array.isArray(raw?.postings)
-    ? raw.postings.find((posting: any) => posting?.role === "revenue")
-    : null;
+function phase6PosResult(
+  raw: GoldenCoastPhase6SaleResponse,
+  saleData: Phase6PosSaleData,
+  activeLocation: Location | null,
+  rows: SaleRow[]
+) {
+  const revenuePosting = raw.postings?.find((posting) => posting.role === "revenue") ?? null;
   const voucher = revenuePosting?.voucher ?? null;
-  const grandTotal = Number(raw?.revenueUsd ?? 0);
+  const grandTotal = Number(raw.revenueUsd ?? 0);
 
   return {
     voucher,
     location: activeLocation,
-    items: saleData.items.map((item: any) => {
+    items: saleData.items.map((item) => {
       const sourceRow = rows.find((row) => Number(row.stockItemId) === Number(item.stockItemId));
       const quantity = String(item.quantity);
       const rate = Number(item.rate).toFixed(2);
@@ -70,7 +107,7 @@ function phase6PosResult(raw: any, saleData: any, activeLocation: Location | nul
     saleDate: saleData.voucherDate,
     isCreditSale: false,
     customer: { id: null, code: null, name: (saleData.notes || "").trim() || "Walk-in Customer" },
-    automaticHadiCollection: raw?.automaticHadiCollection ?? null,
+    automaticHadiCollection: raw.automaticHadiCollection ?? null,
   };
 }
 
@@ -127,7 +164,7 @@ export function usePosMutations({
         // sending it as targetCompanyId lets the global tenant boundary verify
         // membership before the atomic cross-company sale starts.
         const readinessResponse = await fetch(GOLDEN_COAST_PHASE6_READINESS, { credentials: "include" });
-        const readiness = await readOptionalJson(readinessResponse);
+        const readiness = await readOptionalJson<GoldenCoastPhase6ReadinessResponse>(readinessResponse);
 
         if (readinessResponse.ok) {
           const hadiCompanyId = Number(readiness?.automaticHadiPair?.hadiCompanyId ?? 0);
@@ -144,7 +181,7 @@ export function usePosMutations({
             customerName: (saleData.notes || "").trim() || "Walk-in Customer",
             clientRequestId: String(saleData.clientSaleId),
             notes: saleData.notes || undefined,
-            lines: saleData.items.map((item: any) => ({
+            lines: (saleData.items as PosSaleItemPayload[]).map((item) => ({
               stockItemId: item.stockItemId,
               qty: String(item.quantity),
               unitPriceUsd: Number(item.rate).toFixed(2),
@@ -155,7 +192,7 @@ export function usePosMutations({
             `${GOLDEN_COAST_PHASE6_SALE}?targetCompanyId=${encodeURIComponent(String(hadiCompanyId))}`,
             phase6Body
           );
-          const raw = await res.json();
+          const raw = (await res.json()) as GoldenCoastPhase6SaleResponse;
           return phase6PosResult(raw, saleData, activeLocation, rows);
         }
 
