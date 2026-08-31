@@ -91,6 +91,12 @@ export function registerSupplierProfitImportRoutes(app: Express, requireAuth: Re
         const normalized = String(value ?? "").trim().toLowerCase();
         return normalized.length > 0 && !foundInputCodes.has(normalized);
       });
+      const matches = resolvedResult.rows.map((row) => ({
+        inputIndex: Number(row.ord) - 1,
+        inputCode: String(row.input_code),
+        stockItemId: Number(row.id),
+        code: String(row.code),
+      }));
 
       const items = resolvedResult.rows.map(
         (row): ProfitSourceItem => ({
@@ -105,7 +111,7 @@ export function registerSupplierProfitImportRoutes(app: Express, requireAuth: Re
         })
       );
 
-      if (items.length === 0) return res.json({ rows: [], notFound });
+      if (items.length === 0) return res.json({ rows: [], notFound, matches });
 
       const rows = await buildSupplierProfitRows({
         companyId,
@@ -117,7 +123,7 @@ export function registerSupplierProfitImportRoutes(app: Express, requireAuth: Re
         locationId: rawLocationId ? Number(rawLocationId) : null,
       });
 
-      res.json({ rows, notFound });
+      res.json({ rows, notFound, matches });
     } catch (err: unknown) {
       logger.error("[supplier-profit-check/import-by-codes]", { error: getErrorMessage(err) });
       res.status(500).json({ message: getErrorMessage(err) });
