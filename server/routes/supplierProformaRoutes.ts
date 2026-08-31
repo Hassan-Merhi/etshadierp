@@ -9,6 +9,7 @@ import { eq, and, ne } from "drizzle-orm";
 import ExcelJS from "exceljs";
 import { buildAliasMap, resolveBarcode } from "./helpers/proformaBarcodeHelpers";
 import { registerContainerLoadedItemsRoutes } from "./container-loaded-items";
+import { importSupplierProformaLines } from "./helpers/supplierProformaImport";
 import { supplierProformas, supplierProformaLines, suppliers } from "@shared/schema";
 
 /**
@@ -281,41 +282,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: Reques
     "/api/suppliers/:supplierId/proformas/:proformaId/import-lines",
     requireAuth,
     async (req: Request, res: Response) => {
-      try {
-        const companyId = req.session.currentCompanyId;
-        if (!companyId) return res.status(400).json({ message: "No company selected" });
-        const proformaId = parseId(req.params.proformaId);
-        if (proformaId === null) return res.status(400).json({ message: "Invalid id" });
-        const [proforma] = await db
-          .select()
-          .from(supplierProformas)
-          .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
-        if (!proforma) return res.status(403).json({ message: "Access denied" });
-        const { lines } = req.body;
-        if (!lines || !Array.isArray(lines) || lines.length === 0) {
-          return res.status(400).json({ message: "No lines to import" });
-        }
-        // Resolve alias codes to primary stock-item codes at import time so that
-        // items imported with different (supplier) codes are stored canonically.
-        const { map: aliasMap } = await buildAliasMap(companyId);
-        const lineValues = lines.map((l) => ({
-          proformaId,
-          barcode: resolveBarcode(String(l.barcode || l.Barcode || "").trim(), aliasMap),
-          itemName: String(l.itemName || l["Item Name"] || "").trim(),
-          qty: parseInt(l.qty ?? l.Qty ?? 0) || 0,
-          weightPerBale: sanitizeDecimal(l.weightPerBale ?? l["Weight per Bale"]),
-          pricePerBale: sanitizeDecimal(l.pricePerBale ?? l["Price per Bale"]),
-        }));
-        await batchInsertProformaLines(lineValues);
-        await db.update(supplierProformas).set({ updatedAt: new Date() }).where(eq(supplierProformas.id, proformaId));
-        const allLines = await db
-          .select()
-          .from(supplierProformaLines)
-          .where(eq(supplierProformaLines.proformaId, proformaId));
-        res.json({ imported: lineValues.length, lines: allLines });
-      } catch (error: unknown) {
-        res.status(500).json({ message: getErrorMessage(error) });
-      }
+      await importSupplierProformaLines(req, res);
     }
   );
 

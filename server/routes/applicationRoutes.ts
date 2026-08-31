@@ -56,7 +56,6 @@ import { registerSpMigrationRoutes } from "./sp-migration";
 import { registerStatsRoutes } from "./statsRoutes";
 import { registerStockRoutes } from "./stockRoutes";
 import { registerStockSummaryRoutes } from "./stockSummaryRoutes";
-import { registerSupplierProformaImportRoutes } from "./supplierProformaImportRoutes";
 import { registerSupplierProformaRoutes } from "./supplierProformaRoutes";
 import { registerSupplierRoutes } from "./supplierRoutes";
 import { registerTransporterStatementRoutes } from "./transporterStatementRoutes";
@@ -112,7 +111,6 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerFactoryReportRoutes(app, requireAuth, db);
   registerFactoryIntelligenceRoutes(app, requireAuth, db);
   registerFactoryAttendanceRoutes(app, requireAuth, db);
-  registerSupplierProformaImportRoutes(app, requireAuth);
   registerSupplierProformaRoutes(app, requireAuth);
   await phase4LazyRoutes.supplierProfitCheck(app, requireAuth);
   registerGlobalTransactionRoutes(app, requireAuth);

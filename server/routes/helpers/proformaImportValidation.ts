@@ -26,8 +26,11 @@ function normalizeNumberText(value: unknown): string | null {
   if (!raw) return "0";
 
   // Permit common currency/unit wrappers while rejecting embedded words.
-  raw = raw.replace(/^[^0-9+\-.,]+/, "").replace(/[^0-9.,]+$/, "").replace(/\s+/g, "");
-  if (!raw || !/^[+\-]?[0-9][0-9.,]*$/.test(raw)) return null;
+  raw = raw
+    .replace(/^[^0-9+\-.,]+/, "")
+    .replace(/[^0-9.,]+$/, "")
+    .replace(/\s+/g, "");
+  if (!raw || !/^[+-]?[0-9][0-9.,]*$/.test(raw)) return null;
 
   const comma = raw.lastIndexOf(",");
   const dot = raw.lastIndexOf(".");
@@ -54,7 +57,7 @@ function parseDecimal(
   rowNumber: number
 ): { value?: string; error?: string } {
   const normalized = normalizeNumberText(value);
-  if (normalized === null || !/^[+\-]?\d+(?:\.\d+)?$/.test(normalized)) {
+  if (normalized === null || !/^[+-]?\d+(?:\.\d+)?$/.test(normalized)) {
     return { error: `Row ${rowNumber}: ${label} is not a valid number` };
   }
 
@@ -63,7 +66,7 @@ function parseDecimal(
     return { error: `Row ${rowNumber}: ${label} must be zero or greater` };
   }
 
-  const [integerPart] = normalized.replace(/^[+\-]/, "").split(".");
+  const [integerPart] = normalized.replace(/^[+-]/, "").split(".");
   const significantIntegerDigits = integerPart.replace(/^0+(?=\d)/, "").length;
   if (significantIntegerDigits > maxIntegerDigits) {
     return { error: `Row ${rowNumber}: ${label} is too large` };
