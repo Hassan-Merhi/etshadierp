@@ -18,10 +18,10 @@ function normalizeNullablePrice(value: unknown): number | null {
 }
 
 async function supplierBelongsToCompany(supplierId: number, companyId: number): Promise<boolean> {
-  const result = await pool.query(
-    `SELECT id FROM suppliers WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
-    [supplierId, companyId]
-  );
+  const result = await pool.query(`SELECT id FROM suppliers WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`, [
+    supplierId,
+    companyId,
+  ]);
   return result.rows.length > 0;
 }
 

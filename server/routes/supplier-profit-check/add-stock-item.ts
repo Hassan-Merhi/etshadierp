@@ -15,12 +15,15 @@ export function registerSupplierProfitAddStockItemRoutes(app: Express, requireAu
     if (!companyId) return res.status(400).json({ message: "No company selected" });
 
     const { code, name, stockGroupId: rawStockGroupId, supplierId: rawSupplierId, dubaiPrice, avgSellPrice } = req.body;
-    const normalizedCode = String(code ?? "").trim().toUpperCase();
+    const normalizedCode = String(code ?? "")
+      .trim()
+      .toUpperCase();
     const normalizedName = String(name ?? "").trim();
     const supplierId = Number(rawSupplierId);
     const stockGroupId = rawStockGroupId ? Number(rawStockGroupId) : null;
     if (!normalizedCode || !normalizedName) return res.status(400).json({ message: "Code and name are required" });
-    if (!Number.isInteger(supplierId) || supplierId <= 0) return res.status(400).json({ message: "supplierId required" });
+    if (!Number.isInteger(supplierId) || supplierId <= 0)
+      return res.status(400).json({ message: "supplierId required" });
     if (stockGroupId !== null && (!Number.isInteger(stockGroupId) || stockGroupId <= 0)) {
       return res.status(400).json({ message: "Invalid stockGroupId" });
     }

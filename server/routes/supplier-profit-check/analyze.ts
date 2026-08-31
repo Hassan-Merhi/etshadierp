@@ -114,7 +114,11 @@ export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: R
         items = itemsResult.rows as ProfitSourceItem[];
       } else if (sourceType === "otw_containers") {
         const requestedContainerIds = Array.isArray(containerIds)
-          ? [...new Set(containerIds.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0))]
+          ? [
+              ...new Set(
+                containerIds.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)
+              ),
+            ]
           : [];
         if (requestedContainerIds.length === 0) {
           return res.status(400).json({ message: "Select at least one OTW container" });
@@ -132,7 +136,9 @@ export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: R
           [requestedContainerIds, companyId, supplierId]
         );
         if (scopedContainers.rows.length !== requestedContainerIds.length) {
-          return res.status(400).json({ message: "One or more selected containers are invalid for this supplier/company" });
+          return res
+            .status(400)
+            .json({ message: "One or more selected containers are invalid for this supplier/company" });
         }
 
         const itemsResult = await pool.query(

@@ -20,7 +20,7 @@ export const supplierProfitCheckTranslations = [
     fr: "Identifiant de groupe de stock invalide",
   },
   {
-    en: "Item with code \"${normalizedCode}\" already exists",
+    en: 'Item with code "${normalizedCode}" already exists',
     ar: "يوجد عنصر بهذا الرمز بالفعل",
     fr: "Un article avec ce code existe déjà",
   },

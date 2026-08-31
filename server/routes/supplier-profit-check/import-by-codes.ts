@@ -18,8 +18,14 @@ export function registerSupplierProfitImportRoutes(app: Express, requireAuth: Re
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { codes, supplierId: rawSupplierId, fromDate, toDate, sellPriceSource, locationId: rawLocationId } =
-        req.body;
+      const {
+        codes,
+        supplierId: rawSupplierId,
+        fromDate,
+        toDate,
+        sellPriceSource,
+        locationId: rawLocationId,
+      } = req.body;
       if (!Array.isArray(codes) || codes.length === 0) {
         return res.status(400).json({ message: "codes array is required" });
       }
@@ -27,7 +33,11 @@ export function registerSupplierProfitImportRoutes(app: Express, requireAuth: Re
         return res.status(400).json({ message: "Too many item codes in one import" });
       }
 
-      const normalizedCodes = codes.map((value: unknown) => String(value ?? "").trim().toLowerCase());
+      const normalizedCodes = codes.map((value: unknown) =>
+        String(value ?? "")
+          .trim()
+          .toLowerCase()
+      );
       const validCodes = normalizedCodes.filter(Boolean);
       if (validCodes.length === 0) return res.status(400).json({ message: "No valid codes provided" });
 
@@ -88,7 +98,9 @@ export function registerSupplierProfitImportRoutes(app: Express, requireAuth: Re
 
       const foundInputCodes = new Set(resolvedResult.rows.map((row) => String(row.input_code).toLowerCase()));
       const notFound = codes.filter((value: unknown) => {
-        const normalized = String(value ?? "").trim().toLowerCase();
+        const normalized = String(value ?? "")
+          .trim()
+          .toLowerCase();
         return normalized.length > 0 && !foundInputCodes.has(normalized);
       });
       const matches = resolvedResult.rows.map((row) => ({
@@ -98,18 +110,16 @@ export function registerSupplierProfitImportRoutes(app: Express, requireAuth: Re
         code: String(row.code),
       }));
 
-      const items = resolvedResult.rows.map(
-        (row): ProfitSourceItem => ({
-          id: row.id,
-          code: row.code,
-          name: row.name,
-          stock_group_id: row.stock_group_id,
-          stock_group_name: row.stock_group_name,
-          proforma_qty: null,
-          proforma_price: null,
-          proforma_barcode: row.proforma_barcode,
-        })
-      );
+      const items = resolvedResult.rows.map((row): ProfitSourceItem => ({
+        id: row.id,
+        code: row.code,
+        name: row.name,
+        stock_group_id: row.stock_group_id,
+        stock_group_name: row.stock_group_name,
+        proforma_qty: null,
+        proforma_price: null,
+        proforma_barcode: row.proforma_barcode,
+      }));
 
       if (items.length === 0) return res.json({ rows: [], notFound, matches });
 

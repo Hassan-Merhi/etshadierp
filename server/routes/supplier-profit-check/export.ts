@@ -273,7 +273,9 @@ export function registerSupplierProfitExportRoutes(app: Express, requireAuth: Re
           (effectiveSell != null && landingCost != null ? effectiveSell - landingCost : null);
         const costProfitPct =
           numberOrNull(raw.costProfitPct) ??
-          (costProfit != null && effectiveSell != null && effectiveSell > 0 ? (costProfit / effectiveSell) * 100 : null);
+          (costProfit != null && effectiveSell != null && effectiveSell > 0
+            ? (costProfit / effectiveSell) * 100
+            : null);
         const status = String(
           raw.computedStatus ??
             (effectiveSell == null || landingCost == null

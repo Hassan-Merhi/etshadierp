@@ -57,7 +57,9 @@ export function uniqueAnalysisRows(rows: AnalysisRow[], importedRows: AnalysisRo
       const existingQty = existing.proformaQty;
       const incomingQty = row.proformaQty;
       existing.proformaQty =
-        existingQty == null && incomingQty == null ? null : Math.max(0, existingQty ?? 0) + Math.max(0, incomingQty ?? 0);
+        existingQty == null && incomingQty == null
+          ? null
+          : Math.max(0, existingQty ?? 0) + Math.max(0, incomingQty ?? 0);
     }
   };
 
@@ -136,8 +138,7 @@ export function deriveProfitCheckState({
   const itemsWithQty = computedRows.filter((row) => nonNegativeNumber(qtyMap[row.stockItemId]) > 0);
   const totalQty = itemsWithQty.reduce((sum, row) => sum + nonNegativeNumber(qtyMap[row.stockItemId]), 0);
   const totalLandingCost = itemsWithQty.reduce(
-    (sum, row) =>
-      row.landingCost != null ? sum + nonNegativeNumber(qtyMap[row.stockItemId]) * row.landingCost : sum,
+    (sum, row) => (row.landingCost != null ? sum + nonNegativeNumber(qtyMap[row.stockItemId]) * row.landingCost : sum),
     0
   );
   const totalEstSales = itemsWithQty.reduce((sum, row) => {

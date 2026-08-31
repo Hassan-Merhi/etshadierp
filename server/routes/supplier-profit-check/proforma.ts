@@ -172,8 +172,7 @@ async function resolveAndConsolidateItems(
     itemName: line.itemName,
     qty: line.qty,
     weightPerBale: line.qty > 0 ? line.weightedWeight / line.qty : 0,
-    pricePerBale:
-      overrideMap.get(line.stockItemId) ?? (line.pricedQty > 0 ? line.weightedPrice / line.pricedQty : 0),
+    pricePerBale: overrideMap.get(line.stockItemId) ?? (line.pricedQty > 0 ? line.weightedPrice / line.pricedQty : 0),
   }));
 }
 
@@ -232,7 +231,8 @@ export function registerSupplierProfitProformaRoutes(app: Express, requireAuth: 
       if (lines.length === 0) throw new ProfitCheckInputError("Enter qty for at least one item");
 
       const proformaRef =
-        String(reference ?? "").trim() || `PC-${new Date().toISOString().slice(0, 10)}-${Date.now().toString().slice(-4)}`;
+        String(reference ?? "").trim() ||
+        `PC-${new Date().toISOString().slice(0, 10)}-${Date.now().toString().slice(-4)}`;
       const proformaResult = await client.query(
         `
         INSERT INTO supplier_proformas (company_id, supplier_id, reference, notes, created_at, updated_at)
