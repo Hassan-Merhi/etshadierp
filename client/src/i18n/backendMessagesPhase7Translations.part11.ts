@@ -207,4 +207,44 @@ export const backendMessagesPhase7TranslationsPart11: readonly Phase7BackendMess
     ar: "يجب أن يبدأ رمز الصنف للدرجة {0} بالبادئة {1}",
     fr: "Le code article de la qualité {0} doit commencer par {1}",
   },
+  {
+    en: "Row ${rowNumber}: ${label} is not a valid number",
+    ar: "الصف {0}: {1} ليس رقمًا صالحًا",
+    fr: "Ligne {0} : {1} n’est pas un nombre valide",
+  },
+  {
+    en: "Row ${rowNumber}: ${label} must be zero or greater",
+    ar: "الصف {0}: يجب أن يكون {1} صفرًا أو أكبر",
+    fr: "Ligne {0} : {1} doit être supérieur ou égal à zéro",
+  },
+  {
+    en: "Row ${rowNumber}: ${label} is too large",
+    ar: "الصف {0}: {1} كبير جدًا",
+    fr: "Ligne {0} : {1} est trop grand",
+  },
+  {
+    en: "Invalid supplier or proforma id",
+    ar: "معرّف المورد أو الفاتورة المبدئية غير صالح",
+    fr: "Identifiant de fournisseur ou de proforma non valide",
+  },
+  {
+    en: "Import is limited to ${MAX_IMPORT_LINES.toLocaleString()} lines at a time",
+    ar: "الاستيراد محدود بـ {0} سطر في المرة الواحدة",
+    fr: "L’import est limité à {0} lignes à la fois",
+  },
+  {
+    en: "Import stopped: ${reported}${suffix}",
+    ar: "توقف الاستيراد: {0}{1}",
+    fr: "Import interrompu : {0}{1}",
+  },
+  {
+    en: "Import could not be saved. No rows were imported. Check the spreadsheet values and try again.",
+    ar: "تعذر حفظ الاستيراد. لم يتم استيراد أي صفوف. تحقق من قيم الجدول وحاول مرة أخرى.",
+    fr: "L’import n’a pas pu être enregistré. Aucune ligne n’a été importée. Vérifiez les valeurs du tableur et réessayez.",
+  },
+  {
+    en: "The rows were imported but the proforma could not be reloaded. Refresh the page instead of importing again.",
+    ar: "تم استيراد الصفوف لكن تعذر إعادة تحميل الفاتورة المبدئية. حدّث الصفحة بدلاً من الاستيراد مرة أخرى.",
+    fr: "Les lignes ont été importées mais le proforma n’a pas pu être rechargé. Actualisez la page au lieu de relancer l’import.",
+  },
 ];
