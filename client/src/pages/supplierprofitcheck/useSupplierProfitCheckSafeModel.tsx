@@ -49,8 +49,10 @@ export function useSupplierProfitCheckSafeModel() {
   const queryClient = useQueryClient();
   const companyId = selectedCompany?.id;
 
+  // Reuse the application's normal company-scoped supplier cache key so the
+  // existing stock-group mutation invalidates this exact list immediately.
   const { data: scopedSuppliers = [] } = useQuery<SupplierOption[]>({
-    queryKey: ["/api/suppliers-all-spc", companyId],
+    queryKey: ["/api/suppliers", companyId],
     enabled: !!companyId,
     queryFn: async () => {
       const response = await fetch("/api/suppliers", { credentials: "include" });
