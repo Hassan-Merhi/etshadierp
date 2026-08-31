@@ -17,6 +17,7 @@ import { closeTestServer } from "./setup";
 import {
   GOLDEN_COAST_PHASE5_SALE_DATE,
   GOLDEN_COAST_PHASE5_SALE_URL,
+  goldenCoastPhase5SaleUrl,
   clearLots,
   inventoryQuantity,
   lotRemaining,
@@ -50,7 +51,7 @@ function saleBody(overrides: Record<string, unknown> = {}) {
 }
 
 function postSale(body: Record<string, unknown>) {
-  return fixture.agent.post(GOLDEN_COAST_PHASE5_SALE_URL).send(body);
+  return fixture.agent.post(goldenCoastPhase5SaleUrl(fixture)).send(body);
 }
 
 function seedLot(input: { qty: string; unitCost: string; locationId?: number; createdAt?: string }) {

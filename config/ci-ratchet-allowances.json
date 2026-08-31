@@ -56,7 +56,8 @@
     "USE /api/factory/customer-orders/:id/verification-summary [<anonymous>]",
     "USE /api/factory/customer-orders/:id/verification-summary [requireAuth]",
     "USE /api/factory/customer-orders/:id/verification-summary [authoritativeVerificationStockMiddleware]",
-    "USE / [browserMutationFailClosedBoundary]"
+    "USE / [browserMutationFailClosedBoundary]",
+    "USE /api/sp/sales [<anonymous>]"
   ],
   "routeManifestReplacements": [
     {

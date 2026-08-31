@@ -273,11 +273,7 @@ async function resolveAutomaticHadiCashAccount(
     .select({ id: bankAccounts.id, name: bankAccounts.name })
     .from(bankAccounts)
     .where(
-      and(
-        eq(bankAccounts.companyId, hadiCompanyId),
-        eq(bankAccounts.active, true),
-        isNull(bankAccounts.deletedAt)
-      )
+      and(eq(bankAccounts.companyId, hadiCompanyId), eq(bankAccounts.active, true), isNull(bankAccounts.deletedAt))
     )
     .orderBy(asc(bankAccounts.id));
 
@@ -305,11 +301,7 @@ async function resolveAutomaticHadiCashAccount(
   });
 }
 
-async function gcSalesCashDebitBalance(
-  tx: DatabaseTransaction,
-  companyId: number,
-  accountId: number
-): Promise<string> {
+async function gcSalesCashDebitBalance(tx: DatabaseTransaction, companyId: number, accountId: number): Promise<string> {
   await assertTransactionCompanyScope(tx, companyId);
   const query = await tx.execute(sql`
     SELECT (
@@ -484,11 +476,7 @@ export async function postGoldenCoastAutomaticHadiCollectionTx(input: {
     sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase7:${input.companyId}:${input.clientRequestId}`}))`
   );
 
-  const accounts = await resolveAutomaticRoleAccounts(
-    input.tx,
-    pair,
-    input.gcSalesCashAccountId
-  );
+  const accounts = await resolveAutomaticRoleAccounts(input.tx, pair, input.gcSalesCashAccountId);
   const hadiCashAccount = await resolveAutomaticHadiCashAccount(input.tx, pair.hadiCompanyId);
   await assertTransactionCompanyScope(input.tx, pair.goldenCoastCompanyId);
 
@@ -542,11 +530,7 @@ export async function postGoldenCoastAutomaticHadiCollectionTx(input: {
 
   const postings: GoldenCoastAutomaticHadiResult["postings"] = [];
   for (const item of batch.postings) {
-    const posted = (await postBalancedVoucherTx(
-      input.tx,
-      item.request,
-      postingDependencies
-    )) as PersistedPostingResult;
+    const posted = (await postBalancedVoucherTx(input.tx, item.request, postingDependencies)) as PersistedPostingResult;
     if (posted.replayed) {
       throw new GoldenCoastPhase6AutoHadiError(
         `Automatic HADI collection ${input.clientRequestId} ${item.role} voucher replayed unexpectedly.`,

@@ -13,6 +13,7 @@ import { closeTestServer } from "./setup";
 import {
   GOLDEN_COAST_PHASE5_SALE_DATE,
   GOLDEN_COAST_PHASE5_SALE_URL,
+  goldenCoastPhase5SaleUrl,
   clearLots,
   inventoryQuantity,
   lotRemaining,
@@ -45,7 +46,7 @@ function saleBody(overrides: Record<string, unknown> = {}) {
 }
 
 function postSale(body: Record<string, unknown>) {
-  return fixture.agent.post(GOLDEN_COAST_PHASE5_SALE_URL).send(body);
+  return fixture.agent.post(goldenCoastPhase5SaleUrl(fixture)).send(body);
 }
 
 async function setDeduction(locationId: number, rate: string): Promise<void> {
@@ -103,10 +104,14 @@ describe("Golden Coast Phase 6 special-location allocation", () => {
     expect(res.body.grossProfitUsd).toBe("1140.00");
     expect(res.body.specialLocationDeductionUsd).toBe("75.00");
     expect(res.body.deductionPerQtyUsd).toBe("2.5000");
+    // The Hassan Savings deduction stays on Golden Coast's books; only the sale
+    // cash is collected via HADI.
     expect(res.body.postings.map((posting: { role: string }) => posting.role)).toEqual([
       "revenue",
       "cogs",
       "special_deduction",
+      "hadi_collection_golden_coast",
+      "hadi_collection_hadi",
     ]);
 
     const deductionPosting = res.body.postings.find(
@@ -131,7 +136,12 @@ describe("Golden Coast Phase 6 special-location allocation", () => {
     const res = await postSale(saleBody());
     expect(res.status).toBe(200);
     expect(res.body.specialLocationDeductionUsd).toBe("0.00");
-    expect(res.body.postings.map((posting: { role: string }) => posting.role)).toEqual(["revenue", "cogs"]);
+    expect(res.body.postings.map((posting: { role: string }) => posting.role)).toEqual([
+      "revenue",
+      "cogs",
+      "hadi_collection_golden_coast",
+      "hadi_collection_hadi",
+    ]);
   });
 
   it("replays once and rejects the same sale identity after deduction configuration changes", async () => {
@@ -145,7 +155,7 @@ describe("Golden Coast Phase 6 special-location allocation", () => {
     const remainingAfterFirst = await lotRemaining(lotId);
 
     const replay = await fixture.agent
-      .post(GOLDEN_COAST_PHASE5_SALE_URL)
+      .post(goldenCoastPhase5SaleUrl(fixture))
       .set("X-Idempotency-Key", `${body.clientRequestId}-handler-replay`)
       .send(body);
     expect(replay.status).toBe(200);
@@ -157,7 +167,7 @@ describe("Golden Coast Phase 6 special-location allocation", () => {
 
     await setDeduction(fixture.ctx.locationId, "3.0000");
     const conflict = await fixture.agent
-      .post(GOLDEN_COAST_PHASE5_SALE_URL)
+      .post(goldenCoastPhase5SaleUrl(fixture))
       .set("X-Idempotency-Key", `${body.clientRequestId}-changed-config`)
       .send(body);
     expect(conflict.status).toBe(409);
