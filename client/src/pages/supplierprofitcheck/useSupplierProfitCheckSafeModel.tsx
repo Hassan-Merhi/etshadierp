@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
 import { apiRequest } from "@/lib/queryClient";
@@ -61,6 +61,17 @@ export function useSupplierProfitCheckSafeModel() {
     staleTime: 5 * 60 * 1000,
   });
   const selectedSupplier = scopedSuppliers.find((supplier) => String(supplier.id) === base.supplierId);
+
+  useEffect(() => {
+    if (!base.supplierId) return;
+    const initialQty: Record<number, string> = {};
+    for (const row of base.rows) {
+      if (row.proformaQty != null && row.proformaQty > 0) {
+        initialQty[row.stockItemId] = String(row.proformaQty);
+      }
+    }
+    base.setQtyMap(initialQty);
+  }, [base.supplierId, base.sourceType, base.proformaId, base.otwContainerIds, base.rows, base.setQtyMap]);
 
   const derived = useMemo(
     () =>
