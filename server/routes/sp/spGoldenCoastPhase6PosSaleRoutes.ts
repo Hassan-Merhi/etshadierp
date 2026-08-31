@@ -382,7 +382,6 @@ function saleRevenueUsd(sale: GoldenCoastPhase5SaleInput): string {
 function preDeductionPlan(sale: GoldenCoastPhase5SaleInput, rate: string): GoldenCoastPhase6DeductionPlan | null {
   const totalQty = sale.lines.reduce((sum, line) => sum.plus(new Decimal(line.qty)), new Decimal(0));
   const revenueUsd = saleRevenueUsd(sale);
-  const revenue = new Decimal(revenueUsd);
   const pseudoPlan: GoldenCoastPhase5SalePlan = {
     companyId: sale.companyId,
     locationId: sale.locationId,
