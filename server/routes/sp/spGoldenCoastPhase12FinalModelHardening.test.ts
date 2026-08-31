@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const phase6RouteSource = readFileSync(new URL("./spGoldenCoastPhase6PosSaleRoutes.ts", import.meta.url), "utf8");
+const phase6AutoHadiSource = readFileSync(new URL("./goldenCoastPhase6AutoHadi.ts", import.meta.url), "utf8");
 const phase7RouteSource = readFileSync(new URL("./spGoldenCoastPhase7HadiTransferRoutes.ts", import.meta.url), "utf8");
 const phase7ServiceSource = readFileSync(
   new URL("../../services/accounting/goldenCoastPhase7HadiTransfer.ts", import.meta.url),
@@ -15,6 +16,11 @@ const phase11RouteSource = readFileSync(
   new URL("./spGoldenCoastPhase11MonthlyCloseRoutes.ts", import.meta.url),
   "utf8"
 );
+const legacySalesGuardSource = readFileSync(new URL("./spGoldenCoastLegacySalesGuard.ts", import.meta.url), "utf8");
+const posMutationsSource = readFileSync(
+  new URL("../../../client/src/pages/pos/hooks/usePosMutations.ts", import.meta.url),
+  "utf8"
+);
 const spIndexSource = readFileSync(new URL("./index.ts", import.meta.url), "utf8");
 
 describe("Golden Coast Phase 12 final accounting-model hardening", () => {
@@ -23,6 +29,28 @@ describe("Golden Coast Phase 12 final accounting-model hardening", () => {
     expect(phase6RouteSource).toContain("saleSideAccount overrides are retired for Golden Coast");
     expect(phase6RouteSource).toContain(
       'const saleSideAccount = { kind: "ledger" as const, id: accounts.gcSalesCashAccountId };'
+    );
+  });
+
+  it("atomically routes Phase 6 sale cash into the configured HADI company", () => {
+    expect(phase6RouteSource).toContain("postGoldenCoastAutomaticHadiCollectionTx");
+    expect(phase6RouteSource).toContain("hadi_collection_${item.role}");
+    expect(phase6AutoHadiSource).toContain('operation: "collect_via_hadi"');
+    expect(phase6AutoHadiSource).toContain("buildGoldenCoastPhase7TransferPostings");
+    expect(phase6AutoHadiSource).toContain("postBalancedVoucherTx");
+  });
+
+  it("routes the live Supplier Partner POS to Phase 6 when Golden Coast setup is present", () => {
+    expect(posMutationsSource).toContain("GOLDEN_COAST_PHASE6_READINESS");
+    expect(posMutationsSource).toContain("GOLDEN_COAST_PHASE6_SALE");
+    expect(posMutationsSource).toContain("targetCompanyId=");
+    expect(posMutationsSource).toContain("clientRequestId: String(saleData.clientSaleId)");
+  });
+
+  it("fails closed against stale clients that try the generic SP sale route for Golden Coast", () => {
+    expect(legacySalesGuardSource).toContain("GC_PHASE6_CANONICAL_POS_REQUIRED");
+    expect(spIndexSource.indexOf("registerSpGoldenCoastLegacySalesGuard(app)")).toBeLessThan(
+      spIndexSource.indexOf("registerSpSalesRoutes(app)")
     );
   });
 
