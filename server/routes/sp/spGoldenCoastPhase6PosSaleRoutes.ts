@@ -58,8 +58,14 @@ import {
   planGoldenCoastPhase6SpecialLocationDeduction,
   type GoldenCoastPhase6DeductionPlan,
 } from "../../services/accounting/goldenCoastPhase6SpecialLocationDeduction";
+import { GoldenCoastPhase7TransferError } from "../../services/accounting/goldenCoastPhase7HadiTransfer";
 import { adjustSpInventoryAtomic, respondToSpInventoryIntegrityError } from "../../services/sp/spInventoryIntegrity";
 import { getCurrentExchangeRate } from "../helpers/exchangeRateHelpers";
+import {
+  GoldenCoastPhase6AutoHadiError,
+  postGoldenCoastAutomaticHadiCollectionTx,
+  resolveGoldenCoastAutomaticHadiPair,
+} from "./goldenCoastPhase6AutoHadi";
 import { isGoldenCoastCompany } from "./spGoldenCoastPhase4CutoverFifoRoutes";
 import { loadGoldenCoastAccounts } from "./spGoldenCoastSetupRoutes";
 import { requireSpCompany } from "./spHelpers";
@@ -363,21 +369,28 @@ async function loadVoucherEntries(tx: DatabaseTransaction, voucherId: number) {
   return tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 }
 
+function saleRevenueUsd(sale: GoldenCoastPhase5SaleInput): string {
+  return sale.lines
+    .reduce(
+      (sum, line) => sum.plus(new Decimal(line.qty).times(new Decimal(line.unitPriceUsd)).toDecimalPlaces(2)),
+      new Decimal(0)
+    )
+    .toDecimalPlaces(2)
+    .toFixed(2);
+}
+
 function preDeductionPlan(sale: GoldenCoastPhase5SaleInput, rate: string): GoldenCoastPhase6DeductionPlan | null {
   const totalQty = sale.lines.reduce((sum, line) => sum.plus(new Decimal(line.qty)), new Decimal(0));
-  const revenue = sale.lines.reduce(
-    (sum, line) => sum.plus(new Decimal(line.qty).times(new Decimal(line.unitPriceUsd)).toDecimalPlaces(2)),
-    new Decimal(0)
-  );
+  const revenueUsd = saleRevenueUsd(sale);
   const pseudoPlan: GoldenCoastPhase5SalePlan = {
     companyId: sale.companyId,
     locationId: sale.locationId,
     saleDate: sale.saleDate,
     customerName: sale.customerName,
     clientRequestId: sale.clientRequestId,
-    revenueUsd: revenue.toDecimalPlaces(2).toFixed(2),
+    revenueUsd,
     cogsUsd: "0.00",
-    grossProfitUsd: revenue.toDecimalPlaces(2).toFixed(2),
+    grossProfitUsd: revenueUsd,
     totalQty: totalQty.toDecimalPlaces(4).toFixed(4),
     lines: [],
     allocations: [],
@@ -489,9 +502,15 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
 
     const blockers: string[] = [];
     let accounts: Phase6ResolvedAccounts | null = null;
+    let automaticHadiPair: Awaited<ReturnType<typeof resolveGoldenCoastAutomaticHadiPair>> | null = null;
     let cutoverLotCount = 0;
     try {
       accounts = await resolvePhase6Accounts(db, companyId);
+    } catch (error) {
+      blockers.push(error instanceof Error ? error.message : String(error));
+    }
+    try {
+      automaticHadiPair = await resolveGoldenCoastAutomaticHadiPair(db, companyId);
     } catch (error) {
       blockers.push(error instanceof Error ? error.message : String(error));
     }
@@ -525,6 +544,7 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
       cutoverDate: GOLDEN_COAST_CUTOVER_DATE,
       cutoverLotCount,
       accounts,
+      automaticHadiPair,
       specialLocation: configured.length === 1 ? configured[0] : null,
       blockers,
       canPost: blockers.length === 0,
@@ -557,6 +577,12 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
       maxLines: PHASE6_MAX_SALE_LINES,
     });
     const exchangeRate = await getCurrentExchangeRate(selectedCompany);
+    const revenueUsd = saleRevenueUsd(sale);
+    const actor = {
+      userId: userId ?? null,
+      username: req.session.username || "unknown",
+      reason: "Golden Coast Phase 6 POS sale with automatic HADI collection",
+    };
 
     const result = await db.transaction(async (tx) => {
       await tx.execute(
@@ -588,8 +614,32 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
         saleDigest,
         deductionPlan: expectedDeduction,
       });
-      if (replayed)
-        return { replayed: true as const, postings: replayed, plan: null, deductionPlan: expectedDeduction };
+      if (replayed) {
+        const automaticHadiCollection = await postGoldenCoastAutomaticHadiCollectionTx({
+          tx,
+          companyId: selectedCompany,
+          gcSalesCashAccountId: accounts.gcSalesCashAccountId,
+          saleDate: sale.saleDate,
+          amountUsd: revenueUsd,
+          clientRequestId: sale.clientRequestId,
+          actor,
+        });
+        const postings = [
+          ...replayed,
+          ...automaticHadiCollection.postings.map((item) => ({
+            role: `hadi_collection_${item.role}`,
+            voucher: item.voucher,
+            entries: item.entries,
+          })),
+        ];
+        return {
+          replayed: true as const,
+          postings,
+          plan: null,
+          deductionPlan: expectedDeduction,
+          automaticHadiCollection,
+        };
+      }
 
       const stockItemIds = [...new Set(sale.lines.map((line) => line.stockItemId))];
       const lots = await lockFifoLots(tx, selectedCompany, sale.locationId, stockItemIds);
@@ -617,11 +667,7 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
         saleSideAccount,
         saleDigest,
         exchangeRate: exchangeRate != null ? String(exchangeRate) : null,
-        actor: {
-          userId: userId ?? null,
-          username: req.session.username || "unknown",
-          reason: "Golden Coast Phase 6 POS sale",
-        },
+        actor,
       });
 
       const postings: Array<{
@@ -669,7 +715,24 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
         postings.push({ role: "special_deduction", voucher: posted.voucher, entries: posted.entries });
       }
 
-      return { replayed: false as const, postings, plan, deductionPlan };
+      const automaticHadiCollection = await postGoldenCoastAutomaticHadiCollectionTx({
+        tx,
+        companyId: selectedCompany,
+        gcSalesCashAccountId: accounts.gcSalesCashAccountId,
+        saleDate: sale.saleDate,
+        amountUsd: plan.revenueUsd,
+        clientRequestId: sale.clientRequestId,
+        actor,
+      });
+      postings.push(
+        ...automaticHadiCollection.postings.map((item) => ({
+          role: `hadi_collection_${item.role}`,
+          voucher: item.voucher,
+          entries: item.entries,
+        }))
+      );
+
+      return { replayed: false as const, postings, plan, deductionPlan, automaticHadiCollection };
     });
 
     logger.info("Golden Coast Phase 6 POS sale posted", {
@@ -681,6 +744,9 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
       replayed: result.replayed,
       voucherIds: result.postings.map((item) => item.voucher.id),
       deductionUsd: result.deductionPlan?.deductionUsd ?? "0.00",
+      automaticHadiCompanyId: result.automaticHadiCollection.pair.hadiCompanyId,
+      automaticHadiCashAccount: result.automaticHadiCollection.hadiCashAccount,
+      automaticHadiReplayed: result.automaticHadiCollection.replayed,
       durationMs: Date.now() - startedAt,
     });
 
@@ -688,11 +754,17 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
       clientRequestId: sale.clientRequestId,
       locationId: sale.locationId,
       replayed: result.replayed,
-      revenueUsd: result.plan?.revenueUsd ?? null,
+      revenueUsd: result.plan?.revenueUsd ?? revenueUsd,
       cogsUsd: result.plan?.cogsUsd ?? null,
       grossProfitUsd: result.plan?.grossProfitUsd ?? null,
       specialLocationDeductionUsd: result.deductionPlan?.deductionUsd ?? "0.00",
       deductionPerQtyUsd: result.deductionPlan?.deductionPerQtyUsd ?? "0.0000",
+      automaticHadiCollection: {
+        replayed: result.automaticHadiCollection.replayed,
+        hadiCompanyId: result.automaticHadiCollection.pair.hadiCompanyId,
+        amountUsd: result.automaticHadiCollection.transfer.amountUsd,
+        hadiCashAccount: result.automaticHadiCollection.hadiCashAccount,
+      },
       lines: result.plan?.lines ?? null,
       allocations: result.plan?.allocations ?? null,
       postings: result.postings.map((item) => ({ role: item.role, voucher: item.voucher, entries: item.entries })),
@@ -707,6 +779,19 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
     });
     if (error instanceof GoldenCoastPhase6RouteError) {
       res.status(error.status).json({ code: error.code, message: error.message });
+      return;
+    }
+    if (error instanceof GoldenCoastPhase6AutoHadiError) {
+      res.status(error.status).json({ code: error.code, message: error.message });
+      return;
+    }
+    if (error instanceof GoldenCoastPhase7TransferError) {
+      const conflictCodes = new Set([
+        "GC_PHASE7_COLLECTION_EXCEEDS_BALANCE",
+        "GC_PHASE7_REMITTANCE_EXCEEDS_COLLECTIONS",
+        "GC_PHASE7_SCOPE_INVALID",
+      ]);
+      res.status(conflictCodes.has(error.code) ? 409 : 400).json({ code: error.code, message: error.message });
       return;
     }
     if (error instanceof GoldenCoastPhase6DeductionError) {

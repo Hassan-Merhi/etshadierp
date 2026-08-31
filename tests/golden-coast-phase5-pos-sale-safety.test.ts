@@ -16,6 +16,7 @@ import { closeTestServer } from "./setup";
 import {
   GOLDEN_COAST_PHASE5_SALE_DATE,
   GOLDEN_COAST_PHASE5_SALE_URL,
+  goldenCoastPhase5SaleUrl,
   clearLots,
   inventoryQuantity,
   lotRemaining,
@@ -49,7 +50,7 @@ function saleBody(overrides: Record<string, unknown> = {}) {
 }
 
 function postSale(body: Record<string, unknown>) {
-  return fixture.agent.post(GOLDEN_COAST_PHASE5_SALE_URL).send(body);
+  return fixture.agent.post(goldenCoastPhase5SaleUrl(fixture)).send(body);
 }
 
 function seedLot(input: { qty: string; unitCost: string }) {
@@ -100,7 +101,7 @@ describe("Golden Coast Phase 5 — replay safety", () => {
     // reaches this route's own replay detection, which returns the already
     // posted pair instead of consuming stock again.
     const handlerReplay = await fixture.agent
-      .post(GOLDEN_COAST_PHASE5_SALE_URL)
+      .post(goldenCoastPhase5SaleUrl(fixture))
       .set("X-Idempotency-Key", `${body.clientRequestId}-transport-retry`)
       .send(body);
     expect(handlerReplay.status).toBe(200);
@@ -108,7 +109,17 @@ describe("Golden Coast Phase 5 — replay safety", () => {
     expect(handlerReplay.body.postings.map((posting: { voucher: { id: number } }) => posting.voucher.id)).toEqual(
       first.body.postings.map((posting: { voucher: { id: number } }) => posting.voucher.id)
     );
-    expect(handlerReplay.body.postings.map((posting: { role: string }) => posting.role)).toEqual(["revenue", "cogs"]);
+    // A replay re-reports the sale's own vouchers and adds the automatic HADI
+    // collection pair, which posts on the replay too: the collection is what
+    // moves the cash, and a Phase 6 sale that was recorded before automatic
+    // routing existed must be able to acquire its missing HADI side without
+    // consuming stock again.
+    expect(handlerReplay.body.postings.map((posting: { role: string }) => posting.role)).toEqual([
+      "revenue",
+      "cogs",
+      "hadi_collection_golden_coast",
+      "hadi_collection_hadi",
+    ]);
     expect(await lotRemaining(lotId)).toBeCloseTo(remainingAfterFirst, 4);
     expect(await goldenCoastInventory()).toBeCloseTo(inventoryAfterFirst, 4);
 
@@ -132,7 +143,7 @@ describe("Golden Coast Phase 5 — replay safety", () => {
     // Without the persisted sale digest it would be answered with the original
     // sale's vouchers while silently dropping this one.
     const tampered = await fixture.agent
-      .post(GOLDEN_COAST_PHASE5_SALE_URL)
+      .post(goldenCoastPhase5SaleUrl(fixture))
       .set("X-Idempotency-Key", `${body.clientRequestId}-different-data`)
       .send({ ...body, lines: [{ stockItemId: fixture.goldenCoastStockItemId, qty: "5", unitPriceUsd: "99" }] });
 
@@ -154,7 +165,7 @@ describe("Golden Coast Phase 5 — replay safety", () => {
   });
 
   it("requires a client request id on every Golden Coast sale", async () => {
-    const res = await fixture.agent.post(GOLDEN_COAST_PHASE5_SALE_URL).send({
+    const res = await fixture.agent.post(goldenCoastPhase5SaleUrl(fixture)).send({
       locationId: fixture.ctx.locationId,
       saleDate: GOLDEN_COAST_PHASE5_SALE_DATE,
       customerName: "No Request Id",
@@ -255,7 +266,7 @@ describe("Golden Coast Phase 5 — non-Golden-Coast Supplier Partner companies",
   it("refuses the Phase 5 sale path and leaves the legacy Supplier Partner sale working", async () => {
     await selectCompany(fixture, fixture.plainCompanyId);
     try {
-      const blocked = await fixture.agent.post(GOLDEN_COAST_PHASE5_SALE_URL).send({
+      const blocked = await fixture.agent.post(goldenCoastPhase5SaleUrl(fixture)).send({
         locationId: fixture.plainLocationId,
         saleDate: GOLDEN_COAST_PHASE5_SALE_DATE,
         customerName: "Plain Customer",
