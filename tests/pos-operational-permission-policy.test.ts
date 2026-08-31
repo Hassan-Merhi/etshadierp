@@ -36,6 +36,6 @@ describe("POS operational permission policy", () => {
     expect(isPosSaleCreate("POST", "/api/pos/sales")).toBe(true);
     expect(isPosSaleCreate("GET", "/api/pos/sales")).toBe(false);
     expect(parsePosSaleEditVoucherId("PUT", "/api/vouchers/123/sales")).toBe(123);
-    expect(parsePosSaleEditVoucherId("PATCH", "/api/vouchers/123/sales")).toBeNull();
+    expect(parsePosSaleEditVoucherId("PATCH", "/api/vouchers/123/sales")).toBe(123);
   });
 });

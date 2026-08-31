@@ -64,7 +64,7 @@ export const supplierService = {
     const companySuppliers = search ? await supplierRepository.listAll(companyId) : suppliers;
     if (companySuppliers.length > 0) return suppliers;
 
-    const parentCompanyId = await resolveParentCompanyId();
+    const parentCompanyId = await resolveParentCompanyId(companyId);
     if (parentCompanyId === companyId) return suppliers;
 
     return supplierRepository.list(parentCompanyId, search);
@@ -73,7 +73,7 @@ export const supplierService = {
   async stats(companyId: number) {
     let suppliers = await supplierRepository.listAll(companyId);
     if (suppliers.length === 0) {
-      const parentCompanyId = await resolveParentCompanyId();
+      const parentCompanyId = await resolveParentCompanyId(companyId);
       if (parentCompanyId !== companyId) {
         suppliers = await supplierRepository.listAll(parentCompanyId);
       }

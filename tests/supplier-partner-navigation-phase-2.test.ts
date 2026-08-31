@@ -11,11 +11,11 @@ describe("Supplier Partner navigation phase 2", () => {
     expect(routes).toContain('<Route path="/sp" component={SpOverview} />');
   });
 
-  it("separates daily work from administration", () => {
+  it("keeps setup inside the Supplier Partner section", () => {
     const navigation = read("client/src/lib/supplier-partner-navigation.ts");
     expect(navigation).toContain('label: "Supplier Partner"');
-    expect(navigation).toContain('label: "SP Administration"');
-    expect(navigation).toContain('{ title: "Overview", url: "/sp"');
+    expect(navigation).not.toContain('label: "SP Administration"');
+    expect(navigation).not.toContain('{ title: "Overview", url: "/sp"');
     expect(navigation).toContain('{ title: "Setup", url: "/sp/setup"');
   });
 

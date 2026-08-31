@@ -221,8 +221,12 @@ export async function buildEntrySheet(
         const b = dayBase + d * COLS_PER_DAY;
         const ds = item.salesByDate.get(dates[d]);
         const qtyVal = ds && ds.qty > 0 ? Math.round(ds.qty) : null;
-        const priceVal = ds && ds.qty > 0 ? r4(ds.totalSales / ds.qty) : null;
-        const profitVal = ds && ds.qty > 0 ? r4((ds.totalSales - ds.totalCost) / ds.qty) : null;
+        // The shop's configured per-unit deduction reduces the amount
+        // attributable to the supplier. Keep the visible sale price and
+        // profit consistent with the net total shown in the sheet.
+        const netSales = ds ? ds.totalSales - (ds.totalDeduction ?? 0) : 0;
+        const priceVal = ds && ds.qty > 0 ? r4(netSales / ds.qty) : null;
+        const profitVal = ds && ds.qty > 0 ? r4((netSales - ds.totalCost) / ds.qty) : null;
         const qL = colLetter(b),
           pL = colLetter(b + 1);
 
@@ -341,7 +345,10 @@ export async function buildEntrySheet(
         pL = colLetter(b + 1),
         prL = colLetter(b + 2);
       const qtyTot = Math.round(gb.items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.qty ?? 0), 0));
-      const salTot = r2(gb.items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.totalSales ?? 0), 0));
+       const salTot = r2(gb.items.reduce((s, i) => {
+         const ds = i.salesByDate.get(dates[d]);
+         return s + (ds?.totalSales ?? 0) - (ds?.totalDeduction ?? 0);
+       }, 0));
       const cstTot = r2(gb.items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.totalCost ?? 0), 0));
       const profTot = r2(salTot - cstTot);
 
@@ -420,11 +427,14 @@ export async function buildEntrySheet(
     for (let d = 0; d < dayCount; d++) {
       const b = dayBase + d * COLS_PER_DAY;
       const qtyTot = Math.round(items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.qty ?? 0), 0));
-      const salTot = r2(items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.totalSales ?? 0), 0));
+       const salTot = r2(items.reduce((s, i) => {
+         const ds = i.salesByDate.get(dates[d]);
+         return s + (ds?.totalSales ?? 0) - (ds?.totalDeduction ?? 0);
+       }, 0));
       const profTot = r2(
         items.reduce((s, i) => {
           const ds = i.salesByDate.get(dates[d]);
-          return s + ((ds?.totalSales ?? 0) - (ds?.totalCost ?? 0));
+           return s + (ds?.totalSales ?? 0) - (ds?.totalDeduction ?? 0) - (ds?.totalCost ?? 0);
         }, 0)
       );
 

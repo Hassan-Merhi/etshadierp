@@ -82,4 +82,10 @@ describe("Golden Coast Phase 4 cutover hardening route surface", () => {
     expect(routeSource).toContain("loc.company_id = ${companyId}");
     expect(routeSource).toContain("new Date().toISOString().slice(0, 10) < GOLDEN_COAST_CUTOVER_DATE");
   });
+
+  it("recognizes the existing-position carry-forward as the alternate opening marker", () => {
+    expect(routeSource).toContain("goldenCoastExistingPositionCarryForwardVoucherNumber(companyId)");
+    expect(routeSource).toContain("openingVoucherRow");
+    expect(routeSource).toContain("carryForwardPosted");
+  });
 });

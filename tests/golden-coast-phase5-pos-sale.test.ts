@@ -181,11 +181,17 @@ describe("Golden Coast Phase 5 — FIFO sale accounting", () => {
     expect(await lotRemaining(lotId)).toBeCloseTo(100, 4);
   });
 
-  it("refuses to post before the Phase 4 opening FIFO bridge exists", async () => {
+  it("creates a current-inventory cost lot when no cutover bridge exists", async () => {
     await clearLots(fixture.ctx.companyId);
     const res = await postSale(saleBody());
-    expect(res.status).toBe(409);
-    expect(res.body.code).toBe("GC_PHASE6_NOT_READY");
+    expect(res.status).toBe(200);
+    expect(res.body.cogsUsd).toBe("300.00");
+    expect(res.body.postings.map((posting: { role: string }) => posting.role)).toEqual([
+      "revenue",
+      "cogs",
+      "hadi_collection_golden_coast",
+      "hadi_collection_hadi",
+    ]);
   });
 
   it("never consumes legacy pre-cutover movement rows", async () => {
@@ -232,14 +238,12 @@ describe("Golden Coast Phase 5 — FIFO sale accounting", () => {
     expect(await lotRemaining(legacyLotId)).toBeCloseTo(100, 4);
   });
 
-  it("refuses to post a sale dated before the Golden Coast cutover", async () => {
+  it("accepts a sale dated before the removed Golden Coast cutover", async () => {
     await clearLots(fixture.ctx.companyId);
-    const lotId = await seedLot({ qty: "100", unitCost: "22" });
 
     const res = await postSale(saleBody({ saleDate: "2026-08-31" }));
-    expect(res.status).toBe(409);
-    expect(res.body.code).toBe("GC_PHASE5_PRE_CUTOVER_DATE");
-    expect(await lotRemaining(lotId)).toBeCloseTo(100, 4);
+    expect(res.status).toBe(200);
+    expect(res.body.cogsUsd).toBe("300.00");
   });
 
   it("attributes stock to the selling location and will not sell from an empty one", async () => {
@@ -251,7 +255,7 @@ describe("Golden Coast Phase 5 — FIFO sale accounting", () => {
     expect(otherLocation.body.code).toBe("GC_PHASE5_FIFO_INSUFFICIENT");
   });
 
-  it("rejects a sale line for a stock item with no Golden Coast FIFO stock", async () => {
+  it("uses current inventory cost for stocked items without a cutover lot", async () => {
     await clearLots(fixture.ctx.companyId);
     await seedLot({ qty: "100", unitCost: "22" });
 
@@ -263,8 +267,13 @@ describe("Golden Coast Phase 5 — FIFO sale accounting", () => {
         ],
       })
     );
-    expect(res.status).toBe(409);
-    expect(res.body.code).toBe("GC_PHASE5_FIFO_INSUFFICIENT");
+    expect(res.status).toBe(200);
+    expect(res.body.postings.map((posting: { role: string }) => posting.role)).toEqual([
+      "revenue",
+      "cogs",
+      "hadi_collection_golden_coast",
+      "hadi_collection_hadi",
+    ]);
   });
 
   it("exposes readiness for the Golden Coast company", async () => {
@@ -274,7 +283,7 @@ describe("Golden Coast Phase 5 — FIFO sale accounting", () => {
     const res = await fixture.agent.get(`${GOLDEN_COAST_PHASE5_SALE_URL}/readiness`);
     expect(res.status).toBe(200);
     expect(res.body.canPost).toBe(true);
-    expect(res.body.cutoverLotCount).toBeGreaterThan(0);
+    expect(res.body.costLotCount).toBeGreaterThan(0);
     expect(res.body.accounts).toMatchObject({
       saleSideAccountId: fixture.saleSideAccountId,
       salesRevenueAccountId: fixture.salesAccountId,

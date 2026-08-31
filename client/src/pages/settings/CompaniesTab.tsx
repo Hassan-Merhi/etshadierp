@@ -48,6 +48,7 @@ export function CompaniesTab() {
       active: true,
       baseCurrency: "USD",
       displayCurrency: "none",
+      parentCompanyId: null,
     },
   });
 
@@ -74,6 +75,7 @@ export function CompaniesTab() {
         active: true,
         baseCurrency: "USD",
         displayCurrency: "none",
+        parentCompanyId: null,
       });
     },
     onError: (error: ClientErrorLike) => {
@@ -105,6 +107,7 @@ export function CompaniesTab() {
       active: company.active ?? true,
       baseCurrency: company.baseCurrency || "USD",
       displayCurrency: company.displayCurrency || "none",
+      parentCompanyId: company.parentCompanyId ?? null,
     });
     setIsCompanyDialogOpen(true);
   }
@@ -112,6 +115,21 @@ export function CompaniesTab() {
   function handleSubmitCompany(data: CompanyFormValues) {
     createCompanyMutation.mutate(data);
   }
+
+  const selectedCompanyType = companyForm.watch("companyType");
+  const selectedParentCompanyId = companyForm.watch("parentCompanyId");
+  const editingCompanyId = Number(editingCompany?.id ?? 0);
+  const activeParentCompanies = companies.filter(
+    (company) => company.active && Number(company.id) !== editingCompanyId
+  );
+  const selectedParentCompany = companies.find(
+    (company) => Number(company.id) === Number(selectedParentCompanyId)
+  );
+  const parentCompanyOptions =
+    selectedParentCompany &&
+    !activeParentCompanies.some((company) => Number(company.id) === Number(selectedParentCompanyId))
+      ? [selectedParentCompany, ...activeParentCompanies]
+      : activeParentCompanies;
 
   return (
     <div className="space-y-5">
@@ -139,6 +157,7 @@ export function CompaniesTab() {
                 active: true,
                 baseCurrency: "USD",
                 displayCurrency: "none",
+                parentCompanyId: null,
               });
             }
           }}
@@ -154,6 +173,7 @@ export function CompaniesTab() {
                   active: true,
                   baseCurrency: "USD",
                   displayCurrency: "none",
+                  parentCompanyId: null,
                 });
               }}
               data-testid="button-add-company"
@@ -280,6 +300,44 @@ export function CompaniesTab() {
                     </FormItem>
                   )}
                 />
+                {(editingCompany || selectedCompanyType === "supplier_partner") && (
+                  <FormField
+                    control={companyForm.control}
+                    name="parentCompanyId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Parent Company</FormLabel>
+                        <Select
+                          value={field.value == null ? "none" : String(field.value)}
+                          onValueChange={(value) => field.onChange(value === "none" ? null : Number(value))}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-parent-company">
+                              <SelectValue placeholder="No parent company" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">No parent company</SelectItem>
+                            {parentCompanyOptions.map((company) => (
+                              <SelectItem
+                                key={company.id}
+                                value={String(company.id)}
+                                disabled={!company.active}
+                              >
+                                {company.name} ({company.code})
+                                {!company.active ? " — inactive" : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          For Golden Coast Supplier Partners, choose the active HADI parent company.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 {editingCompany && (
                   <div className="border-t pt-4">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">

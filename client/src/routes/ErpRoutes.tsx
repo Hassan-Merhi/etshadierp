@@ -429,10 +429,10 @@ export function ErpRoutes({ user }: ErpRoutesProps) {
       <Route path="/sp/reports" component={SpReports} />
       <Route path="/sp/aliases" component={SpAliases} />
       <Route path="/sp/migration">
-        <Redirect to="/sp/setup?tab=migration" />
+        <Redirect to="/sp/setup" />
       </Route>
       <Route path="/sp/gc-migration">
-        <Redirect to="/sp/setup?tab=migration" />
+        <Redirect to="/sp/setup" />
       </Route>
       <Route path="/sp/setup" component={SpSetup} />
 

@@ -76,7 +76,7 @@ export default function SpGoldenCoast() {
         </TabsList>
 
         <TabsContent value="overview" className="mt-5 space-y-5">
-          <GoldenCoastOverview onOpenTab={setTab} />
+           <GoldenCoastOverview onOpenTab={setTab} />
         </TabsContent>
 
         <TabsContent value="hadi" className="mt-5">

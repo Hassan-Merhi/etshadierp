@@ -1,8 +1,6 @@
-import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";
@@ -11,10 +9,25 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, BarChart3, CreditCard, CheckCircle2, FileSpreadsheet } from "lucide-react";
+import { Loader2, BarChart3, FileSpreadsheet } from "lucide-react";
+import { QuickMonthlyClose } from "./golden-coast/QuickMonthlyClose";
 
-const REPORT_TABS = ["payable", "profit", "sales-form"] as const;
+const REPORT_TABS = ["profit", "sales-form"] as const;
 type ReportTab = (typeof REPORT_TABS)[number];
+
+type CashAccount = {
+  id: string | number;
+  name: string;
+};
+
+type AccountsResponse = {
+  accounts?: CashAccount[];
+};
+
+function extractAccounts(payload: AccountsResponse | CashAccount[] | undefined): CashAccount[] {
+  if (Array.isArray(payload)) return payload;
+  return Array.isArray(payload?.accounts) ? payload.accounts : [];
+}
 
 function fmt(v: number, dec = 2) {
   const n = parseFloat(String(v ?? "0"));
@@ -25,18 +38,15 @@ function fmt(v: number, dec = 2) {
 
 export default function SpReports() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const { selectedCompany } = useCompany();
   const [tab, setTab] = useHubQueryState<ReportTab>({
     key: "tab",
     allowedValues: REPORT_TABS,
-    defaultValue: "payable",
+    defaultValue: "profit",
     omitDefault: true,
   });
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [splitPeriod, setSplitPeriod] = useState(new Date().toISOString().slice(0, 7));
-  const [customSplitPct, setCustomSplitPct] = useState("50");
 
   const [exportFrom, setExportFrom] = useState(() => {
     const d = new Date();
@@ -49,7 +59,6 @@ export default function SpReports() {
   const [exporting, setExporting] = useState(false);
   const [exportingV2, setExportingV2] = useState(false);
 
-  const payableUrl = "/api/sp/report/payable";
   const profitUrl = `/api/sp/report/profit${
     startDate || endDate
       ? `?${new URLSearchParams({ ...(startDate && { startDate }), ...(endDate && { endDate }) })}`
@@ -57,31 +66,13 @@ export default function SpReports() {
   }`;
   const splitsUrl = "/api/sp/profit-splits";
 
-  const { data: payable, isLoading: payableLoading } = useQuery<any>({ queryKey: [payableUrl] });
   const { data: profit, isLoading: profitLoading } = useQuery<any>({ queryKey: [profitUrl] });
   const { data: splits = [], isLoading: splitsLoading } = useQuery<any[]>({ queryKey: [splitsUrl] });
   const { data: locations = [] } = useQuery<any[]>({ queryKey: ["/api/locations"] });
-  const { data: accounts = [] } = useQuery<any[]>({ queryKey: ["/api/accounts/all", selectedCompany?.id] });
-
-  const finalizeMutation = useMutation({
-    mutationFn: (body: any) => apiRequest("POST", "/api/sp/profit-splits", body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [splitsUrl] });
-      toast({ title: "Profit split finalized" });
-    },
-    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  const { data: accountsResponse } = useQuery<AccountsResponse | CashAccount[]>({
+    queryKey: ["/api/accounts/all", selectedCompany?.id],
   });
-
-  const handleFinalize = () => {
-    if (!profit) return;
-    finalizeMutation.mutate({
-      periodMonth: splitPeriod,
-      totalRevenue: profit.totalRevenue,
-      totalCogs: profit.totalCogs,
-      totalSharedCharges: profit.totalSharedCharges,
-      splitPct: customSplitPct,
-    });
-  };
+  const accounts = extractAccounts(accountsResponse);
 
   const handleExportSalesForm = async () => {
     if (!exportFrom || !exportTo) {
@@ -152,14 +143,11 @@ export default function SpReports() {
     <div className="space-y-4 max-w-4xl">
       <div>
         <h1 className="text-xl font-semibold">Reports</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Payable statement, Profit & Loss, and Sales Form export</p>
+        <p className="text-sm text-muted-foreground mt-0.5">Profit & Loss and Sales Form export</p>
       </div>
 
       <Tabs value={tab} onValueChange={(value) => setTab(value as ReportTab)}>
         <TabsList data-testid="tabs-sp-reports" className="flex-wrap gap-1">
-          <TabsTrigger value="payable" data-testid="tab-sp-payable">
-            <CreditCard className="h-3.5 w-3.5 mr-1.5" /> Supplier Payable
-          </TabsTrigger>
           <TabsTrigger value="profit" data-testid="tab-sp-profit">
             <BarChart3 className="h-3.5 w-3.5 mr-1.5" /> Profit & Loss
           </TabsTrigger>
@@ -167,59 +155,6 @@ export default function SpReports() {
             <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" /> Sales Form
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="payable" className="mt-4">
-          {payableLoading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading...
-            </div>
-          ) : (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <CardTitle className="text-sm">Supplier Cash Payable</CardTitle>
-                    <CardDescription className="text-xs">
-                      Full sale amount owed to supplier — from sale postings
-                    </CardDescription>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground">Closing Balance</p>
-                    <p className="text-lg font-bold text-orange-600">{fmt(payable?.closingBalance)}</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {(payable?.movements || []).length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No payable entries yet.</p>
-                ) : (
-                  <div className="space-y-0.5">
-                    <div className="grid grid-cols-5 text-xs font-medium text-muted-foreground pb-1 border-b border-border/40">
-                      <span>Date</span>
-                      <span className="col-span-2">Description</span>
-                      <span className="text-right">Credit</span>
-                      <span className="text-right">Balance</span>
-                    </div>
-                    {(payable?.movements || []).map((m: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="grid grid-cols-5 text-xs py-1 border-b border-border/30 last:border-0"
-                        data-testid={`row-sp-payable-${idx}`}
-                      >
-                        <span className="text-muted-foreground">{m.date?.slice(0, 10)}</span>
-                        <span className="col-span-2 truncate">{m.description}</span>
-                        <span className="text-right tabular-nums text-orange-600">
-                          {m.credit > 0 ? fmt(m.credit) : ""}
-                        </span>
-                        <span className="text-right tabular-nums font-medium">{fmt(m.balance)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
 
         <TabsContent value="profit" className="mt-4 space-y-4">
           <div className="flex items-center gap-3 flex-wrap">
@@ -291,57 +226,16 @@ export default function SpReports() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm">Profit Split (Report Only)</CardTitle>
+                  <CardTitle className="text-sm">Profit Split</CardTitle>
                   <CardDescription className="text-xs">
-                    50/50 split — supplier share is informational only, not posted to Supplier Cash Payable
+                    Choose the report month and split it using the ledger-derived Golden Coast monthly close.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Our Share (50%)</p>
-                      <p className="font-semibold text-green-600">{fmt(profit.ourShare)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Supplier Share (50%)</p>
-                      <p className="font-semibold text-orange-600">{fmt(profit.supplierShare)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-end gap-3 pt-1">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Period (YYYY-MM)</label>
-                      <Input
-                        value={splitPeriod}
-                        onChange={(e) => setSplitPeriod(e.target.value)}
-                        className="mt-1 w-28 text-xs"
-                        data-testid="input-sp-split-period"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Split %</label>
-                      <Input
-                        type="number"
-                        value={customSplitPct}
-                        onChange={(e) => setCustomSplitPct(e.target.value)}
-                        className="mt-1 w-20 text-xs"
-                        data-testid="input-sp-split-pct"
-                      />
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleFinalize}
-                      disabled={finalizeMutation.isPending}
-                      data-testid="button-sp-finalize-split"
-                    >
-                      {finalizeMutation.isPending ? (
-                        <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-                      ) : (
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                      )}
-                      Finalize
-                    </Button>
-                  </div>
+                <CardContent>
+                  <QuickMonthlyClose
+                    periodMonth={endDate.length >= 7 ? endDate.slice(0, 7) : ""}
+                    companyKey={selectedCompany?.id ?? "no-company"}
+                  />
                 </CardContent>
               </Card>
             </>
@@ -479,11 +373,11 @@ export default function SpReports() {
                   supplier template with your data (18-day max, formula-based).
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">Export System Sales Form</span> — clean from-scratch
-                  workbook built from your live system data. Opening &amp; closing stock match the Location Inventory
-                  page. Supports any date range. 5 sheets, no Ageing: ENTRY, Summary (visible) + Costing, Sales,
-                  Summary-Itemwise (hidden). Optionally select an Opening Cash Account to auto-fill day-1 cash from the
-                  ledger balance.
+                   <span className="font-medium text-foreground">Export System Sales Form</span> — clean from-scratch
+                   workbook built from your live system data. Opening &amp; closing stock match the Location Inventory
+                   page. Supports any date range. Three sheets: ENTRY (visible) plus Costing and Sales (hidden).
+                   Items with no opening, closing, or sales activity are omitted. Optionally select an Opening Cash
+                   Account to auto-fill day-1 cash from the ledger balance.
                 </p>
               </div>
             </CardContent>

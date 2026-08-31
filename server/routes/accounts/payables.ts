@@ -21,7 +21,7 @@ export function registerAccountPayableRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const suppliers = await storage.getAllSuppliers();
-      const parentCompanyId = await resolveParentCompanyId();
+      const parentCompanyId = await resolveParentCompanyId(companyId);
       const isChildCompany = companyId !== parentCompanyId;
 
       const payableAccounts = (

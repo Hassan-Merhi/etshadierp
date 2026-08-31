@@ -19,6 +19,7 @@ import { buildEntrySheet } from "../server/services/sp-sales-form-v2/buildEntryS
 import { buildSalesSheet } from "../server/services/sp-sales-form-v2/buildSalesSheet";
 import { buildSummaryItemwiseSheet } from "../server/services/sp-sales-form-v2/buildSummaryItemwiseSheet";
 import { buildSummarySheet } from "../server/services/sp-sales-form-v2/buildSummarySheet";
+import { buildItemRegistry } from "../server/services/sp-sales-form-v2/itemRegistry";
 import type { ItemRow, SpSalesFormV2Params } from "../server/services/sp-sales-form-v2/types";
 
 const DATES = ["2026-03-01", "2026-03-02"];
@@ -108,6 +109,23 @@ describe("entry sheet", () => {
     expect(sheetText(ws)).toContain("Rice 5kg");
   });
 
+  it("reduces sale total and profit by the location deduction per unit", async () => {
+    const wb = new ExcelJS.Workbook();
+    const item = itemRow({
+      salesByDate: new Map([
+        [DATES[0], { qty: 17, totalSales: 1985, totalCost: 1375, totalDeduction: 85 }],
+        [DATES[1], { qty: 0, totalSales: 0, totalCost: 0, totalDeduction: 0 }],
+      ]),
+    });
+    await buildEntrySheet(wb, [item], DATES, DATES.length, params, null);
+
+    const ws = wb.getWorksheet("ENTRY")!;
+    // One item: row 4, group subtotal row 5, grand total row 6.
+    expect((ws.getCell(5, 8).value as ExcelJS.CellFormulaValue).result).toBe(1900);
+    expect((ws.getCell(6, 8).value as ExcelJS.CellFormulaValue).result).toBe(1900);
+    expect((ws.getCell(4, 9).value as ExcelJS.CellFormulaValue).result).toBeCloseTo(30.8824, 3);
+  });
+
   it("builds a usable sheet for a period with no items", async () => {
     const wb = new ExcelJS.Workbook();
     await buildEntrySheet(wb, [], DATES, DATES.length, params, null);
@@ -151,6 +169,54 @@ describe("sales and costing sheets", () => {
     const ws = wb.worksheets.find((sheet) => sheet.name.toLowerCase().includes("cost"))!;
     expect(ws).toBeDefined();
     expect(sheetText(ws)).toContain("IT-501");
+  });
+});
+
+describe("item registry", () => {
+  it("omits items with no opening, closing, or sales activity", () => {
+    const inactive = itemRow({
+      stockItemId: 502,
+      itemCode: "IT-502",
+      itemName: "Inactive item",
+      openQty: 0,
+      openValue: 0,
+      closeQty: 0,
+      closeValue: 0,
+      totalQty: 0,
+      totalSales: 0,
+      totalCost: 0,
+      salesByDate: new Map(),
+    });
+    const active = itemRow({ stockItemId: 503, itemCode: "IT-503", itemName: "Active item" });
+    const result = buildItemRegistry(
+      new Map([
+        [inactive.stockItemId, {
+          stockItemId: inactive.stockItemId,
+          stockItemCode: inactive.itemCode,
+          stockItemName: inactive.itemName,
+          stockGroupName: inactive.groupName,
+          stockItemUom: inactive.itemUom,
+          quantity: 0,
+          averageRate: 0,
+          totalValue: 0,
+        }],
+        [active.stockItemId, {
+          stockItemId: active.stockItemId,
+          stockItemCode: active.itemCode,
+          stockItemName: active.itemName,
+          stockGroupName: active.groupName,
+          stockItemUom: active.itemUom,
+          quantity: active.openQty,
+          averageRate: active.openRate,
+          totalValue: active.openValue,
+        }],
+      ]),
+      new Map(),
+      [],
+      DATES.length,
+    );
+
+    expect(result.map((item) => item.itemName)).toEqual(["Active item"]);
   });
 });
 

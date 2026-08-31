@@ -38,8 +38,11 @@ export function buildItemRegistry(
   }
   for (const sale of salesRows) {
     const row = ensure(sale.stockItemId, sale.itemCode, sale.itemName, sale.groupName, sale.uom);
-    const ex = row.salesByDate.get(sale.saleDate) ?? { qty: 0, totalSales: 0, totalCost: 0 };
-    ex.qty += sale.qty; ex.totalSales += sale.totalSales; ex.totalCost += sale.totalCost;
+    const ex = row.salesByDate.get(sale.saleDate) ?? { qty: 0, totalSales: 0, totalCost: 0, totalDeduction: 0 };
+    ex.qty += sale.qty;
+    ex.totalSales += sale.totalSales;
+    ex.totalCost += sale.totalCost;
+    ex.totalDeduction = (ex.totalDeduction ?? 0) + sale.totalDeduction;
     row.salesByDate.set(sale.saleDate, ex);
   }
 
@@ -55,8 +58,21 @@ export function buildItemRegistry(
     if (!row.openRate && row.closeRate) row.openRate = row.closeRate;
   }
 
+  // Do not carry completely inactive items into the workbook. Inventory
+  // snapshots commonly include every stock master item, even when it had no
+  // opening stock, closing stock, or sales in the requested period.
+  const activeItems = Array.from(registry.values()).filter((item) =>
+    item.openQty !== 0 ||
+    item.openValue !== 0 ||
+    item.totalQty !== 0 ||
+    item.totalSales !== 0 ||
+    item.totalCost !== 0 ||
+    item.closeQty !== 0 ||
+    item.closeValue !== 0
+  );
+
   // Sort by group, then item name
-  return Array.from(registry.values()).sort((a, b) => {
+  return activeItems.sort((a, b) => {
     const gCmp = (a.groupName || "~").localeCompare(b.groupName || "~");
     return gCmp !== 0 ? gCmp : a.itemName.localeCompare(b.itemName);
   });

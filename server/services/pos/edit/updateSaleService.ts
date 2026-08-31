@@ -29,6 +29,11 @@ import { rebuildSaleItems } from "./rebuildSaleItems";
 import { nextCanonicalSourceRevision } from "../../inventory/canonicalSourceRevision";
 import { updateVoucherRecord } from "./updateSaleVoucher";
 import { rebuildSaleAccountingEntries } from "./rebuildSaleAccounting";
+import {
+  isGoldenCoastPosCompany,
+  postGoldenCoastPosAccountingTx,
+  reverseGoldenCoastPosAccountingTx,
+} from "../goldenCoastPosAccounting";
 
 function err(result: HandlerErrorResult) {
   return { status: result.status, body: result.body };
@@ -129,8 +134,6 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
     const oldSalesItems = await tx.select().from(salesItems).where(eq(salesItems.voucherId, voucherId)).for("update");
     oldSalesItems.sort((a, b) => a.stockItemId - b.stockItemId);
 
-    const oldItemsMap = new Map(oldSalesItems.map((item) => [item.id, item]));
-
     // Each edit appends its own reversal and reissue to the append-only
     // journal, so it needs an idempotency key of its own.
     const canonicalRevision = await nextCanonicalSourceRevision(
@@ -139,6 +142,20 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
       "pos-sale",
       String(voucherId)
     );
+
+    const isGoldenCoastEdit = isSpCompanyEdit && (await isGoldenCoastPosCompany(tx, currentCompanyId));
+    const clientSaleId = String(lockedVoucher.clientSaleId ?? "").trim();
+    if (isGoldenCoastEdit && clientSaleId) {
+      await reverseGoldenCoastPosAccountingTx({
+        tx,
+        companyId: currentCompanyId,
+        clientSaleId,
+        revision: canonicalRevision,
+        actor: { userId, username, reason: `Edit Golden Coast POS sale ${lockedVoucher.voucherNumber}` },
+      });
+    }
+
+    const oldItemsMap = new Map(oldSalesItems.map((item) => [item.id, item]));
 
     await reverseOriginalSaleInventory(tx, lockedVoucher, oldSalesItems, canonicalRevision);
     await clearOldSaleRecords(tx, voucherId);
@@ -178,11 +195,51 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
       exchangeRate: lockedVoucher.exchangeRate ? String(lockedVoucher.exchangeRate) : null,
     });
 
+    if (isGoldenCoastEdit && clientSaleId && !isCreditSale) {
+      const oldPaymentEntry = oldEntries.find((entry) => Number(entry.debitAmount ?? 0) > 0);
+      const normalizedPaymentType =
+        paymentAccountType === "bank" || paymentAccountType === "cash"
+          ? paymentAccountType
+          : oldPaymentEntry?.bankAccountId
+            ? "bank"
+            : "cash";
+      const normalizedPaymentId = Number(
+        paymentAccountId || oldPaymentEntry?.bankAccountId || oldPaymentEntry?.ledgerAccountId || 0
+      );
+      if (!Number.isInteger(normalizedPaymentId) || normalizedPaymentId <= 0) {
+        throw new Error("Golden Coast POS edit requires a valid cash or bank payment account");
+      }
+      const payableAmount = Math.max(
+        0,
+        Number(
+          (
+            rebuildResult.grandTotal -
+            rebuildResult.totalQtySoldEdit * editSpDeductionPerQty
+          ).toFixed(2)
+        )
+      );
+      await postGoldenCoastPosAccountingTx({
+        tx,
+        companyId: currentCompanyId,
+        locationId: targetLocationId,
+        clientSaleId,
+        revision: `edit${canonicalRevision}`,
+        saleDate: String(voucherDate || lockedVoucher.voucherDate),
+        amountUsd: rebuildResult.grandTotal,
+        paymentAccountType: normalizedPaymentType,
+        paymentAccountId: normalizedPaymentId,
+        supplierPayableAccountId: editSpPayableAccountId!,
+        payableAmountUsd: payableAmount,
+        actor: { userId, username, reason: `Edit Golden Coast itemized POS sale ${lockedVoucher.voucherNumber}` },
+      });
+    }
+
     return {
       existingVoucher: lockedVoucher,
       targetLocationId,
       grandTotal: rebuildResult.grandTotal,
       totalQtySoldEdit: rebuildResult.totalQtySoldEdit,
+      isGoldenCoastEdit,
     };
   });
 
@@ -229,10 +286,12 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
   const newDate = voucherDate || oldDate;
   const datesToRecalc = new Set<string>([oldDate]);
   if (newDate !== oldDate) datesToRecalc.add(newDate);
-  for (const date of datesToRecalc) {
-    recalculateIntercompanyForDate(currentCompanyId, date).catch((error) =>
-      logger.error("[IntercompanyPOS Recalc] Unhandled:", { error })
-    );
+  if (!transactionResult.isGoldenCoastEdit) {
+    for (const date of datesToRecalc) {
+      recalculateIntercompanyForDate(currentCompanyId, date).catch((error) =>
+        logger.error("[IntercompanyPOS Recalc] Unhandled:", { error })
+      );
+    }
   }
 
   try {

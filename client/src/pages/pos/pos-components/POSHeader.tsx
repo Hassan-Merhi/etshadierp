@@ -33,6 +33,7 @@ export interface POSHeaderProps {
   navigate: (path: string) => void;
   saveMutation?: any;
   hasValidItems?: boolean;
+  disableSave?: boolean;
   handleSaveSale?: () => void;
   lastAutosaved?: Date | null;
   drafts?: any[];
@@ -73,6 +74,7 @@ export function POSHeader({
   onShowStockReport,
   saveMutation,
   hasValidItems,
+  disableSave,
   handleSaveSale,
   lastAutosaved,
   drafts = [],
@@ -181,7 +183,7 @@ export function POSHeader({
         {handleSaveSale && (
           <Button
             onClick={handleSaveSale}
-            disabled={saveMutation?.isPending || !hasValidItems}
+            disabled={saveMutation?.isPending || !hasValidItems || disableSave}
             className="gap-2"
             data-testid="button-save-sale"
           >

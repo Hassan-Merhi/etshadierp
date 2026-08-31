@@ -30,10 +30,10 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
         return res.json(_vsCached.data);
       }
 
-      // Parent is never inferred by "lowest company ID" — only the explicit
-      // parentCompanyId setting decides whether this company's suppliers carry
-      // their historical opening balance.
-      const parentCompanyId = await resolveParentCompanyId();
+      // Parent is resolved from the active company's explicit relationship,
+      // with the legacy global setting retained only as a compatibility
+      // fallback for unlinked historical data.
+      const parentCompanyId = await resolveParentCompanyId(companyId);
       const isChildCompany = companyId !== parentCompanyId;
 
       // Phase 1: determine company type (other fetches are conditional on this)

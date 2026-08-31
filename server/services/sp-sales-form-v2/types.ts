@@ -10,7 +10,13 @@ export interface SpSalesFormV2Params {
 }
 
 // ── Internal types ────────────────────────────────────────────────────────────
-export interface DaySale { qty: number; totalSales: number; totalCost: number }
+export interface DaySale {
+  qty: number;
+  totalSales: number;
+  totalCost: number;
+  /** Location-configured supplier payable deduction applied per sold unit. */
+  totalDeduction?: number;
+}
 export interface InvEntry {
   stockItemId: number;
   stockItemCode: string;

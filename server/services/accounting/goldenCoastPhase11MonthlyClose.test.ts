@@ -113,8 +113,8 @@ describe("Golden Coast Phase 11 monthly close", () => {
     ).toEqual([11, 12, 14, 14, 14, 15, 16]);
   });
 
-  it("rejects pre-cutover months and months without activity", () => {
-    expect(() => close("2026-08")).toThrowError(GoldenCoastPhase11CloseError);
+  it("allows pre-cutover reporting months and still rejects months without activity", () => {
+    expect(close("2026-08").periodMonth).toBe("2026-08");
     expect(() =>
       planGoldenCoastPhase11MonthlyClose({
         close: close(),

@@ -85,16 +85,9 @@ describe("Golden Coast Phase 5 sale request parsing", () => {
     ).toThrow(/repeats stock item/);
   });
 
-  it("refuses to date a sale before the Golden Coast cutover", () => {
-    expect(() => parsed({ saleDate: "2026-08-31" })).toThrow(/cannot be earlier than the Golden Coast cutover/);
-    try {
-      parsed({ saleDate: "2026-01-15" });
-      expect.unreachable("a pre-cutover sale date must not parse");
-    } catch (error) {
-      expect((error as GoldenCoastPhase5SaleError).code).toBe("GC_PHASE5_PRE_CUTOVER_DATE");
-    }
-    // The cutover date itself is the first sellable day.
-    expect(parsed({ saleDate: "2026-09-01" }).saleDate).toBe("2026-09-01");
+  it("accepts sale dates without a Golden Coast cutover prerequisite", () => {
+    expect(parsed({ saleDate: "2026-01-15" }).saleDate).toBe("2026-01-15");
+    expect(parsed({ saleDate: "2026-08-31" }).saleDate).toBe("2026-08-31");
   });
 
   it("rejects an unusable client request id", () => {
@@ -232,7 +225,11 @@ describe("Golden Coast Phase 5 FIFO consumption", () => {
   it("refuses to consume a legacy pre-cutover movement row", () => {
     // Phase 4 leaves legacy rows in place and they sort first by created_at, so
     // this guard is what keeps a sale off unreconciled pre-cutover cost.
-    expect(GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES).toEqual(["golden_coast_cutover", "golden_coast_phase8_offload"]);
+    expect(GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES).toEqual([
+      "golden_coast_cutover",
+      "golden_coast_phase8_offload",
+      "golden-coast-current-inventory",
+    ]);
     for (const sourceType of ["offload", "opening_stock", null]) {
       try {
         planGoldenCoastPhase5Sale({

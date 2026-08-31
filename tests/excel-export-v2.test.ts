@@ -268,12 +268,12 @@ describe("V2 Export — Buffer integrity", () => {
   });
 });
 
-// ── 2. Sheet count and order (6 sheets, incl. Ageing — Phase 15) ──────────────
+// ── 2. Sheet count and order ───────────────────────────────────────────────────
 describe("V2 Export — Sheet order", () => {
-  const EXPECTED_ORDER = ["Costing", "Sales", "ENTRY", "Summary", "Ageing", "Summary-Itemwise"];
+  const EXPECTED_ORDER = ["Costing", "Sales", "ENTRY"];
 
-  it("workbook has exactly 6 sheets", () => {
-    expect(wb.worksheets.length).toBe(6);
+  it("workbook has exactly 3 sheets", () => {
+    expect(wb.worksheets.length).toBe(3);
   });
 
   EXPECTED_ORDER.forEach((name, idx) => {
@@ -282,17 +282,17 @@ describe("V2 Export — Sheet order", () => {
     });
   });
 
-  it("Ageing sheet is visible", () => {
-    const ws = wb.getWorksheet("Ageing");
-    expect(ws).toBeDefined();
-    expect((ws as any)?.state ?? "visible").toBe("visible");
+  it("does not generate the removed summary or ageing sheets", () => {
+    expect(wb.getWorksheet("Summary")).toBeUndefined();
+    expect(wb.getWorksheet("Ageing")).toBeUndefined();
+    expect(wb.getWorksheet("Summary-Itemwise")).toBeUndefined();
   });
 });
 
 // ── 3. Sheet visibility ────────────────────────────────────────────────────────
 describe("V2 Export — Sheet visibility", () => {
-  const HIDDEN_SHEETS = ["Costing", "Sales", "Summary-Itemwise"];
-  const VISIBLE_SHEETS = ["ENTRY", "Summary"];
+  const HIDDEN_SHEETS = ["Costing", "Sales"];
+  const VISIBLE_SHEETS = ["ENTRY"];
 
   HIDDEN_SHEETS.forEach((name) => {
     it(`"${name}" is hidden`, () => {
@@ -312,7 +312,7 @@ describe("V2 Export — Sheet visibility", () => {
 
 // ── 4. No Excel error cells in visible sheets ──────────────────────────────────
 describe("V2 Export — No error cells in visible sheets", () => {
-  ["ENTRY", "Summary", "Ageing"].forEach((name) => {
+  ["ENTRY"].forEach((name) => {
     it(`"${name}" contains no #REF!, #DIV/0!, #VALUE!, #NAME?, #N/A`, () => {
       const ws = wb.getWorksheet(name);
       if (!ws) return;

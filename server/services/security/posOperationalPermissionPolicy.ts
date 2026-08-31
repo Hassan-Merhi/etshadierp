@@ -45,7 +45,7 @@ export function isPosSaleCreate(method: string, path: string): boolean {
 }
 
 export function parsePosSaleEditVoucherId(method: string, path: string): number | null {
-  if (method.toUpperCase() !== "PUT") return null;
+  if (!["PUT", "PATCH"].includes(method.toUpperCase())) return null;
   const match = path.match(/^\/api\/vouchers\/(\d+)\/sales$/);
   return match ? parsePositiveId(match[1]) : null;
 }

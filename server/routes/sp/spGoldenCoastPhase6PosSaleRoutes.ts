@@ -3,8 +3,11 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
 import {
   accountingPostingRequests,
+  companies,
   ledgerAccounts,
   locations,
+  inventory,
+  stockItems,
   spStockMovements,
   voucherEntries,
   vouchers,
@@ -32,11 +35,8 @@ import {
   type GoldenCoastLedgerRow,
 } from "../../services/accounting/goldenCoastPhase2Accounts";
 import {
-  GOLDEN_COAST_CUTOVER_DATE,
-  GOLDEN_COAST_CUTOVER_FIFO_SOURCE,
-} from "../../services/accounting/goldenCoastPhase4CutoverFifo";
-import {
   GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES,
+  GOLDEN_COAST_CURRENT_INVENTORY_FIFO_SOURCE,
   GoldenCoastPhase5SaleError,
   buildGoldenCoastPhase5SalePostings,
   goldenCoastPhase5IdempotencyKey,
@@ -61,6 +61,7 @@ import {
 import { GoldenCoastPhase7TransferError } from "../../services/accounting/goldenCoastPhase7HadiTransfer";
 import { adjustSpInventoryAtomic, respondToSpInventoryIntegrityError } from "../../services/sp/spInventoryIntegrity";
 import { getCurrentExchangeRate } from "../helpers/exchangeRateHelpers";
+import { GOLDEN_COAST_CUTOVER_DATE } from "../../services/accounting/goldenCoastPhase4CutoverFifo";
 import {
   GoldenCoastPhase6AutoHadiError,
   postGoldenCoastAutomaticHadiCollectionTx,
@@ -191,22 +192,76 @@ async function resolvePhase6Accounts(conn: DbLike, companyId: number): Promise<P
   };
 }
 
-async function assertPhase4BridgePosted(conn: DbLike, companyId: number): Promise<number> {
+async function countGoldenCoastFifoLots(conn: DbLike, companyId: number): Promise<number> {
   const rows = await conn.execute(sql`
     SELECT COUNT(*)::int AS lot_count
     FROM sp_stock_movements
     WHERE company_id = ${companyId}
-      AND source_type = ${GOLDEN_COAST_CUTOVER_FIFO_SOURCE}
+      AND source_type IN (${sql.join(
+        GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES.map((source) => sql`${source}`),
+        sql`, `
+      )})
   `);
-  const lotCount = Number(resultRows(rows)[0]?.lot_count ?? 0);
-  if (lotCount <= 0) {
-    throw new GoldenCoastPhase6RouteError(
-      `The Golden Coast ${GOLDEN_COAST_CUTOVER_DATE} opening FIFO bridge has not been posted yet`,
-      "GC_PHASE6_NOT_READY",
-      409
-    );
+  return Number(resultRows(rows)[0]?.lot_count ?? 0);
+}
+
+async function ensureCurrentInventoryLots(
+  tx: DatabaseTransaction,
+  companyId: number,
+  locationId: number,
+  stockItemIds: readonly number[],
+  existingLots: readonly GoldenCoastFifoLot[]
+): Promise<void> {
+  const covered = new Set(existingLots.map((lot) => Number(lot.stockItemId)).filter((id) => Number.isInteger(id)));
+  const missing = stockItemIds.filter((stockItemId) => !covered.has(stockItemId));
+  if (missing.length === 0) return;
+
+  const rows = await tx
+    .select({
+      inventoryId: inventory.id,
+      stockItemId: inventory.stockItemId,
+      quantity: inventory.quantity,
+      averageRate: inventory.averageRate,
+      articleCode: stockItems.code,
+      description: stockItems.name,
+    })
+    .from(inventory)
+    .innerJoin(stockItems, eq(stockItems.id, inventory.stockItemId))
+    .where(
+      and(
+        eq(inventory.companyId, companyId),
+        eq(inventory.locationId, locationId),
+        inArray(inventory.stockItemId, missing),
+        sql`CAST(${inventory.quantity} AS numeric) > 0`
+      )
+    )
+    .for("update");
+
+  for (const row of rows) {
+    const quantity = new Decimal(String(row.quantity ?? "0"));
+    const rate = new Decimal(String(row.averageRate ?? "0"));
+    if (rate.lte(0)) {
+      throw new GoldenCoastPhase6RouteError(
+        `Stock item #${row.stockItemId} has positive inventory with no usable average rate`,
+        "GC_PHASE5_FIFO_COST_INVALID",
+        409
+      );
+    }
+    const unitCost = rate.toDecimalPlaces(6, Decimal.ROUND_HALF_UP).toFixed(6);
+    await tx.insert(spStockMovements).values({
+      companyId,
+      sourceType: GOLDEN_COAST_CURRENT_INVENTORY_FIFO_SOURCE,
+      articleCode: String(row.articleCode ?? ""),
+      description: `Golden Coast current inventory cost lot from inventory #${row.inventoryId}`,
+      stockItemId: Number(row.stockItemId),
+      locationId,
+      qtyIn: quantity.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toFixed(4),
+      qtyRemaining: quantity.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toFixed(4),
+      baseUnitCostUsd: unitCost,
+      landedUnitCostUsd: unitCost,
+      finalUnitCostUsd: unitCost,
+    });
   }
-  return lotCount;
 }
 
 async function resolveSpecialLocationConfig(
@@ -501,12 +556,17 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
     }
 
     const blockers: string[] = [];
+    // Keep the legacy FIFO diagnostic in the response for setup screens and
+    // compatibility tests, but do not make the retired cutover bridge block
+    // the normal itemized POS flow. Required accounting roles still block
+    // readiness because the sale cannot post without them.
     let accounts: Phase6ResolvedAccounts | null = null;
     let automaticHadiPair: Awaited<ReturnType<typeof resolveGoldenCoastAutomaticHadiPair>> | null = null;
-    let cutoverLotCount = 0;
+    let costLotCount = 0;
     try {
       accounts = await resolvePhase6Accounts(db, companyId);
     } catch (error) {
+      logger.warn("Golden Coast legacy Phase 6 diagnostics unavailable", { error });
       blockers.push(error instanceof Error ? error.message : String(error));
     }
     try {
@@ -515,11 +575,10 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
       blockers.push(error instanceof Error ? error.message : String(error));
     }
     try {
-      cutoverLotCount = await assertPhase4BridgePosted(db, companyId);
+      costLotCount = await countGoldenCoastFifoLots(db, companyId);
     } catch (error) {
-      blockers.push(error instanceof Error ? error.message : String(error));
+      logger.warn("Golden Coast legacy FIFO diagnostic unavailable", { error });
     }
-
     const configured = await db
       .select({
         id: locations.id,
@@ -539,11 +598,15 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
       .limit(3);
     if (configured.length > 1)
       blockers.push("More than one active location has a Golden Coast per-unit deduction configured");
-
+    const [company] = await db
+      .select({ parentCompanyId: companies.parentCompanyId, active: companies.active })
+      .from(companies)
+      .where(eq(companies.id, companyId))
+      .limit(1);
     res.json({
-      cutoverDate: GOLDEN_COAST_CUTOVER_DATE,
-      cutoverLotCount,
+      costLotCount,
       accounts,
+      parentCompanyId: company?.parentCompanyId ?? null,
       automaticHadiPair,
       specialLocation: configured.length === 1 ? configured[0] : null,
       blockers,
@@ -595,7 +658,6 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
           409
         );
       }
-      await assertPhase4BridgePosted(tx, selectedCompany);
       const specialConfig = await resolveSpecialLocationConfig(tx, selectedCompany, sale.locationId);
       const accounts = await resolvePhase6Accounts(tx, selectedCompany);
       if ((req.body as Record<string, unknown> | undefined)?.saleSideAccount != null) {
@@ -615,22 +677,27 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
         deductionPlan: expectedDeduction,
       });
       if (replayed) {
-        const automaticHadiCollection = await postGoldenCoastAutomaticHadiCollectionTx({
-          tx,
-          companyId: selectedCompany,
-          gcSalesCashAccountId: accounts.gcSalesCashAccountId,
-          saleDate: sale.saleDate,
-          amountUsd: revenueUsd,
-          clientRequestId: sale.clientRequestId,
-          actor,
-        });
+        const automaticHadiCollection =
+          sale.saleDate >= GOLDEN_COAST_CUTOVER_DATE
+            ? await postGoldenCoastAutomaticHadiCollectionTx({
+                tx,
+                companyId: selectedCompany,
+                gcSalesCashAccountId: accounts.gcSalesCashAccountId,
+                saleDate: sale.saleDate,
+                amountUsd: revenueUsd,
+                clientRequestId: sale.clientRequestId,
+                actor,
+              })
+            : null;
         const postings = [
           ...replayed,
-          ...automaticHadiCollection.postings.map((item) => ({
-            role: `hadi_collection_${item.role}`,
-            voucher: item.voucher,
-            entries: item.entries,
-          })),
+          ...(automaticHadiCollection
+            ? automaticHadiCollection.postings.map((item) => ({
+                role: `hadi_collection_${item.role}`,
+                voucher: item.voucher,
+                entries: item.entries,
+              }))
+            : []),
         ];
         return {
           replayed: true as const,
@@ -642,7 +709,9 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
       }
 
       const stockItemIds = [...new Set(sale.lines.map((line) => line.stockItemId))];
-      const lots = await lockFifoLots(tx, selectedCompany, sale.locationId, stockItemIds);
+      let lots = await lockFifoLots(tx, selectedCompany, sale.locationId, stockItemIds);
+      await ensureCurrentInventoryLots(tx, selectedCompany, sale.locationId, stockItemIds, lots);
+      lots = await lockFifoLots(tx, selectedCompany, sale.locationId, stockItemIds);
       const plan = planGoldenCoastPhase5Sale({ sale, lots });
       const deductionPlan = planGoldenCoastPhase6SpecialLocationDeduction({
         salePlan: plan,
@@ -715,22 +784,27 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
         postings.push({ role: "special_deduction", voucher: posted.voucher, entries: posted.entries });
       }
 
-      const automaticHadiCollection = await postGoldenCoastAutomaticHadiCollectionTx({
-        tx,
-        companyId: selectedCompany,
-        gcSalesCashAccountId: accounts.gcSalesCashAccountId,
-        saleDate: sale.saleDate,
-        amountUsd: plan.revenueUsd,
-        clientRequestId: sale.clientRequestId,
-        actor,
-      });
-      postings.push(
-        ...automaticHadiCollection.postings.map((item) => ({
-          role: `hadi_collection_${item.role}`,
-          voucher: item.voucher,
-          entries: item.entries,
-        }))
-      );
+      const automaticHadiCollection =
+        sale.saleDate >= GOLDEN_COAST_CUTOVER_DATE
+          ? await postGoldenCoastAutomaticHadiCollectionTx({
+              tx,
+              companyId: selectedCompany,
+              gcSalesCashAccountId: accounts.gcSalesCashAccountId,
+              saleDate: sale.saleDate,
+              amountUsd: plan.revenueUsd,
+              clientRequestId: sale.clientRequestId,
+              actor,
+            })
+          : null;
+      if (automaticHadiCollection) {
+        postings.push(
+          ...automaticHadiCollection.postings.map((item) => ({
+            role: `hadi_collection_${item.role}`,
+            voucher: item.voucher,
+            entries: item.entries,
+          }))
+        );
+      }
 
       return { replayed: false as const, postings, plan, deductionPlan, automaticHadiCollection };
     });
@@ -744,9 +818,9 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
       replayed: result.replayed,
       voucherIds: result.postings.map((item) => item.voucher.id),
       deductionUsd: result.deductionPlan?.deductionUsd ?? "0.00",
-      automaticHadiCompanyId: result.automaticHadiCollection.pair.hadiCompanyId,
-      automaticHadiCashAccount: result.automaticHadiCollection.hadiCashAccount,
-      automaticHadiReplayed: result.automaticHadiCollection.replayed,
+      automaticHadiCompanyId: result.automaticHadiCollection?.pair.hadiCompanyId ?? null,
+      automaticHadiCashAccount: result.automaticHadiCollection?.hadiCashAccount ?? null,
+      automaticHadiReplayed: result.automaticHadiCollection?.replayed ?? false,
       durationMs: Date.now() - startedAt,
     });
 
@@ -759,12 +833,14 @@ async function handlePostSale(req: Request, res: Response): Promise<void> {
       grossProfitUsd: result.plan?.grossProfitUsd ?? null,
       specialLocationDeductionUsd: result.deductionPlan?.deductionUsd ?? "0.00",
       deductionPerQtyUsd: result.deductionPlan?.deductionPerQtyUsd ?? "0.0000",
-      automaticHadiCollection: {
-        replayed: result.automaticHadiCollection.replayed,
-        hadiCompanyId: result.automaticHadiCollection.pair.hadiCompanyId,
-        amountUsd: result.automaticHadiCollection.transfer.amountUsd,
-        hadiCashAccount: result.automaticHadiCollection.hadiCashAccount,
-      },
+      automaticHadiCollection: result.automaticHadiCollection
+        ? {
+            replayed: result.automaticHadiCollection.replayed,
+            hadiCompanyId: result.automaticHadiCollection.pair.hadiCompanyId,
+            amountUsd: result.automaticHadiCollection.transfer.amountUsd,
+            hadiCashAccount: result.automaticHadiCollection.hadiCashAccount,
+          }
+        : null,
       lines: result.plan?.lines ?? null,
       allocations: result.plan?.allocations ?? null,
       postings: result.postings.map((item) => ({ role: item.role, voucher: item.voucher, entries: item.entries })),

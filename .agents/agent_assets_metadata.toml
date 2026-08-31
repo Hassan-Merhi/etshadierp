@@ -1,3 +1,16 @@
 uploads = []
 generated = []
-outputs = []
+
+[[outputs]]
+id = "aiLnatRtd0cEI5ugGutro"
+uri = "file://reports/golden-coast-stock-reconciliation.csv"
+type = "table"
+title = "Golden Coast Stock Reconciliation"
+description = "Read-only inventory detail for company 10: location, item, quantity, average rate, and calculated Stock in Hand value."
+logical_id = "ddce9f22-8f4d-421f-b039-a6f4ab3225b1"
+content_hash = "sha256:f0b16532d69f876c1fffbf6a68f1be166678a3261261434b9a3c3c747a8039ab"
+size = 8414
+mtime_ms = 1788174053670
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:5cce0241-5c5e-47b8-bd4d-97baf766a57f/ddce9f22-8f4d-421f-b039-a6f4ab3225b1/b247df25-36a2-4018-8514-e5cc1587cb83"
+storage_version_token = "1788174054240772"
+content_type = "text/csv"

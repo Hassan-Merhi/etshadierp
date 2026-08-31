@@ -37,7 +37,7 @@ function stableFixtureCode(prefix: string, suffix: string): string {
 }
 
 export const GOLDEN_COAST_PHASE5_SALE_URL = "/api/sp/golden-coast/phase6/pos-sale";
-/** On or after the September 1, 2026 cutover, which Phase 5 requires. */
+/** Shared sale date used by the Golden Coast POS integration fixtures. */
 export const GOLDEN_COAST_PHASE5_SALE_DATE = "2026-09-05";
 
 /**
@@ -69,6 +69,15 @@ export interface GoldenCoastPhase5Fixture {
   hadiCashAccountId: number;
   goldenCoastHadiIntercompanyAccountId: number;
   hadiGoldenCoastIntercompanyAccountId: number;
+}
+
+export interface GoldenCoastNormalPosFixture extends GoldenCoastPhase5Fixture {
+  hadiCompanyId: number;
+  hadiLocationId: number;
+  hadiCashAccountId: number;
+  hadiIntercompanyAccountId: number;
+  goldenCoastIntercompanyAccountId: number;
+  deductionClearingAccountId: number;
 }
 
 async function insertLedgerAccount(input: {
@@ -298,6 +307,95 @@ export async function setupGoldenCoastPhase5Fixture(prefix: string): Promise<Gol
   return fixture;
 }
 
+/**
+ * Fixture for the canonical itemized POS path.
+ *
+ * Unlike the Phase 5 fixture, this creates the actual Golden Coast/HADI
+ * relationship used by normal POS settlement. The user is a member of both
+ * companies so requests can authorize the HADI target-company scope without
+ * bypassing the tenant boundary.
+ */
+export async function setupGoldenCoastNormalPosFixture(prefix: string): Promise<GoldenCoastNormalPosFixture> {
+  const fixture = await setupGoldenCoastPhase5Fixture(prefix);
+  const hadiCompanyCode = stableFixtureCode(prefix, "HADI");
+  const [hadiCompany] = await db
+    .insert(schema.companies)
+    .values({
+      code: hadiCompanyCode,
+      name: `${prefix}_HadiCompany`,
+      companyType: "erp",
+      baseCurrency: "USD",
+    })
+    .returning();
+
+  await pool.query(`UPDATE companies SET parent_company_id = $1 WHERE id = $2`, [
+    hadiCompany.id,
+    fixture.ctx.companyId,
+  ]);
+  await db.insert(schema.userCompanyRoles).values({
+    userId: fixture.ctx.userId,
+    companyId: hadiCompany.id,
+    role: "Admin",
+  });
+
+  const [hadiLocation] = await db
+    .insert(schema.locations)
+    .values({
+      companyId: hadiCompany.id,
+      code: `${hadiCompanyCode}-WH1`,
+      name: `${prefix}_HadiWarehouse`,
+    })
+    .returning();
+  const hadiCashAccountId = await insertLedgerAccount({
+    companyId: hadiCompany.id,
+    code: "HADI-CASH",
+    name: "Cash Account",
+    accountType: "Cash",
+    subType: "Cash",
+  });
+  const hadiIntercompanyAccountId = await insertLedgerAccount({
+    companyId: hadiCompany.id,
+    code: "HADI-SP-IC",
+    name: `${prefix}_TestCompany — Intercompany`,
+    accountType: "Intercompany",
+    subType: "hadi_sp_intercompany",
+  });
+  const goldenCoastIntercompanyAccountId = await insertLedgerAccount({
+    companyId: fixture.ctx.companyId,
+    code: "GC-HADI-IC",
+    name: `${prefix}_HadiCompany — Intercompany`,
+    accountType: "Intercompany",
+    subType: "sp_hadi_intercompany",
+  });
+  const deductionClearingAccountId = await insertLedgerAccount({
+    companyId: fixture.ctx.companyId,
+    code: "SP-PAYDDC",
+    name: "Supplier Payable Deduction Clearing",
+    accountType: "Liability",
+    subType: "sp_pay_deduction_clearing",
+  });
+
+  await db.insert(schema.companySettings).values({
+    companyId: fixture.ctx.companyId,
+    spPosPayableAccountId: fixture.saleSideAccountId,
+    spPosProfitAccountId: fixture.salesAccountId,
+  });
+  await pool.query(
+    `UPDATE locations SET supplier_partner_payable_deduction_per_qty = $1 WHERE id = $2 AND company_id = $3`,
+    ["10.0000", fixture.ctx.locationId, fixture.ctx.companyId]
+  );
+
+  return {
+    ...fixture,
+    hadiCompanyId: hadiCompany.id,
+    hadiLocationId: hadiLocation.id,
+    hadiCashAccountId,
+    hadiIntercompanyAccountId,
+    goldenCoastIntercompanyAccountId,
+    deductionClearingAccountId,
+  };
+}
+
 export async function selectCompany(fixture: GoldenCoastPhase5Fixture, companyId: number): Promise<void> {
   const res = await fixture.agent.post("/api/auth/set-company").send({ companyId });
   if (res.status !== 200) {
@@ -323,6 +421,14 @@ export async function teardownGoldenCoastPhase5Fixture(fixture: GoldenCoastPhase
   await pool.query(`DELETE FROM sp_sale_lines WHERE company_id = ANY($1::int[])`, [companyIds]);
   await pool.query(`DELETE FROM sp_sales WHERE company_id = ANY($1::int[])`, [companyIds]);
   await cleanupTestData(fixture.prefix);
+}
+
+export async function teardownGoldenCoastNormalPosFixture(fixture: GoldenCoastNormalPosFixture): Promise<void> {
+  // The parent FK is intentionally restrictive in production. Clear the link
+  // before the shared teardown discovers and deletes the HADI fixture company.
+  await pool.query(`UPDATE companies SET parent_company_id = NULL WHERE id = $1`, [fixture.ctx.companyId]);
+  await db.delete(schema.companySettings).where(eq(schema.companySettings.companyId, fixture.ctx.companyId));
+  await teardownGoldenCoastPhase5Fixture(fixture);
 }
 
 /** Mirrors what the Phase 4 opening FIFO bridge writes. */

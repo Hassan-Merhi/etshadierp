@@ -31,26 +31,25 @@ import Decimal from "decimal.js";
 import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import type { CentralPostingRequest, PostingActor } from "./centralPostingEngine";
 import { buildGenericVoucherPostingRequest } from "./genericVoucherPosting";
-import { GOLDEN_COAST_CUTOVER_DATE, GOLDEN_COAST_CUTOVER_FIFO_SOURCE } from "./goldenCoastPhase4CutoverFifo";
+import { GOLDEN_COAST_CUTOVER_FIFO_SOURCE } from "./goldenCoastPhase4CutoverFifo";
 import { GOLDEN_COAST_PHASE8_OFFLOAD_FIFO_SOURCE } from "./goldenCoastPhase8ContainerOffload";
 
 /** Posting `sourceType` every Phase 5 sale voucher is tagged with. */
 export const GOLDEN_COAST_PHASE5_SOURCE_TYPE = "golden-coast-phase5-pos-sale";
+/** Cost lots created lazily from the current ERP inventory without a cutover journal. */
+export const GOLDEN_COAST_CURRENT_INVENTORY_FIFO_SOURCE = "golden-coast-current-inventory";
 
 /**
  * `sp_stock_movements.source_type` values a Golden Coast sale may consume.
  *
- * Phase 4 adds its opening bridge rows without zeroing the company's legacy
- * pre-cutover movement rows, and those legacy rows sort first by `created_at`.
- * Consuming them would derive COGS from unreconciled pre-cutover costs and
- * double the quantity the cutover actually reconciled, so Phase 5 reads only
- * the canonical post-cutover lots. A later Golden Coast phase that creates new
- * post-cutover stock adds its source here. Phase 8 offloads are the first such
- * addition: they land real post-cutover containers with their own provenance.
+ * Legacy movement rows are intentionally excluded. Golden Coast can consume
+ * either an existing canonical lot, a Phase 8 offload lot, or a lot lazily
+ * created from the current ERP inventory when no cutover was performed.
  */
 export const GOLDEN_COAST_POST_CUTOVER_FIFO_SOURCES: readonly string[] = [
   GOLDEN_COAST_CUTOVER_FIFO_SOURCE,
   GOLDEN_COAST_PHASE8_OFFLOAD_FIFO_SOURCE,
+  GOLDEN_COAST_CURRENT_INVENTORY_FIFO_SOURCE,
 ];
 
 /** Keeps the derived voucher numbers inside `vouchers.voucher_number` (100). */
@@ -217,15 +216,6 @@ function saleDate(value: unknown): string {
   const text = requiredText(value, "saleDate", 10);
   if (!ISO_DATE_PATTERN.test(text) || Number.isNaN(Date.parse(`${text}T00:00:00Z`))) {
     throw new GoldenCoastPhase5SaleError("saleDate must be an ISO calendar date (YYYY-MM-DD)");
-  }
-  // A sale consumes post-cutover FIFO stock, so dating it before the cutover
-  // would post revenue and COGS into the period the Phase 3 opening balance
-  // already summarizes. ISO dates compare correctly as strings.
-  if (text < GOLDEN_COAST_CUTOVER_DATE) {
-    throw new GoldenCoastPhase5SaleError(
-      `saleDate cannot be earlier than the Golden Coast cutover date ${GOLDEN_COAST_CUTOVER_DATE}`,
-      "GC_PHASE5_PRE_CUTOVER_DATE"
-    );
   }
   return text;
 }

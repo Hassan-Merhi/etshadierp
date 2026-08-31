@@ -19,20 +19,44 @@ export function registerSpSetupRoutes(app: Express) {
 
       const created: string[] = [];
       const existing: string[] = [];
+      const liveAccountNames = new Set(
+        (
+          await db
+            .select({ name: ledgerAccounts.name })
+            .from(ledgerAccounts)
+            .where(and(eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt)))
+        ).map((account) => account.name)
+      );
 
       for (const acct of SP_ACCOUNTS) {
         const found = await getSpAccount(companyId, acct.subType);
         if (!found) {
+          const [codeCollision] = await db
+            .select({ id: ledgerAccounts.id })
+            .from(ledgerAccounts)
+            .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, acct.code)))
+            .limit(1);
+          const code = codeCollision ? `${acct.code}-${companyId}` : acct.code;
+          let name = acct.name;
+          if (liveAccountNames.has(name)) {
+            name = `${acct.name} (${acct.code})`;
+            let suffix = 2;
+            while (liveAccountNames.has(name)) {
+              name = `${acct.name} (${acct.code}-${suffix})`;
+              suffix += 1;
+            }
+          }
           await db.insert(ledgerAccounts).values({
             companyId,
-            code: acct.code,
-            name: acct.name,
+            code,
+            name,
             accountType: acct.accountType,
             subType: acct.subType,
             isHidden: acct.isHidden,
             active: true,
           });
-          created.push(acct.name);
+          liveAccountNames.add(name);
+          created.push(name);
         } else {
           existing.push(acct.name);
         }

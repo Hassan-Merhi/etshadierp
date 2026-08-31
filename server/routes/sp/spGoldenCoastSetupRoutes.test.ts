@@ -52,6 +52,7 @@ describe("Golden Coast setup route surface hardened by Phase 13", () => {
   it("repairs reciprocal accounts in place instead of deleting ledger history", () => {
     expect(routeSource).toContain("planGoldenCoastPhase13IntercompanyAccount");
     expect(routeSource).toContain("patch[repair.field] = repair.to");
+    expect(routeSource).toContain('openingBalanceSide: "Cr"');
     expect(routeSource).not.toContain(".delete(");
     expect(routeSource).not.toContain("voucherEntries");
   });
@@ -70,5 +71,11 @@ describe("Golden Coast setup route surface hardened by Phase 13", () => {
   it("preserves the existing embedded Phase 2 status for legacy setup consumers", () => {
     expect(spSetupSource).toContain("summarizeGoldenCoastAccountSetup");
     expect(spSetupSource).toContain("goldenCoast,");
+  });
+
+  it("keeps legacy SP setup idempotent when a company already has a matching account name or code", () => {
+    expect(spSetupSource).toContain("const liveAccountNames = new Set");
+    expect(spSetupSource).toContain("const [codeCollision]");
+    expect(spSetupSource).toContain("name = `${acct.name} (${acct.code})`");
   });
 });

@@ -41,6 +41,7 @@ import {
 import { insertSaleVoucher } from "./createSaleVoucher";
 import { lockAndDeductInventoryForSaleItem } from "./deductSaleInventory";
 import { lockAndFindExistingPosSaleTx } from "./posSaleIdempotency";
+import { isGoldenCoastPosCompany, postGoldenCoastPosAccountingTx } from "./goldenCoastPosAccounting";
 
 function err(result: HandlerErrorResult): CreatePosSaleResult {
   return { status: result.status, body: result.body };
@@ -48,7 +49,7 @@ function err(result: HandlerErrorResult): CreatePosSaleResult {
 
 export async function createPosSale(
   params: CreatePosSaleParams,
-  companyType: { isSpCompany: boolean }
+  companyType: { isSpCompany: boolean; isGoldenCoast?: boolean }
 ): Promise<CreatePosSaleResult> {
   const {
     currentCompanyId,
@@ -60,8 +61,9 @@ export async function createPosSale(
     voucherDateFallback,
     body,
   } = params;
-  const { isSpCompany } = companyType;
+  const { isSpCompany, isGoldenCoast = false } = companyType;
   const isPOSUser = userRole === "POS";
+  let goldenCoastSaleDetected = isGoldenCoast;
 
   const {
     locationId,
@@ -290,7 +292,30 @@ export async function createPosSale(
         });
       }
 
-      return { voucher: txVoucher, saleItems: txSaleItems, replayed: false };
+        goldenCoastSaleDetected =
+          isGoldenCoast || (isSpCompany && (await isGoldenCoastPosCompany(tx, currentCompanyId)));
+        if (goldenCoastSaleDetected && !isCreditSale) {
+         const payableAmount = Math.max(
+           0,
+           Number((grandTotal - spCtx.spPosTotalQtySold * spCtx.spPosDeductionPerQty).toFixed(2))
+         );
+         await postGoldenCoastPosAccountingTx({
+           tx,
+           companyId: currentCompanyId,
+           locationId: parsedLocationId,
+           clientSaleId: clientSaleId || "",
+           revision: "create",
+           saleDate: voucherDate,
+           amountUsd: grandTotal,
+           paymentAccountType: accountType === "bank" ? "bank" : "cash",
+           paymentAccountId: accountId,
+           supplierPayableAccountId: spCtx.spPosPayableAccountId!,
+           payableAmountUsd: payableAmount,
+           actor: { userId, username, reason: "Golden Coast itemized POS sale settlement" },
+         });
+       }
+
+       return { voucher: txVoucher, saleItems: txSaleItems, replayed: false };
     });
   } catch (error: unknown) {
     const committedRetry = await checkIdempotentSale(currentCompanyId, clientSaleId);
@@ -345,7 +370,7 @@ export async function createPosSale(
     /* non-fatal */
   }
 
-  if (!isCreditSale && accountType === "cash") {
+  if (!goldenCoastSaleDetected && !isCreditSale && accountType === "cash") {
     runIntercompanyPosTransfer(currentCompanyId, accountId, grandTotal, voucherDate).catch((error) =>
       logger.error("[IntercompanyPOS] Unhandled:", { error })
     );
