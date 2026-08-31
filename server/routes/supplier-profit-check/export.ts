@@ -1,14 +1,46 @@
 /**
- * supplierProfitCheckRoutes: SupplierProfitExport endpoints.
+ * Supplier Profit Check Excel exports.
  *
- * Registered by ./index.ts in the original order; Express resolves
- * first-match, so that order is behaviour.
+ * Supplier export consolidates legacy duplicate proforma lines before writing.
+ * Internal export consumes the exact effective sell/Dubai/landing values shown
+ * by the client so the workbook cannot disagree with the on-screen analysis.
  */
 import type { Express, Request, Response, RequestHandler } from "express";
+import ExcelJS from "exceljs";
+import { pool } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { pool } from "../../db";
-import ExcelJS from "exceljs";
+
+const NAVY = "1A2C5B";
+const GOLD = "C9A84C";
+const LIGHT_GOLD = "F7EFD8";
+const WHITE = "FFFFFF";
+const GREEN = "1A7A3E";
+const RED = "C0392B";
+const YELLOW = "856404";
+const LIGHT_RED = "FDECEA";
+const LIGHT_GREEN = "E9F7EF";
+const LIGHT_YELLOW = "FFF9E6";
+
+function numberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function applyHeader(cell: ExcelJS.Cell) {
+  cell.font = { bold: true, color: { argb: WHITE } };
+  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GOLD } };
+  cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+}
+
+function sendWorkbook(res: Response, workbook: ExcelJS.Workbook, filename: string) {
+  return workbook.xlsx.writeBuffer().then((raw) => {
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(Buffer.from(raw));
+  });
+}
 
 export function registerSupplierProfitExportRoutes(app: Express, requireAuth: RequestHandler) {
   app.get(
@@ -18,139 +50,140 @@ export function registerSupplierProfitExportRoutes(app: Express, requireAuth: Re
       try {
         const companyId = req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
-        const proformaId = parseInt(req.params.proformaId);
-        if (isNaN(proformaId)) return res.status(400).json({ message: "Invalid proformaId" });
+        const proformaId = Number(req.params.proformaId);
+        if (!Number.isInteger(proformaId) || proformaId <= 0) {
+          return res.status(400).json({ message: "Invalid proformaId" });
+        }
 
         const proformaResult = await pool.query(
           `
-        SELECT sp.*, s.legal_name as supplier_name
-        FROM supplier_proformas sp
-        JOIN suppliers s ON s.id = sp.supplier_id
-        WHERE sp.id = $1 AND sp.company_id = $2
-      `,
+          SELECT sp.id, sp.reference, sp.notes, s.legal_name AS supplier_name
+          FROM supplier_proformas sp
+          JOIN suppliers s ON s.id = sp.supplier_id
+          WHERE sp.id = $1
+            AND sp.company_id = $2
+            AND s.company_id = $2
+            AND s.deleted_at IS NULL
+        `,
           [proformaId, companyId]
         );
-        if (!proformaResult.rows.length) return res.status(404).json({ message: "Proforma not found" });
+        if (proformaResult.rows.length === 0) return res.status(404).json({ message: "Proforma not found" });
         const proforma = proformaResult.rows[0];
 
         const linesResult = await pool.query(
           `
-        SELECT barcode, item_name, qty, weight_per_bale, price_per_bale,
-          (qty * price_per_bale::numeric) as total_price
-        FROM supplier_proforma_lines
-        WHERE proforma_id = $1
-        ORDER BY barcode
-      `,
-          [proformaId]
+          WITH resolved AS (
+            SELECT
+              si.id AS stock_item_id,
+              si.code AS barcode,
+              si.name AS item_name,
+              spl.qty::numeric AS qty,
+              spl.price_per_bale::numeric AS price_per_bale
+            FROM supplier_proforma_lines spl
+            JOIN supplier_proformas sp ON sp.id = spl.proforma_id
+            JOIN LATERAL (
+              SELECT candidate.id, candidate.code, candidate.name
+              FROM stock_items candidate
+              WHERE candidate.company_id = $2
+                AND candidate.deleted_at IS NULL
+                AND (
+                  lower(candidate.code) = lower(spl.barcode)
+                  OR EXISTS (
+                    SELECT 1
+                    FROM stock_item_code_aliases alias
+                    WHERE alias.stock_item_id = candidate.id
+                      AND alias.company_id = $2
+                      AND lower(alias.alias_code) = lower(spl.barcode)
+                  )
+                )
+              ORDER BY CASE WHEN lower(candidate.code) = lower(spl.barcode) THEN 0 ELSE 1 END, candidate.id
+              LIMIT 1
+            ) si ON TRUE
+            WHERE sp.id = $1 AND sp.company_id = $2
+          )
+          SELECT
+            stock_item_id,
+            barcode,
+            item_name,
+            SUM(qty)::numeric AS qty,
+            COALESCE(
+              SUM(qty * price_per_bale) / NULLIF(SUM(qty) FILTER (WHERE price_per_bale IS NOT NULL), 0),
+              0
+            )::numeric AS price_per_bale
+          FROM resolved
+          GROUP BY stock_item_id, barcode, item_name
+          ORDER BY barcode, stock_item_id
+        `,
+          [proformaId, companyId]
         );
-        const lines = linesResult.rows;
 
-        const wb = new ExcelJS.Workbook();
-        wb.creator = "ERP System";
-        const ws = wb.addWorksheet("Proforma");
-
-        const NAVY = "1A2C5B";
-        const GOLD = "C9A84C";
-        const LIGHT_GOLD = "F7EFD8";
-        const WHITE = "FFFFFF";
-
-        ws.columns = [
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = "ERP System";
+        const sheet = workbook.addWorksheet("Proforma");
+        sheet.columns = [
           { key: "item_code", width: 18 },
-          { key: "item_name", width: 35 },
+          { key: "item_name", width: 38 },
           { key: "qty", width: 12 },
-          { key: "unit_price", width: 15 },
+          { key: "unit_price", width: 16 },
           { key: "total_price", width: 18 },
         ];
 
-        // Header banner (rows 1-3)
-        ws.mergeCells("A1:E1");
-        const title = ws.getCell("A1");
+        sheet.mergeCells("A1:E1");
+        const title = sheet.getCell("A1");
         title.value = "SUPPLIER PROFORMA";
         title.font = { bold: true, size: 16, color: { argb: WHITE } };
         title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
         title.alignment = { horizontal: "center", vertical: "middle" };
-        ws.getRow(1).height = 30;
+        sheet.getRow(1).height = 30;
 
-        ws.mergeCells("A2:C2");
-        ws.getCell("A2").value = `Supplier: ${proforma.supplier_name}`;
-        ws.getCell("A2").font = { bold: true, size: 11, color: { argb: NAVY } };
-        ws.getCell("A2").fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GOLD } };
-
-        ws.mergeCells("D2:E2");
-        ws.getCell("D2").value = `Ref: ${proforma.reference}`;
-        ws.getCell("D2").font = { bold: true, size: 11, color: { argb: NAVY } };
-        ws.getCell("D2").fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GOLD } };
-        ws.getCell("D2").alignment = { horizontal: "right" };
-
-        ws.mergeCells("A3:C3");
-        ws.getCell("A3").value = `Date: ${new Date().toLocaleDateString()}`;
-        ws.getCell("A3").fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GOLD } };
-
-        if (proforma.notes) {
-          ws.mergeCells("D3:E3");
-          ws.getCell("D3").value = proforma.notes;
-          ws.getCell("D3").fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GOLD } };
+        sheet.mergeCells("A2:C2");
+        sheet.getCell("A2").value = `Supplier: ${proforma.supplier_name}`;
+        sheet.mergeCells("D2:E2");
+        sheet.getCell("D2").value = `Ref: ${proforma.reference}`;
+        sheet.getCell("D2").alignment = { horizontal: "right" };
+        sheet.mergeCells("A3:C3");
+        sheet.getCell("A3").value = `Date: ${new Date().toLocaleDateString()}`;
+        sheet.mergeCells("D3:E3");
+        sheet.getCell("D3").value = proforma.notes || "";
+        for (const address of ["A2", "D2", "A3", "D3"]) {
+          const cell = sheet.getCell(address);
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GOLD } };
+          cell.font = { color: { argb: NAVY }, bold: address === "A2" || address === "D2" };
         }
-        ws.getRow(2).height = 22;
-        ws.getRow(3).height = 20;
 
-        // Column headers
-        const headerRow = ws.addRow(["Item Code", "Item Name", "Qty", "Unit Price (USD)", "Total (USD)"]);
-        headerRow.eachCell((c) => {
-          c.font = { bold: true, color: { argb: WHITE } };
-          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GOLD } };
-          c.alignment = { horizontal: "center" };
-          c.border = {
-            bottom: { style: "thin", color: { argb: NAVY } },
-          };
-        });
-        headerRow.height = 20;
+        const header = sheet.addRow(["Item Code", "Item Name", "Qty", "Unit Price (USD)", "Total (USD)"]);
+        header.eachCell(applyHeader);
 
         let totalQty = 0;
         let grandTotal = 0;
-
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          const qty = Number(line.qty);
-          const unitPrice = Number(line.price_per_bale);
+        for (const [index, line] of linesResult.rows.entries()) {
+          const qty = Number(line.qty) || 0;
+          const unitPrice = Number(line.price_per_bale) || 0;
           const total = qty * unitPrice;
           totalQty += qty;
           grandTotal += total;
-
-          const row = ws.addRow([line.barcode, line.item_name, qty, unitPrice, total]);
-          if (i % 2 === 0) {
-            row.eachCell((c) => {
-              c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "F4F6FA" } };
+          const row = sheet.addRow([line.barcode, line.item_name, qty, unitPrice, total]);
+          if (index % 2 === 0) {
+            row.eachCell((cell) => {
+              cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "F4F6FA" } };
             });
           }
           row.getCell(3).numFmt = "#,##0";
           row.getCell(4).numFmt = "#,##0.00";
           row.getCell(5).numFmt = "#,##0.00";
-          row.getCell(3).alignment = { horizontal: "right" };
-          row.getCell(4).alignment = { horizontal: "right" };
-          row.getCell(5).alignment = { horizontal: "right" };
         }
 
-        // Grand total row
-        const totRow = ws.addRow(["", "GRAND TOTAL", totalQty, "", grandTotal]);
-        totRow.eachCell((c) => {
-          c.font = { bold: true, color: { argb: WHITE } };
-          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
-          c.border = {
-            top: { style: "double", color: { argb: GOLD } },
-          };
+        const totalRow = sheet.addRow(["", "GRAND TOTAL", totalQty, "", grandTotal]);
+        totalRow.eachCell((cell) => {
+          cell.font = { bold: true, color: { argb: WHITE } };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
         });
-        totRow.getCell(3).numFmt = "#,##0";
-        totRow.getCell(5).numFmt = "#,##0.00";
-        totRow.getCell(3).alignment = { horizontal: "right" };
-        totRow.getCell(5).alignment = { horizontal: "right" };
+        totalRow.getCell(3).numFmt = "#,##0";
+        totalRow.getCell(5).numFmt = "#,##0.00";
 
-        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        res.setHeader("Content-Disposition", `attachment; filename="proforma-${proforma.reference}.xlsx"`);
-        const buffer = Buffer.from(await wb.xlsx.writeBuffer());
-        res.send(buffer);
+        await sendWorkbook(res, workbook, `proforma-${proforma.reference}.xlsx`);
       } catch (err: unknown) {
-        logger.error("[export-supplier]", { error: getErrorMessage(err) });
+        logger.error("[supplier-profit-check/export-supplier]", { error: getErrorMessage(err) });
         res.status(500).json({ message: getErrorMessage(err) });
       }
     }
@@ -160,223 +193,155 @@ export function registerSupplierProfitExportRoutes(app: Express, requireAuth: Re
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-
       const { rows, supplierName, fromDate, toDate, proformaRef } = req.body;
       if (!Array.isArray(rows)) return res.status(400).json({ message: "rows required" });
+      if (rows.length > 10000) return res.status(400).json({ message: "Too many rows to export" });
 
-      const wb = new ExcelJS.Workbook();
-      wb.creator = "ERP System";
-      const ws = wb.addWorksheet("Analysis");
-
-      const NAVY = "1A2C5B";
-      const GOLD = "C9A84C";
-      const GREEN = "1A7A3E";
-      const RED = "C0392B";
-      const YELLOW = "856404";
-      const LIGHT_RED = "FDECEA";
-      const LIGHT_GREEN = "E9F7EF";
-      const LIGHT_YELLOW = "FFF9E6";
-      const WHITE = "FFFFFF";
-
-      ws.columns = [
-        { key: "code", width: 14 },
-        { key: "name", width: 32 },
-        { key: "stock", width: 12 },
-        { key: "avg_sell", width: 14 },
-        { key: "hassans_price", width: 16 },
-        { key: "avg_cost", width: 14 },
-        { key: "cost_source", width: 14 },
-        { key: "hassans_profit", width: 16 },
-        { key: "hassans_profit_pct", width: 13 },
-        { key: "cost_profit", width: 16 },
-        { key: "cost_profit_pct", width: 13 },
-        { key: "status", width: 12 },
-        { key: "qty", width: 10 },
-        { key: "total_avg_cost", width: 18 },
-        { key: "est_total_sales", width: 18 },
-        { key: "est_hassans_profit", width: 20 },
-        { key: "est_cost_profit", width: 18 },
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "ERP System";
+      const sheet = workbook.addWorksheet("Analysis");
+      sheet.columns = [
+        { width: 14 },
+        { width: 34 },
+        { width: 12 },
+        { width: 15 },
+        { width: 15 },
+        { width: 14 },
+        { width: 15 },
+        { width: 15 },
+        { width: 14 },
+        { width: 13 },
+        { width: 12 },
+        { width: 13 },
+        { width: 18 },
+        { width: 18 },
+        { width: 18 },
+        { width: 17 },
+        { width: 15 },
+        { width: 15 },
+        { width: 15 },
       ];
 
-      // Title
-      ws.mergeCells("A1:R1");
-      const t = ws.getCell("A1");
-      t.value = `INTERNAL PROFIT ANALYSIS — ${supplierName || ""}`;
-      t.font = { bold: true, size: 14, color: { argb: WHITE } };
-      t.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
-      t.alignment = { horizontal: "center", vertical: "middle" };
-      ws.getRow(1).height = 28;
+      sheet.mergeCells("A1:S1");
+      const title = sheet.getCell("A1");
+      title.value = `INTERNAL PROFIT ANALYSIS — ${String(supplierName ?? "")}`;
+      title.font = { bold: true, size: 14, color: { argb: WHITE } };
+      title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
+      title.alignment = { horizontal: "center", vertical: "middle" };
+      sheet.getRow(1).height = 28;
 
-      ws.mergeCells("A2:R2");
-      const sub = ws.getCell("A2");
-      sub.value = `Date Range: ${fromDate} → ${toDate}   |   Proforma Ref: ${proformaRef || "N/A"}`;
-      sub.font = { bold: false, size: 10, color: { argb: NAVY } };
-      sub.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "F7EFD8" } };
-      sub.alignment = { horizontal: "center" };
-      ws.getRow(2).height = 18;
+      sheet.mergeCells("A2:S2");
+      const subtitle = sheet.getCell("A2");
+      subtitle.value = `Date Range: ${fromDate || "All Time"} → ${toDate || "All Time"}   |   Proforma Ref: ${proformaRef || "N/A"}`;
+      subtitle.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GOLD } };
+      subtitle.font = { color: { argb: NAVY } };
+      subtitle.alignment = { horizontal: "center" };
 
       const headers = [
         "Item Code",
         "Item Name",
-        "Current Stock",
-        "Avg Sell Price",
-        "Hassan's Price",
-        "Avg Cost",
-        "Cost Source",
-        "Hassan's Profit",
-        "Hassan's Profit %",
+        "Sales Qty",
+        "Effective Sell",
+        "Dubai Price",
+        "Extra / Bale",
+        "Landing Cost",
         "Cost Profit",
         "Cost Profit %",
         "Status",
         "Qty to Order",
-        "Total Avg Cost",
+        "Total Landing Cost",
         "Est. Total Sales",
-        "Est. Hassan's Profit",
         "Est. Cost Profit",
+        "Inventory Avg Cost",
+        "Hassan Price",
+        "Hassan Profit",
+        "Current Stock",
+        "PO Price Source",
       ];
-      const hRow = ws.addRow(headers);
-      hRow.eachCell((c) => {
-        c.font = { bold: true, color: { argb: WHITE }, size: 10 };
-        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GOLD } };
-        c.alignment = { horizontal: "center", wrapText: true };
-        c.border = { bottom: { style: "thin", color: { argb: NAVY } } };
-      });
-      hRow.height = 24;
+      const header = sheet.addRow(headers);
+      header.eachCell(applyHeader);
+      header.height = 28;
 
-      const numFmt2 = "#,##0.00";
-      const numFmt0 = "#,##0";
-      const numFmtPct = '0.00"%"';
+      for (const raw of rows) {
+        const qty = Math.max(0, numberOrNull(raw.qty) ?? 0);
+        const effectiveSell = numberOrNull(raw.effectiveSellPrice ?? raw.avgSellingPrice);
+        const effectivePo = numberOrNull(raw.effectivePoPrice ?? raw.poPrice);
+        const extraPerBale = Math.max(0, numberOrNull(raw.extraCostPerBale) ?? 0);
+        const landingCost = numberOrNull(raw.landingCost) ?? (effectivePo != null ? effectivePo + extraPerBale : null);
+        const costProfit =
+          numberOrNull(raw.costProfit) ??
+          (effectiveSell != null && landingCost != null ? effectiveSell - landingCost : null);
+        const costProfitPct =
+          numberOrNull(raw.costProfitPct) ??
+          (costProfit != null && effectiveSell != null && effectiveSell > 0 ? (costProfit / effectiveSell) * 100 : null);
+        const status = String(
+          raw.computedStatus ??
+            (effectiveSell == null || landingCost == null
+              ? "no_sales_data"
+              : costProfit! > 0
+                ? "gaining"
+                : costProfit! < 0
+                  ? "losing"
+                  : "break_even")
+        );
+        const inventoryAvgCost = numberOrNull(raw.inventoryAvgCost) ?? 0;
+        const hassanPrice = numberOrNull(raw.configPrice) ?? 0;
+        const hassanProfit = numberOrNull(raw.hassanProfit) ?? hassanPrice - inventoryAvgCost;
+        const totalLandingCost = landingCost != null ? qty * landingCost : 0;
+        const estimatedSales = effectiveSell != null ? qty * effectiveSell : 0;
+        const estimatedProfit = costProfit != null ? qty * costProfit : 0;
 
-      for (let i = 0; i < rows.length; i++) {
-        const r = rows[i];
-        const sell = r.avgSellingPrice != null ? Number(r.avgSellingPrice) : null;
-        const hassansPrice = Number(r.configPrice) || 0;
-        const avgCost = Number(r.offloadingCost) || 0;
-
-        // Hassan's Profit = Hassan's Price − Avg Cost
-        const hassansProfit = hassansPrice - avgCost;
-        const hassansProfitPct = hassansPrice > 0 ? (hassansProfit / hassansPrice) * 100 : null;
-
-        // Cost Profit = Avg Sell − Avg Cost
-        const costProfit = sell != null ? sell - avgCost : null;
-        const costProfitPct = sell != null && sell > 0 && costProfit != null ? (costProfit / sell) * 100 : null;
-
-        const qty = Number(r.qty) || 0;
-        const totalAvgCost = qty * avgCost;
-        const estTotalSales = sell != null ? qty * sell : 0;
-        const estHassansProfit = qty * hassansProfit;
-        const estCostProfit = costProfit != null ? qty * costProfit : 0;
-
-        const statusByHassans =
-          hassansProfit > 0 ? "gaining" : hassansProfit < 0 ? "losing" : sell == null ? "no_sales_data" : "break_even";
-
-        const dataRow = ws.addRow([
-          r.code,
-          r.name,
-          Number(r.currentStock) || 0,
-          sell ?? "",
-          hassansPrice,
-          avgCost,
-          r.nCostSource || "missing",
-          hassansProfit,
-          hassansProfitPct ?? "",
+        const row = sheet.addRow([
+          raw.code,
+          raw.name,
+          numberOrNull(raw.salesQty) ?? 0,
+          effectiveSell ?? "",
+          effectivePo ?? "",
+          extraPerBale,
+          landingCost ?? "",
           costProfit ?? "",
           costProfitPct ?? "",
-          statusByHassans,
+          status,
           qty,
-          totalAvgCost,
-          estTotalSales,
-          estHassansProfit,
-          estCostProfit,
+          totalLandingCost,
+          estimatedSales,
+          estimatedProfit,
+          inventoryAvgCost,
+          hassanPrice,
+          hassanProfit,
+          numberOrNull(raw.currentStock) ?? 0,
+          raw.poPriceSource || "missing",
         ]);
 
-        // Row background by hassan's profit status
-        let rowColor: string | null = null;
-        if (statusByHassans === "losing") rowColor = LIGHT_RED;
-        else if (statusByHassans === "gaining") rowColor = LIGHT_GREEN;
-        else if (statusByHassans === "no_sales_data") rowColor = LIGHT_YELLOW;
-        if (rowColor) {
-          dataRow.eachCell((c) => {
-            c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowColor! } };
+        const fill =
+          status === "losing"
+            ? LIGHT_RED
+            : status === "gaining"
+              ? LIGHT_GREEN
+              : status === "no_sales_data"
+                ? LIGHT_YELLOW
+                : null;
+        if (fill) {
+          row.eachCell((cell) => {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fill } };
           });
         }
+        const statusCell = row.getCell(10);
+        if (status === "gaining") statusCell.font = { bold: true, color: { argb: GREEN } };
+        else if (status === "losing") statusCell.font = { bold: true, color: { argb: RED } };
+        else if (status === "no_sales_data") statusCell.font = { bold: true, color: { argb: YELLOW } };
 
-        // Status cell font color (col 12)
-        const statusCell = dataRow.getCell(12);
-        if (statusByHassans === "gaining") statusCell.font = { bold: true, color: { argb: GREEN } };
-        else if (statusByHassans === "losing") statusCell.font = { bold: true, color: { argb: RED } };
-        else if (statusByHassans === "no_sales_data") statusCell.font = { bold: true, color: { argb: YELLOW } };
-
-        // Number formats: 3=stock, 4=sell, 5=hassansPrice, 6=avgCost, 8=hassansProfit, 10=costProfit, 14=totalAvgCost, 15=estSales, 16=estHassans, 17=estCost
-        [4, 5, 6, 8, 10, 14, 15, 16, 17].forEach((col) => {
-          dataRow.getCell(col).numFmt = numFmt2;
-        });
-        dataRow.getCell(3).numFmt = numFmt2;
-        dataRow.getCell(9).numFmt = numFmtPct; // Hassan's Profit %
-        dataRow.getCell(11).numFmt = numFmtPct; // Cost Profit %
-        dataRow.getCell(13).numFmt = numFmt0; // Qty
+        for (const column of [4, 5, 6, 7, 8, 12, 13, 14, 15, 16, 17, 18]) {
+          row.getCell(column).numFmt = "#,##0.00";
+        }
+        row.getCell(9).numFmt = '0.00"%"';
+        row.getCell(11).numFmt = "#,##0";
       }
 
-      // Summary totals
-      const hasQty = rows.filter((r) => Number(r.qty) > 0);
-      const totalQtyOrdered = hasQty.reduce((s: number, r) => s + (Number(r.qty) || 0), 0);
-      const totalAvgCostSum = hasQty.reduce(
-        (s: number, r) => s + (Number(r.qty) || 0) * (Number(r.offloadingCost) || 0),
-        0
-      );
-      const totalEstSales = hasQty.reduce((s: number, r) => {
-        return r.avgSellingPrice != null ? s + (Number(r.qty) || 0) * Number(r.avgSellingPrice) : s;
-      }, 0);
-      const totalEstHassansProfit = hasQty.reduce((s: number, r) => {
-        const hp = (Number(r.configPrice) || 0) - (Number(r.offloadingCost) || 0);
-        return s + (Number(r.qty) || 0) * hp;
-      }, 0);
-      const totalEstCostProfit = hasQty.reduce((s: number, r) => {
-        const sell = r.avgSellingPrice != null ? Number(r.avgSellingPrice) : null;
-        const p = sell != null ? sell - (Number(r.offloadingCost) || 0) : null;
-        return p != null ? s + (Number(r.qty) || 0) * p : s;
-      }, 0);
-
-      ws.addRow([]);
-      const sumRow = ws.addRow([
-        "TOTALS",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        `${hasQty.length} items`,
-        totalQtyOrdered,
-        totalAvgCostSum,
-        totalEstSales,
-        totalEstHassansProfit,
-        totalEstCostProfit,
-      ]);
-      sumRow.eachCell((c) => {
-        c.font = { bold: true, color: { argb: WHITE } };
-        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
-        c.border = { top: { style: "double", color: { argb: GOLD } } };
-      });
-      sumRow.getCell(13).numFmt = numFmt0; // qty
-      sumRow.getCell(14).numFmt = numFmt2; // total avg cost
-      sumRow.getCell(15).numFmt = numFmt2; // est sales
-      sumRow.getCell(16).numFmt = numFmt2; // est hassan's profit
-      sumRow.getCell(17).numFmt = numFmt2; // est cost profit
-
-      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="profit-analysis-${proformaRef || "export"}.xlsx"`);
-      const buffer = Buffer.from(await wb.xlsx.writeBuffer());
-      res.send(buffer);
+      await sendWorkbook(res, workbook, `profit-analysis-${proformaRef || "export"}.xlsx`);
     } catch (err: unknown) {
-      logger.error("[export-internal]", { error: getErrorMessage(err) });
+      logger.error("[supplier-profit-check/export-internal]", { error: getErrorMessage(err) });
       res.status(500).json({ message: getErrorMessage(err) });
     }
   });
-
-  // ── PO Price Overrides ──────────────────────────────────────────────────────
 }
