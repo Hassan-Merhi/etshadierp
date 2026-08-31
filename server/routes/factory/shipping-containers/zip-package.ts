@@ -20,7 +20,7 @@ import {
 import { eq, and, inArray } from "drizzle-orm";
 import path from "path";
 import fs from "fs";
-import archiver from "archiver";
+import { ZipArchive } from "archiver";
 
 import { fetchInternalBuffer, getCompanyId } from "./_helpers";
 
@@ -60,7 +60,7 @@ export async function buildShippingZipBuffer(entries: ShippingZipEntry[]): Promi
     throw new Error("Download failed");
   }
 
-  const archive = archiver("zip", { zlib: { level: 6 } });
+  const archive = new ZipArchive({ zlib: { level: 6 } });
   const chunks: Buffer[] = [];
   const output = new Writable({
     write(chunk: Buffer, _encoding, callback) {

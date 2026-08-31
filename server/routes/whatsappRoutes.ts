@@ -31,7 +31,7 @@ import { generateNetPositionExcel, generateMonthEnds } from "../helpers/generate
 import { generateStockPdf } from "../helpers/generateStockPdf";
 import { sendExportEmail } from "../services/emailService";
 import { triggerDailyWhatsAppSendNow } from "../services/scheduler";
-import archiver from "archiver";
+import { ZipArchive } from "archiver";
 import { getClientDate } from "../lib/dateUtils";
 
 export function registerWhatsAppRoutes(app: Express) {
@@ -534,7 +534,7 @@ export function registerWhatsAppRoutes(app: Express) {
       });
       const { recipientId: reqRecipientId } = req.body as Record<string, any>;
 
-      const allCompanies = ((await storage.getAllCompanies()));
+      const allCompanies = await storage.getAllCompanies();
       if (!allCompanies.length) return res.status(400).json({ message: "No companies found" });
 
       const today = getClientDate(req);
@@ -545,7 +545,7 @@ export function registerWhatsAppRoutes(app: Express) {
       // Build ZIP
       const zipBuf = await new Promise<Buffer>((resolve, reject) => {
         const chunks: Buffer[] = [];
-        const arc = archiver("zip", { zlib: { level: 6 } });
+        const arc = new ZipArchive({ zlib: { level: 6 } });
         arc.on("data", (chunk: Buffer) => chunks.push(chunk));
         arc.on("end", () => resolve(Buffer.concat(chunks)));
         arc.on("error", reject);

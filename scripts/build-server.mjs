@@ -10,6 +10,11 @@
  * entry instead of asking esbuild to convert its dynamic built-in requires
  * into an ESM bundle, and harden the final artifact against named imports.
  *
+ * archiver v8 is ESM-only and no longer exposes the legacy default factory
+ * export. Keep it external like the other runtime packages, but normalize any
+ * surviving legacy default import in the emitted artifact to the v8
+ * ZipArchive constructor before publishing.
+ *
  * All other npm packages remain external.
  */
 
@@ -91,9 +96,36 @@ output = output.replace(xlsxNamedImport, (_match, readName, utilsName, writeName
   return `import ${pkgName} from "xlsx-js-style";\nconst { read: ${readName}, utils: ${utilsName}, write: ${writeName} } = ${pkgName};`;
 });
 
-if (xlsxInteropRewriteCount > 0) {
+// archiver v8 removed the default callable factory used by v7. If a legacy
+// default import survives into the server artifact, replace that import with a
+// small v8-compatible ZIP factory. The application only uses the legacy factory
+// for ZIP archives, so reject any unexpected format rather than silently
+// changing behaviour.
+let archiverInteropRewriteCount = 0;
+const archiverDefaultImport =
+  /import\s+([A-Za-z_$][\w$]*)\s+from\s*["']archiver["'];?/g;
+
+output = output.replace(archiverDefaultImport, (_match, localName) => {
+  const zipArchiveName = `ArchiverZipArchiveCompat${archiverInteropRewriteCount++}`;
+  return [
+    `import { ZipArchive as ${zipArchiveName} } from "archiver";`,
+    `const ${localName} = (format, options) => {`,
+    `  if (format !== "zip") throw new Error(\`Unsupported archiver format: \${format}\`);`,
+    `  return new ${zipArchiveName}(options);`,
+    `};`,
+  ].join("\n");
+});
+
+if (xlsxInteropRewriteCount > 0 || archiverInteropRewriteCount > 0) {
   await writeFile("dist/index.js", output, "utf8");
+}
+
+if (xlsxInteropRewriteCount > 0) {
   console.log(`Rewrote ${xlsxInteropRewriteCount} xlsx-js-style named import(s) for CommonJS runtime compatibility`);
+}
+
+if (archiverInteropRewriteCount > 0) {
+  console.log(`Rewrote ${archiverInteropRewriteCount} archiver default import(s) for v8 ESM compatibility`);
 }
 
 // Refuse to publish artifacts that can reproduce the known startup crashes.
@@ -101,6 +133,8 @@ const unresolvedDecimalImport =
   /(?:from\s*["']decimal\.js["']|import\s*\(\s*["']decimal\.js["']\s*\)|node_modules\/decimal\.js\/index\.js)/;
 const unresolvedXlsxNamedImport =
   /import\s*\{[^}]*\}\s*from\s*["']xlsx-js-style["']/;
+const unresolvedArchiverDefaultImport =
+  /import\s+[A-Za-z_$][\w$]*\s+from\s*["']archiver["']/;
 
 if (unresolvedDecimalImport.test(output)) {
   throw new Error(
@@ -114,4 +148,10 @@ if (unresolvedXlsxNamedImport.test(output)) {
   );
 }
 
-console.log("Server bundle verified: xlsx-js-style has safe CommonJS interop and decimal.js is embedded");
+if (unresolvedArchiverDefaultImport.test(output)) {
+  throw new Error(
+    "Production bundle still contains an archiver default import; refusing to publish an archiver v8-incompatible artifact.",
+  );
+}
+
+console.log("Server bundle verified: xlsx-js-style and archiver have safe runtime interop, and decimal.js is embedded");
