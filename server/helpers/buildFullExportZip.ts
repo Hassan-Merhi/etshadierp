@@ -1,4 +1,4 @@
-import archiver from "archiver";
+import { ZipArchive } from "archiver";
 import type { Writable } from "stream";
 import { streamCompanyWorkbookDirect } from "../services/export-excel";
 import { logger } from "../lib/logger";
@@ -18,6 +18,7 @@ export interface StreamExportZipResult {
 }
 
 type ExportProgress = (msg: string, level?: "info" | "success" | "warning" | "error") => void;
+type ExportArchive = InstanceType<typeof ZipArchive>;
 
 function createProgressLogger(onProgress?: ExportProgress): ExportProgress {
   return (
@@ -31,7 +32,7 @@ function createProgressLogger(onProgress?: ExportProgress): ExportProgress {
   );
 }
 
-function attachArchiveLogging(arc: archiver.Archiver): void {
+function attachArchiveLogging(arc: ExportArchive): void {
   arc.on("warning", (error: unknown) => {
     logger.warn("Export ZIP archiver warning", {
       module: "full-export",
@@ -42,7 +43,7 @@ function attachArchiveLogging(arc: archiver.Archiver): void {
 }
 
 async function appendCompanyWorkbooks(
-  arc: archiver.Archiver,
+  arc: ExportArchive,
   companies: any[],
   fromDate: string | undefined,
   toDate: string | undefined,
@@ -99,7 +100,7 @@ async function streamFullExportZipUnsafe(
   onProgress?: ExportProgress
 ): Promise<StreamExportZipResult> {
   const log = createProgressLogger(onProgress);
-  const arc = archiver("zip", { zlib: { level: 6 } });
+  const arc = new ZipArchive({ zlib: { level: 6 } });
   attachArchiveLogging(arc);
 
   const complete = new Promise<void>((resolve, reject) => {
@@ -163,7 +164,7 @@ async function buildFullExportZipUnsafe(
 ): Promise<ExportZipResult> {
   const log = createProgressLogger(onProgress);
   const chunks: Buffer[] = [];
-  const arc = archiver("zip", { zlib: { level: 6 } });
+  const arc = new ZipArchive({ zlib: { level: 6 } });
   attachArchiveLogging(arc);
   arc.on("data", (chunk: Buffer) => chunks.push(chunk));
 
