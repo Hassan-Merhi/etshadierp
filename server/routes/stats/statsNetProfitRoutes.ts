@@ -660,14 +660,14 @@ export function registerStatsNetProfitRoutes(app: Express) {
         onUsTotal,
         incomeTotal,
         expensesTotal,
-         currency: {
-           ...netPositionCurrency,
-           currentCashBankTranslationApplied: false,
-           historicalValuesLocked: true,
-         },
-         currencyRevaluation: {
-           reportTotalsProvisional: netPositionCurrency.totalsProvisional,
-         },
+        currency: {
+          ...netPositionCurrency,
+          currentCashBankTranslationApplied: false,
+          historicalValuesLocked: true,
+        },
+        currencyRevaluation: {
+          reportTotalsProvisional: netPositionCurrency.totalsProvisional,
+        },
       };
       _setCached(_cacheKey, _result);
       res.json(_result);

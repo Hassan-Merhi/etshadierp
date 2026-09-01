@@ -192,7 +192,10 @@ export function registerLedgerAccountWriteRoutes(app: Express) {
       const accountType = parsed.accountType || existingAccount.accountType;
       if (parsed.subType && parsed.subType !== "Group" && VALID_LEDGER_SUBTYPES[accountType]) {
         const allowedAccountTypes = parsed.subType === "sp_payable" ? ["Liability", "Accounts Payable"] : [accountType];
-        if (!VALID_LEDGER_SUBTYPES[accountType].includes(parsed.subType) || !allowedAccountTypes.includes(accountType)) {
+        if (
+          !VALID_LEDGER_SUBTYPES[accountType].includes(parsed.subType) ||
+          !allowedAccountTypes.includes(accountType)
+        ) {
           return res.status(400).json({
             message: `Invalid subType "${parsed.subType}" for accountType "${accountType}". Valid options: ${VALID_LEDGER_SUBTYPES[accountType].join(", ")}`,
           });

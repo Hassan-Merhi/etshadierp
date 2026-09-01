@@ -188,13 +188,13 @@ export const phase3RemainingTranslationsPart24: readonly Phase3SharedUiEntry[] =
     fr: "{{0}} comptes de capitaux propres — exclus des totaux de position nette",
   },
   {
-    en: "Invalid subType \"${parsed.subType}\" for accountType \"${parsed.accountType}\". Valid options: ${VALID_LEDGER_SUBTYPES[parsed.accountType].join(\", \")}",
-    ar: "نوع الحساب الفرعي \"{{0}}\" غير صالح لنوع الحساب \"{{1}}\". الخيارات الصالحة: {{2}}",
-    fr: "Sous-type \"{{0}}\" non valide pour le type de compte \"{{1}}\". Options valides : {{2}}",
+    en: 'Invalid subType "${parsed.subType}" for accountType "${parsed.accountType}". Valid options: ${VALID_LEDGER_SUBTYPES[parsed.accountType].join(", ")}',
+    ar: 'نوع الحساب الفرعي "{{0}}" غير صالح لنوع الحساب "{{1}}". الخيارات الصالحة: {{2}}',
+    fr: 'Sous-type "{{0}}" non valide pour le type de compte "{{1}}". Options valides : {{2}}',
   },
   {
-    en: "Invalid subType \"${parsed.subType}\" for accountType \"${accountType}\". Valid options: ${VALID_LEDGER_SUBTYPES[accountType].join(\", \")}",
-    ar: "نوع الحساب الفرعي \"{{0}}\" غير صالح لنوع الحساب \"{{1}}\". الخيارات الصالحة: {{2}}",
-    fr: "Sous-type \"{{0}}\" non valide pour le type de compte \"{{1}}\". Options valides : {{2}}",
+    en: 'Invalid subType "${parsed.subType}" for accountType "${accountType}". Valid options: ${VALID_LEDGER_SUBTYPES[accountType].join(", ")}',
+    ar: 'نوع الحساب الفرعي "{{0}}" غير صالح لنوع الحساب "{{1}}". الخيارات الصالحة: {{2}}',
+    fr: 'Sous-type "{{0}}" non valide pour le type de compte "{{1}}". Options valides : {{2}}',
   },
 ];

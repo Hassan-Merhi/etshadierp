@@ -447,7 +447,8 @@ export default function NetProfitDetails() {
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                Native balances remain separate; historical base values use the {data.currency.rateConvention} convention.
+                Native balances remain separate; historical base values use the {data.currency.rateConvention}{" "}
+                convention.
               </p>
               {nativeCurrencies.length > 0 && (
                 <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs font-mono">
