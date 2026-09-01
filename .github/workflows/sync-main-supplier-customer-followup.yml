@@ -1,0 +1,33 @@
+name: Sync supplier customer fix with main
+
+on:
+  push:
+    branches:
+      - fix/supplier-partner-customer-legacy-zero-net-position
+
+permissions:
+  contents: write
+
+jobs:
+  sync-main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/supplier-partner-customer-legacy-zero-net-position
+          fetch-depth: 0
+
+      - name: Merge latest main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-edit origin/main
+
+      - name: Remove one-time workflow
+        run: |
+          git rm .github/workflows/sync-main-supplier-customer-followup.yml
+          git commit -m "chore: remove one-time main sync workflow"
+
+      - name: Push synchronized branch
+        run: git push origin HEAD:fix/supplier-partner-customer-legacy-zero-net-position
