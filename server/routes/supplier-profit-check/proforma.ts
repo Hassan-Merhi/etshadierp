@@ -124,7 +124,7 @@ async function resolveAndConsolidateItems(
     const stockItemId = resolved?.id ?? null;
     const barcode = resolved?.code ?? code;
     const rawItemName = String(item.itemName ?? item.name ?? "").trim();
-    const itemName = resolved?.name ?? rawItemName || code;
+    const itemName = resolved?.name ?? (rawItemName || code);
     const groupKey = stockItemId != null ? `stock:${stockItemId}` : `raw:${code.toLowerCase()}`;
     const suppliedPrice = optionalNonNegativeNumber(item.supplierPrice);
     const weight = optionalNonNegativeNumber(item.weight) ?? 0;
