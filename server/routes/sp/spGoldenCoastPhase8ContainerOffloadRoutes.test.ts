@@ -47,22 +47,16 @@ describe("Golden Coast Phase 8 container/offload route", () => {
     expect(routeSource).toContain("adjustSpInventoryAtomic");
   });
 
-  it("refuses to post before the cutover is posted", () => {
-    expect(routeSource).toContain("GOLDEN_COAST_CUTOVER_FIFO_SOURCE");
-    expect(routeSource).toContain("GC_PHASE8_NOT_READY");
+  it("does not require a cutover before container activity", () => {
     expect(routeSource).toContain("GC_PHASE8_NOT_CONFIGURED");
-    // Readiness keys off the Phase 3 cutover voucher, which exists for every
-    // company that crossed the cutover.
-    expect(routeSource).toContain("goldenCoastPhase3VoucherNumber(companyId)");
-    expect(phase4RouteSource).toContain("export const goldenCoastPhase3VoucherNumber");
+    expect(routeSource).toContain("Container activity is available as soon as Golden Coast accounts are");
+    expect(routeSource).not.toContain("cutoverVoucherNumber");
   });
 
   it("still admits a company that carried no stock in hand across the cutover", () => {
-    // Phase 4 skips zero-quantity inventory, so an empty FIFO bridge is a
-    // legitimate outcome and must not lock the company out of Phase 8.
+    // Phase 4 skips zero-quantity inventory; Phase 8 no longer depends on it.
     expect(phase4ServiceSource).toContain("if (quantity.isZero()) continue;");
-    expect(routeSource).toContain("CAST(inv.quantity AS numeric) <> 0");
-    expect(routeSource).toContain("pending_count");
+    expect(routeSource).not.toContain("pending_count");
   });
 
   it("resolves every posting account from the canonical Golden Coast role definitions", () => {

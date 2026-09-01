@@ -385,6 +385,8 @@ async function handleGoldenCoastSetup(req: Request, res: Response): Promise<void
               name: item.name,
               accountType: item.accountType,
               subType: item.subType,
+              openingBalanceSide:
+                item.role === "fresh_start_equity" || item.role === "hassan_equity" ? "Cr" : undefined,
               isHidden: !item.requiresVisible,
               active: true,
             })
@@ -409,6 +411,21 @@ async function handleGoldenCoastSetup(req: Request, res: Response): Promise<void
           fields: item.repairs.map((repair) => repair.field),
         });
       }
+
+      // Partner equity is credit-normal. Older Golden Coast setup runs left the
+      // opening side at the ledger default (Dr), which made a correct profit
+      // credit appear to reduce the partner balance in the Accounts screen.
+      await tx
+        .update(ledgerAccounts)
+        .set({ openingBalanceSide: "Cr" })
+        .where(
+          and(
+            eq(ledgerAccounts.companyId, companyId),
+            inArray(ledgerAccounts.subType, ["gc_partner_capital", "gc_owner_capital"]),
+            eq(ledgerAccounts.accountType, "Equity"),
+            isNull(ledgerAccounts.deletedAt)
+          )
+        );
 
       const settingsChanged = await bindGoldenCoastSettings(tx, companyId, settingsBindings);
       const defs = goldenCoastPhase13IntercompanyDefinitions({

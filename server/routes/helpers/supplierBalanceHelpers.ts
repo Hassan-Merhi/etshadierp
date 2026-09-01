@@ -28,7 +28,20 @@ export class ParentCompanyNotConfiguredError extends Error {
  * suppliers.company_id existed. Never guesses via lowest company ID. Concurrent
  * callers share one in-flight resolution to avoid repeated configuration reads.
  */
-export async function resolveParentCompanyId(): Promise<number> {
+export async function resolveParentCompanyId(companyId?: number | null): Promise<number> {
+  // Prefer the explicit company relationship. This is the authoritative
+  // tenant-scoped configuration for current supplier rows and does not depend
+  // on the legacy global system setting.
+  if (companyId) {
+    const currentCompany = await storage.getCompanyById(companyId);
+    if (currentCompany?.parentCompanyId) return currentCompany.parentCompanyId;
+
+    // A root company is identified safely by an explicit child link, never by
+    // its numeric ID or position in the company list.
+    const linkedChild = (await storage.getAllCompanies()).some((company) => company.parentCompanyId === companyId);
+    if (linkedChild) return companyId;
+  }
+
   if (parentCompanyResolution) return parentCompanyResolution;
 
   const resolution = (async () => {
@@ -52,7 +65,7 @@ export async function resolveParentCompanyId(): Promise<number> {
 
 export async function isParentCompanyContext(companyId?: number | null): Promise<boolean> {
   if (!companyId) return true;
-  const parentCompanyId = await resolveParentCompanyId();
+  const parentCompanyId = await resolveParentCompanyId(companyId);
   return companyId === parentCompanyId;
 }
 

@@ -80,10 +80,32 @@ export function registerLedgerAccountWriteRoutes(app: Express) {
       // "Group" is a universal special subType used to mark an account as a parent group
       // and bypasses the per-type validation intentionally.
       const validSubTypes: Record<string, string[]> = {
-        Income: ["Direct Income", "Indirect Income"],
         Expense: ["Direct Expense", "Indirect Expense"],
-        Liability: ["Current Liability", "Long-term Liability", "Loans Payable", "Output Tax", "Tax Payable"],
-        Asset: ["Current Asset", "Fixed Asset", "Input Tax", "Tax Receivable"],
+        Liability: [
+          "Current Liability",
+          "Long-term Liability",
+          "Loans Payable",
+          "Output Tax",
+          "Tax Payable",
+          "sp_otw_clearing",
+          "sp_cost_clearing",
+          "sp_pay_deduction_clearing",
+          "sp_payable",
+        ],
+        Asset: [
+          "Current Asset",
+          "Fixed Asset",
+          "Input Tax",
+          "Tax Receivable",
+          "sp_goods_otw",
+          "sp_prepaid",
+          "sp_stock",
+          "sp_prepaid_expenses",
+        ],
+        "Direct Expense": ["sp_cogs", "sp_shared_charges"],
+        Income: ["Direct Income", "Indirect Income", "sp_sales"],
+        Equity: ["sp_opnbal"],
+        Intercompany: ["sp_hadi_intercompany"],
       };
 
       if (parsed.subType && parsed.subType !== "Group" && validSubTypes[parsed.accountType]) {
@@ -168,14 +190,37 @@ export function registerLedgerAccountWriteRoutes(app: Express) {
       // Validate subType based on accountType if accountType is being updated
       const accountType = parsed.accountType || existingAccount.accountType;
       const validSubTypes: Record<string, string[]> = {
-        Income: ["Direct Income", "Indirect Income"],
         Expense: ["Direct Expense", "Indirect Expense"],
-        Liability: ["Current Liability", "Long-term Liability", "Loans Payable", "Output Tax", "Tax Payable"],
-        Asset: ["Current Asset", "Fixed Asset", "Input Tax", "Tax Receivable"],
+        Liability: [
+          "Current Liability",
+          "Long-term Liability",
+          "Loans Payable",
+          "Output Tax",
+          "Tax Payable",
+          "sp_otw_clearing",
+          "sp_cost_clearing",
+          "sp_pay_deduction_clearing",
+          "sp_payable",
+        ],
+        Asset: [
+          "Current Asset",
+          "Fixed Asset",
+          "Input Tax",
+          "Tax Receivable",
+          "sp_goods_otw",
+          "sp_prepaid",
+          "sp_stock",
+          "sp_prepaid_expenses",
+        ],
+        "Direct Expense": ["sp_cogs", "sp_shared_charges"],
+        Income: ["Direct Income", "Indirect Income", "sp_sales"],
+        Equity: ["sp_opnbal"],
+        Intercompany: ["sp_hadi_intercompany"],
       };
 
       if (parsed.subType && parsed.subType !== "Group" && validSubTypes[accountType]) {
-        if (!validSubTypes[accountType].includes(parsed.subType)) {
+        const allowedAccountTypes = parsed.subType === "sp_payable" ? ["Liability", "Accounts Payable"] : [accountType];
+        if (!validSubTypes[accountType].includes(parsed.subType) || !allowedAccountTypes.includes(accountType)) {
           return res.status(400).json({
             message: `Invalid subType "${parsed.subType}" for accountType "${accountType}". Valid options: ${validSubTypes[accountType].join(", ")}`,
           });

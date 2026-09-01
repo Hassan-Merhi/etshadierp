@@ -60,7 +60,7 @@ export function resolveAuthenticatedAppRoute({
     isSupplierPartnerCompany &&
     (currentLocation === "/sp/migration" || currentLocation === "/sp/gc-migration")
   ) {
-    decision = { kind: "redirect", to: "/sp/setup?tab=migration" };
+    decision = { kind: "redirect", to: "/sp/setup" };
   } else if (isSupplierPartnerCompany && isSupplierPartnerRoute && !SUPPLIER_PARTNER_PATHS.has(currentLocation)) {
     decision = { kind: "redirect", to: "/sp" };
   } else if (

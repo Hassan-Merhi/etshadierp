@@ -13,7 +13,7 @@ import { vouchers } from "@shared/schema";
 import { logger } from "../../../lib/logger";
 import { eq } from "drizzle-orm";
 
-/** Updates voucher description, total amount, location, and optionally date. */
+/** Updates voucher description, total amount, location, credit state, and optionally date. */
 export async function updateVoucherRecord(
   tx: DbTransaction,
   params: {
@@ -24,13 +24,24 @@ export async function updateVoucherRecord(
     targetLocationId: number;
     oldLocationId: number;
     voucherDate: any;
+    isCreditSale: boolean;
   }
 ): Promise<void> {
-  const { voucherId, description, grandTotal, locationChanged, targetLocationId, oldLocationId, voucherDate } = params;
+  const {
+    voucherId,
+    description,
+    grandTotal,
+    locationChanged,
+    targetLocationId,
+    oldLocationId,
+    voucherDate,
+    isCreditSale,
+  } = params;
 
   const voucherUpdate: any = {
     description: description || null,
     totalAmount: grandTotal.toString(),
+    isCreditSale,
   };
   if (locationChanged) {
     voucherUpdate.locationId = targetLocationId;

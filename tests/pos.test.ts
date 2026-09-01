@@ -53,12 +53,7 @@ async function deleteSalesVouchersForCompany() {
   const vouchers = await db
     .select({ id: schema.vouchers.id })
     .from(schema.vouchers)
-    .where(
-      and(
-        eq(schema.vouchers.companyId, ctx.companyId),
-        eq(schema.vouchers.voucherType, "Sales"),
-      ),
-    );
+    .where(and(eq(schema.vouchers.companyId, ctx.companyId), eq(schema.vouchers.voucherType, "Sales")));
   for (const v of vouchers) {
     await db.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, v.id));
     await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, v.id));
@@ -116,9 +111,7 @@ describe("POS Sale — Core Flow", () => {
     const beforeCount = await db
       .select()
       .from(schema.vouchers)
-      .where(
-        and(eq(schema.vouchers.companyId, ctx.companyId), eq(schema.vouchers.voucherType, "Sales")),
-      );
+      .where(and(eq(schema.vouchers.companyId, ctx.companyId), eq(schema.vouchers.voucherType, "Sales")));
 
     await agent.post("/api/pos/sales").send({
       locationId: ctx.locationId,
@@ -131,9 +124,7 @@ describe("POS Sale — Core Flow", () => {
     const afterCount = await db
       .select()
       .from(schema.vouchers)
-      .where(
-        and(eq(schema.vouchers.companyId, ctx.companyId), eq(schema.vouchers.voucherType, "Sales")),
-      );
+      .where(and(eq(schema.vouchers.companyId, ctx.companyId), eq(schema.vouchers.voucherType, "Sales")));
 
     expect(afterCount.length).toBe(beforeCount.length + 1);
   });
@@ -156,10 +147,7 @@ describe("POS Sale — Core Flow", () => {
     const voucherId = res.body?.voucher?.id ?? res.body?.voucherId ?? res.body?.id;
     expect(voucherId).toBeDefined();
 
-    const items = await db
-      .select()
-      .from(schema.salesItems)
-      .where(eq(schema.salesItems.voucherId, voucherId));
+    const items = await db.select().from(schema.salesItems).where(eq(schema.salesItems.voucherId, voucherId));
 
     expect(items.length).toBe(2);
   });
@@ -269,19 +257,41 @@ describe("POS Sale — Edit", () => {
 
     const editRes = await agent.put(`/api/vouchers/${voucherId}/sales`).send({
       locationId: ctx.locationId,
-      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 10, rate: 20 }],
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 10, sellingPrice: "20" }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
       voucherDate: new Date().toISOString().split("T")[0],
     });
 
-    if (editRes.status >= 200 && editRes.status < 300) {
-      const qtyAfterEdit = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
-      expect(qtyAfterEdit).toBe(90);
-    } else {
-      // PUT /api/vouchers/:id/sales may not be implemented; mark clearly
-      expect(editRes.status, `Expected edit endpoint to succeed, got ${editRes.status}: ${JSON.stringify(editRes.body)}`).toBeGreaterThanOrEqual(200);
-    }
+    expect(editRes.status).toBe(200);
+    const qtyAfterEdit = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
+    expect(qtyAfterEdit).toBe(90);
+  });
+
+  it("keeps PATCH edits compatible while using the canonical sale editor", async () => {
+    const createRes = await agent.post("/api/pos/sales").send({
+      locationId: ctx.locationId,
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 5, rate: 20 }],
+      paymentAccountType: "ledger",
+      paymentAccountId: ctx.cashAccountId,
+      voucherDate: new Date().toISOString().split("T")[0],
+    });
+
+    expect(createRes.status).toBe(200);
+    const voucherId = createRes.body?.voucher?.id;
+    expect(voucherId).toBeDefined();
+
+    const editRes = await agent.patch(`/api/vouchers/${voucherId}/sales`).send({
+      locationId: ctx.locationId,
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 7, sellingPrice: "20" }],
+      voucherDate: new Date().toISOString().split("T")[0],
+    });
+
+    expect(editRes.status).toBe(200);
+    expect(editRes.body?.id).toBe(voucherId);
+    expect(editRes.body?.voucher?.id).toBe(voucherId);
+    expect(editRes.body?.items).toHaveLength(1);
+    expect(await getInventoryQty(ctx.locationId, ctx.stockItemIds[0])).toBe(93);
   });
 
   it("deleting a sale restores inventory", async () => {

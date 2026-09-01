@@ -33,6 +33,7 @@ import {
 } from "../../services/accounting/goldenCoastPhase3Cutover";
 import { requireSpCompany } from "./spHelpers";
 import { loadGoldenCoastAccounts, loadGoldenCoastSettings } from "./spGoldenCoastSetupRoutes";
+import { goldenCoastExistingPositionCarryForwardVoucherNumber } from "../../services/accounting/goldenCoastCutoverMarkers";
 
 const postingDependencies = createDatabasePostingDependencies();
 const phase3RequestBudget = privilegedRequestBudget({ maxBodyBytes: 16 * 1024, maxCollectionItems: 25 });
@@ -174,6 +175,21 @@ async function existingCutoverVoucherTx(tx: DatabaseTransaction | typeof db, com
   return voucher ?? null;
 }
 
+async function existingPositionCarryForwardVoucherTx(tx: DatabaseTransaction | typeof db, companyId: number) {
+  const [voucher] = await tx
+    .select()
+    .from(vouchers)
+    .where(
+      and(
+        eq(vouchers.companyId, companyId),
+        eq(vouchers.voucherNumber, goldenCoastExistingPositionCarryForwardVoucherNumber(companyId)),
+        isNull(vouchers.deletedAt)
+      )
+    )
+    .limit(1);
+  return voucher ?? null;
+}
+
 async function canonicalPreCutoverBalances(
   tx: DatabaseTransaction | typeof db,
   companyId: number,
@@ -227,10 +243,11 @@ async function canonicalPreCutoverBalances(
 }
 
 async function readiness(tx: DatabaseTransaction | typeof db, companyId: number) {
-  const [accounts, settings, existingVoucher] = await Promise.all([
+  const [accounts, settings, existingVoucher, existingPositionCarryForwardVoucher] = await Promise.all([
     loadGoldenCoastAccounts(tx, companyId),
     loadGoldenCoastSettings(tx, companyId),
     existingCutoverVoucherTx(tx, companyId),
+    existingPositionCarryForwardVoucherTx(tx, companyId),
   ]);
   const phase2 = summarizeGoldenCoastAccountSetup({ companyId, accounts, settings });
   const blockers: string[] = [];
@@ -245,13 +262,15 @@ async function readiness(tx: DatabaseTransaction | typeof db, companyId: number)
   } else {
     try {
       resolveRoleAccounts(accounts);
-      preCutoverBalances = await canonicalPreCutoverBalances(tx, companyId, accounts);
-      const nonZero = preCutoverBalances.filter((item) => Math.abs(Number(item.debitMinusCreditUsd)) > 0.005);
-      if (nonZero.length > 0 && !existingVoucher) {
-        blockers.push(
-          `Canonical cutover accounts already contain pre-${GOLDEN_COAST_PHASE3_CUTOVER_DATE} opening or ledger balances; ` +
-            "Phase 3 refuses to layer a fresh opening journal on top of historical balances. Reconcile or migrate those balances first."
-        );
+      if (!existingVoucher && !existingPositionCarryForwardVoucher) {
+        preCutoverBalances = await canonicalPreCutoverBalances(tx, companyId, accounts);
+        const nonZero = preCutoverBalances.filter((item) => Math.abs(Number(item.debitMinusCreditUsd)) > 0.005);
+        if (nonZero.length > 0) {
+          blockers.push(
+            `Canonical cutover accounts already contain pre-${GOLDEN_COAST_PHASE3_CUTOVER_DATE} opening or ledger balances; ` +
+              "Phase 3 refuses to layer a fresh opening journal on top of historical balances. Reconcile or migrate those balances first."
+          );
+        }
       }
     } catch (error) {
       blockers.push(error instanceof Error ? error.message : String(error));
@@ -269,10 +288,16 @@ async function readiness(tx: DatabaseTransaction | typeof db, companyId: number)
     },
     preCutoverBalances,
     existingVoucher,
-    posted: !!existingVoucher,
+    existingPositionCarryForwardVoucher,
+    posted: !!existingVoucher || !!existingPositionCarryForwardVoucher,
+    openingMode: existingPositionCarryForwardVoucher
+      ? "existing-position-carry-forward"
+      : existingVoucher
+        ? "standard"
+        : null,
     blockers,
     canPreview: phase2.isConfigured,
-    canPost: phase2.isConfigured && blockers.length === 0 && !existingVoucher,
+    canPost: phase2.isConfigured && blockers.length === 0 && !existingVoucher && !existingPositionCarryForwardVoucher,
   };
 }
 
@@ -365,13 +390,14 @@ async function handlePost(req: Request, res: Response): Promise<void> {
     const cashAccount = parseCashAccount(req.body?.cashAccount);
     const result = await db.transaction(async (tx) => {
       const state = await readiness(tx, selectedCompany);
-      if (state.existingVoucher) {
+      const existingOpeningVoucher = state.existingVoucher ?? state.existingPositionCarryForwardVoucher;
+      if (existingOpeningVoucher) {
         const entries = await tx
           .select()
           .from(voucherEntries)
-          .where(eq(voucherEntries.voucherId, state.existingVoucher.id));
+          .where(eq(voucherEntries.voucherId, existingOpeningVoucher.id));
         return {
-          posted: { voucher: state.existingVoucher, entries, replayed: true } as PersistedPostingResult,
+          posted: { voucher: existingOpeningVoucher, entries, replayed: true } as PersistedPostingResult,
           plan: null,
         };
       }

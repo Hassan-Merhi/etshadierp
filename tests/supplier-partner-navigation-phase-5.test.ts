@@ -20,13 +20,13 @@ describe("Supplier Partner navigation phase 5", () => {
     expect(appNavigation).toContain('if (cleanPath === "/sp/opening-stock") return "/sp"');
     expect(appNavigation).toContain('if (cleanPath === "/sp/aliases") return "/sp"');
     expect(appNavigation).toContain('if (cleanPath === "/sp/setup") return "/sp"');
-    expect(appNavigation).toContain('return "/sp/setup?tab=migration"');
+    expect(appNavigation).toContain('return "/sp/setup"');
     expect(appNavigation).toContain("getSupplierPartnerParent(pathname) ?? getParentRoute(pathname)");
   });
 
   it("keeps compatibility migration redirects replacement-based", () => {
     expect(routeGuard).toContain('currentLocation === "/sp/migration"');
     expect(routeGuard).toContain('currentLocation === "/sp/gc-migration"');
-    expect(routeGuard).toContain('decision = { kind: "redirect", to: "/sp/setup?tab=migration" }');
+    expect(routeGuard).toContain('decision = { kind: "redirect", to: "/sp/setup" }');
   });
 });

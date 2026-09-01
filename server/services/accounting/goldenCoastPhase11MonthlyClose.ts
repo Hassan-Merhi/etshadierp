@@ -3,7 +3,6 @@ import Decimal from "decimal.js";
 import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import type { CentralPostingRequest, PostingActor } from "./centralPostingEngine";
 import { buildGenericVoucherPostingRequest } from "./genericVoucherPosting";
-import { GOLDEN_COAST_CUTOVER_DATE } from "./goldenCoastPhase4CutoverFifo";
 import { GOLDEN_COAST_PHASE11_SOURCE_TYPE } from "./goldenCoastPhase11CloseIdentity";
 
 export { GOLDEN_COAST_PHASE11_SOURCE_TYPE } from "./goldenCoastPhase11CloseIdentity";
@@ -80,12 +79,6 @@ function parseMonth(value: unknown): { periodMonth: string; periodStart: string;
   const [year, month] = periodMonth.split("-").map(Number);
   if (month < 1 || month > 12) throw new GoldenCoastPhase11CloseError("periodMonth must be a real calendar month");
   const periodStart = `${periodMonth}-01`;
-  if (periodStart < GOLDEN_COAST_CUTOVER_DATE) {
-    throw new GoldenCoastPhase11CloseError(
-      `periodMonth cannot precede the Golden Coast cutover month ${GOLDEN_COAST_CUTOVER_DATE.slice(0, 7)}`,
-      "GC_PHASE11_PRE_CUTOVER_MONTH"
-    );
-  }
   const end = new Date(Date.UTC(year, month, 0));
   const periodEnd = `${periodMonth}-${String(end.getUTCDate()).padStart(2, "0")}`;
   return { periodMonth, periodStart, periodEnd };

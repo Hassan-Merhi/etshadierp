@@ -45,6 +45,7 @@ interface PosMobileLayoutProps {
   setNotes: (v: string) => void;
   saveMutation: any;
   hasValidItems: boolean;
+  disableSave?: boolean;
   handleSaveSale: () => void;
   formatDisplayAmount: (v: number) => string;
   isSpCompany?: boolean;
@@ -85,6 +86,7 @@ export function PosMobileLayout({
   setNotes,
   saveMutation,
   hasValidItems,
+  disableSave,
   handleSaveSale,
   formatDisplayAmount,
   isSpCompany,
@@ -500,7 +502,7 @@ export function PosMobileLayout({
             className="min-h-12 min-w-[8.5rem] shrink-0 px-5 text-base font-semibold"
             size="lg"
             onClick={handleSaveSale}
-            disabled={saveMutation?.isPending || !hasValidItems}
+            disabled={saveMutation?.isPending || !hasValidItems || disableSave}
             data-testid="button-mobile-checkout"
           >
             {saveMutation?.isPending ? "Saving…" : "Checkout"}

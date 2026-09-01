@@ -18,7 +18,7 @@ describe("ERP parent route registry", () => {
     ["/locations/3/stock-items/15/vouchers/2026/7", "/locations/3/stock-items/15/history"],
     ["/locations/3/stock-items/15/history", "/inventory?tab=by-location"],
     ["/erp/rental/payments", "/erp/rental/shops"],
-    ["/sp/gc-migration", "/sp/setup?tab=migration"],
+    ["/sp/gc-migration", "/sp/setup"],
     ["/inventory-repair", "/settings"],
   ])("maps %s to %s", (path, expected) => {
     expect(getParentRoute(path)).toBe(expected);

@@ -34,6 +34,11 @@ interface PosCheckoutParams {
   activeLocation: Location | null;
   editVoucherId?: string;
   editVoucher: any;
+  isSpCompany?: boolean;
+  isGoldenCoastPhase6?: boolean;
+  goldenCoastReadinessLoading?: boolean;
+  goldenCoastReadinessBlocked?: boolean;
+  goldenCoastReadinessBlockers?: readonly string[];
   inventory: InventoryItem[];
   currentShift: any;
   posUser: any;
@@ -80,6 +85,11 @@ export function usePosCheckout({
   activeLocation,
   editVoucherId,
   editVoucher,
+  isSpCompany,
+  isGoldenCoastPhase6,
+  goldenCoastReadinessLoading,
+  goldenCoastReadinessBlocked,
+  goldenCoastReadinessBlockers,
   inventory,
   currentShift,
   posUser,
@@ -91,6 +101,24 @@ export function usePosCheckout({
   const handleSaveSale = () => {
     if (!activeLocation && !editVoucherId) {
       toast({ title: "Error", description: "Please select a location", variant: "destructive" });
+      return;
+    }
+    if (isSpCompany && goldenCoastReadinessLoading) {
+      toast({
+        title: "POS is still loading",
+        description: "Please wait while the active Supplier Partner POS configuration is verified.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (isSpCompany && isGoldenCoastPhase6 && goldenCoastReadinessBlocked) {
+      toast({
+        title: "Golden Coast POS unavailable",
+        description:
+          goldenCoastReadinessBlockers?.[0] ||
+          "Resolve the Golden Coast accounting setup issue before sales can be posted.",
+        variant: "destructive",
+      });
       return;
     }
     if (!isCreditSale && !paymentAccountId) {
@@ -148,6 +176,9 @@ export function usePosCheckout({
           salesItemId: row.salesItemId,
           quantity: row.quantity.toString(),
           rate: rateInUSD.toFixed(6),
+          stockItemName: row.itemName,
+          stockItemCode: row.stockItemCode,
+          configuredPrice: row.configuredPrice,
         };
       }),
     };
@@ -156,6 +187,9 @@ export function usePosCheckout({
   };
 
   const handleNewSale = () => {
+    // A retry of the current sale must keep its request identity, but a new
+    // transaction must never reuse an identity from a failed attempt.
+    clientSaleIdRef.current = crypto.randomUUID();
     setRows([{ id: "1", itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 }]);
     setNotes("");
     setSavedSale(null);

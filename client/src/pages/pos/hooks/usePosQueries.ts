@@ -7,6 +7,7 @@ import { buildPosInventory, type SpMovement } from "./posInventory";
 interface PosQueriesParams {
   posUser: unknown;
   activeLocation: Location | null;
+  companyId?: number;
   isCreditSale: boolean;
   editVoucherId?: string;
   showPrintDialog: boolean;
@@ -17,15 +18,47 @@ interface PosQueriesParams {
 
 type StockInventoryItem = APIInventoryItem & { stock: string };
 
+export interface GoldenCoastPosReadiness {
+  isGoldenCoast: boolean;
+  canPost?: boolean;
+  blockers?: string[];
+  costLotCount?: number;
+  parentCompanyId?: number | null;
+}
+
 export function usePosQueries({
   posUser,
   activeLocation,
+  companyId,
   isCreditSale,
   editVoucherId,
   showPrintDialog,
   showStockPrompt,
   isSpCompany,
 }: PosQueriesParams) {
+  const { data: goldenCoastReadiness, isLoading: goldenCoastReadinessLoading } = useQuery<GoldenCoastPosReadiness>({
+    queryKey: companyId ? ["/api/sp/golden-coast/phase6/pos-sale/readiness", companyId] : [],
+    enabled: !!isSpCompany && !!companyId,
+    retry: false,
+    queryFn: async () => {
+      const res = await fetch("/api/sp/golden-coast/phase6/pos-sale/readiness", {
+        credentials: "include",
+      });
+      const body = await res.json().catch(() => null);
+
+      // Non-Golden-Coast Supplier Partners are expected to receive the
+      // configured 409 response from this probe. Treat that as a normal
+      // negative result so their legacy POS flow remains unchanged.
+      if (res.status === 409 && body?.code === "GC_PHASE6_NOT_CONFIGURED") {
+        return { isGoldenCoast: false };
+      }
+      if (!res.ok) {
+        throw new Error(body?.message || "Failed to check Golden Coast POS readiness");
+      }
+      return { ...body, isGoldenCoast: true };
+    },
+  });
+
   const { data: posAssignedLocations = [], isLoading: posLocationsLoading } = useQuery<Location[]>({
     queryKey: posUser ? ["/api/my-locations"] : [],
     enabled: !!posUser,
@@ -187,6 +220,9 @@ export function usePosQueries({
     refetchDrafts,
     currentShift,
     authUser,
+    goldenCoastPhase6: goldenCoastReadiness?.isGoldenCoast === true,
+    goldenCoastReadinessLoading,
+    goldenCoastReadiness,
     lastSoldPrices,
     posCustomers,
     editVoucher,

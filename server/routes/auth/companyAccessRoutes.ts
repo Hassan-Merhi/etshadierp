@@ -36,6 +36,54 @@ function saveSession(req: Request): Promise<void> {
   });
 }
 
+class CompanyParentValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CompanyParentValidationError";
+  }
+}
+
+async function normalizeParentCompanyId(rawValue: unknown, companyId?: number): Promise<number | null | undefined> {
+  if (rawValue === undefined) return undefined;
+  if (rawValue === null || rawValue === "" || rawValue === "none") return null;
+
+  const parentCompanyId =
+    typeof rawValue === "number"
+      ? rawValue
+      : typeof rawValue === "string" && rawValue.trim().length > 0
+        ? Number(rawValue)
+        : NaN;
+
+  if (!Number.isInteger(parentCompanyId) || parentCompanyId <= 0) {
+    throw new CompanyParentValidationError("Parent company must be a valid company.");
+  }
+  if (companyId !== undefined && parentCompanyId === companyId) {
+    throw new CompanyParentValidationError("A company cannot be its own parent company.");
+  }
+
+  const parentCompany = await storage.getCompanyById(parentCompanyId);
+  if (!parentCompany) {
+    throw new CompanyParentValidationError("The selected parent company does not exist.");
+  }
+  if (!parentCompany.active) {
+    throw new CompanyParentValidationError("The selected parent company is inactive.");
+  }
+
+  return parentCompanyId;
+}
+
+async function prepareCompanyPayload(body: unknown, companyId?: number): Promise<Record<string, unknown>> {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new CompanyParentValidationError("Company data must be an object.");
+  }
+
+  const payload = { ...(body as Record<string, unknown>) };
+  if (Object.prototype.hasOwnProperty.call(payload, "parentCompanyId")) {
+    payload.parentCompanyId = await normalizeParentCompanyId(payload.parentCompanyId, companyId);
+  }
+  return payload;
+}
+
 export function registerCompanyAccessRoutes(app: Express) {
   app.get("/api/companies", requireAuth, async (req, res) => {
     try {
@@ -109,7 +157,8 @@ export function registerCompanyAccessRoutes(app: Express) {
 
   app.post("/api/companies", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
-      res.status(201).json(await storage.createCompany(req.body));
+      const payload = await prepareCompanyPayload(req.body);
+      res.status(201).json(await storage.createCompany(payload as Parameters<typeof storage.createCompany>[0]));
     } catch (error: unknown) {
       res.status(400).json({ message: getErrorMessage(error) });
     }
@@ -130,7 +179,8 @@ export function registerCompanyAccessRoutes(app: Express) {
   app.patch("/api/companies/:id", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       const companyId = await resolveAuthorizedCompanyId(req, req.params.id);
-      res.json(await storage.updateCompany(companyId, req.body));
+      const payload = await prepareCompanyPayload(req.body, companyId);
+      res.json(await storage.updateCompany(companyId, payload as Parameters<typeof storage.updateCompany>[1]));
     } catch (error: unknown) {
       if (error instanceof CompanyAccessError) return sendCompanyAccessError(res, error);
       res.status(400).json({ message: getErrorMessage(error) });

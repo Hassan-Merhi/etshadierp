@@ -56,6 +56,7 @@ interface SetupConfirmationPayload {
   confirmation: "CHANGE SP SETUP";
   reason: string;
   idempotencyKey: string;
+  clientRequestId: string;
   targetCompanyId?: number;
 }
 
@@ -80,10 +81,12 @@ function requestSetupConfirmation(actionLabel: string, targetCompanyId?: number)
     return null;
   }
 
+  const idempotencyKey = createFreshIdempotencyKey("sp-setup");
   return {
     confirmation: "CHANGE SP SETUP",
     reason,
-    idempotencyKey: createFreshIdempotencyKey("sp-setup"),
+    idempotencyKey,
+    clientRequestId: idempotencyKey,
     ...(targetCompanyId && targetCompanyId > 0 ? { targetCompanyId } : {}),
   };
 }
@@ -112,7 +115,6 @@ function IntercompanyReadinessRow({ account }: { account: GoldenCoastIntercompan
 export default function SpSetupPanel() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
   const { data: status, isLoading: isSpStatusLoading } = useQuery<any>({
     queryKey: ["/api/sp/setup/status"],
   });
@@ -394,7 +396,7 @@ export default function SpSetupPanel() {
             </p>
             <p>
               Cash-funded inventory plus Container Reserve consume Hassan funding. The unused balance becomes Hassan
-              Savings automatically at cutover; it is not added as extra capital.
+              Savings through settlement; it is not added as extra capital.
             </p>
           </div>
 

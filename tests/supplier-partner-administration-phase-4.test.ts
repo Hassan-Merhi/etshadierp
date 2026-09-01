@@ -5,33 +5,29 @@ import path from "node:path";
 const root = process.cwd();
 const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 
-describe("Supplier Partner administration phase 4", () => {
+describe("Supplier Partner setup navigation", () => {
   const setup = read("client/src/pages/sp/SpSetup.tsx");
   const navigation = read("client/src/lib/supplier-partner-navigation.ts");
   const overview = read("client/src/pages/sp/SpOverview.tsx");
   const panel = read("client/src/pages/sp/SpSetupPanel.tsx");
   const routeGuard = read("client/src/app/authenticatedAppRouteGuard.ts");
 
-  it("consolidates setup and migration under one URL-backed administration hub", () => {
-    expect(setup).toContain("allowedValues: ADMIN_TABS");
-    expect(setup).toContain('defaultValue: "setup"');
+  it("exposes setup without the retired migration tab", () => {
     expect(setup).toContain("<SpSetupPanel />");
-    expect(setup).toContain("<GcLshiMigration />");
-    expect(navigation).toContain("/sp/setup?tab=migration");
-    expect(overview).toContain("/sp/setup?tab=migration");
+    expect(setup).not.toContain("GcLshiMigration");
+    expect(navigation).not.toContain("/sp/setup?tab=migration");
+    expect(overview).not.toContain("/sp/setup?tab=migration");
   });
 
-  it("limits setup to Admin or Developer and migration to Developer", () => {
+  it("limits setup to Admin or Developer", () => {
     expect(setup).toContain('role === "Admin" || role === "Developer"');
-    expect(setup).toContain('role === "Developer"');
     expect(setup).toContain('<Redirect replace to="/sp" />');
-    expect(setup).toContain('<Redirect replace to="/sp/setup" />');
   });
 
   it("canonicalizes both historical migration URLs with replacement history", () => {
     expect(routeGuard).toContain('currentLocation === "/sp/migration"');
     expect(routeGuard).toContain('currentLocation === "/sp/gc-migration"');
-    expect(routeGuard).toContain('decision = { kind: "redirect", to: "/sp/setup?tab=migration" }');
+    expect(routeGuard).toContain('decision = { kind: "redirect", to: "/sp/setup" }');
   });
 
   it("keeps the Supplier Partner overview as the real namespace landing page", () => {

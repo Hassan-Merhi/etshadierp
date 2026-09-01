@@ -23,9 +23,7 @@ export async function fetchInventory(
   if (locationId) {
     locationIds = [locationId];
   } else {
-    const res = await db.execute(
-      sql`SELECT id FROM locations WHERE company_id = ${companyId} AND deleted_at IS NULL`
-    );
+    const res = await db.execute(sql`SELECT id FROM locations WHERE company_id = ${companyId} AND deleted_at IS NULL`);
     locationIds = queryRows(res).map((r) => Number(r.id));
   }
 
@@ -88,6 +86,7 @@ export async function fetchSalesData(
     qty: number;
     totalSales: number;
     totalCost: number;
+    totalDeduction: number;
   }>
 > {
   const locFilter = locationId ? sql` AND v.location_id = ${locationId}` : sql``;
@@ -101,11 +100,16 @@ export async function fetchSalesData(
       v.voucher_date::text                                 AS sale_date,
       SUM(si.quantity)::numeric                            AS qty,
       SUM(si.total_sales)::numeric                         AS total_sales,
-      SUM(si.total_cost)::numeric                          AS total_cost
+      SUM(si.total_cost)::numeric                          AS total_cost,
+      SUM(
+        si.quantity * COALESCE(l.supplier_partner_payable_deduction_per_qty, 0)
+      )::numeric                                           AS total_deduction
     FROM  sales_items  si
     JOIN  vouchers     v  ON v.id  = si.voucher_id
     JOIN  stock_items  sk ON sk.id = si.stock_item_id
     LEFT  JOIN stock_groups sg ON sg.id = sk.stock_group_id
+    LEFT  JOIN locations     l  ON l.id = v.location_id
+                                 AND l.company_id = v.company_id
     WHERE v.company_id   = ${companyId}
       AND v.deleted_at   IS NULL
       AND v.voucher_type = 'Sales'
@@ -125,6 +129,7 @@ export async function fetchSalesData(
     qty: pn(r.qty),
     totalSales: pn(r.total_sales),
     totalCost: pn(r.total_cost),
+    totalDeduction: pn(r.total_deduction),
   }));
 }
 
@@ -190,11 +195,7 @@ export async function fetchAgeingData(
 }
 
 // ── Cash account opening balance ─────────────────────────────────────────────
-export async function fetchCashAccountBalance(
-  accountId: number,
-  companyId: number,
-  asOfDate: string
-): Promise<number> {
+export async function fetchCashAccountBalance(accountId: number, companyId: number, asOfDate: string): Promise<number> {
   const res = await db.execute(sql`
     SELECT COALESCE(SUM(ve.debit_amount - ve.credit_amount), 0) AS balance
     FROM   voucher_entries ve

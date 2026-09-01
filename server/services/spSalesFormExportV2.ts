@@ -13,22 +13,12 @@
  *                   (WHERE voucher_type='Sales' AND optional=false AND deleted_at IS NULL), which
  *                   is the same source calculateHistoricalLocationInventory reverses out of its
  *                   as-of-date snapshot, guaranteeing opening − sales + offloads ≈ closing.
- *   Ageing        : container_offloads.offload_date (best available inbound-movement date per
- *                   stock item at this location) is used as the "last stock-in" date fallback for
- *                   bucketing closing stock into 0-30/31-60/61-90/91-120/121+ day buckets. Exact
- *                   per-lot/FIFO ageing is not tracked anywhere in the schema, so this is a
- *                   documented best-available-movement-date fallback, not fabricated ageing — see
- *                   buildAgeingSheet() in sp-sales-form-v2/buildAgeingSheet.ts for the exact rule
- *                   and its code comment.
  *   Opening cash  : voucher_entries SUM(debit-credit) as of dayBefore(fromDate) for cashAccountId
  *
- * Sheet order (6 sheets):
+ * Sheet order (3 sheets):
  *   1. Costing          — hidden
  *   2. Sales            — hidden
  *   3. ENTRY            — visible  ← main page (includes Group/category column)
- *   4. Summary          — visible
- *   5. Ageing           — visible
- *   6. Summary-Itemwise — hidden
  *
  * Implementation is split across server/services/sp-sales-form-v2/ — this file only
  * orchestrates: accept params, build date list, call data fetchers, build item
@@ -40,19 +30,11 @@ import ExcelJS from "exceljs";
 import { logger } from "../lib/logger";
 import { SpSalesFormV2Params } from "./sp-sales-form-v2/types";
 import { toUtcDate, addDays, dateStr } from "./sp-sales-form-v2/dateHelpers";
-import {
-  fetchInventory,
-  fetchSalesData,
-  fetchAgeingData,
-  fetchCashAccountBalance,
-} from "./sp-sales-form-v2/dataFetchers";
+import { fetchInventory, fetchSalesData, fetchCashAccountBalance } from "./sp-sales-form-v2/dataFetchers";
 import { buildItemRegistry } from "./sp-sales-form-v2/itemRegistry";
 import { buildCostingSheet } from "./sp-sales-form-v2/buildCostingSheet";
 import { buildSalesSheet } from "./sp-sales-form-v2/buildSalesSheet";
 import { buildEntrySheet } from "./sp-sales-form-v2/buildEntrySheet";
-import { buildSummarySheet } from "./sp-sales-form-v2/buildSummarySheet";
-import { buildAgeingSheet } from "./sp-sales-form-v2/buildAgeingSheet";
-import { buildSummaryItemwiseSheet } from "./sp-sales-form-v2/buildSummaryItemwiseSheet";
 import { scanErrors } from "./sp-sales-form-v2/workbookErrorScanner";
 
 export type { SpSalesFormV2Params } from "./sp-sales-form-v2/types";
@@ -73,12 +55,11 @@ export async function generateSpSalesFormExcelV2(params: SpSalesFormV2Params): P
   const dayBefore = dateStr(addDays(startDate, -1));
 
   // Fetch all data in parallel
-  const [openMap, closeMap, salesRows, openingCashBalance, ageingMap] = await Promise.all([
+  const [openMap, closeMap, salesRows, openingCashBalance] = await Promise.all([
     fetchInventory(companyId, locationId, dayBefore),
     fetchInventory(companyId, locationId, toDate),
     fetchSalesData(companyId, locationId, fromDate, toDate),
     cashAccountId ? fetchCashAccountBalance(cashAccountId, companyId, dayBefore) : Promise.resolve(null),
-    fetchAgeingData(companyId, locationId, toDate),
   ]);
   logger.info(
     `[spSalesFormExportV2] cashAccountId=${cashAccountId ?? "none"} openingCashBalance=${openingCashBalance ?? "n/a (manual)"}`
@@ -103,9 +84,6 @@ export async function generateSpSalesFormExcelV2(params: SpSalesFormV2Params): P
   buildCostingSheet(wb, items); // 1. Costing — hidden
   buildSalesSheet(wb, items, dates); // 2. Sales — hidden
   await buildEntrySheet(wb, items, dates, dayCount, params, openingCashBalance); // 3. ENTRY — visible (async for ws.protect)
-  buildSummarySheet(wb, items, dates, params); // 4. Summary — visible
-  buildAgeingSheet(wb, items, ageingMap, toDate); // 5. Ageing — visible
-  buildSummaryItemwiseSheet(wb, items, dayCount); // 6. Summary-Itemwise — hidden
 
   // Error scan — fail fast on visible-sheet errors
   const errors = scanErrors(wb);
