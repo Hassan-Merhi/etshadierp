@@ -172,4 +172,29 @@ export const phase3RemainingTranslationsPart24: readonly Phase3SharedUiEntry[] =
     ar: "لا يمكن نقل الكمية المتبقية بينما لا يزال التحميل رقم {{0}} يستخدم هذه الفاتورة الأولية",
     fr: "Impossible de déplacer le reste tant que le chargement n°{{0}} utilise encore ce proforma",
   },
+  {
+    en: "Partner Capital / Equity",
+    ar: "رأس مال الشركاء / حقوق الملكية",
+    fr: "Capital des associés / Capitaux propres",
+  },
+  {
+    en: "Net Equity Balance",
+    ar: "صافي رصيد حقوق الملكية",
+    fr: "Solde net des capitaux propres",
+  },
+  {
+    en: "${data?.equity?.accounts?.length || 0} equity accounts — excluded from Net Position totals",
+    ar: "{{0}} حسابات حقوق ملكية — مستبعدة من إجماليات صافي المركز",
+    fr: "{{0}} comptes de capitaux propres — exclus des totaux de position nette",
+  },
+  {
+    en: "Invalid subType \"${parsed.subType}\" for accountType \"${parsed.accountType}\". Valid options: ${VALID_LEDGER_SUBTYPES[parsed.accountType].join(\", \")}",
+    ar: "نوع الحساب الفرعي \"{{0}}\" غير صالح لنوع الحساب \"{{1}}\". الخيارات الصالحة: {{2}}",
+    fr: "Sous-type \"{{0}}\" non valide pour le type de compte \"{{1}}\". Options valides : {{2}}",
+  },
+  {
+    en: "Invalid subType \"${parsed.subType}\" for accountType \"${accountType}\". Valid options: ${VALID_LEDGER_SUBTYPES[accountType].join(\", \")}",
+    ar: "نوع الحساب الفرعي \"{{0}}\" غير صالح لنوع الحساب \"{{1}}\". الخيارات الصالحة: {{2}}",
+    fr: "Sous-type \"{{0}}\" non valide pour le type de compte \"{{1}}\". Options valides : {{2}}",
+  },
 ];
