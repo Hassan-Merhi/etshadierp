@@ -67,13 +67,8 @@ export default function SpReports() {
   });
   const [startDate, setStartDate] = useState(() => getCurrentMonthRange().from);
   const [endDate, setEndDate] = useState(() => getCurrentMonthRange().to);
-
-  const [exportFrom, setExportFrom] = useState(() => {
-    const d = new Date();
-    d.setDate(1);
-    return d.toISOString().slice(0, 10);
-  });
-  const [exportTo, setExportTo] = useState(new Date().toISOString().slice(0, 10));
+  const [exportFrom, setExportFrom] = useState(() => getCurrentMonthRange().from);
+  const [exportTo, setExportTo] = useState(() => getCurrentMonthRange().to);
   const [exportLocationId, setExportLocationId] = useState<string>("all");
   const [exportCashAccountId, setExportCashAccountId] = useState<string>("none");
   const [exporting, setExporting] = useState(false);
@@ -82,16 +77,18 @@ export default function SpReports() {
   useEffect(() => {
     let activeMonthKey = getCurrentMonthRange().key;
 
-    const syncProfitRangeToCurrentMonth = () => {
+    const syncReportRangesToCurrentMonth = () => {
       const currentMonth = getCurrentMonthRange();
       if (currentMonth.key === activeMonthKey) return;
 
       activeMonthKey = currentMonth.key;
       setStartDate(currentMonth.from);
       setEndDate(currentMonth.to);
+      setExportFrom(currentMonth.from);
+      setExportTo(currentMonth.to);
     };
 
-    const intervalId = window.setInterval(syncProfitRangeToCurrentMonth, 60_000);
+    const intervalId = window.setInterval(syncReportRangesToCurrentMonth, 60_000);
     return () => window.clearInterval(intervalId);
   }, []);
 
@@ -110,6 +107,16 @@ export default function SpReports() {
   });
   const accounts = extractAccounts(accountsResponse);
 
+  useEffect(() => {
+    const gcSalesCash = accounts.find((account) => account.name.trim().toLowerCase() === "gc sales cash");
+    if (!gcSalesCash) return;
+
+    setExportCashAccountId((current) => {
+      const currentAccountStillExists = accounts.some((account) => String(account.id) === current);
+      return currentAccountStillExists ? current : String(gcSalesCash.id);
+    });
+  }, [accounts, selectedCompany?.id]);
+
   const handleExportSalesForm = async () => {
     if (!exportFrom || !exportTo) {
       toast({ title: "Please select both From and To dates", variant: "destructive" });
@@ -126,7 +133,7 @@ export default function SpReports() {
       }
       const blob = await res.blob();
       const disposition = res.headers.get("Content-Disposition") ?? "";
-      const match = disposition.match(/filename="?([^"]+)"?/);
+      const match = disposition.match(/filename="?([^\"]+)"?/);
       const filename = match ? match[1] : `sales_form_${exportFrom}_${exportTo}.xlsx`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -159,7 +166,7 @@ export default function SpReports() {
       }
       const blob = await res.blob();
       const disposition = res.headers.get("Content-Disposition") ?? "";
-      const match = disposition.match(/filename="?([^"]+)"?/);
+      const match = disposition.match(/filename="?([^\"]+)"?/);
       const filename = match ? match[1] : `system_sales_form_${exportFrom}_${exportTo}.xlsx`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -348,14 +355,14 @@ export default function SpReports() {
                   </Select>
                 </div>
                 <div className="min-w-48">
-                  <label className="text-xs text-muted-foreground">Opening Cash Account (optional)</label>
+                  <label className="text-xs text-muted-foreground">Opening Cash Account</label>
                   <Select
                     value={exportCashAccountId}
                     onValueChange={setExportCashAccountId}
                     data-testid="select-sp-export-cash-account"
                   >
                     <SelectTrigger className="mt-1" data-testid="select-sp-export-cash-account-trigger">
-                      <SelectValue placeholder="No account (manual entry)" />
+                      <SelectValue placeholder="GC Sales Cash" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No account (manual entry)</SelectItem>
@@ -412,8 +419,8 @@ export default function SpReports() {
                   <span className="font-medium text-foreground">Export System Sales Form</span> — clean from-scratch
                   workbook built from your live system data. Opening &amp; closing stock match the Location Inventory
                   page. Supports any date range. Three sheets: ENTRY (visible) plus Costing and Sales (hidden). Items
-                  with no opening, closing, or sales activity are omitted. Optionally select an Opening Cash Account to
-                  auto-fill day-1 cash from the ledger balance.
+                  with no opening, closing, or sales activity are omitted. Opening cash defaults to GC Sales Cash when
+                  that account exists for the selected company.
                 </p>
               </div>
             </CardContent>
