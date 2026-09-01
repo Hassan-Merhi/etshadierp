@@ -1,0 +1,236 @@
+name: Apply supplier partner customer balance follow-up
+
+on:
+  push:
+    branches:
+      - fix/supplier-partner-customer-legacy-zero-net-position
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/supplier-partner-customer-legacy-zero-net-position
+          fetch-depth: 0
+
+      - name: Apply Net Position follow-up
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, found {count}: {old[:80]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          live = "server/routes/stats/statsNetProfitRoutes.ts"
+          asof = "server/helpers/calculateNetPositionAsOf.ts"
+          excel = "server/routes/stats/statsNetPositionRoutes.ts"
+          multi = "server/routes/stats/statsMultiCurrencyRoutes.ts"
+
+          replace_once(
+              live,
+              'import { getNetPositionCurrencySummary } from "../../services/accounting/netPositionCurrency";\n',
+              'import { getNetPositionCurrencySummary } from "../../services/accounting/netPositionCurrency";\n'
+              'import { getSupplierPartnerCustomerNetPosition } from "../../helpers/supplierPartnerCustomerNetPosition";\n',
+          )
+          replace_once(
+              live,
+              '      const equityIncludedInNetPosition = isSupplierPartner;\n',
+              '      const equityIncludedInNetPosition = isSupplierPartner;\n'
+              '      const supplierPartnerCustomerPosition = isSupplierPartner\n'
+              '        ? await getSupplierPartnerCustomerNetPosition(companyId, toDate)\n'
+              '        : null;\n',
+          )
+
+          replace_once(
+              asof,
+              'import { calculateHistoricalLocationInventory } from "../routes/_helpers";\n',
+              'import { calculateHistoricalLocationInventory } from "../routes/_helpers";\n'
+              'import { getSupplierPartnerCustomerNetPosition } from "./supplierPartnerCustomerNetPosition";\n',
+          )
+          replace_once(
+              asof,
+              '  const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;\n',
+              '  const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;\n'
+              '  const supplierPartnerCustomerPosition = isSupplierPartner\n'
+              '    ? await getSupplierPartnerCustomerNetPosition(companyId, toDate)\n'
+              '    : null;\n',
+          )
+
+          replace_once(
+              excel,
+              'import { classifyEquityAccounts, classifyNetPositionAccounts, round2 } from "../../netPositionHelper";\n',
+              'import { classifyEquityAccounts, classifyNetPositionAccounts, round2 } from "../../netPositionHelper";\n'
+              'import { getSupplierPartnerCustomerNetPosition } from "../../helpers/supplierPartnerCustomerNetPosition";\n',
+          )
+          replace_once(
+              excel,
+              '      const isSupplierPartner = company?.companyType === "supplier_partner";\n',
+              '      const isSupplierPartner = company?.companyType === "supplier_partner";\n'
+              '      const supplierPartnerCustomerPosition = isSupplierPartner\n'
+              '        ? await getSupplierPartnerCustomerNetPosition(companyId, toDate)\n'
+              '        : null;\n',
+          )
+
+          customer_allow_old = '              a.subType === "Accounts Receivable" ||\n'
+          customer_allow_new = (
+              '              ((a.accountType === "Customer" ||\n'
+              '                a.subType === "Accounts Receivable" ||\n'
+              '                (a.code || "").toUpperCase().startsWith("CUST-") ||\n'
+              '                (a.name || "").toLowerCase().includes("customer account")) &&\n'
+              '                !supplierPartnerCustomerPosition?.ledgerAccountIds.has(a.id)) ||\n'
+          )
+          for path in (live, asof, excel):
+              replace_once(path, customer_allow_old, customer_allow_new)
+
+          replace_once(
+              live,
+              '      const categoryTotals = classified.categoryTotals;\n\n'
+              '      // Exclude ledger-based "Accrued Rent Payable"',
+              '      const categoryTotals = classified.categoryTotals;\n\n'
+              '      // Supplier-partner customers are calculated from both linked receivable ledgers\n'
+              '      // and direct customer voucher entries. Linked customer ledgers are excluded above\n'
+              '      // so each balance appears exactly once.\n'
+              '      if (supplierPartnerCustomerPosition) {\n'
+              '        for (const customer of supplierPartnerCustomerPosition.items) {\n'
+              '          const value = round2(Math.abs(customer.signedBalance));\n'
+              '          if (customer.signedBalance > 0) {\n'
+              '            forUsTotal = round2(forUsTotal + value);\n'
+              '            categoryTotals["asset_Asset"] = round2((categoryTotals["asset_Asset"] || 0) + value);\n'
+              '            forUsAccounts.push({\n'
+              '              id: customer.ledgerAccountId ?? undefined,\n'
+              '              name: customer.name,\n'
+              '              code: customer.code,\n'
+              '              value,\n'
+              '              category: "Asset",\n'
+              '            });\n'
+              '          } else {\n'
+              '            onUsTotal = round2(onUsTotal + value);\n'
+              '            categoryTotals["liability_Liability"] = round2(\n'
+              '              (categoryTotals["liability_Liability"] || 0) + value\n'
+              '            );\n'
+              '            onUsAccounts.push({\n'
+              '              id: customer.ledgerAccountId ?? undefined,\n'
+              '              name: customer.name,\n'
+              '              code: customer.code,\n'
+              '              value,\n'
+              '              category: "Liability",\n'
+              '            });\n'
+              '          }\n'
+              '        }\n'
+              '        forUsAccounts.sort((a, b) => b.value - a.value);\n'
+              '        onUsAccounts.sort((a, b) => b.value - a.value);\n'
+              '      }\n\n'
+              '      // Exclude ledger-based "Accrued Rent Payable"',
+          )
+
+          replace_once(
+              asof,
+              '  const onUsLines: NetPositionLineItem[] = classified.onUsAccounts.map((a) => ({\n'
+              '    label: a.name,\n'
+              '    value: round2(a.value),\n'
+              '    category: a.category,\n'
+              '    side: "onUs",\n'
+              '  }));\n\n'
+              '  // ── Stock on floor',
+              '  const onUsLines: NetPositionLineItem[] = classified.onUsAccounts.map((a) => ({\n'
+              '    label: a.name,\n'
+              '    value: round2(a.value),\n'
+              '    category: a.category,\n'
+              '    side: "onUs",\n'
+              '  }));\n\n'
+              '  if (supplierPartnerCustomerPosition) {\n'
+              '    for (const customer of supplierPartnerCustomerPosition.items) {\n'
+              '      const value = round2(Math.abs(customer.signedBalance));\n'
+              '      if (customer.signedBalance > 0) {\n'
+              '        forUsTotal = round2(forUsTotal + value);\n'
+              '        forUsLines.push({ label: customer.name, value, category: "Asset", side: "forUs" });\n'
+              '      } else {\n'
+              '        onUsTotal = round2(onUsTotal + value);\n'
+              '        onUsLines.push({ label: customer.name, value, category: "Liability", side: "onUs" });\n'
+              '      }\n'
+              '    }\n'
+              '  }\n\n'
+              '  // ── Stock on floor',
+          )
+
+          replace_once(
+              excel,
+              '      const forUsAccounts = [...classified.forUsAccounts];\n'
+              '      const onUsAccounts = [...classified.onUsAccounts];\n\n'
+              '      // ── 3. Stock In Hand',
+              '      const forUsAccounts = [...classified.forUsAccounts];\n'
+              '      const onUsAccounts = [...classified.onUsAccounts];\n\n'
+              '      if (supplierPartnerCustomerPosition) {\n'
+              '        for (const customer of supplierPartnerCustomerPosition.items) {\n'
+              '          const value = round2(Math.abs(customer.signedBalance));\n'
+              '          if (customer.signedBalance > 0) {\n'
+              '            forUsTotal = round2(forUsTotal + value);\n'
+              '            forUsAccounts.push({\n'
+              '              id: customer.ledgerAccountId ?? undefined,\n'
+              '              name: customer.name,\n'
+              '              code: customer.code,\n'
+              '              value,\n'
+              '              category: "Asset",\n'
+              '            });\n'
+              '          } else {\n'
+              '            onUsTotal = round2(onUsTotal + value);\n'
+              '            onUsAccounts.push({\n'
+              '              id: customer.ledgerAccountId ?? undefined,\n'
+              '              name: customer.name,\n'
+              '              code: customer.code,\n'
+              '              value,\n'
+              '              category: "Liability",\n'
+              '            });\n'
+              '          }\n'
+              '        }\n'
+              '        forUsAccounts.sort((a, b) => b.value - a.value);\n'
+              '        onUsAccounts.sort((a, b) => b.value - a.value);\n'
+              '      }\n\n'
+              '      // ── 3. Stock In Hand',
+          )
+
+          replace_once(
+              multi,
+              '  payload.forUs.accounts = forUsAccounts.sort((a, b) => Number(b.value || 0) - Number(a.value || 0));\n'
+              '  payload.onUs.accounts = onUsAccounts.sort((a, b) => Number(b.value || 0) - Number(a.value || 0));\n',
+              '  payload.forUs.accounts = forUsAccounts\n'
+              '    .filter((row) => Math.abs(Number(row.value || 0)) >= 0.005)\n'
+              '    .sort((a, b) => Number(b.value || 0) - Number(a.value || 0));\n'
+              '  payload.onUs.accounts = onUsAccounts\n'
+              '    .filter((row) => Math.abs(Number(row.value || 0)) >= 0.005)\n'
+              '    .sort((a, b) => Number(b.value || 0) - Number(a.value || 0));\n',
+          )
+          replace_once(
+              multi,
+              '  payload.forUs.breakdown = rebuildBreakdown(payload.forUs.accounts);\n'
+              '  payload.onUs.breakdown = rebuildBreakdown(payload.onUs.accounts);\n',
+              '  payload.forUs.breakdown = rebuildBreakdown(payload.forUs.accounts);\n'
+              '  payload.onUs.breakdown = rebuildBreakdown(payload.onUs.accounts);\n',
+          )
+          PY
+
+      - name: Remove one-time workflow
+        run: rm .github/workflows/apply-supplier-partner-customer-zero-followup.yml
+
+      - name: Commit and push
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/routes/stats/statsNetProfitRoutes.ts \
+                  server/helpers/calculateNetPositionAsOf.ts \
+                  server/routes/stats/statsNetPositionRoutes.ts \
+                  server/routes/stats/statsMultiCurrencyRoutes.ts \
+                  .github/workflows/apply-supplier-partner-customer-zero-followup.yml
+          git commit -m "fix: include authoritative customer balances and hide zero accounts"
+          git push origin HEAD:fix/supplier-partner-customer-legacy-zero-net-position
