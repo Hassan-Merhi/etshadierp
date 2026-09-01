@@ -1,5 +1,5 @@
 import { getErrorDetails } from "@shared/errorUtils";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +36,26 @@ function fmt(v: number, dec = 2) {
     : `$${n.toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec })}`;
 }
 
+function toLocalDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentMonthRange(now = new Date()) {
+  const year = now.getFullYear();
+  const monthIndex = now.getMonth();
+  const firstDay = new Date(year, monthIndex, 1);
+  const lastDay = new Date(year, monthIndex + 1, 0);
+
+  return {
+    key: `${year}-${String(monthIndex + 1).padStart(2, "0")}`,
+    from: toLocalDateInputValue(firstDay),
+    to: toLocalDateInputValue(lastDay),
+  };
+}
+
 export default function SpReports() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
@@ -45,8 +65,8 @@ export default function SpReports() {
     defaultValue: "profit",
     omitDefault: true,
   });
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState(() => getCurrentMonthRange().from);
+  const [endDate, setEndDate] = useState(() => getCurrentMonthRange().to);
 
   const [exportFrom, setExportFrom] = useState(() => {
     const d = new Date();
@@ -58,6 +78,22 @@ export default function SpReports() {
   const [exportCashAccountId, setExportCashAccountId] = useState<string>("none");
   const [exporting, setExporting] = useState(false);
   const [exportingV2, setExportingV2] = useState(false);
+
+  useEffect(() => {
+    let activeMonthKey = getCurrentMonthRange().key;
+
+    const syncProfitRangeToCurrentMonth = () => {
+      const currentMonth = getCurrentMonthRange();
+      if (currentMonth.key === activeMonthKey) return;
+
+      activeMonthKey = currentMonth.key;
+      setStartDate(currentMonth.from);
+      setEndDate(currentMonth.to);
+    };
+
+    const intervalId = window.setInterval(syncProfitRangeToCurrentMonth, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const profitUrl = `/api/sp/report/profit${
     startDate || endDate
