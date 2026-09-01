@@ -481,6 +481,79 @@ export function registerPoImportRoutes(app: Express) {
             creditAmount: poGrandTotal.toFixed(2),
             narration: `PO ${poNumber} - Container ${containerNumber}`,
           });
+
+          // Linked SP company: mirror the payable into the explicit parent company.
+          // Keep the SP voucher above unchanged; this creates only the parent-side JV
+          // so the parent supplier balance is credited without double-posting local purchases.
+          if (isSubsidiary && parentCompanyId) {
+            const subsidiaryName = currentCompanyLink?.name || `Company ${currentCompanyId}`;
+            const subsidiaryAccountName = `${subsidiaryName} Credit`;
+            let subsidiaryReceivableAccount = await storage.getLedgerAccountByName(
+              subsidiaryAccountName,
+              parentCompanyId
+            );
+
+            if (!subsidiaryReceivableAccount) {
+              let code = subsidiaryName.substring(0, 3).toUpperCase() + "CRD";
+              let suffix = 1;
+              while (await storage.getLedgerAccountByCode(code, parentCompanyId)) {
+                code = subsidiaryName.substring(0, 3).toUpperCase() + "CRD" + suffix;
+                suffix++;
+              }
+              subsidiaryReceivableAccount = await storage.createLedgerAccount({
+                companyId: parentCompanyId,
+                name: subsidiaryAccountName,
+                code,
+                accountType: "Asset",
+                subType: "Current Asset",
+              });
+            }
+
+            const intercoParentTotal =
+              resolvedFreightPaidBy === "parent" && poFreight > 0 ? poGrandTotal : poIntercoTotal;
+            const parentVoucher = await storage.createVoucher({
+              companyId: parentCompanyId,
+              postingSource: infrastructurePostingIdentity(
+                "po-import",
+                `${parentCompanyId}:${poNumber}`,
+                "parent-intercompany"
+              ),
+              currency: "USD",
+              voucherNumber: `IC-${poNumber}-${Date.now()}`,
+              voucherType: "Journal",
+              voucherDate: importDate,
+              description: `${containerNumber} ${supplier?.legalName || "Unknown"}`,
+              totalAmount: intercoParentTotal.toString(),
+              optional: false,
+              sourceModule: "ERP",
+            });
+
+            await storage.createVoucherEntry({
+              voucherId: parentVoucher.id,
+              ledgerAccountId: subsidiaryReceivableAccount.id,
+              debitAmount: intercoParentTotal.toFixed(2),
+              creditAmount: "0",
+              narration: `${subsidiaryName} PO ${poNumber} - Container ${containerNumber}`,
+            });
+
+            await storage.createVoucherEntry({
+              voucherId: parentVoucher.id,
+              supplierId: supplierId,
+              debitAmount: "0",
+              creditAmount: poIntercoTotal.toFixed(2),
+              narration: `${subsidiaryName} PO ${poNumber} - Container ${containerNumber}`,
+            });
+
+            if (resolvedFreightPaidBy === "parent" && resolvedFreightParentAccountId && poFreight > 0) {
+              await storage.createVoucherEntry({
+                voucherId: parentVoucher.id,
+                ledgerAccountId: resolvedFreightParentAccountId,
+                debitAmount: "0",
+                creditAmount: poFreight.toFixed(2),
+                narration: `Freight - ${subsidiaryName} PO ${poNumber} - Container ${containerNumber}`,
+              });
+            }
+          }
         } else if (isSubsidiary) {
           // Get the subsidiary's company settings for parent credit account
           const companySettings = await storage.getCompanySettings(currentCompanyId);
