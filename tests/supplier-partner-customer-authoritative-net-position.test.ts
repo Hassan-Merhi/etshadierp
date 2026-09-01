@@ -38,4 +38,12 @@ describe("supplier partner customer Net Position", () => {
     const source = read("server/routes/stats/statsMultiCurrencyRoutes.ts");
     expect(source).toContain(".filter((row) => Math.abs(Number(row.value || 0)) >= 0.005)");
   });
+
+  it("keeps the new SP cash-account labels covered by the shared translation registry", () => {
+    const translations = read("client/src/i18n/phase3RemainingTranslations.part25.ts");
+    const registry = read("client/src/i18n/sharedUiPhase3Translations.ts");
+    expect(translations).toContain('en: "Opening Cash Account"');
+    expect(translations).toContain('en: "GC Sales Cash"');
+    expect(registry).toContain("phase3RemainingTranslationsPart25");
+  });
 });
