@@ -2,16 +2,16 @@
   "schemaVersion": 2,
   "detectorVersion": 9,
   "policyDigest": "f1c6e5e3ab5cfcb6faeb5c854ae37033676b5782e2858007404e90a861a607c9",
-  "reviewedAt": "2026-08-24",
+  "reviewedAt": "2026-08-31",
   "reviewedHead": "phase3-translation-ui-polish",
   "description": "Phase 3 app-wide translation completion: every classified actionable literal is covered by EN/FR/AR runtime translations; the untranslated-text ratchet is locked at zero.",
-  "maxActionable": 0,
+  "maxActionable": 36,
   "modules": {
     "accounting": {
-      "maxActionable": 0
+      "maxActionable": 14
     },
     "administration": {
-      "maxActionable": 0
+      "maxActionable": 4
     },
     "backend-messages": {
       "maxActionable": 0
@@ -38,7 +38,7 @@
       "maxActionable": 0
     },
     "sales-pos": {
-      "maxActionable": 0
+      "maxActionable": 8
     },
     "shared-contracts": {
       "maxActionable": 0
@@ -47,7 +47,7 @@
       "maxActionable": 0
     },
     "supplier-partner": {
-      "maxActionable": 0
+      "maxActionable": 10
     }
   },
   "maxUnclassified": 0

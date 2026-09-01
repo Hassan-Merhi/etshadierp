@@ -63,7 +63,7 @@ describe("Mobile responsiveness Phase 8 POS", () => {
       'updateRow(actualIndex, "quantity"',
       'updateRow(actualIndex, "rate"',
       "onClick={handleSaveSale}",
-      "disabled={saveMutation?.isPending || !hasValidItems}",
+      "disabled={saveMutation?.isPending || !hasValidItems || disableSave}",
     ]) {
       expect(mobile).toContain(token);
     }

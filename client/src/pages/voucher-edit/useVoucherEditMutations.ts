@@ -88,7 +88,7 @@ export function useVoucherEditMutations({
   const updateSalesMutation = useMutation({
     mutationFn: async (data: SalesFormData) => {
       const salesData = prepareSalesData(data);
-      return await modeApiRequest("PATCH", `/api/vouchers/${id}/sales`, salesData);
+      return await modeApiRequest("PUT", `/api/vouchers/${id}/sales`, salesData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });

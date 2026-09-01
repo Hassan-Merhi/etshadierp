@@ -4,9 +4,10 @@ import { registerSpAccessControl } from "./spAccessControl";
 import { registerSpPermissionRoutes } from "./spPermissionRoutes";
 import { registerSpSetupRoutes } from "./spSetupRoutes";
 import { registerSpGoldenCoastSetupRoutes } from "./spGoldenCoastSetupRoutes";
+import { registerSpGoldenCoastExistingPositionCarryForwardRoutes } from "./spGoldenCoastExistingPositionCarryForwardRoutes";
 import { registerSpGoldenCoastPhase3CutoverRoutes } from "./spGoldenCoastPhase3CutoverRoutes";
 import { registerSpGoldenCoastPhase4CutoverFifoRoutes } from "./spGoldenCoastPhase4CutoverFifoRoutes";
-import { registerSpGoldenCoastPhase6PosSaleRoutes } from "./spGoldenCoastPhase6PosSaleRoutes";
+import { registerSpGoldenCoastPhase6PosSaleRoutes } from "./spGoldenCoastPhase6PosSaleRegistration";
 import { registerSpGoldenCoastPhase7HadiTransferRoutes } from "./spGoldenCoastPhase7HadiTransferRoutes";
 import { registerSpGoldenCoastPhase8ContainerOffloadRoutes } from "./spGoldenCoastPhase8ContainerOffloadRoutes";
 import { registerSpGoldenCoastPhase9HassanSavingsWithdrawalRoutes } from "./spGoldenCoastPhase9HassanSavingsWithdrawalRoutes";
@@ -70,6 +71,7 @@ export function registerSpRoutes(app: Express) {
 
   registerSpSetupRoutes(app);
   registerSpGoldenCoastSetupRoutes(app);
+  registerSpGoldenCoastExistingPositionCarryForwardRoutes(app);
   registerSpGoldenCoastPhase3CutoverRoutes(app);
   registerSpGoldenCoastPhase4CutoverFifoRoutes(app);
   // Phase 6 supersedes the Phase 5 mutation surface: it keeps the same FIFO

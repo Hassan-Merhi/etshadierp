@@ -25,6 +25,7 @@ import { usePosHandlers } from "./hooks/usePosHandlers";
 
 import { POS_COLUMNS, formatDisplayAmount } from "./utils/posCalculations";
 import { ErrorState } from "@/components/ui/page-state";
+import { GoldenCoastPosReadinessAlert } from "./pos-components/GoldenCoastPosReadinessAlert";
 
 export default function POS({ posUser, editVoucherId }: { posUser?: any; editVoucherId?: string } = {}) {
   const { selectedLocation, setSelectedLocation } = useLocationContext();
@@ -128,6 +129,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     refetchDrafts,
     currentShift,
     authUser,
+    goldenCoastPhase6,
+    goldenCoastReadinessLoading,
+    goldenCoastReadiness,
     lastSoldPrices,
     posCustomers: _posCustomers,
     editVoucher,
@@ -141,6 +145,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   } = usePosQueries({
     posUser,
     activeLocation,
+    companyId: selectedCompany?.id,
     isCreditSale,
     editVoucherId,
     showPrintDialog,
@@ -315,7 +320,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         setPaymentAccountId(String(debitEntry.ledgerAccountId));
       }
     }
-  }, [editVoucher, allLedgerAccounts, setPaymentAccountType, setPaymentAccountId, setIsCreditSale, setSelectedCustomerId]);
+  }, [
+    editVoucher,
+    allLedgerAccounts,
+    setPaymentAccountType,
+    setPaymentAccountId,
+    setIsCreditSale,
+    setSelectedCustomerId,
+  ]);
 
   // ── WhatsApp / mutations / autosave ───────────────────────────────────────
   const { handleSendInvoiceWhatsApp, handleSendWhatsAppReport } = usePosWhatsApp({
@@ -339,6 +351,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     editVoucherId,
     editVoucher,
     isSpCompany,
+    isGoldenCoastPhase6: goldenCoastPhase6,
+    goldenCoastParentCompanyId: goldenCoastReadiness?.parentCompanyId,
     clientSaleIdRef,
     rows,
     isCreditSale,
@@ -429,6 +443,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     activeLocation,
     editVoucherId,
     editVoucher,
+    isSpCompany,
+    isGoldenCoastPhase6: goldenCoastPhase6,
+    goldenCoastReadinessLoading,
+    goldenCoastReadinessBlocked: goldenCoastReadiness?.canPost === false,
+    goldenCoastReadinessBlockers: goldenCoastReadiness?.blockers,
     inventory,
     apiInventory,
     lastSoldPrices,
@@ -441,6 +460,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   const handleKeyDown = makeHandleKeyDown(searchTerm);
   const fmtAmount = (v: number) => formatDisplayAmount(activeCurrency, v);
+  const goldenCoastPosBlocked = isSpCompany && goldenCoastPhase6 && goldenCoastReadiness?.canPost === false;
+  const goldenCoastPosSaveDisabled = isSpCompany && (goldenCoastReadinessLoading || goldenCoastPosBlocked);
 
   // ── Admin/dev: export the current edit-mode transaction to Excel ───────────
   async function handleExportTransaction() {
@@ -591,6 +612,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         navigate={navigate}
         saveMutation={saveMutation}
         hasValidItems={hasValidItems}
+        disableSave={goldenCoastPosSaveDisabled}
         handleSaveSale={handleSaveSale}
         lastAutosaved={lastAutosaved}
         drafts={drafts}
@@ -631,6 +653,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         isSpCompany={isSpCompany}
       />
 
+      {goldenCoastPosBlocked && <GoldenCoastPosReadinessAlert blockers={goldenCoastReadiness?.blockers} />}
+
       {/* ── Desktop layout ── */}
       <div className="hidden lg:flex flex-1 overflow-hidden p-4">
         <div className="flex flex-row gap-4 h-full w-full">
@@ -641,27 +665,27 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                   Loading inventory…
                 </div>
               ) : (
-              <SaleGrid
-                rows={rows}
-                columns={POS_COLUMNS}
-                selectedCell={selectedCell}
-                setSelectedCell={setSelectedCell}
-                updateRow={updateRow}
-                handleDeleteRow={(i) => setRows(rows.filter((_, idx) => idx !== i))}
-                handleKeyDown={handleKeyDown}
-                setActiveRow={setActiveRow}
-                setSearchTerm={setSearchTerm}
-                setHighlightedIndex={setHighlightedIndex}
-                getStockWarning={() => null}
-                formatDisplayAmount={fmtAmount}
-                activeCurrency={activeCurrency}
-                exchangeRate={exchangeRate}
-                inputRefs={inputRefs}
-                clearActiveRowTimerRef={clearActiveRowTimerRef}
-                focusCell={focusCell}
-                toast={toast}
-                isEditMode={!!editVoucherId}
-              />
+                <SaleGrid
+                  rows={rows}
+                  columns={POS_COLUMNS}
+                  selectedCell={selectedCell}
+                  setSelectedCell={setSelectedCell}
+                  updateRow={updateRow}
+                  handleDeleteRow={(i) => setRows(rows.filter((_, idx) => idx !== i))}
+                  handleKeyDown={handleKeyDown}
+                  setActiveRow={setActiveRow}
+                  setSearchTerm={setSearchTerm}
+                  setHighlightedIndex={setHighlightedIndex}
+                  getStockWarning={() => null}
+                  formatDisplayAmount={fmtAmount}
+                  activeCurrency={activeCurrency}
+                  exchangeRate={exchangeRate}
+                  inputRefs={inputRefs}
+                  clearActiveRowTimerRef={clearActiveRowTimerRef}
+                  focusCell={focusCell}
+                  toast={toast}
+                  isEditMode={!!editVoucherId}
+                />
               )}
             </div>
             <div className="mt-2 px-1 pb-2">
@@ -720,6 +744,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         setNotes={setNotes}
         saveMutation={saveMutation}
         hasValidItems={hasValidItems}
+        disableSave={goldenCoastPosSaveDisabled}
         handleSaveSale={handleSaveSale}
         formatDisplayAmount={fmtAmount}
         isSpCompany={isSpCompany}
@@ -753,7 +778,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         stockInventoryLoading={stockInventoryLoading}
         handleStockPrint={handleStockPrint}
         handleSendWhatsAppReport={handleSendWhatsAppReport}
-        stockInventory={((stockInventory)).map((item) => ({
+        stockInventory={stockInventory.map((item) => ({
           stockItemName: item.stockItemName,
           stockItemCode: item.stockItemCode,
           stock: parseFloat(item.quantity),

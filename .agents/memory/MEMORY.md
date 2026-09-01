@@ -38,6 +38,7 @@
 - [Chat widget minimize/fullscreen pattern](chat-widget-minimize-pattern.md) — minimized bar must use sibling buttons not nested interactive elements; fullscreen toggle must stay visible on mobile too.
 - [AI chat draft anti-hallucination pattern](ai-draft-hallucination-guard.md) — never let an intent's LLM acknowledgment claim "prepared a draft" without a final code-level guard checking a real draft object exists.
 - [SP POS unification](sp-pos-unification.md) — Supplier Partner POS shares the normal ERP POS UI now; /api/sp/sales is the correct SP voucher endpoint, group SP stock by stockItemId not articleCode.
+- [SP setup request identity](sp-setup-request-identity.md) — setup mutations need clientRequestId or X-Idempotency-Key; body-only idempotencyKey is rejected by the shared accounting guard.
 - [req.body mutation after destructure is a no-op](req-body-mutation-after-destructure.md) — legacy handlers that destructure then later mutate req.body fields don't affect already-bound consts; preserve as-is during refactors, flag as latent bug.
 - [AI chat intent classification priority](ai-chat-intent-priority.md) — domain-specific signals must outrank generic financial-transfer heuristics in classifyChatIntent; anti-hallucination overrides should apply regardless of (possibly wrong) classified intent.
 - [GC migration stock master fix](gc-migration-stock-master-fix.md) — never reuse source-company stock_item ids in target company rows; create real target stock_items via source_links map.
@@ -84,5 +85,15 @@
 - [Currency formatter test compatibility](currency-formatter-test-compatibility.md) — financial screens should prefer historical-base formatting but tolerate lightweight test providers that only expose the legacy formatter.
 - [Express 5 routing compatibility](express5-routing-compatibility.md) — named wildcards, app.router stack access, and registration-time mount capture are required after the Express 5 upgrade.
 - [Replit preview HMR](replit-preview-hmr.md) — Replit's preview proxy can reject Vite websocket upgrades; disable HMR only in Replit preview and keep local HMR enabled.
+- [Replit full-screen port mapping](replit-fullscreen-port-mapping.md) — explicit :5000 URLs must map external 5000 directly to the app listener, not a stale internal proxy port.
 - [Duplicate posting audit](duplicate-posting-audit.md) — financial retries need stable company-scoped identity; timestamps, payload hashes, and display numbers are not identities.
 - [Insurance workbook month names](insurance-workbook-month-names.md) — plain month sheet names use the selected workbook year; sheets with an explicit year retain that year.
+- [Ignored tracked migration files](ignored-tracked-migrations.md) — after merging branches, compare tracked migration trees when startup references a missing SQL file; ignored patterns can hide schema drift.
+- [Stale Vite source rewrites](stale-vite-source-rewrites.md) — when a component has moved to source-owned behavior, bypass its legacy build-time rewrite rather than letting strict markers kill preview startup.
+- [Supplier Partner ledger subtypes](supplier-partner-ledger-subtypes.md) — generic ledger edit validation must preserve SP role subtypes such as sp_payable, including legacy Accounts Payable records.
+- [Golden Coast POS request identity](golden-coast-pos-request-identity.md) — keep Phase 6 under the operational guard; handler-level replay needs fresh transport keys, while changed payloads require a rotated client identity.
+- [Golden Coast cutover removal](golden-coast-existing-position-carry-forward.md) — active POS/container flows do not require the opening cutover; POS lazily costs current inventory while historical bridge support remains.
+- [Golden Coast normal POS settlement](golden-coast-normal-pos-settlement.md) — shared itemized POS journal plus atomic paired GC/HADI cash settlement; reclassify only when payable and canonical GC cash differ.
+- [Golden Coast normal POS integration](golden-coast-normal-pos-integration.md) — cross-company fixtures must link HADI, authorize targetCompanyId, and assert source cash plus paired settlement legs.
+- [GitHub push fallback](github-api-push-fallback.md) — when HTTPS Git credentials fail, create the branch commit through the authorized GitHub API using incremental tree uploads.
+- [Git tree manifest safety](github-tree-manifest-safety.md) — large tree output can truncate in CodeExecution; build manifests with direct child_process/fs reads, never returned shell text.

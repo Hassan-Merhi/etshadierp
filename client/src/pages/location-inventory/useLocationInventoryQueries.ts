@@ -110,6 +110,8 @@ export function useLocationInventoryQueries({
   const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
     queryKey: currentInventoryUrl ? [currentInventoryUrl] : [],
     enabled: !!currentInventoryUrl && !!companyId,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const openingInventoryUrl =
@@ -119,6 +121,8 @@ export function useLocationInventoryQueries({
   const { data: openingInventoryData = [], isLoading: openingInventoryLoading } = useQuery<InventoryItem[]>({
     queryKey: openingInventoryUrl ? [openingInventoryUrl] : [],
     enabled: !!openingInventoryUrl && !!companyId,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const closingInventoryUrl =
@@ -128,6 +132,8 @@ export function useLocationInventoryQueries({
   const { data: closingInventoryData = [], isLoading: closingInventoryLoading } = useQuery<InventoryItem[]>({
     queryKey: closingInventoryUrl ? [closingInventoryUrl] : [],
     enabled: !!closingInventoryUrl && !!companyId,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const { data: allInventoryRaw, isLoading: allInventoryLoading } = useQuery({

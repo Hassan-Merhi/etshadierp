@@ -20,6 +20,7 @@ import {
   type GoldenCoastInventorySnapshotRow,
 } from "../../services/accounting/goldenCoastPhase4CutoverFifo";
 import { requireSpCompany } from "./spHelpers";
+import { goldenCoastExistingPositionCarryForwardVoucherNumber } from "../../services/accounting/goldenCoastCutoverMarkers";
 
 const phase4RequestBudget = privilegedRequestBudget({ maxBodyBytes: 8 * 1024, maxCollectionItems: 10 });
 /**
@@ -104,6 +105,21 @@ async function loadSnapshotState(conn: DbLike, companyId: number) {
     LIMIT 1
   `);
   const voucherRow = resultRows(voucherRows)[0];
+  const carryForwardVoucherRows = await conn.execute(sql`
+    SELECT v.id,
+           COALESCE(SUM(CASE WHEN ve.ledger_account_id = ${stockAccountId}
+             THEN CAST(ve.debit_amount AS numeric) - CAST(ve.credit_amount AS numeric)
+             ELSE 0 END), 0) AS stock_in_hand_opening
+    FROM vouchers v
+    LEFT JOIN voucher_entries ve ON ve.voucher_id = v.id
+    WHERE v.company_id = ${companyId}
+      AND v.voucher_number = ${goldenCoastExistingPositionCarryForwardVoucherNumber(companyId)}
+      AND v.deleted_at IS NULL
+    GROUP BY v.id
+    LIMIT 1
+  `);
+  const carryForwardVoucherRow = resultRows(carryForwardVoucherRows)[0];
+  const openingVoucherRow = voucherRow ?? carryForwardVoucherRow;
 
   const inventoryRows = await conn.execute(sql`
     SELECT inv.id AS inventory_id,
@@ -130,7 +146,7 @@ async function loadSnapshotState(conn: DbLike, companyId: number) {
   const existing = resultRows(existingRows);
 
   const blockers: string[] = [];
-  if (!voucherRow) {
+  if (!openingVoucherRow) {
     blockers.push(releaseDebtEnglish("Phase 3 cutover voucher has not been posted yet."));
   }
   if (new Date().toISOString().slice(0, 10) < GOLDEN_COAST_CUTOVER_DATE) {
@@ -138,7 +154,7 @@ async function loadSnapshotState(conn: DbLike, companyId: number) {
   }
 
   let plan: ReturnType<typeof buildGoldenCoastCutoverFifoPlan> | null = null;
-  if (voucherRow) {
+  if (openingVoucherRow) {
     try {
       const inventory: GoldenCoastInventorySnapshotRow[] = resultRows(inventoryRows).map((row) => ({
         inventoryId: Number(row.inventory_id),
@@ -151,7 +167,7 @@ async function loadSnapshotState(conn: DbLike, companyId: number) {
       }));
       plan = buildGoldenCoastCutoverFifoPlan({
         companyId,
-        stockInHandOpeningUsd: String(voucherRow.stock_in_hand_opening ?? "0"),
+        stockInHandOpeningUsd: String(openingVoucherRow.stock_in_hand_opening ?? "0"),
         inventory,
       });
     } catch (error) {
@@ -168,7 +184,10 @@ async function loadSnapshotState(conn: DbLike, companyId: number) {
   return {
     cutoverDate: GOLDEN_COAST_CUTOVER_DATE,
     phase3VoucherNumber: phase3VoucherNumber(companyId),
+    carryForwardVoucherNumber: goldenCoastExistingPositionCarryForwardVoucherNumber(companyId),
     phase3Posted: !!voucherRow,
+    carryForwardPosted: !!carryForwardVoucherRow,
+    openingPosted: !!openingVoucherRow,
     existing,
     posted: existing.length > 0,
     plan,

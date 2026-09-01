@@ -55,12 +55,14 @@ describe("Golden Coast route and navigation wiring", () => {
     expect(decision).toEqual({ kind: "redirect", to: "/sp" });
   });
 
-  it("offers Golden Coast in the daily navigation without moving setup or migration", () => {
-    expect(SUPPLIER_PARTNER_DAILY_ITEMS.map((item) => item.url)).toContain("/sp/golden-coast");
+  it("offers Golden Coast and Setup in the Supplier Partner navigation", () => {
+    expect(SUPPLIER_PARTNER_DAILY_ITEMS.map((item) => item.url)).not.toContain("/sp/golden-coast");
 
     const setupUrls = SUPPLIER_PARTNER_SECTIONS.flatMap((section) => section.items.map((item) => item.url));
     expect(setupUrls).toContain("/sp/setup");
-    expect(setupUrls).toContain("/sp/setup?tab=migration");
+    expect(setupUrls).not.toContain("/sp/setup?tab=migration");
+    expect(setupUrls).not.toContain("/sp/opening-stock");
+    expect(setupUrls).not.toContain("/sp/aliases");
   });
 
   it("mounts the Golden Coast page lazily on its own route and ERP routes elsewhere", async () => {

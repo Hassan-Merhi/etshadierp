@@ -23,6 +23,7 @@ import {
   getGoldenCoastAccountDefinition,
   type GoldenCoastAccountRole,
 } from "../../services/accounting/goldenCoastPhase2Accounts";
+import { GOLDEN_COAST_PHASE5_SOURCE_TYPE } from "../../services/accounting/goldenCoastPhase5PosSale";
 import {
   GOLDEN_COAST_PHASE11_SPLIT_PCT,
   GoldenCoastPhase11CloseError,
@@ -33,11 +34,7 @@ import {
   planGoldenCoastPhase11MonthlyClose,
   type GoldenCoastPhase11Accounts,
 } from "../../services/accounting/goldenCoastPhase11MonthlyClose";
-import {
-  goldenCoastPhase3VoucherNumber,
-  isGoldenCoastCompany,
-  type DbLike,
-} from "./spGoldenCoastPhase4CutoverFifoRoutes";
+import { isGoldenCoastCompany, type DbLike } from "./spGoldenCoastPhase4CutoverFifoRoutes";
 import { requireSpCompany } from "./spHelpers";
 
 const postingDependencies = createDatabasePostingDependencies();
@@ -67,35 +64,6 @@ function monthBounds(periodMonth: string): { start: string; end: string } {
   const [year, month] = periodMonth.split("-").map(Number);
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
   return { start: `${periodMonth}-01`, end: `${periodMonth}-${String(lastDay).padStart(2, "0")}` };
-}
-
-function assertMonthEnded(periodMonth: string): void {
-  const { end } = monthBounds(periodMonth);
-  const today = new Date().toISOString().slice(0, 10);
-  if (end >= today) {
-    throw new Phase11RouteError(
-      `The ${periodMonth} monthly close is not eligible until the month has ended`,
-      "GC_PHASE11_MONTH_NOT_ENDED",
-      409
-    );
-  }
-}
-
-async function assertCutoverPosted(conn: DbLike, companyId: number): Promise<void> {
-  const result = await conn.execute(sql`
-    SELECT id FROM vouchers
-    WHERE company_id = ${companyId}
-      AND voucher_number = ${goldenCoastPhase3VoucherNumber(companyId)}
-      AND deleted_at IS NULL
-    LIMIT 1
-  `);
-  if (!resultRows(result)[0]) {
-    throw new Phase11RouteError(
-      "Golden Coast Phase 3 cutover must be posted before monthly close",
-      "GC_PHASE11_NOT_READY",
-      409
-    );
-  }
 }
 
 async function resolveCanonicalRole(conn: DbLike, companyId: number, role: GoldenCoastAccountRole): Promise<number> {
@@ -197,6 +165,71 @@ async function accountPeriodActivity(
   return { debit: String(row?.debit ?? "0"), credit: String(row?.credit ?? "0") };
 }
 
+async function salesItemsPeriodActivity(
+  conn: DbLike,
+  companyId: number,
+  salesAccountId: number,
+  cogsAccountId: number,
+  start: string,
+  end: string
+): Promise<{ revenue: string; cogs: string }> {
+  const result = await conn.execute(sql`
+    WITH itemized AS (
+      SELECT
+        COALESCE(SUM(CAST(si.total_sales AS numeric)), 0)::numeric AS revenue,
+        COALESCE(SUM(CAST(si.total_cost AS numeric)), 0)::numeric AS cogs
+      FROM sales_items si
+      JOIN vouchers v ON v.id = si.voucher_id
+      WHERE v.company_id = ${companyId}
+        AND v.voucher_type = 'Sales'
+        AND v.deleted_at IS NULL
+        AND COALESCE(v.optional, false) = false
+        AND v.voucher_date >= ${start}::date
+        AND v.voucher_date <= ${end}::date
+    ),
+    legacy_phase6 AS (
+      SELECT
+        COALESCE(SUM(
+          CASE WHEN ve.ledger_account_id = ${salesAccountId}
+            THEN CAST(ve.credit_amount AS numeric) - CAST(ve.debit_amount AS numeric)
+            ELSE 0
+          END
+        ), 0)::numeric AS revenue,
+        COALESCE(SUM(
+          CASE WHEN ve.ledger_account_id = ${cogsAccountId}
+            THEN CAST(ve.debit_amount AS numeric) - CAST(ve.credit_amount AS numeric)
+            ELSE 0
+          END
+        ), 0)::numeric AS cogs
+      FROM accounting_posting_requests apr
+      JOIN vouchers v ON v.id = apr.voucher_id
+      JOIN voucher_entries ve ON ve.voucher_id = v.id
+      WHERE apr.company_id = ${companyId}
+        AND apr.source_type = ${GOLDEN_COAST_PHASE5_SOURCE_TYPE}
+        AND v.company_id = ${companyId}
+        AND v.deleted_at IS NULL
+        AND COALESCE(v.optional, false) = false
+        AND COALESCE(v.effective_date, v.voucher_date) >= ${start}::date
+        AND COALESCE(v.effective_date, v.voucher_date) <= ${end}::date
+        AND NOT EXISTS (
+          SELECT 1
+          FROM sales_items si2
+          WHERE si2.voucher_id = v.id
+        )
+    )
+    SELECT
+      (itemized.revenue + legacy_phase6.revenue)::text AS revenue,
+      (itemized.cogs + legacy_phase6.cogs)::text AS cogs
+    FROM itemized
+    CROSS JOIN legacy_phase6
+  `);
+  const row = resultRows(result)[0];
+  return {
+    revenue: String(row?.revenue ?? "0"),
+    cogs: String(row?.cogs ?? "0"),
+  };
+}
+
 async function ppdBalance(conn: DbLike, companyId: number, accountId: number): Promise<Decimal> {
   const result = await conn.execute(sql`
     SELECT (
@@ -226,16 +259,14 @@ async function ppdBalance(conn: DbLike, companyId: number, accountId: number): P
 
 async function buildPlan(conn: DbLike, companyId: number, body: unknown) {
   const close = parseGoldenCoastPhase11CloseInput({ companyId, body });
-  assertMonthEnded(close.periodMonth);
   const accounts = await resolveAccounts(conn, companyId);
   const { start, end } = monthBounds(close.periodMonth);
-  const [sales, cogs, shared] = await Promise.all([
-    accountPeriodActivity(conn, companyId, accounts.salesAccountId, start, end),
-    accountPeriodActivity(conn, companyId, accounts.cogsAccountId, start, end),
+  const [salesItems, shared] = await Promise.all([
+    salesItemsPeriodActivity(conn, companyId, accounts.salesAccountId, accounts.cogsAccountId, start, end),
     accountPeriodActivity(conn, companyId, accounts.sharedChargesAccountId, start, end),
   ]);
-  const revenue = new Decimal(sales.credit).minus(sales.debit);
-  const totalCogs = new Decimal(cogs.debit).minus(cogs.credit);
+  const revenue = new Decimal(salesItems.revenue);
+  const totalCogs = new Decimal(salesItems.cogs);
   const totalShared = new Decimal(shared.debit).minus(shared.credit);
   const plan = planGoldenCoastPhase11MonthlyClose({
     close,
@@ -301,10 +332,8 @@ async function readiness(req: Request, res: Response): Promise<void> {
     if (!(await isGoldenCoastCompany(db, companyId))) {
       throw new Phase11RouteError("Golden Coast is not configured", "GC_PHASE11_NOT_CONFIGURED", 409);
     }
-    await assertCutoverPosted(db, companyId);
     const periodMonth = String(req.query.periodMonth ?? "");
     const probe = parseGoldenCoastPhase11CloseInput({ companyId, body: { periodMonth, clientRequestId: "readiness" } });
-    assertMonthEnded(probe.periodMonth);
     const existing = await db
       .select()
       .from(spProfitSplits)
@@ -337,9 +366,7 @@ async function closeMonth(req: Request, res: Response): Promise<void> {
     if (!(await isGoldenCoastCompany(db, companyId))) {
       throw new Phase11RouteError("Golden Coast is not configured", "GC_PHASE11_NOT_CONFIGURED", 409);
     }
-    await assertCutoverPosted(db, companyId);
     const parsed = parseGoldenCoastPhase11CloseInput({ companyId, body: req.body });
-    assertMonthEnded(parsed.periodMonth);
 
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(73111, ${companyId})`);

@@ -1,4 +1,5 @@
 import { ZipArchive } from "archiver";
+import type { Archiver } from "archiver";
 import type { Writable } from "stream";
 import { streamCompanyWorkbookDirect } from "../services/export-excel";
 import { logger } from "../lib/logger";
@@ -18,7 +19,7 @@ export interface StreamExportZipResult {
 }
 
 type ExportProgress = (msg: string, level?: "info" | "success" | "warning" | "error") => void;
-type ExportArchive = InstanceType<typeof ZipArchive>;
+type ExportArchive = Archiver;
 
 function createProgressLogger(onProgress?: ExportProgress): ExportProgress {
   return (

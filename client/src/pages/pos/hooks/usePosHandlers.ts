@@ -52,6 +52,11 @@ interface PosHandlersParams {
   activeLocation: Location | null;
   editVoucherId?: string;
   editVoucher: unknown;
+  isSpCompany?: boolean;
+  isGoldenCoastPhase6?: boolean;
+  goldenCoastReadinessLoading?: boolean;
+  goldenCoastReadinessBlocked?: boolean;
+  goldenCoastReadinessBlockers?: readonly string[];
   inventory: InventoryItem[];
   apiInventory: APIInventoryItem[];
   lastSoldPrices: Record<number, string>;
@@ -124,6 +129,11 @@ export function usePosHandlers(params: PosHandlersParams) {
     activeLocation: params.activeLocation,
     editVoucherId: params.editVoucherId,
     editVoucher: params.editVoucher,
+    isSpCompany: params.isSpCompany,
+    isGoldenCoastPhase6: params.isGoldenCoastPhase6,
+    goldenCoastReadinessLoading: params.goldenCoastReadinessLoading,
+    goldenCoastReadinessBlocked: params.goldenCoastReadinessBlocked,
+    goldenCoastReadinessBlockers: params.goldenCoastReadinessBlockers,
     inventory: params.inventory,
     currentShift: params.currentShift,
     posUser: params.posUser,

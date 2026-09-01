@@ -44,6 +44,8 @@ interface UsePosMutationsParams {
   editVoucherId?: string;
   editVoucher: any;
   isSpCompany?: boolean;
+  isGoldenCoastPhase6?: boolean;
+  goldenCoastParentCompanyId?: number | null;
   clientSaleIdRef: React.MutableRefObject<string>;
   rows: SaleRow[];
   isCreditSale: boolean;
@@ -116,6 +118,8 @@ export function usePosMutations({
   editVoucherId,
   editVoucher,
   isSpCompany,
+  isGoldenCoastPhase6,
+  goldenCoastParentCompanyId,
   clientSaleIdRef,
   rows,
   isCreditSale,
@@ -153,7 +157,18 @@ export function usePosMutations({
             sellingPrice: String(item.rate),
           })),
         };
-        const res = await apiRequest("PUT", `/api/vouchers/${editVoucherId}/sales`, updateData);
+        const res = await apiRequest("PUT", `/api/vouchers/${editVoucherId}/sales`, {
+          ...updateData,
+          targetCompanyId: goldenCoastParentCompanyId ?? undefined,
+        });
+        return res.json();
+      }
+
+      if (isSpCompany && isGoldenCoastPhase6) {
+        const res = await apiRequest("POST", "/api/pos/sales", {
+          ...saleData,
+          targetCompanyId: goldenCoastParentCompanyId ?? undefined,
+        });
         return res.json();
       }
 
@@ -279,6 +294,15 @@ export function usePosMutations({
       }
     },
     onError: (error: ClientErrorLike) => {
+      if (isGoldenCoastPhase6 && error.code === "POSTING_IDEMPOTENCY_CONFLICT") {
+        clientSaleIdRef.current = crypto.randomUUID();
+        toast({
+          title: "Sale request refreshed",
+          description: "The previous sale request no longer matches these items. Please click Save again.",
+          variant: "destructive",
+        });
+        return;
+      }
       toast({
         title: "Error",
         description: error.message || `Failed to ${editVoucherId ? "update" : "save"} sale`,

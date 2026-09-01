@@ -43,6 +43,6 @@ describe("Golden Coast Phase 5 POS sale retirement", () => {
   it("keeps pre-cutover and legacy posting paths out of the canonical Phase 6 sale", () => {
     expect(phase6RouteSource).not.toContain("goldenCoastPhase1Posting");
     expect(phase6RouteSource).not.toContain("buildGoldenCoastPhase1PostingBatch");
-    expect(phase6RouteSource).not.toContain("tx.insert(spStockMovements)");
+    expect(phase6RouteSource).toContain("GOLDEN_COAST_CURRENT_INVENTORY_FIFO_SOURCE");
   });
 });

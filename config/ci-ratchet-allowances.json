@@ -1,6 +1,7 @@
 {
   "description": "Reviewed CI ratchet deltas for intentional functionality added before the architecture snapshots were refreshed. Every allowance is exact so unrelated growth or routes still fail. The route-manifest additions were folded into config/route-manifest.json on 2026-08-05, so these lists only contain exact reviewed deltas since that snapshot.",
   "godFileLineCaps": {
+    "server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.ts": 909,
     "server/services/factory/postOffloadPhase6Safety.ts": 927,
     "server/services/rental/rentalPaymentPostingService.ts": 958,
     "client/src/pages/ContainerLoadingScan.tsx": 1133,
@@ -33,6 +34,8 @@
     "POST /api/sp/golden-coast/phase9/hassan-savings-withdrawal [<anonymous> > <anonymous> > requireAuth > requireNonPOS > <anonymous>]",
     "GET /api/sp/golden-coast/phase10/sales-cash-settlement/readiness [<anonymous> > requireAuth > requireNonPOS > <anonymous>]",
     "POST /api/sp/golden-coast/phase10/sales-cash-settlement [<anonymous> > <anonymous> > requireAuth > requireNonPOS > <anonymous>]",
+    "GET /api/sp/golden-coast/cutover/existing-position-carry-forward [<anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "POST /api/sp/golden-coast/cutover/existing-position-carry-forward [<anonymous> > <anonymous> > requireAuth > <anonymous> > <anonymous>]",
     "GET /api/insurance/import/template [<anonymous> > requireAuth > <anonymous>]",
     "POST /api/insurance/import/preview [<anonymous> > requireAuth > multerMiddleware > <anonymous>]",
     "POST /api/insurance/import/apply [<anonymous> > requireAuth > <anonymous>]",
@@ -92,6 +95,8 @@
   ],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [
+      "tests/ui/company-parent-selector.test.ts",
+      "tests/ui/golden-coast-pos-phase6-contract.test.ts",
       "tests/factory-post-offload-phase5-reconciliation.test.ts",
       "tests/factory-post-offload-phase6-safety-repair.test.ts",
       "tests/ui/authenticated-request-gating.test.ts",
@@ -134,6 +139,6 @@
       "tests/formatting-gate-parity.test.ts",
       "tests/supplier-profit-check-integrity.test.ts"
     ],
-    "maxAdditionalTextAssertions": 646
+    "maxAdditionalTextAssertions": 659
   }
 }

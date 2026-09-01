@@ -80,6 +80,7 @@ export interface PosSaleRequestBody {
   clientSaleId?: string;
   currency?: string | null;
   exchangeRate?: string | number | null;
+  targetCompanyId?: number | string | null;
 }
 
 /**

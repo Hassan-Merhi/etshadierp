@@ -168,7 +168,7 @@ export function getParentRoute(pathname: string): string | null {
   if (cleanPath === "/sp/aliases") return "/sp";
   if (cleanPath === "/sp/setup") return "/sp";
   if (cleanPath === "/sp/migration" || cleanPath === "/sp/gc-migration") {
-    return "/sp/setup?tab=migration";
+    return "/sp/setup";
   }
 
   return null;

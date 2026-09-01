@@ -478,7 +478,7 @@ export function registerAccountListRoutes(app: Express) {
       // company's books — child/sub companies start from zero and only accrue a
       // balance from their OWN vouchers. The parent is NEVER inferred from
       // "lowest company ID" — only the explicit parentCompanyId setting decides.
-      const parentCompanyId = await resolveParentCompanyId();
+      const parentCompanyId = await resolveParentCompanyId(companyId);
       const isChildCompany = companyId !== parentCompanyId;
 
       // Calculate each supplier's balance scoped to THIS company only (opening

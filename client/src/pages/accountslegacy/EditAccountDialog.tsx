@@ -40,7 +40,17 @@ const ACCOUNT_TYPES = [
 const SUB_TYPE_OPTIONS: Record<string, string[]> = {
   Income: ["Direct Income", "Indirect Income"],
   Expense: ["Direct Expense", "Indirect Expense"],
-  Liability: ["Current Liability", "Long-term Liability", "Loans Payable", "Output Tax", "Tax Payable"],
+  Liability: [
+    "Current Liability",
+    "Long-term Liability",
+    "Loans Payable",
+    "Output Tax",
+    "Tax Payable",
+    "sp_otw_clearing",
+    "sp_cost_clearing",
+    "sp_pay_deduction_clearing",
+    "sp_payable",
+  ],
   Asset: ["Current Asset", "Fixed Asset", "Input Tax", "Tax Receivable"],
 };
 

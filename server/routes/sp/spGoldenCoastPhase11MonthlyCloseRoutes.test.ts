@@ -28,12 +28,21 @@ describe("Golden Coast Phase 11 monthly close route surface", () => {
   });
 
   it("derives revenue, COGS and shared charges from posted company-scoped vouchers", () => {
-    expect(routeSource).toContain("accountPeriodActivity");
+    expect(routeSource).toContain("salesItemsPeriodActivity");
+    expect(routeSource).toContain("SUM(CAST(si.total_sales AS numeric))");
+    expect(routeSource).toContain("SUM(CAST(si.total_cost AS numeric))");
+    expect(routeSource).toContain("FROM sales_items si");
     expect(routeSource).toContain("v.company_id = ${companyId}");
     expect(routeSource).toContain("COALESCE(v.optional, false) = false");
     expect(routeSource).toContain("v.deleted_at IS NULL");
-    expect(routeSource).toContain("sales.credit");
-    expect(routeSource).toContain("cogs.debit");
+    expect(routeSource).toContain("accountPeriodActivity");
+  });
+
+  it("does not require the obsolete Phase 3 opening cutover", () => {
+    expect(routeSource).not.toContain("assertCutoverPosted");
+    expect(routeSource).not.toContain("Golden Coast Phase 3 cutover must be posted");
+    expect(serviceSource).not.toContain("GC_PHASE11_PRE_CUTOVER_MONTH");
+    expect(routeSource).not.toContain("GC_PHASE11_MONTH_NOT_ENDED");
   });
 
   it("serializes the close and checks Profit Pending Distribution before and after posting", () => {

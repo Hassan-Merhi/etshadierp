@@ -1,13 +1,7 @@
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import {
-  intercompanyPosConfigs,
-  companies,
-  ledgerAccounts,
-  vouchers,
-  voucherEntries,
-} from "@shared/schema";
+import { intercompanyPosConfigs, companies, ledgerAccounts, vouchers, voucherEntries } from "@shared/schema";
 import { eq, and, sql, ilike, isNull } from "drizzle-orm";
 
 // ─── Intercompany POS ─────────────────────────────────────────────────────────
@@ -18,6 +12,23 @@ export async function runIntercompanyPosTransfer(
   saleDateStr: string
 ) {
   try {
+    // Golden Coast has its own atomic, paired HADI settlement. Letting this
+    // legacy fire-and-forget transfer run as well credits the source cash a
+    // second time and uses the old auto-created intercompany account.
+    const goldenCoastRoleRows = await db
+      .select({ subType: ledgerAccounts.subType })
+      .from(ledgerAccounts)
+      .where(
+        and(
+          eq(ledgerAccounts.companyId, sourceCompanyId),
+          sql`${ledgerAccounts.subType} IN ('gc_partner_capital', 'gc_owner_capital')`,
+          eq(ledgerAccounts.active, true),
+          isNull(ledgerAccounts.deletedAt)
+        )
+      );
+    const goldenCoastRoles = new Set(goldenCoastRoleRows.map((row) => row.subType));
+    if (goldenCoastRoles.has("gc_partner_capital") && goldenCoastRoles.has("gc_owner_capital")) return;
+
     const [config] = await db
       .select()
       .from(intercompanyPosConfigs)
