@@ -133,7 +133,7 @@ export default function SpReports() {
       }
       const blob = await res.blob();
       const disposition = res.headers.get("Content-Disposition") ?? "";
-      const match = disposition.match(/filename="?([^\"]+)"?/);
+      const match = disposition.match(/filename="?([^"]+)"?/);
       const filename = match ? match[1] : `sales_form_${exportFrom}_${exportTo}.xlsx`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -166,7 +166,7 @@ export default function SpReports() {
       }
       const blob = await res.blob();
       const disposition = res.headers.get("Content-Disposition") ?? "";
-      const match = disposition.match(/filename="?([^\"]+)"?/);
+      const match = disposition.match(/filename="?([^"]+)"?/);
       const filename = match ? match[1] : `system_sales_form_${exportFrom}_${exportTo}.xlsx`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
