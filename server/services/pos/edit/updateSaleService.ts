@@ -145,7 +145,7 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
 
     const isGoldenCoastEdit = isSpCompanyEdit && (await isGoldenCoastPosCompany(tx, currentCompanyId));
     const clientSaleId = String(lockedVoucher.clientSaleId ?? "").trim();
-    if (isGoldenCoastEdit && clientSaleId) {
+    if (isGoldenCoastEdit && clientSaleId && !Boolean(lockedVoucher.isCreditSale)) {
       await reverseGoldenCoastPosAccountingTx({
         tx,
         companyId: currentCompanyId,
@@ -178,6 +178,7 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
       targetLocationId,
       oldLocationId,
       voucherDate,
+      isCreditSale: Boolean(isCreditSale),
     });
 
     await rebuildSaleAccountingEntries(tx, {
