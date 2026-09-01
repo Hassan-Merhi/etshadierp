@@ -78,12 +78,7 @@ beforeAll(async () => {
     `INSERT INTO suppliers (company_id, code, legal_name, email, active)
      VALUES ($1, $2, $3, $4, true)
      RETURNING id`,
-    [
-      ctx.companyId,
-      `${TEST_PREFIX}-SUP-${Date.now()}`,
-      `${TEST_PREFIX} Parent Supplier`,
-      `${TEST_PREFIX}@example.test`,
-    ]
+    [ctx.companyId, `${TEST_PREFIX}-SUP-${Date.now()}`, `${TEST_PREFIX} Parent Supplier`, `${TEST_PREFIX}@example.test`]
   );
   supplierId = Number(supplier.rows[0].id);
 
