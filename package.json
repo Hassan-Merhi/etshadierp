@@ -214,7 +214,7 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^10.9.0",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-react-hooks": "5.2.0",
+    "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-unused-imports": "^4.4.1",
     "jsdom": "^30.0.0",
     "prettier": "^3.8.4",
