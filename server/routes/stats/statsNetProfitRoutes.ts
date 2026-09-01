@@ -90,6 +90,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // All other SP ledger accounts (OTW, prepaid, intercompany, clearing accounts, etc.) are excluded.
       // For non-SP: exclude sp_stock (inventory table is authoritative) and sp_cost_clearing (double-counts).
       const isSupplierPartner = companyRecord?.companyType === "supplier_partner";
+      const equityIncludedInNetPosition = isSupplierPartner;
       const accountsForClassify = isSupplierPartner
         ? companyAccounts.filter((a) => a.accountType === "Cash" || a.subType === "sp_payable")
         : companyAccounts.filter((a) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing");
@@ -558,11 +559,11 @@ export function registerStatsNetProfitRoutes(app: Express) {
         }
       }
 
-      // Net Position = Pure sign-based: Sum(positive balances) - Sum(negative balances)
-      // Positive balance = asset (what we have)
-      // Negative balance = liability (what we owe)
-      // This is a simplified calculation: Assets - Liabilities only
-      const netPosition = round2(forUsTotal - onUsTotal);
+      // Net Position remains Assets - Liabilities for regular companies.
+      // Supplier-partner companies also include signed partner equity directly:
+      // debit equity increases the position, while credit equity reduces it.
+      const equityNetPositionContribution = equityIncludedInNetPosition ? equity.total : 0;
+      const netPosition = round2(forUsTotal - onUsTotal + equityNetPositionContribution);
 
       const netPositionLabel = netPosition >= 0 ? "We have more than we owe" : "We owe more than we have";
 
@@ -597,7 +598,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       }
 
       // Net Worth and Profit for backward compatibility
-      const netWorth = round2(forUsTotal - onUsTotal);
+      const netWorth = netPosition;
       const netProfit = round2(incomeTotal - expensesTotal);
 
       // Breakdown for display
@@ -621,6 +622,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
         equity: {
           total: equity.total,
           accounts: equity.accounts,
+          includedInNetPosition: equityIncludedInNetPosition,
         },
         netPosition,
       };
@@ -650,7 +652,10 @@ export function registerStatsNetProfitRoutes(app: Express) {
           breakdown: expensesBreakdown,
           accounts: expensesAccounts,
         },
-        equity,
+        equity: {
+          ...equity,
+          includedInNetPosition: equityIncludedInNetPosition,
+        },
         ownersCapital,
         netWorth,
         netPosition,
