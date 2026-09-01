@@ -12,6 +12,7 @@ import { locations, employees, suppliers, containers } from "@shared/schema";
 import { eq, and, or, isNull, lte, sql } from "drizzle-orm";
 import { classifyEquityAccounts, classifyNetPositionAccounts, round2 } from "../netPositionHelper";
 import { calculateHistoricalLocationInventory } from "../routes/_helpers";
+import { getSupplierPartnerCustomerNetPosition } from "./supplierPartnerCustomerNetPosition";
 
 export interface NetPositionLineItem {
   label: string;
@@ -107,6 +108,9 @@ export async function calculateNetPositionAsOf(
 
   const parentCompanyId = await storage.getParentCompanyId();
   const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
+  const supplierPartnerCustomerPosition = isSupplierPartner
+    ? await getSupplierPartnerCustomerNetPosition(companyId, toDate)
+    : null;
 
   // SP formula: What We Have = Cash + Customer A/R + SP-HADI-IC receivable (Hadi holds the cash on SP's behalf);
   // What We Owe = Supplier Cash Payable plus Loan/Loans balances.
@@ -120,7 +124,11 @@ export async function calculateNetPositionAsOf(
           a.accountType === "Cash" ||
           a.accountType === "Loan" ||
           a.accountType === "Loans" ||
-          a.subType === "Accounts Receivable" ||
+          ((a.accountType === "Customer" ||
+            a.subType === "Accounts Receivable" ||
+            (a.code || "").toUpperCase().startsWith("CUST-") ||
+            (a.name || "").toLowerCase().includes("customer account")) &&
+            !supplierPartnerCustomerPosition?.ledgerAccountIds.has(a.id)) ||
           a.subType === "sp_payable" ||
           a.subType === "sp_hadi_intercompany"
       )
@@ -145,6 +153,19 @@ export async function calculateNetPositionAsOf(
     category: a.category,
     side: "onUs",
   }));
+
+  if (supplierPartnerCustomerPosition) {
+    for (const customer of supplierPartnerCustomerPosition.items) {
+      const value = round2(Math.abs(customer.signedBalance));
+      if (customer.signedBalance > 0) {
+        forUsTotal = round2(forUsTotal + value);
+        forUsLines.push({ label: customer.name, value, category: "Asset", side: "forUs" });
+      } else {
+        onUsTotal = round2(onUsTotal + value);
+        onUsLines.push({ label: customer.name, value, category: "Liability", side: "onUs" });
+      }
+    }
+  }
 
   // ── Stock on floor ────────────────────────────────────────────────────
   const activeLocationsData = await db
