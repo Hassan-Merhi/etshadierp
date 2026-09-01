@@ -1,0 +1,161 @@
+name: Apply supplier partner net position follow-up v2
+
+on:
+  push:
+    branches:
+      - fix/supplier-partner-equity-loan-net-position-v2
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/supplier-partner-equity-loan-net-position-v2
+          fetch-depth: 0
+
+      - name: Apply deterministic source fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              data = p.read_text()
+              count = data.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one match, found {count}")
+              p.write_text(data.replace(old, new, 1))
+
+          replace_once(
+              "server/routes/stats/statsNetProfitRoutes.ts",
+              '      // SP formula: What We Have = Cash + Stock (from inventory table); What We Owe = Supplier Cash Payable only.\n      // All other SP ledger accounts (OTW, prepaid, intercompany, clearing accounts, etc.) are excluded.',
+              '      // SP formula: What We Have = Cash + Stock (from inventory table); What We Owe includes supplier cash payable and Loan/Loans balances.\n      // Other SP ledger accounts (OTW, prepaid, intercompany, clearing accounts, etc.) remain excluded unless explicitly part of the formula.'
+          )
+          replace_once(
+              "server/routes/stats/statsNetProfitRoutes.ts",
+              '        ? companyAccounts.filter((a) => a.accountType === "Cash" || a.subType === "sp_payable")',
+              '        ? companyAccounts.filter(\n            (a) =>\n              a.accountType === "Cash" ||\n              a.accountType === "Loan" ||\n              a.accountType === "Loans" ||\n              a.subType === "sp_payable"\n          )'
+          )
+
+          replace_once(
+              "server/routes/stats/statsMultiCurrencyRoutes.ts",
+              '  netPosition?: number;\n  currency?: Record<string, unknown> & { currentCashBankTranslationApplied?: boolean };',
+              '  netPosition?: number;\n  netWorth?: number;\n  equity?: { total?: number; includedInNetPosition?: boolean };\n  currency?: Record<string, unknown> & { currentCashBankTranslationApplied?: boolean };'
+          )
+          replace_once(
+              "server/routes/stats/statsMultiCurrencyRoutes.ts",
+              '  const forUsRounded = round2(forUsTotal.toNumber());\n  const onUsRounded = round2(onUsTotal.toNumber());\n  const netPosition = round2(forUsRounded - onUsRounded);',
+              '  const forUsRounded = round2(forUsTotal.toNumber());\n  const onUsRounded = round2(onUsTotal.toNumber());\n  const equityContribution =\n    payload.equity?.includedInNetPosition === true ? new Decimal(payload.equity.total ?? 0) : new Decimal(0);\n  const netPosition = round2(\n    new Decimal(forUsRounded).minus(onUsRounded).plus(equityContribution).toNumber()\n  );'
+          )
+          replace_once(
+              "server/routes/stats/statsMultiCurrencyRoutes.ts",
+              '  payload.netPosition = netPosition;\n  payload.netPositionLabel = netPosition >= 0 ? "Net Assets" : "Net Liabilities";',
+              '  payload.netPosition = netPosition;\n  payload.netWorth = netPosition;\n  payload.netPositionLabel = netPosition >= 0 ? "Net Assets" : "Net Liabilities";'
+          )
+
+          replace_once(
+              "server/helpers/calculateNetPositionAsOf.ts",
+              'import { classifyNetPositionAccounts, round2 } from "../netPositionHelper";',
+              'import { classifyEquityAccounts, classifyNetPositionAccounts, round2 } from "../netPositionHelper";'
+          )
+          replace_once(
+              "server/helpers/calculateNetPositionAsOf.ts",
+              '        (a) => a.accountType === "Cash" || a.subType === "sp_payable" || a.subType === "sp_hadi_intercompany"',
+              '        (a) =>\n          a.accountType === "Cash" ||\n          a.accountType === "Loan" ||\n          a.accountType === "Loans" ||\n          a.subType === "sp_payable" ||\n          a.subType === "sp_hadi_intercompany"'
+          )
+          replace_once(
+              "server/helpers/calculateNetPositionAsOf.ts",
+              '  const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {\n    includeSupplierTypeAccounts: shouldIncludeSuppliers,\n  });\n\n  let forUsTotal = classified.forUsTotal;',
+              '  const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {\n    includeSupplierTypeAccounts: shouldIncludeSuppliers,\n  });\n  const equity = classifyEquityAccounts(companyAccounts, accountBalances);\n\n  let forUsTotal = classified.forUsTotal;'
+          )
+          replace_once(
+              "server/helpers/calculateNetPositionAsOf.ts",
+              '  const netPosition = round2(forUsTotal - onUsTotal);',
+              '  const equityContribution = isSupplierPartner ? equity.total : 0;\n  const netPosition = round2(forUsTotal - onUsTotal + equityContribution);'
+          )
+
+          replace_once(
+              "server/routes/stats/statsNetPositionRoutes.ts",
+              'import { classifyNetPositionAccounts, round2 } from "../../netPositionHelper";',
+              'import { classifyEquityAccounts, classifyNetPositionAccounts, round2 } from "../../netPositionHelper";'
+          )
+          replace_once(
+              "server/routes/stats/statsNetPositionRoutes.ts",
+              '      // SP formula: Cash + Stock (inventory) → What We Have; sp_payable only → What We Owe.',
+              '      // SP formula: Cash + Stock (inventory) → What We Have; sp_payable and Loan/Loans → What We Owe.'
+          )
+          replace_once(
+              "server/routes/stats/statsNetPositionRoutes.ts",
+              '        ? companyAccounts.filter((a) => a.accountType === "Cash" || a.subType === "sp_payable")',
+              '        ? companyAccounts.filter(\n            (a) =>\n              a.accountType === "Cash" ||\n              a.accountType === "Loan" ||\n              a.accountType === "Loans" ||\n              a.subType === "sp_payable"\n          )'
+          )
+          replace_once(
+              "server/routes/stats/statsNetPositionRoutes.ts",
+              '      const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {\n        includeSupplierTypeAccounts: shouldIncludeSuppliers,\n      });\n      let forUsTotal = classified.forUsTotal;',
+              '      const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {\n        includeSupplierTypeAccounts: shouldIncludeSuppliers,\n      });\n      const equity = classifyEquityAccounts(companyAccounts, accountBalances);\n      let forUsTotal = classified.forUsTotal;'
+          )
+          replace_once(
+              "server/routes/stats/statsNetPositionRoutes.ts",
+              '      const netPosition = round2(forUsTotal - onUsTotal);',
+              '      const equityContribution = isSupplierPartner ? equity.total : 0;\n      const netPosition = round2(forUsTotal - onUsTotal + equityContribution);'
+          )
+          PY
+
+      - name: Add regression coverage
+        run: |
+          cat > tests/supplier-partner-net-position-inclusion.test.ts <<'EOF'
+          import fs from "node:fs";
+          import path from "node:path";
+          import { describe, expect, it } from "vitest";
+
+          const root = path.resolve(process.cwd());
+          const read = (relativePath: string) => fs.readFileSync(path.join(root, relativePath), "utf8");
+
+          describe("supplier partner net position inclusion", () => {
+            it("includes Loan/Loans and signed equity in the live Net Position", () => {
+              const source = read("server/routes/stats/statsNetProfitRoutes.ts");
+              expect(source).toContain('a.accountType === "Loan"');
+              expect(source).toContain('a.accountType === "Loans"');
+              expect(source).toContain("equityNetPositionContribution");
+              expect(source).toContain("forUsTotal - onUsTotal + equityNetPositionContribution");
+            });
+
+            it("does not let current-cash translation erase supplier-partner equity", () => {
+              const source = read("server/routes/stats/statsMultiCurrencyRoutes.ts");
+              expect(source).toContain("payload.equity?.includedInNetPosition === true");
+              expect(source).toContain("plus(equityContribution)");
+              expect(source).toContain("payload.netWorth = netPosition");
+            });
+
+            it("keeps historical/monthly and Excel calculations aligned", () => {
+              const asOf = read("server/helpers/calculateNetPositionAsOf.ts");
+              const excel = read("server/routes/stats/statsNetPositionRoutes.ts");
+              for (const source of [asOf, excel]) {
+                expect(source).toContain("classifyEquityAccounts");
+                expect(source).toContain('a.accountType === "Loan"');
+                expect(source).toContain('a.accountType === "Loans"');
+                expect(source).toContain("equityContribution");
+                expect(source).toContain("forUsTotal - onUsTotal + equityContribution");
+              }
+            });
+          });
+          EOF
+
+      - name: Remove one-time workflows
+        run: |
+          rm -f .github/workflows/apply-supplier-partner-equity-loan-followup.yml
+          rm -f .github/workflows/apply-supplier-partner-followup-v2.yml
+
+      - name: Commit and push fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: preserve supplier equity and include loan balances"
+          git push origin HEAD:fix/supplier-partner-equity-loan-net-position-v2
