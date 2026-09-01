@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const root = path.resolve(process.cwd());
 const read = (relativePath: string) => fs.readFileSync(path.join(root, relativePath), "utf8");
 
+// Supplier partners intentionally add signed equity after classifying assets and liabilities.
 describe("supplier partner net position inclusion", () => {
   it("includes Loan/Loans and signed equity in the live Net Position", () => {
     const source = read("server/routes/stats/statsNetProfitRoutes.ts");
