@@ -57,7 +57,6 @@ interface NetProfitData {
   totalIncome: number;
   totalExpenses: number;
   netProfit: number;
-  spPosProfit?: number;
   forUs: { total: number; breakdown: BreakdownItem[]; accounts: AccountItem[] };
   onUs: { total: number; breakdown: BreakdownItem[]; accounts: AccountItem[] };
   equity?: { total: number; accounts: AccountItem[]; includedInNetPosition?: boolean };
@@ -725,47 +724,6 @@ export default function NetProfitDetails() {
         />
       )}
 
-      {/* SP Partner: Realized POS Profit */}
-      {(data?.spPosProfit ?? 0) !== 0 && (
-        <Card data-testid="card-sp-pos-profit" className="overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-500/10 to-transparent dark:from-blue-500/15 px-5 py-4">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">
-                  <TrendingUp className="h-4 w-4" />
-                </div>
-                <div>
-                  <div className="font-semibold text-base text-blue-600 dark:text-blue-400">
-                    Realized Profit (POS Sales)
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    Supplier partner POS profit — calculated from actual sale &amp; cost per item
-                  </div>
-                </div>
-              </div>
-              <span
-                className={`text-2xl font-bold font-mono tabular-nums ${(data?.spPosProfit ?? 0) >= 0 ? "text-blue-600 dark:text-blue-400" : "text-destructive"}`}
-              >
-                {formatAmount(data?.spPosProfit ?? 0)}
-              </span>
-            </div>
-          </div>
-          <CardContent className="pt-3 pb-4">
-            <div className="rounded-md overflow-hidden border border-border/60">
-              <div className="flex items-center justify-between px-3 py-2.5 text-sm">
-                <span className="text-foreground">Supplier Partner POS Profit</span>
-                <span className="font-mono tabular-nums font-medium text-blue-600 dark:text-blue-400">
-                  {formatAmount(data?.spPosProfit ?? 0)}
-                </span>
-              </div>
-              <div className="px-3 py-2 bg-muted/40 text-xs text-muted-foreground border-t border-border/50">
-                Formula: Sum of (sale price − cost price) across all POS sale lines
-                {toDate ? ` up to ${toDate}` : " (all time)"}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
