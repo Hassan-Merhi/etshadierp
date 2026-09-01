@@ -5,7 +5,7 @@ import { db } from "../../db";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { containers, suppliers, employees, salaryAdvances, exchangeRates } from "@shared/schema";
 import { eq, and, or, desc, inArray, sql, isNull, lte } from "drizzle-orm";
-import { classifyNetPositionAccounts, getAccountNetBalance } from "../../netPositionHelper";
+import { classifyEquityAccounts, classifyNetPositionAccounts, getAccountNetBalance } from "../../netPositionHelper";
 
 import { _getCached, _setCached } from "../../services/shared/ttlCache";
 import { computeRentalOutstanding } from "./netProfitRentalSection";
@@ -96,6 +96,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
         includeSupplierTypeAccounts: shouldIncludeSuppliers,
       });
+      const equity = classifyEquityAccounts(companyAccounts, accountBalances);
       let forUsTotal = classified.forUsTotal;
       let onUsTotal = classified.onUsTotal;
       const forUsAccounts = classified.forUsAccounts;
@@ -617,6 +618,10 @@ export function registerStatsNetProfitRoutes(app: Express) {
           total: expensesTotal,
           breakdown: expensesBreakdown,
         },
+        equity: {
+          total: equity.total,
+          accounts: equity.accounts,
+        },
         netPosition,
       };
 
@@ -645,6 +650,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
           breakdown: expensesBreakdown,
           accounts: expensesAccounts,
         },
+        equity,
         ownersCapital,
         netWorth,
         netPosition,

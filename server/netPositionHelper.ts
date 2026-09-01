@@ -32,6 +32,15 @@ export interface NetPositionAccount {
   category: string;
 }
 
+export interface EquityAccount extends NetPositionAccount {
+  balanceSide: "Dr" | "Cr";
+}
+
+export interface EquityResult {
+  total: number;
+  accounts: EquityAccount[];
+}
+
 export interface ClassifyOptions {
   /**
    * Extra account codes (uppercase) to skip from net-position classification.
@@ -63,7 +72,7 @@ export interface ClassifyResult {
 // ─── Constants (mirror the ERP route) ───────────────────────────────────────
 
 const assetDefaultDrTypes = ["Asset", "Current Asset", "Bank", "Cash", "Customer"];
-const liabilityAccountTypes = ["Liability", "Duty Agent", "Transporter Agent", "Loan"];
+const liabilityAccountTypes = ["Liability", "Duty Agent", "Transporter Agent", "Loan", "Loans"];
 const excludedAccountTypes = ["Income", "Profit", "Equity", "EQUITY", "Fixed Asset", "Intercompany"];
 export const expenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
 const assetAccountTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
@@ -117,6 +126,34 @@ export function getAccountNetBalance(acc: AccountLike, balanceMap: Map<number, A
   const signedOpening = opening * openingSide;
   const balance = balanceMap.get(acc.id) || { debit: 0, credit: 0 };
   return signedOpening + balance.debit - balance.credit;
+}
+
+/** Classifies equity accounts for display without including them in Assets/Liabilities totals. */
+export function classifyEquityAccounts(accounts: AccountLike[], balanceMap: Map<number, AccountBalance>): EquityResult {
+  let total = 0;
+  const equityAccounts: EquityAccount[] = [];
+
+  for (const acc of accounts) {
+    if (!["Equity", "EQUITY"].includes(acc.accountType || "")) continue;
+
+    const netBalance = getAccountNetBalance(acc, balanceMap);
+    if (Math.abs(netBalance) < 0.01) continue;
+
+    total += netBalance;
+    equityAccounts.push({
+      id: acc.id,
+      name: acc.name,
+      code: acc.code || "",
+      value: round2(Math.abs(netBalance)),
+      category: "Partner Capital / Equity",
+      balanceSide: netBalance >= 0 ? "Dr" : "Cr",
+    });
+  }
+
+  return {
+    total: round2(total),
+    accounts: equityAccounts.sort((a, b) => b.value - a.value),
+  };
 }
 
 // ─── Main classification function ────────────────────────────────────────────

@@ -45,6 +45,7 @@ interface AccountItem {
   code: string;
   value: number;
   category: string;
+  balanceSide?: "Dr" | "Cr";
 }
 
 interface BreakdownItem {
@@ -59,6 +60,7 @@ interface NetProfitData {
   spPosProfit?: number;
   forUs: { total: number; breakdown: BreakdownItem[]; accounts: AccountItem[] };
   onUs: { total: number; breakdown: BreakdownItem[]; accounts: AccountItem[] };
+  equity?: { total: number; accounts: AccountItem[] };
   income: { total: number; breakdown: BreakdownItem[]; accounts: AccountItem[] };
   expenses: { total: number; breakdown: BreakdownItem[]; accounts: AccountItem[] };
   netPosition: number;
@@ -87,14 +89,24 @@ function CategoryGroup({
 }: {
   category: string;
   accounts: AccountItem[];
-  side: "asset" | "liability";
+  side: "asset" | "liability" | "equity";
   formatAmount: (n: number) => string;
 }) {
   const [open, setOpen] = useState(true);
   // Use signed sum so credit-balance prepaid entries (negative) reduce the total
   const total = accounts.reduce((s, a) => s + a.value, 0);
-  const color = side === "asset" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400";
-  const headerBg = side === "asset" ? "bg-emerald-50/60 dark:bg-emerald-950/30" : "bg-rose-50/60 dark:bg-rose-950/30";
+  const color =
+    side === "asset"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : side === "equity"
+        ? "text-violet-600 dark:text-violet-400"
+        : "text-rose-600 dark:text-rose-400";
+  const headerBg =
+    side === "asset"
+      ? "bg-emerald-50/60 dark:bg-emerald-950/30"
+      : side === "equity"
+        ? "bg-violet-50/60 dark:bg-violet-950/30"
+        : "bg-rose-50/60 dark:bg-rose-950/30";
 
   return (
     <div className="rounded-md overflow-hidden border border-border/60">
@@ -141,6 +153,9 @@ function CategoryGroup({
                     {isCreditOnAsset && (
                       <span className="text-xs text-rose-500 dark:text-rose-400 font-normal ml-1">(Cr)</span>
                     )}
+                    {side === "equity" && acc.balanceSide && (
+                      <span className="text-xs text-muted-foreground font-normal ml-1">({acc.balanceSide})</span>
+                    )}
                     <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
                   </button>
                 ) : (
@@ -148,6 +163,9 @@ function CategoryGroup({
                     {acc.name}
                     {isCreditOnAsset && (
                       <span className="text-xs text-rose-500 dark:text-rose-400 font-normal">(Cr)</span>
+                    )}
+                    {side === "equity" && acc.balanceSide && (
+                      <span className="text-xs text-muted-foreground font-normal ml-1">({acc.balanceSide})</span>
                     )}
                   </span>
                 )}
@@ -175,7 +193,7 @@ function SidePanel({
   id: string;
   title: string;
   subtitle?: string;
-  side: "asset" | "liability";
+  side: "asset" | "liability" | "equity";
   total: number;
   accounts: AccountItem[];
   formatAmount: (n: number) => string;
@@ -194,16 +212,29 @@ function SidePanel({
   );
 
   const isAsset = side === "asset";
+  const isEquity = side === "equity";
   const headerGradient = isAsset
     ? "from-emerald-500/10 to-transparent dark:from-emerald-500/15"
-    : "from-rose-500/10 to-transparent dark:from-rose-500/15";
-  const totalColor = isAsset ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400";
+    : isEquity
+      ? "from-violet-500/10 to-transparent dark:from-violet-500/15"
+      : "from-rose-500/10 to-transparent dark:from-rose-500/15";
+  const totalColor = isAsset
+    ? "text-emerald-600 dark:text-emerald-400"
+    : isEquity
+      ? "text-violet-600 dark:text-violet-400"
+      : "text-rose-600 dark:text-rose-400";
   const iconBg = isAsset
     ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400"
-    : "bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400";
+    : isEquity
+      ? "bg-violet-100 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400"
+      : "bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400";
   const footerBg = isAsset
     ? "bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200/60 dark:border-emerald-800/40"
-    : "bg-rose-50/50 dark:bg-rose-950/30 border-rose-200/60 dark:border-rose-800/40";
+    : isEquity
+      ? "bg-violet-50/50 dark:bg-violet-950/30 border-violet-200/60 dark:border-violet-800/40"
+      : "bg-rose-50/50 dark:bg-rose-950/30 border-rose-200/60 dark:border-rose-800/40";
+  const displayTotal = isEquity ? Math.abs(total) : total;
+  const totalSide = isEquity && total !== 0 ? (total > 0 ? "Dr" : "Cr") : null;
 
   return (
     <Card data-testid={`card-${id}`} className="flex flex-col overflow-hidden">
@@ -214,7 +245,13 @@ function SidePanel({
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg ${iconBg}`}>
-              {isAsset ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+              {isAsset ? (
+                <ArrowUpRight className="h-4 w-4" />
+              ) : isEquity ? (
+                <Scale className="h-4 w-4" />
+              ) : (
+                <ArrowDownRight className="h-4 w-4" />
+              )}
             </div>
             <div>
               <div className={`font-semibold text-base ${totalColor}`}>{title}</div>
@@ -222,7 +259,10 @@ function SidePanel({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`text-2xl font-bold font-mono tabular-nums ${totalColor}`}>{formatAmount(total)}</span>
+            <span className={`text-2xl font-bold font-mono tabular-nums ${totalColor}`}>
+              {formatAmount(displayTotal)}
+              {totalSide && <span className="text-xs font-normal ml-1">{totalSide}</span>}
+            </span>
             {open ? (
               <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
             ) : (
@@ -248,8 +288,13 @@ function SidePanel({
               <div
                 className={`flex justify-between items-center px-3 py-2.5 rounded-md border font-semibold text-sm mt-2 ${footerBg}`}
               >
-                <span className="text-muted-foreground">{isAsset ? "Total Assets" : "Total Liabilities"}</span>
-                <span className={`font-mono tabular-nums ${totalColor}`}>{formatAmount(total)}</span>
+                <span className="text-muted-foreground">
+                  {isAsset ? "Total Assets" : isEquity ? "Net Equity Balance" : "Total Liabilities"}
+                </span>
+                <span className={`font-mono tabular-nums ${totalColor}`}>
+                  {formatAmount(displayTotal)}
+                  {totalSide && <span className="text-xs font-normal ml-1">{totalSide}</span>}
+                </span>
               </div>
             </>
           ) : (
@@ -628,6 +673,17 @@ export default function NetProfitDetails() {
           formatAmount={formatAmount}
         />
       </div>
+
+      {/* ── Partner capital / equity ── */}
+      <SidePanel
+        id="equity"
+        title="Partner Capital / Equity"
+        subtitle={`${data?.equity?.accounts?.length || 0} equity accounts — excluded from Net Position totals`}
+        side="equity"
+        total={data?.equity?.total ?? 0}
+        accounts={data?.equity?.accounts || []}
+        formatAmount={formatAmount}
+      />
 
       {/* SP Partner: Realized POS Profit */}
       {(data?.spPosProfit ?? 0) !== 0 && (
