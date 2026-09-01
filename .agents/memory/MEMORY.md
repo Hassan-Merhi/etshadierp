@@ -96,3 +96,4 @@
 - [Golden Coast normal POS settlement](golden-coast-normal-pos-settlement.md) — shared itemized POS journal plus atomic paired GC/HADI cash settlement; reclassify only when payable and canonical GC cash differ.
 - [Golden Coast normal POS integration](golden-coast-normal-pos-integration.md) — cross-company fixtures must link HADI, authorize targetCompanyId, and assert source cash plus paired settlement legs.
 - [GitHub push fallback](github-api-push-fallback.md) — when HTTPS Git credentials fail, create the branch commit through the authorized GitHub API using incremental tree uploads.
+- [Git tree manifest safety](github-tree-manifest-safety.md) — large tree output can truncate in CodeExecution; build manifests with direct child_process/fs reads, never returned shell text.
