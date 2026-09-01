@@ -28,7 +28,7 @@ jobs:
               text = p.read_text()
               count = text.count(old)
               if count != 1:
-                  raise SystemExit(f"{path}: expected one match, found {count}: {old[:80]!r}")
+                  raise SystemExit(f"{path}: expected one match, found {count}: {old[:100]!r}")
               p.write_text(text.replace(old, new, 1))
 
           live = "server/routes/stats/statsNetProfitRoutes.ts"
@@ -81,141 +81,142 @@ jobs:
               '        : null;\n',
           )
 
-          customer_allow_old = '              a.subType === "Accounts Receivable" ||\n'
-          customer_allow_new = (
-              '              ((a.accountType === "Customer" ||\n'
-              '                a.subType === "Accounts Receivable" ||\n'
-              '                (a.code || "").toUpperCase().startsWith("CUST-") ||\n'
-              '                (a.name || "").toLowerCase().includes("customer account")) &&\n'
-              '                !supplierPartnerCustomerPosition?.ledgerAccountIds.has(a.id)) ||\n'
+          customer_expr = (
+              '((a.accountType === "Customer" ||\n'
+              '{child}a.subType === "Accounts Receivable" ||\n'
+              '{child}(a.code || "").toUpperCase().startsWith("CUST-") ||\n'
+              '{child}(a.name || "").toLowerCase().includes("customer account")) &&\n'
+              '{child}!supplierPartnerCustomerPosition?.ledgerAccountIds.has(a.id)) ||\n'
           )
-          for path in (live, asof, excel):
-              replace_once(path, customer_allow_old, customer_allow_new)
+          for path, indent in ((live, '              '), (asof, '          '), (excel, '              ')):
+              old = indent + 'a.subType === "Accounts Receivable" ||\n'
+              new = indent + customer_expr.format(child=indent + '  ')
+              replace_once(path, old, new)
 
           replace_once(
               live,
-              '      const categoryTotals = classified.categoryTotals;\n\n'
-              '      // Exclude ledger-based "Accrued Rent Payable"',
-              '      const categoryTotals = classified.categoryTotals;\n\n'
-              '      // Supplier-partner customers are calculated from both linked receivable ledgers\n'
-              '      // and direct customer voucher entries. Linked customer ledgers are excluded above\n'
-              '      // so each balance appears exactly once.\n'
-              '      if (supplierPartnerCustomerPosition) {\n'
-              '        for (const customer of supplierPartnerCustomerPosition.items) {\n'
-              '          const value = round2(Math.abs(customer.signedBalance));\n'
-              '          if (customer.signedBalance > 0) {\n'
-              '            forUsTotal = round2(forUsTotal + value);\n'
-              '            categoryTotals["asset_Asset"] = round2((categoryTotals["asset_Asset"] || 0) + value);\n'
-              '            forUsAccounts.push({\n'
-              '              id: customer.ledgerAccountId ?? undefined,\n'
-              '              name: customer.name,\n'
-              '              code: customer.code,\n'
-              '              value,\n'
-              '              category: "Asset",\n'
-              '            });\n'
-              '          } else {\n'
-              '            onUsTotal = round2(onUsTotal + value);\n'
-              '            categoryTotals["liability_Liability"] = round2(\n'
-              '              (categoryTotals["liability_Liability"] || 0) + value\n'
-              '            );\n'
-              '            onUsAccounts.push({\n'
-              '              id: customer.ledgerAccountId ?? undefined,\n'
-              '              name: customer.name,\n'
-              '              code: customer.code,\n'
-              '              value,\n'
-              '              category: "Liability",\n'
-              '            });\n'
-              '          }\n'
-              '        }\n'
-              '        forUsAccounts.sort((a, b) => b.value - a.value);\n'
-              '        onUsAccounts.sort((a, b) => b.value - a.value);\n'
-              '      }\n\n'
-              '      // Exclude ledger-based "Accrued Rent Payable"',
+              '      const categoryTotals = classified.categoryTotals;\n\n      // Exclude ledger-based "Accrued Rent Payable"',
+              '''      const categoryTotals = classified.categoryTotals;
+
+      // Linked customer ledgers are replaced by the authoritative customer balance below,
+      // which also includes direct customer-targeted journal/receipt entries.
+      if (supplierPartnerCustomerPosition) {
+        for (const customer of supplierPartnerCustomerPosition.items) {
+          const value = round2(Math.abs(customer.signedBalance));
+          if (customer.signedBalance > 0) {
+            forUsTotal = round2(forUsTotal + value);
+            categoryTotals["asset_Asset"] = round2((categoryTotals["asset_Asset"] || 0) + value);
+            forUsAccounts.push({
+              id: customer.ledgerAccountId ?? undefined,
+              name: customer.name,
+              code: customer.code,
+              value,
+              category: "Asset",
+            });
+          } else {
+            onUsTotal = round2(onUsTotal + value);
+            categoryTotals["liability_Liability"] = round2(
+              (categoryTotals["liability_Liability"] || 0) + value
+            );
+            onUsAccounts.push({
+              id: customer.ledgerAccountId ?? undefined,
+              name: customer.name,
+              code: customer.code,
+              value,
+              category: "Liability",
+            });
+          }
+        }
+        forUsAccounts.sort((a, b) => b.value - a.value);
+        onUsAccounts.sort((a, b) => b.value - a.value);
+      }
+
+      // Exclude ledger-based "Accrued Rent Payable"''',
           )
 
           replace_once(
               asof,
-              '  const onUsLines: NetPositionLineItem[] = classified.onUsAccounts.map((a) => ({\n'
-              '    label: a.name,\n'
-              '    value: round2(a.value),\n'
-              '    category: a.category,\n'
-              '    side: "onUs",\n'
-              '  }));\n\n'
-              '  // ── Stock on floor',
-              '  const onUsLines: NetPositionLineItem[] = classified.onUsAccounts.map((a) => ({\n'
-              '    label: a.name,\n'
-              '    value: round2(a.value),\n'
-              '    category: a.category,\n'
-              '    side: "onUs",\n'
-              '  }));\n\n'
-              '  if (supplierPartnerCustomerPosition) {\n'
-              '    for (const customer of supplierPartnerCustomerPosition.items) {\n'
-              '      const value = round2(Math.abs(customer.signedBalance));\n'
-              '      if (customer.signedBalance > 0) {\n'
-              '        forUsTotal = round2(forUsTotal + value);\n'
-              '        forUsLines.push({ label: customer.name, value, category: "Asset", side: "forUs" });\n'
-              '      } else {\n'
-              '        onUsTotal = round2(onUsTotal + value);\n'
-              '        onUsLines.push({ label: customer.name, value, category: "Liability", side: "onUs" });\n'
-              '      }\n'
-              '    }\n'
-              '  }\n\n'
-              '  // ── Stock on floor',
+              '''  const onUsLines: NetPositionLineItem[] = classified.onUsAccounts.map((a) => ({
+    label: a.name,
+    value: round2(a.value),
+    category: a.category,
+    side: "onUs",
+  }));
+
+  // ── Stock on floor''',
+              '''  const onUsLines: NetPositionLineItem[] = classified.onUsAccounts.map((a) => ({
+    label: a.name,
+    value: round2(a.value),
+    category: a.category,
+    side: "onUs",
+  }));
+
+  if (supplierPartnerCustomerPosition) {
+    for (const customer of supplierPartnerCustomerPosition.items) {
+      const value = round2(Math.abs(customer.signedBalance));
+      if (customer.signedBalance > 0) {
+        forUsTotal = round2(forUsTotal + value);
+        forUsLines.push({ label: customer.name, value, category: "Asset", side: "forUs" });
+      } else {
+        onUsTotal = round2(onUsTotal + value);
+        onUsLines.push({ label: customer.name, value, category: "Liability", side: "onUs" });
+      }
+    }
+  }
+
+  // ── Stock on floor''',
           )
 
           replace_once(
               excel,
-              '      const forUsAccounts = [...classified.forUsAccounts];\n'
-              '      const onUsAccounts = [...classified.onUsAccounts];\n\n'
-              '      // ── 3. Stock In Hand',
-              '      const forUsAccounts = [...classified.forUsAccounts];\n'
-              '      const onUsAccounts = [...classified.onUsAccounts];\n\n'
-              '      if (supplierPartnerCustomerPosition) {\n'
-              '        for (const customer of supplierPartnerCustomerPosition.items) {\n'
-              '          const value = round2(Math.abs(customer.signedBalance));\n'
-              '          if (customer.signedBalance > 0) {\n'
-              '            forUsTotal = round2(forUsTotal + value);\n'
-              '            forUsAccounts.push({\n'
-              '              id: customer.ledgerAccountId ?? undefined,\n'
-              '              name: customer.name,\n'
-              '              code: customer.code,\n'
-              '              value,\n'
-              '              category: "Asset",\n'
-              '            });\n'
-              '          } else {\n'
-              '            onUsTotal = round2(onUsTotal + value);\n'
-              '            onUsAccounts.push({\n'
-              '              id: customer.ledgerAccountId ?? undefined,\n'
-              '              name: customer.name,\n'
-              '              code: customer.code,\n'
-              '              value,\n'
-              '              category: "Liability",\n'
-              '            });\n'
-              '          }\n'
-              '        }\n'
-              '        forUsAccounts.sort((a, b) => b.value - a.value);\n'
-              '        onUsAccounts.sort((a, b) => b.value - a.value);\n'
-              '      }\n\n'
-              '      // ── 3. Stock In Hand',
+              '''      const forUsAccounts = [...classified.forUsAccounts];
+      const onUsAccounts = [...classified.onUsAccounts];
+
+      // ── 3. Stock In Hand''',
+              '''      const forUsAccounts = [...classified.forUsAccounts];
+      const onUsAccounts = [...classified.onUsAccounts];
+
+      if (supplierPartnerCustomerPosition) {
+        for (const customer of supplierPartnerCustomerPosition.items) {
+          const value = round2(Math.abs(customer.signedBalance));
+          if (customer.signedBalance > 0) {
+            forUsTotal = round2(forUsTotal + value);
+            forUsAccounts.push({
+              id: customer.ledgerAccountId ?? undefined,
+              name: customer.name,
+              code: customer.code,
+              value,
+              category: "Asset",
+            });
+          } else {
+            onUsTotal = round2(onUsTotal + value);
+            onUsAccounts.push({
+              id: customer.ledgerAccountId ?? undefined,
+              name: customer.name,
+              code: customer.code,
+              value,
+              category: "Liability",
+            });
+          }
+        }
+        forUsAccounts.sort((a, b) => b.value - a.value);
+        onUsAccounts.sort((a, b) => b.value - a.value);
+      }
+
+      // ── 3. Stock In Hand''',
           )
 
           replace_once(
               multi,
               '  payload.forUs.accounts = forUsAccounts.sort((a, b) => Number(b.value || 0) - Number(a.value || 0));\n'
               '  payload.onUs.accounts = onUsAccounts.sort((a, b) => Number(b.value || 0) - Number(a.value || 0));\n',
-              '  payload.forUs.accounts = forUsAccounts\n'
-              '    .filter((row) => Math.abs(Number(row.value || 0)) >= 0.005)\n'
-              '    .sort((a, b) => Number(b.value || 0) - Number(a.value || 0));\n'
-              '  payload.onUs.accounts = onUsAccounts\n'
-              '    .filter((row) => Math.abs(Number(row.value || 0)) >= 0.005)\n'
-              '    .sort((a, b) => Number(b.value || 0) - Number(a.value || 0));\n',
-          )
-          replace_once(
-              multi,
-              '  payload.forUs.breakdown = rebuildBreakdown(payload.forUs.accounts);\n'
-              '  payload.onUs.breakdown = rebuildBreakdown(payload.onUs.accounts);\n',
-              '  payload.forUs.breakdown = rebuildBreakdown(payload.forUs.accounts);\n'
-              '  payload.onUs.breakdown = rebuildBreakdown(payload.onUs.accounts);\n',
+              '''  payload.forUs.accounts = forUsAccounts
+    .filter((row) => Math.abs(Number(row.value || 0)) >= 0.005)
+    .sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+  payload.onUs.accounts = onUsAccounts
+    .filter((row) => Math.abs(Number(row.value || 0)) >= 0.005)
+    .sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+''',
           )
           PY
 
