@@ -31,6 +31,7 @@ interface AnalysisRow {
   status: string;
   proformaQty: number | null;
   proformaBarcode: string | null;
+  unresolved?: boolean;
 }
 
 export interface OtwContainer {
