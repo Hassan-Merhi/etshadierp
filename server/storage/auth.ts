@@ -124,7 +124,7 @@ export async function deleteCompany(id: number): Promise<void> {
 
   await safe(sql`DELETE FROM factory_waste_entries WHERE company_id = ${id}`);
   await safe(
-    sql`DELETE FROM factory_daybook_entry_edits WHERE entry_id IN (SELECT id FROM factory_daybook_entries WHERE company_id = ${id})`
+    sql`DELETE FROM factory_daybook_entry_edits WHERE daybook_entry_id IN (SELECT id FROM factory_daybook_entries WHERE company_id = ${id})`
   );
   await safe(sql`DELETE FROM factory_daybook_entries WHERE company_id = ${id}`);
   await safe(
