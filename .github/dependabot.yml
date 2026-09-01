@@ -11,6 +11,11 @@ updates:
       default-days: 7
     open-pull-requests-limit: 10
     rebase-strategy: auto
+    ignore:
+      # Keep Node type definitions on the same major as the canonical Node 24 runtime.
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
     groups:
       production-dependencies:
         dependency-type: production
