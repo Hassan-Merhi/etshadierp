@@ -10,7 +10,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { locations, employees, suppliers, containers } from "@shared/schema";
 import { eq, and, or, isNull, lte, sql } from "drizzle-orm";
-import { classifyNetPositionAccounts, round2 } from "../netPositionHelper";
+import { classifyEquityAccounts, classifyNetPositionAccounts, round2 } from "../netPositionHelper";
 import { calculateHistoricalLocationInventory } from "../routes/_helpers";
 
 export interface NetPositionLineItem {
@@ -116,12 +116,18 @@ export async function calculateNetPositionAsOf(
   // For non-SP companies, the generic exclusion of internal sp_stock / sp_cost_clearing applies.
   const accountsForClassify = isSupplierPartner
     ? companyAccounts.filter(
-        (a) => a.accountType === "Cash" || a.subType === "sp_payable" || a.subType === "sp_hadi_intercompany"
+        (a) =>
+          a.accountType === "Cash" ||
+          a.accountType === "Loan" ||
+          a.accountType === "Loans" ||
+          a.subType === "sp_payable" ||
+          a.subType === "sp_hadi_intercompany"
       )
     : companyAccounts.filter((a) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing");
   const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
     includeSupplierTypeAccounts: shouldIncludeSuppliers,
   });
+  const equity = classifyEquityAccounts(companyAccounts, accountBalances);
 
   let forUsTotal = classified.forUsTotal;
   let onUsTotal = classified.onUsTotal;
@@ -296,7 +302,8 @@ export async function calculateNetPositionAsOf(
 
   forUsTotal = round2(forUsTotal);
   onUsTotal = round2(onUsTotal);
-  const netPosition = round2(forUsTotal - onUsTotal);
+  const equityContribution = isSupplierPartner ? equity.total : 0;
+  const netPosition = round2(forUsTotal - onUsTotal + equityContribution);
 
   return {
     forUsTotal,

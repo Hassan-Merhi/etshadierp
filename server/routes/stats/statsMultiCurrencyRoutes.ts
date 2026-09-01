@@ -41,6 +41,8 @@ type NetPositionPayload = {
   forUsTotal?: number;
   onUsTotal?: number;
   netPosition?: number;
+  netWorth?: number;
+  equity?: { total?: number; includedInNetPosition?: boolean };
   currency?: Record<string, unknown> & { currentCashBankTranslationApplied?: boolean };
   currencyRevaluation?: Record<string, unknown>;
 } & Record<string, unknown>;
@@ -105,7 +107,11 @@ function applyCurrentCashTranslation(payload: NetPositionPayload, summaries: Cas
 
   const forUsRounded = round2(forUsTotal.toNumber());
   const onUsRounded = round2(onUsTotal.toNumber());
-  const netPosition = round2(forUsRounded - onUsRounded);
+  const equityContribution =
+    payload.equity?.includedInNetPosition === true ? new Decimal(payload.equity.total ?? 0) : new Decimal(0);
+  const netPosition = round2(
+    new Decimal(forUsRounded).minus(onUsRounded).plus(equityContribution).toNumber()
+  );
 
   payload.forUs.accounts = forUsAccounts.sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
   payload.onUs.accounts = onUsAccounts.sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
@@ -116,6 +122,7 @@ function applyCurrentCashTranslation(payload: NetPositionPayload, summaries: Cas
   payload.forUsTotal = forUsRounded;
   payload.onUsTotal = onUsRounded;
   payload.netPosition = netPosition;
+  payload.netWorth = netPosition;
   payload.netPositionLabel = netPosition >= 0 ? "Net Assets" : "Net Liabilities";
   return payload;
 }
