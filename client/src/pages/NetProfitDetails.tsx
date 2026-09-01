@@ -57,9 +57,11 @@ interface NetProfitData {
   totalIncome: number;
   totalExpenses: number;
   netProfit: number;
+  spPosProfit?: number;
+  spPosProfitBaselineDate?: string | null;
   forUs: { total: number; breakdown: BreakdownItem[]; accounts: AccountItem[] };
   onUs: { total: number; breakdown: BreakdownItem[]; accounts: AccountItem[] };
-  equity?: { total: number; accounts: AccountItem[]; includedInNetPosition?: boolean };
+  equity?: { total: number; accounts: AccountItem[] };
   income: { total: number; breakdown: BreakdownItem[]; accounts: AccountItem[] };
   expenses: { total: number; breakdown: BreakdownItem[]; accounts: AccountItem[] };
   netPosition: number;
@@ -402,15 +404,13 @@ export default function NetProfitDetails() {
   const forUsTotal = data?.forUsTotal || 0;
   const onUsTotal = data?.onUsTotal || 0;
   const netPos = data?.netPosition || 0;
-  const equityTotal = data?.equity?.total ?? 0;
-  const equityIncludedInNetPosition = data?.equity?.includedInNetPosition === true;
-  const equitySide = equityTotal === 0 ? null : equityTotal > 0 ? "Dr" : "Cr";
   const isPositive = netPos >= 0;
 
   // Ratio bar: what fraction of total is assets
   const grandTotal = forUsTotal + onUsTotal;
   const assetPct = grandTotal > 0 ? (forUsTotal / grandTotal) * 100 : 50;
   const nativeCurrencies = Object.keys(data?.currency?.nativeDebitByCurrency ?? {});
+  const hasSpPosProfitBaseline = Boolean(data?.spPosProfitBaselineDate);
 
   return (
     <div className="p-4 md:p-6 space-y-5 w-full">
@@ -575,9 +575,7 @@ export default function NetProfitDetails() {
       <Card data-testid="card-formula" className="overflow-hidden">
         <CardContent className="p-0">
           {/* Three stat blocks */}
-          <div
-            className={`grid grid-cols-1 ${equityIncludedInNetPosition ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-3"} divide-y sm:divide-y-0 sm:divide-x divide-border`}
-          >
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
             {/* What We Have */}
             <div className="p-5 flex items-center gap-4">
               <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 shrink-0">
@@ -611,26 +609,6 @@ export default function NetProfitDetails() {
                 </p>
               </div>
             </div>
-
-            {equityIncludedInNetPosition && (
-              <div className="p-5 flex items-center gap-4 bg-violet-50/40 dark:bg-violet-950/20">
-                <div className="p-2.5 rounded-xl bg-violet-100 dark:bg-violet-900/50 shrink-0">
-                  <Scale className="h-5 w-5 text-violet-600 dark:text-violet-400" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-0.5">
-                    Partner Equity
-                  </p>
-                  <p className="text-2xl font-bold font-mono tabular-nums text-violet-600 dark:text-violet-400 truncate">
-                    {formatAmount(Math.abs(equityTotal))}
-                    {equitySide && <span className="text-xs font-normal ml-1">{equitySide}</span>}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {data?.equity?.accounts?.length || 0} equity accounts · included in Net Position
-                  </p>
-                </div>
-              </div>
-            )}
 
             {/* Net Position */}
             <div
@@ -677,18 +655,6 @@ export default function NetProfitDetails() {
         </CardContent>
       </Card>
 
-      {equityIncludedInNetPosition && (
-        <SidePanel
-          id="equity"
-          title="Partner Capital / Equity"
-          subtitle={`${data?.equity?.accounts?.length || 0} equity accounts — included in Net Position total`}
-          side="equity"
-          total={equityTotal}
-          accounts={data?.equity?.accounts || []}
-          formatAmount={formatAmount}
-        />
-      )}
-
       {/* ── Assets + Liabilities side by side ── */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <SidePanel
@@ -712,18 +678,64 @@ export default function NetProfitDetails() {
       </div>
 
       {/* ── Partner capital / equity ── */}
-      {!equityIncludedInNetPosition && (
-        <SidePanel
-          id="equity"
-          title="Partner Capital / Equity"
-          subtitle={`${data?.equity?.accounts?.length || 0} equity accounts — excluded from Net Position totals`}
-          side="equity"
-          total={equityTotal}
-          accounts={data?.equity?.accounts || []}
-          formatAmount={formatAmount}
-        />
-      )}
+      <SidePanel
+        id="equity"
+        title="Partner Capital / Equity"
+        subtitle={`${data?.equity?.accounts?.length || 0} equity accounts — excluded from Net Position totals`}
+        side="equity"
+        total={data?.equity?.total ?? 0}
+        accounts={data?.equity?.accounts || []}
+        formatAmount={formatAmount}
+      />
 
+      {/* SP Partner: Realized POS Profit */}
+      {((data?.spPosProfit ?? 0) !== 0 || hasSpPosProfitBaseline) && (
+        <Card data-testid="card-sp-pos-profit" className="overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-500/10 to-transparent dark:from-blue-500/15 px-5 py-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">
+                  <TrendingUp className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="font-semibold text-base text-blue-600 dark:text-blue-400">
+                    Realized Profit (POS Sales)
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    Supplier partner POS profit —{" "}
+                    {hasSpPosProfitBaseline
+                      ? `calculated since ${data?.spPosProfitBaselineDate}`
+                      : "calculated from actual sale & cost per item"}
+                  </div>
+                </div>
+              </div>
+              <span
+                className={`text-2xl font-bold font-mono tabular-nums ${(data?.spPosProfit ?? 0) >= 0 ? "text-blue-600 dark:text-blue-400" : "text-destructive"}`}
+              >
+                {formatAmount(data?.spPosProfit ?? 0)}
+              </span>
+            </div>
+          </div>
+          <CardContent className="pt-3 pb-4">
+            <div className="rounded-md overflow-hidden border border-border/60">
+              <div className="flex items-center justify-between px-3 py-2.5 text-sm">
+                <span className="text-foreground">Supplier Partner POS Profit</span>
+                <span className="font-mono tabular-nums font-medium text-blue-600 dark:text-blue-400">
+                  {formatAmount(data?.spPosProfit ?? 0)}
+                </span>
+              </div>
+              <div className="px-3 py-2 bg-muted/40 text-xs text-muted-foreground border-t border-border/50">
+                Formula: Sum of (sale price − cost price) across all POS sale lines
+                {hasSpPosProfitBaseline
+                  ? ` on or after ${data?.spPosProfitBaselineDate}${toDate ? `, up to ${toDate}` : ""}`
+                  : toDate
+                    ? ` up to ${toDate}`
+                    : " (all time)"}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
