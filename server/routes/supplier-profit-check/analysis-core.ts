@@ -9,6 +9,7 @@ export interface ProfitSourceItem {
   proforma_qty: number | string | null;
   proforma_price: number | string | null;
   proforma_barcode: string | null;
+  unresolved?: boolean;
 }
 
 interface BuildSupplierProfitRowsInput {
@@ -31,14 +32,16 @@ function finiteNumber(value: unknown): number | null {
  * Defensive final boundary: Supplier Profit Check must never expose more than
  * one row for a stock item. Source queries already aggregate, but keeping the
  * invariant here prevents a later SQL change from reintroducing duplicate rows
- * and double-counting totals in the client.
+ * and double-counting totals in the client. Negative ids are reserved for
+ * unresolved source rows so imported proforma quantities are never silently
+ * discarded just because a barcode no longer resolves to an active stock item.
  */
 export function consolidateProfitSourceItems(items: ProfitSourceItem[]): ProfitSourceItem[] {
   const byId = new Map<number, ProfitSourceItem>();
 
   for (const item of items) {
     const id = Number(item.id);
-    if (!Number.isInteger(id) || id <= 0) continue;
+    if (!Number.isInteger(id) || id === 0) continue;
 
     const existing = byId.get(id);
     if (!existing) {
@@ -53,6 +56,7 @@ export function consolidateProfitSourceItems(items: ProfitSourceItem[]): ProfitS
 
     if (existing.proforma_price == null && item.proforma_price != null) existing.proforma_price = item.proforma_price;
     if (!existing.proforma_barcode && item.proforma_barcode) existing.proforma_barcode = item.proforma_barcode;
+    if (item.unresolved) existing.unresolved = true;
   }
 
   return [...byId.values()];
@@ -70,7 +74,7 @@ export async function buildSupplierProfitRows({
   const items = consolidateProfitSourceItems(sourceItems);
   if (items.length === 0) return [];
 
-  const stockItemIds = items.map((item) => Number(item.id));
+  const stockItemIds = items.map((item) => Number(item.id)).filter((id) => id > 0);
   const allTime = !fromDate || !toDate;
 
   const avgSellResult = allTime
@@ -222,6 +226,7 @@ export async function buildSupplierProfitRows({
 
   return items.map((item) => {
     const id = Number(item.id);
+    const unresolved = item.unresolved === true || id < 0;
     const salesData = avgSellMap.get(id);
     const avgSellingPrice = salesData?.avgSellingPrice ?? null;
     const salesQty = salesData?.salesQty ?? 0;
@@ -232,16 +237,20 @@ export async function buildSupplierProfitRows({
     const invAvgCost = inventoryData?.avgCost ?? 0;
     const offloadingCost = invAvgCost > 0 ? invAvgCost : (avgCostFallbackMap.get(id) ?? 0);
     const avgCostSource = invAvgCost > 0 ? "inventory" : avgCostFallbackMap.has(id) ? "po_fallback" : "missing";
+    const proformaPrice = finiteNumber(item.proforma_price);
+    const unresolvedProformaPrice = unresolved && proformaPrice != null && proformaPrice > 0 ? proformaPrice : null;
     const poPrice = nCostMap.has(id)
       ? nCostMap.get(id)!
       : avgCostFallbackMap.has(id)
         ? avgCostFallbackMap.get(id)!
-        : null;
+        : unresolvedProformaPrice;
     const poPriceSource = nCostMap.has(id)
       ? "selected_supplier_po"
       : avgCostFallbackMap.has(id)
         ? "any_po_fallback"
-        : "missing";
+        : unresolvedProformaPrice != null
+          ? "proforma_unresolved"
+          : "missing";
     const groupSellingPrice = groupPriceMap.get(id) ?? null;
     const hassansProfit = configPrice - offloadingCost;
     const baseCostProfit = avgSellingPrice != null ? avgSellingPrice - offloadingCost : null;
@@ -282,6 +291,7 @@ export async function buildSupplierProfitRows({
       hassansProfit,
       proformaQty: item.proforma_qty != null ? Number(item.proforma_qty) : null,
       proformaBarcode: item.proforma_barcode,
+      unresolved,
     };
   });
 }
