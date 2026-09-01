@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { companies } from "@shared/schema";
 
 import { db } from "../../db";
-import { assertCompanyAccess } from "../../security/companyAccessBoundary";
+import { assertCompanyAccess, CompanyAccessError } from "../../security/companyAccessBoundary";
 import { getCompanyRequestRuntimeContext, runWithCompanyRequestRuntimeContext } from "./companyRequestRuntimeContext";
 import {
   createTenantDatabaseScope,
@@ -63,7 +63,17 @@ export async function runWithVerifiedParentCompanyScope<T>(parentCompanyId: numb
     );
   }
 
-  await assertCompanyAccess(requestContext.userId, parentCompanyId);
+  try {
+    await assertCompanyAccess(requestContext.userId, parentCompanyId);
+  } catch (error) {
+    // A membership denial is an expected authorization outcome, not a fault. Callers catch this
+    // helper's own error type, so translate rather than let CompanyAccessError escape and be
+    // reported as an unhandled 500.
+    if (error instanceof CompanyAccessError) {
+      throw new ParentCompanyPostingScopeError(`No access to parent company ${parentCompanyId}.`, error.status);
+    }
+    throw error;
+  }
 
   const authorizedCompanyIds = [...new Set([...(requestContext.authorizedCompanyIds ?? []), parentCompanyId])];
 
