@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "description": "One-way ratchet on ESLint warnings, counted by scripts/run-lint.mjs from a single ESLint run. totals.warningCeiling is the exact measured count, may only fall, and is the value npm run lint enforces. perRule freezes each warning rule at its own count so a drawdown in one rule cannot silently pay for a regression in another. Lower a ceiling in the same change that removes warnings; leaving headroom lets it refill silently.",
+  "scan": {
+    "patterns": [
+      "client/src/**/*.{ts,tsx}",
+      "server/**/*.ts",
+      "shared/**/*.ts"
+    ],
+    "reportPath": "artifacts/lint/eslint-report.json",
+    "step": 500
+  },
+  "totals": {
+    "warningCeiling": 0,
+    "errorCeiling": 0
+  },
+  "perRule": {},
+  "notes": {
+    "errorCeiling": "Zero and permanent. ESLint errors are not part of the warning drawdown.",
+    "phase2": "Phase 2 completed the warning drawdown: zero warnings remain and no rule allowance is retained. Type escapes remain separately frozen per file in config/type-escape-boundaries.json."
+  }
+}

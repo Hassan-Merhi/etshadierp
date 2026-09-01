@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "description": "Inventory for scripts/verify-*.mjs and scripts/audit-*.mjs. 'wired' now means an automatic GitHub Actions or CircleCI invocation, not merely an npm alias. Package-only and workflow_dispatch-only scripts are 'manual'; scripts reached only from tests/other scripts are 'chained'; scripts with no invocation/exposure are 'orphan'. Automatic wired scripts must pass unless they explicitly require a build artifact/database/network and are listed in environmentDependent. knownFailing is allowed only for manual checks: a failing script may not be promoted into automatic CI and then suppressed. Stale exception rows fail. The orphan count remains a falling ceiling.",
+  "orphanCeiling": 17,
+  "environmentDependent": {
+    "verify-server-bundle.mjs": "Reads dist/ — requires npm run build.",
+    "verify-runtime-dependencies.mjs": "Reads esbuild's metafile from dist/ — requires npm run build.",
+    "verify-production-artifact.mjs": "Inspects the built production artifact.",
+    "verify-dependency-audit.mjs": "Runs npm audit, which needs registry access.",
+    "verify-ci-disposable-schema.mjs": "Provisions and drops a throwaway database.",
+    "verify-sp-migration-rehearsal.mjs": "Executes a migration rehearsal against a database.",
+    "verify-database-backup.mjs": "Exercises backup and restore against a database.",
+    "verify-memory-stabilization.mjs": "Measures runtime memory against a running server.",
+    "audit-coverage-ratchet.mjs": "Reads coverage/ — requires a coverage run.",
+    "audit-lint-warnings.mjs": "Reads artifacts/lint/eslint-report.json — requires npm run lint.",
+    "audit-god-file-boundaries.mjs": "Reports reviewed growth allowances as failures; the gate is tests/god-file-boundaries.test.ts, which consults config/ci-ratchet-allowances.json.",
+    "verify-startup-migrations.mjs": "Reads /api/health/db from a running application — requires npm run build and a started server against a provisioned database."
+  },
+  "knownFailing": {}
+}

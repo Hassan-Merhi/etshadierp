@@ -1,0 +1,23 @@
+/* Mobile performance lifecycle — driven by useMobilePerformanceLifecycle. */
+
+html[data-app-visibility="hidden"] *,
+html[data-app-visibility="hidden"] *::before,
+html[data-app-visibility="hidden"] *::after {
+  animation-play-state: paused !important;
+  transition-duration: 0s !important;
+}
+
+html[data-save-data="true"] {
+  scroll-behavior: auto;
+}
+
+html[data-save-data="true"] [data-responsive-chart="true"],
+html[data-slow-connection="true"] [data-responsive-chart="true"] {
+  transition: none !important;
+}
+
+@media (max-width: 767px) {
+  html[data-save-data="true"] [data-responsive-chart-panel="true"] {
+    box-shadow: none;
+  }
+}

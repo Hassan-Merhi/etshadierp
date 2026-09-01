@@ -1,0 +1,96 @@
+import type { Express } from "express";
+import { registerDaybookPaginationRoutes } from "./daybookPaginationRoutes";
+import { registerSupplierPurchaseOrderPaginationRoutes } from "./vouchers/supplierPurchaseOrderPaginationRoutes";
+import { registerVoucherPaginationRoutes } from "./vouchers/voucherPaginationRoutes";
+import { registerVoucherQueryRoutes } from "./vouchers/voucherQueryRoutes";
+import { registerVoucherCreateRoutes } from "./vouchers/voucherCreateRoutes";
+import { registerVoucherPaymentRoutes } from "./vouchers/voucherPaymentRoutes";
+import { registerCentralGenericVoucherCreateRoute } from "./vouchers/centralGenericVoucherCreateRoute";
+import { registerCentralPaymentReceiptCreateRoute } from "./vouchers/centralPaymentReceiptCreateRoute";
+import { registerVoucherExactReversalRoute } from "./vouchers/voucherExactReversalRoute";
+import { registerCentralPaymentReceiptLifecycleRoutes } from "./vouchers/centralPaymentReceiptLifecycleRoute";
+import { registerCentralPaymentReceiptDeleteRoute } from "./vouchers/centralPaymentReceiptDeleteRoute";
+import { registerCentralJournalCreateRoute } from "./vouchers/centralJournalCreateRoute";
+import { registerCentralJournalLifecycleRoutes } from "./vouchers/centralJournalLifecycleRoute";
+import { registerCentralStockTransferDeleteRoutes } from "./vouchers/centralStockTransferDeleteRoute";
+import { registerVoucherJournalRoutes } from "./vouchers/voucherJournalRoutes";
+import { registerVoucherSalesUpdateRoutes } from "./vouchers/sales-update";
+import { registerVoucherPurchaseUpdateRoutes } from "./vouchers/voucherPurchaseUpdateRoutes";
+import { registerVoucherTransferRoutes } from "./vouchers/transfer";
+import { registerSmartTransferPreviewRoutes } from "./vouchers/smartTransferPreviewRoutes";
+import { registerStockTransferLifecycleRoutes } from "./vouchers/stockTransferLifecycleRoutes";
+import { registerStockTransferRevisionLifecycleRoutes } from "./vouchers/stockTransferRevisionLifecycleRoutes";
+import { registerImmutableStockTransferRevisionRoutes } from "./vouchers/immutableStockTransferRevisionRoutes";
+import { registerAdminPostUpdateStockTransferRevisionRoute } from "./vouchers/adminPostUpdateStockTransferRevisionRoute";
+
+function registerVoucherDetailCompatibility(app: Express) {
+  app.get("/api/vouchers/:id", (_req, res, next) => {
+    const sendJson = res.json.bind(res);
+
+    res.json = ((body: unknown) => {
+      if (body && typeof body === "object" && !Array.isArray(body) && "transferData" in body && !("transfer" in body)) {
+        const voucherDetail = body as Record<string, unknown>;
+        return sendJson({
+          ...voucherDetail,
+          transfer: voucherDetail.transferData,
+        });
+      }
+
+      return sendJson(body);
+    }) as typeof res.json;
+
+    next();
+  });
+}
+
+export function registerVoucherRoutes(app: Express) {
+  // The ERP Daybook uses one SQL-paged chronological union of vouchers and offloads.
+  registerDaybookPaginationRoutes(app);
+
+  // Supplier purchase-order reads follow the company-owned supplier model and
+  // shadow the historical cross-company compatibility route below.
+  registerSupplierPurchaseOrderPaginationRoutes(app);
+
+  // Native SQL pagination shadows the legacy array reader while preserving its
+  // array response for callers that do not explicitly request pagination.
+  registerVoucherPaginationRoutes(app);
+
+  // Stock-transfer lifecycle routes must shadow the older direct transfer editor.
+  registerStockTransferLifecycleRoutes(app);
+  // The current admin editor writes the transfer first and then posts the
+  // immutable revision snapshot. Accept that already-applied baseline before
+  // the canonical stale guard; untouched and POS revisions still fall through.
+  registerAdminPostUpdateStockTransferRevisionRoute(app);
+  registerImmutableStockTransferRevisionRoutes(app);
+  registerStockTransferRevisionLifecycleRoutes(app);
+
+  // The daybook detail dialog reads `transfer`, while the canonical voucher
+  // endpoint currently returns `transferData`. Preserve both keys so source and
+  // destination locations render without changing existing API consumers.
+  registerVoucherDetailCompatibility(app);
+  registerVoucherQueryRoutes(app);
+
+  // Program 2 protected creation handlers call next() for unsupported legacy
+  // compatibility shapes, so they must be registered before the old creators.
+  registerCentralGenericVoucherCreateRoute(app);
+  registerVoucherCreateRoutes(app);
+
+  registerCentralPaymentReceiptCreateRoute(app);
+  registerVoucherExactReversalRoute(app);
+  registerCentralPaymentReceiptLifecycleRoutes(app);
+  registerCentralPaymentReceiptDeleteRoute(app);
+  registerVoucherPaymentRoutes(app);
+
+  registerCentralJournalCreateRoute(app);
+  registerCentralJournalLifecycleRoutes(app);
+  registerVoucherJournalRoutes(app);
+
+  // Stock Transfer deletion must run before the generic voucher delete routes,
+  // which server/routes.ts registers once immediately after this registry.
+  registerCentralStockTransferDeleteRoutes(app);
+
+  registerVoucherSalesUpdateRoutes(app);
+  registerVoucherPurchaseUpdateRoutes(app);
+  registerVoucherTransferRoutes(app);
+  registerSmartTransferPreviewRoutes(app);
+}

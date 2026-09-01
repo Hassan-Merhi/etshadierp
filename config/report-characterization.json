@@ -1,0 +1,36 @@
+{
+  "description": "Response pins for the single-handler route files remaining in Phase 3. The route manifest proves a route is still registered; these prove the handler still computes the same figures. Volatile fields (ids, timestamps) are stripped before hashing.",
+  "regenerate": "UPDATE_REPORT_CHARACTERIZATION=1 npm run test:backend -- report-endpoint",
+  "pins": {
+    "GET /api/stats/net-profit": {
+      "status": 200,
+      "shape": "{currency,currencyRevaluation,expenses,expensesTotal,forUs,forUsTotal,income,incomeTotal,netPosition,netPositionBreakdown,netPositionLabel,netProfit,netWorth,onUs,onUsTotal,ownersCapital,spPosProfit,totalExpenses,totalIncome}",
+      "hash": "b20e765ec3c448d635e0222dea7f3e05435556bfaf34101906ba56e82519c502"
+    },
+    "GET /api/reports/net-profit-excel": {
+      "status": 200,
+      "shape": "workbook:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "hash": "8100eae894c541251fcce6ce21a360e4fede5ae9dd7ab71e0ca2eb628e38147a"
+    },
+    "GET /api/factory/net-position": {
+      "status": 200,
+      "shape": "{asOf,balanceOnTableValue,forUs,forUsTotal,inventoryValue,ledgerAssets,ledgerLiabilities,loadingOrders,loadingTotal,netPosition,netPositionLabel,onUs,onUsTotal,payrollPayable,pendingOrders,pendingTotal,rawMaterialValue,supplierLiabilities,supplierOverpayments,verifiedOrders,verifiedTotal}",
+      "hash": "c00529935a1b91e0a878d0e099674c917fce5f570d8bf253880a1ffae8f2a0c9"
+    },
+    "GET /api/factory/suppliers/:supplierId/statement": {
+      "status": 200,
+      "shape": "{brokerContainers,currencyGroups,fxTransfers,ledger,linkedSupplierGroups,obCommissions,offloadCharges,payments,statement,summary,supplier,voucherPayments}",
+      "hash": "c744dde780be869ca88c8c74469c2405b547aff44dded594119247f721e72b7f"
+    },
+    "PATCH /api/purchase-orders/:poId": {
+      "status": 200,
+      "shape": "{chargesEdited,companyId,containerId,createdAt,currency,discount,documentCharges,freight,freightOwnAccountId,freightPaidBy,freightParentAccountId,fumigation,id,itemsTotal,otherCharges,poNumber,status,supplierId,surcharge,voucherId}",
+      "hash": "69b8c4af5f779ba4f55c187626c307bc05387fd1e2dec54a6ad3dae1252ba918"
+    },
+    "POST /api/factory/raw-stock/offload": {
+      "status": 200,
+      "shape": "{commission,rawStock}",
+      "hash": "3d7f5a53fb683c9754a103dc5aa9dc501de5c381de4b162c4230bb15f1ed550b"
+    }
+  }
+}

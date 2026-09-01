@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "phase": "8C",
+  "purpose": "Define the minimum reporting and traceability contract for high-risk ERP records without changing accounting, inventory, costing, posting, or historical data behavior.",
+  "requiredTraceFields": [
+    "stable-record-identity",
+    "company-scope",
+    "business-date",
+    "created-at",
+    "created-by-or-system-source",
+    "source-workflow",
+    "status-or-lifecycle-state",
+    "reference-or-document-number"
+  ],
+  "requiredReportProperties": [
+    "deterministic-ordering",
+    "server-side-filtering-where-large",
+    "full-filter-totals-independent-of-pagination",
+    "explicit-date-boundaries",
+    "company-isolation",
+    "export-parity-with-visible-filters",
+    "no-hidden-record-body-logging"
+  ],
+  "families": [
+    {
+      "id": "accounting-journal-and-vouchers",
+      "risk": "critical",
+      "traceRequirements": ["stable-record-identity", "company-scope", "business-date", "source-workflow", "status-or-lifecycle-state", "reference-or-document-number"],
+      "reportRequirements": ["deterministic-ordering", "full-filter-totals-independent-of-pagination", "explicit-date-boundaries", "company-isolation", "export-parity-with-visible-filters"],
+      "preserve": ["debit-credit-balance", "brought-forward-semantics", "closing-balance-semantics", "reversal-history"]
+    },
+    {
+      "id": "inventory-and-stock-movements",
+      "risk": "critical",
+      "traceRequirements": ["stable-record-identity", "company-scope", "business-date", "created-by-or-system-source", "source-workflow", "reference-or-document-number"],
+      "reportRequirements": ["deterministic-ordering", "server-side-filtering-where-large", "explicit-date-boundaries", "company-isolation", "export-parity-with-visible-filters"],
+      "preserve": ["authoritative-quantity", "authoritative-rate", "authoritative-value", "location-attribution"]
+    },
+    {
+      "id": "factory-costing-and-mix-batches",
+      "risk": "critical",
+      "traceRequirements": ["stable-record-identity", "company-scope", "business-date", "created-at", "created-by-or-system-source", "source-workflow", "status-or-lifecycle-state", "reference-or-document-number"],
+      "reportRequirements": ["deterministic-ordering", "explicit-date-boundaries", "company-isolation", "export-parity-with-visible-filters"],
+      "preserve": ["supplier-cost-attribution", "container-cost-history", "mix-batch-cost-history", "offload-charge-attribution"]
+    },
+    {
+      "id": "container-and-offload-lifecycle",
+      "risk": "high",
+      "traceRequirements": ["stable-record-identity", "company-scope", "business-date", "created-at", "source-workflow", "status-or-lifecycle-state", "reference-or-document-number"],
+      "reportRequirements": ["deterministic-ordering", "server-side-filtering-where-large", "explicit-date-boundaries", "company-isolation", "export-parity-with-visible-filters"],
+      "preserve": ["original-container-cost", "received-weight-history", "post-offload-adjustments", "supplier-attribution"]
+    },
+    {
+      "id": "payroll-and-employee-adjustments",
+      "risk": "high",
+      "traceRequirements": ["stable-record-identity", "company-scope", "business-date", "created-at", "created-by-or-system-source", "source-workflow", "status-or-lifecycle-state"],
+      "reportRequirements": ["deterministic-ordering", "explicit-date-boundaries", "company-isolation", "export-parity-with-visible-filters"],
+      "preserve": ["pay-period-attribution", "employee-attribution", "adjustment-history"]
+    },
+    {
+      "id": "administrative-repairs-and-imports",
+      "risk": "critical",
+      "traceRequirements": ["stable-record-identity", "company-scope", "created-at", "created-by-or-system-source", "source-workflow", "status-or-lifecycle-state", "reference-or-document-number"],
+      "reportRequirements": ["deterministic-ordering", "company-isolation", "no-hidden-record-body-logging"],
+      "preserve": ["dry-run-evidence", "confirmation-scope", "audit-record", "idempotency-evidence"]
+    }
+  ]
+}

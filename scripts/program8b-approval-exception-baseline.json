@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "purpose": "Static governance baseline for high-risk ERP approval and exception workflows. This file documents required control classes; it does not change runtime behavior.",
+  "controlClasses": [
+    {
+      "id": "authorization",
+      "description": "The caller must have the required role or permission before a high-risk action is accepted."
+    },
+    {
+      "id": "validation",
+      "description": "Business invariants must be checked before persistence or posting."
+    },
+    {
+      "id": "preview-or-dry-run",
+      "description": "Bulk repair, recalculation, or historical correction workflows should support a non-mutating preview when practical."
+    },
+    {
+      "id": "explicit-confirmation",
+      "description": "Destructive, irreversible, or historical corrections require explicit confirmation tied to the intended operation."
+    },
+    {
+      "id": "transactional-write",
+      "description": "Multi-record financial or stock changes must commit atomically."
+    },
+    {
+      "id": "audit-trail",
+      "description": "Administrative exceptions and repair actions must retain actor, action, scope, and outcome evidence."
+    },
+    {
+      "id": "idempotency-or-replay-protection",
+      "description": "Retries must not duplicate postings, stock movements, vouchers, or repair effects."
+    }
+  ],
+  "workflowFamilies": [
+    {
+      "id": "voucher-posting-and-reversal",
+      "risk": "critical",
+      "requiredControls": ["authorization", "validation", "transactional-write", "audit-trail", "idempotency-or-replay-protection"]
+    },
+    {
+      "id": "stock-movement-transfer-and-adjustment",
+      "risk": "critical",
+      "requiredControls": ["authorization", "validation", "transactional-write", "audit-trail", "idempotency-or-replay-protection"]
+    },
+    {
+      "id": "factory-cost-recalculation-and-historical-repair",
+      "risk": "critical",
+      "requiredControls": ["authorization", "validation", "preview-or-dry-run", "explicit-confirmation", "transactional-write", "audit-trail", "idempotency-or-replay-protection"]
+    },
+    {
+      "id": "container-offload-and-post-offload-adjustment",
+      "risk": "critical",
+      "requiredControls": ["authorization", "validation", "explicit-confirmation", "transactional-write", "audit-trail", "idempotency-or-replay-protection"]
+    },
+    {
+      "id": "opening-balance-import-and-data-tools",
+      "risk": "high",
+      "requiredControls": ["authorization", "validation", "preview-or-dry-run", "explicit-confirmation", "transactional-write", "audit-trail"]
+    },
+    {
+      "id": "payroll-adjustment-and-bonus",
+      "risk": "high",
+      "requiredControls": ["authorization", "validation", "explicit-confirmation", "transactional-write", "audit-trail"]
+    },
+    {
+      "id": "accounting-period-or-locked-record-exception",
+      "risk": "critical",
+      "requiredControls": ["authorization", "validation", "explicit-confirmation", "audit-trail"]
+    }
+  ]
+}

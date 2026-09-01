@@ -1,0 +1,131 @@
+{
+  "description": "Triage baseline for tests that assert on source text. structuralGuardTests intentionally constrain repository shape and survive code motion. sourceCoupledTests pin literal code substrings and will fail when code moves even if behaviour is unchanged, so they must be reviewed before splitting the files they pin. This list is a ratchet: it may shrink, never grow.",
+  "regenerate": "UPDATE_SOURCE_TEXT_BASELINE=1 npm run test:backend -- source-text-assertions",
+  "classificationCaveat": "Classification is heuristic: a test that reads source files and also asserts substrings on parsed JSON can be reported as source-coupled. The godFileHotspots reverse index below is exact and is the actionable output.",
+  "maxSourceCoupledTests": 68,
+  "maxTotalTextAssertions": 893,
+  "sourceCoupledTests": [
+    "server/routes/location/commonInventoryPerformanceRoutes.test.ts",
+    "tests/account-migration-control-reference-safety.test.ts",
+    "tests/auth-route-composition.test.ts",
+    "tests/company-access-boundary-contract.test.ts",
+    "tests/critical-schema-readiness.test.ts",
+    "tests/customer-route-composition.test.ts",
+    "tests/deleted-items-permanent-delete-regression.test.ts",
+    "tests/duplicate-route-ownership.test.ts",
+    "tests/factory-bilingual-completion.test.ts",
+    "tests/factory-bilingual-phase7-documents.test.ts",
+    "tests/factory-bilingual-phase8-surfaces.test.ts",
+    "tests/factory-container-access-offline-scan-regression.test.ts",
+    "tests/factory-costing-engine-consolidation-contract.test.ts",
+    "tests/factory-historical-replay-atomic-audit.test.ts",
+    "tests/factory-historical-replay-company-scope.test.ts",
+    "tests/factory-historical-replay-completed-block.test.ts",
+    "tests/factory-historical-replay-locks.test.ts",
+    "tests/factory-historical-replay-mismatch-only.test.ts",
+    "tests/factory-historical-replay-no-accounting-writes.test.ts",
+    "tests/factory-historical-replay-no-global-db.test.ts",
+    "tests/factory-historical-replay-no-runtime-ddl.test.ts",
+    "tests/factory-historical-replay-persisted-total.test.ts",
+    "tests/factory-historical-replay-prepare-guard.test.ts",
+    "tests/factory-historical-replay-preview-snapshot.test.ts",
+    "tests/factory-historical-replay-replay-only-costs.test.ts",
+    "tests/factory-historical-replay-review-token.test.ts",
+    "tests/factory-historical-replay-source-only-parent.test.ts",
+    "tests/factory-historical-replay-token-required.test.ts",
+    "tests/factory-historical-replay-undo-stale.test.ts",
+    "tests/factory-historical-replay-user-binding.test.ts",
+    "tests/factory-historical-replay-v7-final-safety.test.ts",
+    "tests/factory-historical-replay-v8-production-readiness.test.ts",
+    "tests/factory-historical-replay-v8-verification.test.ts",
+    "tests/factory-historical-replay-wiring.test.ts",
+    "tests/factory-historical-replay-zero-rate.test.ts",
+    "tests/factory-opening-balance-assignment-safety.test.ts",
+    "tests/factory-post-offload-historical-replay-wiring.test.ts",
+    "tests/factory-post-offload-impact-preview.test.ts",
+    "tests/factory-post-offload-phase5-reconciliation.test.ts",
+    "tests/factory-post-offload-phase6-safety-repair.test.ts",
+    "tests/factory-refresh-route-preservation.test.ts",
+    "tests/frontend-layout.test.ts",
+    "tests/frontend-lazy-imports.test.ts",
+    "tests/historical-currency-repair-center-contract.test.ts",
+    "tests/inventory-route-ownership.test.ts",
+    "tests/migration-registry.test.ts",
+    "tests/multi-currency-integration.test.ts",
+    "tests/operations-route-ownership.test.ts",
+    "tests/phase11-operational-monitoring.test.ts",
+    "tests/phase12-business-regression-suite.test.ts",
+    "tests/phase2-backend-module-separation.test.ts",
+    "tests/phase5-routes-legacy-extraction.test.ts",
+    "tests/phase6-chat-report-domains.test.ts",
+    "tests/phase7-debug-route-extraction.test.ts",
+    "tests/pos-location-pool-crash.test.ts",
+    "tests/program-6c-stock-light-route.test.ts",
+    "tests/properties-canonical-routes.test.ts",
+    "tests/reports-route-composition.test.ts",
+    "tests/startup-warning-repairs.test.ts",
+    "tests/supplier-partner-administration-phase-4.test.ts",
+    "tests/supplier-partner-navigation-phase-2.test.ts",
+    "tests/supplier-partner-navigation-phase-5.test.ts",
+    "tests/supplier-partner-report-tabs.test.ts",
+    "tests/supplier-partner-route-guard.test.ts",
+    "tests/ui/authenticated-request-gating.test.ts",
+    "tests/ui/company-state-isolation.test.ts",
+    "tests/ui/phase10-ui-consistency.test.ts",
+    "tests/ui/phase9-type-safety-wiring.test.ts"
+  ],
+  "structuralGuardTests": [
+    "tests/api-smoke-sweep.test.ts",
+    "tests/excel-helper.test.ts",
+    "tests/factory-bilingual-schema.test.ts",
+    "tests/factory-historical-replay-no-apply.test.ts",
+    "tests/factory-historical-replay-phase6-boundary.test.ts",
+    "tests/factory-historical-replay-source-priority.test.ts",
+    "tests/factory-insurance-company-isolation.test.ts",
+    "tests/factory-partial-offload-cost-consistency.test.ts",
+    "tests/god-file-boundaries.test.ts",
+    "tests/report-endpoint-characterization.test.ts",
+    "tests/route-manifest.test.ts",
+    "tests/source-text-assertions.test.ts",
+    "tests/startup-schema-integrity.test.ts",
+    "tests/tenant-control-migration-safety.test.ts"
+  ],
+  "godFileHotspots": [
+    {
+      "path": "server/chatService.ts",
+      "lines": 1976,
+      "pinnedBy": [
+        "tests/phase6-chat-report-domains.test.ts"
+      ]
+    },
+    {
+      "path": "client/src/pages/vouchers/JournalForm.tsx",
+      "lines": 1626,
+      "pinnedBy": [
+        "tests/frontend-layout.test.ts"
+      ]
+    },
+    {
+      "path": "client/src/pages/factory/FactoryContainerLoadingScan.tsx",
+      "lines": 1906,
+      "pinnedBy": [
+        "tests/ui/bandwidth-phase-1-page-polling.test.ts"
+      ]
+    },
+    {
+      "path": "client/src/pages/ContainerLoadingScan.tsx",
+      "lines": 1133,
+      "pinnedBy": [
+        "tests/ui/bandwidth-phase-1-page-polling.test.ts"
+      ]
+    }
+  ],
+  "pinnedPathsNoLongerPresent": [
+    "client/src/components/GlobalLanguageSwitch.tsx",
+    "server/chat/reports/legacyReportEngine.ts",
+    "server/routes/authRoutesLegacy.ts",
+    "server/routes/customerRoutesLegacy.ts",
+    "server/routes/reportsRoutesLegacy.ts",
+    "server/routesLegacy.ts"
+  ]
+}

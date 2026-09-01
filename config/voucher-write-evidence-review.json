@@ -1,0 +1,151 @@
+{
+  "version": 4,
+  "reviewState": "REVIEWED FILE BY FILE",
+  "scope": "Active voucher creation sites detected by scripts/audit-write-evidence.mjs after excluding updates/deletes/restores/moves of existing voucher rows. Completed phases are retained separately as historical evidence and must not re-enter the active backlog.",
+  "summary": {
+    "initialReviewed": 81,
+    "activeReviewed": 15,
+    "explicitReplayGuard": 15,
+    "migrationImportRepair": 0,
+    "operationalWithoutRequestIdentity": 0,
+    "phase3InfrastructureCompleted": 11,
+    "phase4OperationalCompleted": 22,
+    "phase5OperationalCompleted": 22,
+    "phase6SpecialPurposeCompleted": 11,
+    "unreviewed": 0,
+    "phase7PostReviewSafeWriters": 1
+  },
+  "reviewed": {
+    "explicit-replay-guard": {
+      "verdict": "documented compatibility exemption with an explicit replay/source guard",
+      "reason": "These pre-existing creation sites are protected by an existing-voucher/source-row check, atomic state claim, conflict handling, or replace-in-transaction semantics. Phase 7 freezes this exact reviewed set: no new raw voucher creator may join it without an explicit review-file exemption, so direct voucher creation can no longer grow silently.",
+      "files": [
+        "server/routes/balance-repair/undo.ts",
+        "server/routes/containers/containerFreightWriteRoutes.ts",
+        "server/routes/containers/containerHelpers.ts",
+        "server/routes/factory/containers/other-charges-currency-admin.ts",
+        "server/routes/factory/customer-orders/finalize-loading/finalize.ts",
+        "server/routes/helpers/intercompanyHelpers.ts",
+        "server/routes/intercompanyNotificationRoutes.ts",
+        "server/routes/offloadRoutes.ts",
+        "server/routes/payroll/advanceManagementRoutes.ts",
+        "server/routes/payroll/core/generate.ts",
+        "server/routes/payroll/core/migrations.ts",
+        "server/routes/sp-migration/spMigrationSalesRoutes.ts",
+        "server/routes/sp/spContainerRoutes.ts",
+        "server/routes/sp/spMigrationPhase2Containers.ts",
+        "server/routes/sp/spMigrationPhase2Sales.ts"
+      ]
+    }
+  },
+  "completed": {
+    "phase-3-infrastructure-writers": {
+      "verdict": "phase 3 completed with required deterministic posting identity",
+      "reason": "These lower-level voucher writers use the durable accounting posting request identity boundary. They require stable business/request source identity, serialize identical concurrent retries, reuse matching vouchers, reject changed payloads under a reused key, and clean identity markers before intentional hard-delete/rebuild operations.",
+      "files": [
+        "server/routes/payroll/_payrollAccountingHelper.ts",
+        "server/services/accounting/voucherPostingService.ts",
+        "server/services/containers/offload-lifecycle/charge-vouchers.ts",
+        "server/services/containers/offload-lifecycle/sp-journals.ts",
+        "server/services/factory/post-offload-charge/apply.ts",
+        "server/services/pos/createSaleVoucher.ts",
+        "server/services/rental/rentalPaymentPostingService.ts",
+        "server/storage/accounting/fiscal-periods.ts",
+        "server/storage/accounting/vouchers.ts",
+        "server/storage/containers-store/offload.ts",
+        "server/storage/containers-store/purchase-orders.ts"
+      ]
+    },
+    "phase-4-operational-writers": {
+      "verdict": "phase 4 completed behind the durable operational request boundary",
+      "reason": "These highest-risk manual voucher, payroll, advance, employee cash/POS and supplier-payment writers are registered behind one company-scoped request boundary. Browser and offline retries reuse a persisted clientRequestId; the server atomically reserves (company, idempotency key), fingerprints method/path/payload, blocks duplicate execution, waits for an identical in-flight request, replays the stored response after completion, rejects changed payloads under the same key, and fails closed when the first outcome is uncertain.",
+      "files": [
+        "server/routes/employees/salaryAdvanceRoutes.ts",
+        "server/routes/erp-payroll/bonuses.ts",
+        "server/routes/erp-payroll/bulk-adjustments.ts",
+        "server/routes/erp-payroll/employee-deposits.ts",
+        "server/routes/erp-payroll/runs.ts",
+        "server/routes/erp-payroll/withdrawals.ts",
+        "server/routes/erp-payroll/worker-payments.ts",
+        "server/routes/factory/employee-pos/employee-crud/bulk-payroll.ts",
+        "server/routes/factory/employee-pos/employee-crud/bulk-withdraw.ts",
+        "server/routes/factory/employee-pos/employee-crud/cash.ts",
+        "server/routes/factory/employee-pos/employeeAdvancesBonusRoutes.ts",
+        "server/routes/factory/employee-pos/pos-financial/sale-write.ts",
+        "server/routes/factory/suppliers/crud/payments.ts",
+        "server/routes/payroll/advance-accounting/bulk-repay.ts",
+        "server/routes/payroll/advance-accounting/cash.ts",
+        "server/routes/payroll/advance-accounting/repay-by-month.ts",
+        "server/routes/payroll/advance-accounting/repayment-audit.ts",
+        "server/routes/payroll/advance-accounting/repayments.ts",
+        "server/routes/payroll/core/mark-paid.ts",
+        "server/routes/vouchers/voucherCreateRoutes.ts",
+        "server/routes/vouchers/voucherJournalRoutes.ts",
+        "server/routes/vouchers/voucherPaymentRoutes.ts"
+      ]
+    },
+    "phase-5-operational-writers": {
+      "verdict": "phase 5 completed behind the durable operational request boundary",
+      "reason": "The final operational families now receive browser/offline-stable client request identity and are claimed by a company-scoped durable server boundary before the legacy handlers execute. Identical retries/concurrent submissions replay one result; changed payload under a reused identity conflicts; uncertain outcomes fail closed.",
+      "files": [
+        "server/routes/containers/offload/create.ts",
+        "server/routes/creditNoteRoutes.ts",
+        "server/routes/factory/containers/create.ts",
+        "server/routes/factory/containers/delete.ts",
+        "server/routes/factory/containers/other-charges.ts",
+        "server/routes/factory/containers/update.ts",
+        "server/routes/factory/customer-orders/orderChargesRoutes.ts",
+        "server/routes/factory/factoryTransporterRoutes.ts",
+        "server/routes/factory/raw-stock/rawStockAdjRoutes.ts",
+        "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts",
+        "server/routes/factory/raw-stock/rawStockReverseOffloadRoute.ts",
+        "server/routes/payroll/worker-stats-advances/advanceAdminRoutes.ts",
+        "server/routes/payroll/worker-stats-advances/advancesRoutes.ts",
+        "server/routes/rental/shared/accrual.ts",
+        "server/routes/rental/shared/auto-transfer.ts",
+        "server/routes/rental/units-contracts/contract-end.ts",
+        "server/routes/rental/units-contracts/guarantees.ts",
+        "server/routes/sp/spLifecycleRoutes.ts",
+        "server/routes/sp/spOffloadLifecycleRoutes.ts",
+        "server/routes/sp/spOffloadRoutes.ts",
+        "server/routes/sp/spOpeningStockRoutes.ts",
+        "server/routes/sp/spSalesRoutes.ts"
+      ]
+    },
+    "phase-6-deterministic-source-writers": {
+      "verdict": "phase 6 completed with deterministic durable source identity",
+      "reason": "These special-purpose routes are not given browser-generated request IDs. The server derives a stable migration/import/repair source key from the operation kind, target company and canonical source payload (or an explicit sourceRunId/importBatchId), persists that key before execution, replays completed reruns, rejects changed data under a reused key, releases definite validation failures, and fails closed on uncertain server outcomes.",
+      "files": [
+        "server/routes/admin/adminPoFixRoutes.ts",
+        "server/routes/creditSalesImportRoutes.ts",
+        "server/routes/exchangeRateRoutes.ts",
+        "server/routes/posImportRoutes.ts",
+        "server/routes/sp-migration/spMigrationSetupRoutes.ts",
+        "server/routes/stockTransferImportRoutes.ts"
+      ]
+    },
+    "phase-6-intrinsic-replay-safe-writers": {
+      "verdict": "phase 6 completed by durable business-state replay proof",
+      "reason": "These writers already derive safety from persistent business state rather than a browser request: payroll migration rewrites only old-account vouchers, company import requires an empty target, payroll backfill excludes payroll IDs that already have vouchers, rental re-accrue only corrects still-detectable discrepancies, and deferred-rent reclassification uses a per-company advisory lock and journals only the current remaining balance.",
+      "files": [
+        "server/routes/erp-payroll/runs-migration.ts",
+        "server/routes/factory/docs-users/companyImportRoutes.ts",
+        "server/routes/payroll/worker-statement/backfill.ts",
+        "server/routes/rental/rentalAccrualConfigRoutes.ts",
+        "server/services/rental/reclassifyDeferredRentService.ts"
+      ]
+    },
+    "phase-7-post-review-safe-writers": {
+      "verdict": "post-review creator already protected by durable stock-document request identity",
+      "reason": "This stock-transfer creator entered the live tree after the original 81-file voucher review. Its create-from-scratch branch already consumes clientRequestId, uses the stock-document idempotency key/marker inside the transfer transaction, replays the existing transfer on retry, and is protected by the global accounting request identity client path. Phase 7 records it explicitly so the direct-creation audit can distinguish reviewed growth from an unprotected escape hatch.",
+      "files": [
+        "server/routes/fiscal-transfers/create.ts"
+      ]
+    }
+  },
+  "phase7DirectCreationPolicy": {
+    "rule": "Any server file that directly inserts a vouchers row must already appear in this reviewed/completed inventory. A new direct creator fails audit-write-evidence until it is moved through an approved canonical writer or explicitly documented as a restoration/recovery compatibility exemption.",
+    "newDirectCreatorsAllowed": 0
+  },
+  "unreviewed": []
+}

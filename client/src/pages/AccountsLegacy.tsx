@@ -1,0 +1,213 @@
+/**
+ * Accounts Overview (legacy) page shell.
+ *
+ * Keeps its route and default export. State, queries, mutations and forms live
+ * in ./accountslegacy/useAccountsLegacyModel; the search results, find-voucher
+ * tab, alter-account dialog and destructive confirmations are separate views
+ * under ./accountslegacy. The account table, statement view and the existing
+ * AccountDialogs bundle are unchanged.
+ */
+import { Layers, Plus, Search, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/PageHeader";
+import { ErrorState } from "@/components/ui/page-state";
+import { AccountDialogs } from "./accounts/AccountDialogs";
+import { AccountTable } from "./accounts/AccountTable";
+import { AccountStatementView } from "./accounts/AccountStatementView";
+import { useAccountsLegacyModel } from "./accountslegacy/useAccountsLegacyModel";
+import { AccountSearchResults } from "./accountslegacy/AccountSearchResults";
+import { FindVoucherTab } from "./accountslegacy/FindVoucherTab";
+import { EditAccountDialog } from "./accountslegacy/EditAccountDialog";
+import { AccountsConfirmDialogs } from "./accountslegacy/AccountsConfirmDialogs";
+
+export default function Accounts() {
+  const model = useAccountsLegacyModel();
+  const { selectedAccount, selectedAccountIsLedger } = model;
+
+  const closeSelectedAccount = () => {
+    model.setSelectedAccount(null);
+
+    // Accounts can be opened through a deep-link such as
+    // ?accountId=123&accountType=ledger. If those parameters remain in the URL,
+    // useAccountsLegacyModel immediately auto-selects the same account again after
+    // the X button clears local state. Remove the statement-specific parameters at
+    // the same time so closing actually returns to the account list.
+    const params = new URLSearchParams(window.location.search);
+    params.delete("accountId");
+    params.delete("accountType");
+    params.delete("startDate");
+    params.delete("endDate");
+    const nextSearch = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      nextSearch ? `${window.location.pathname}?${nextSearch}` : window.location.pathname
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <PageHeader title="Accounts Overview" subtitle="View all accounts, balances, and transaction history" />
+        <div className="flex gap-2">
+          {(model.currentUser?.role === "Admin" || model.currentUser?.role === "Developer") && (
+            <Button
+              variant="outline"
+              data-testid="button-account-groups"
+              onClick={() => model.navigate("/account-groups")}
+            >
+              <Layers className="w-4 h-4 mr-2" /> Account Groups
+            </Button>
+          )}
+          <Button
+            data-testid="button-create-account"
+            disabled={!model.selectedCompany}
+            onClick={() => model.navigate(`${model.modePrefix}/create`)}
+          >
+            <Plus className="w-4 h-4 mr-2" /> Create
+          </Button>
+        </div>
+      </div>
+
+      <AccountDialogs
+        bankToEdit={model.bankToEdit}
+        setBankToEdit={model.setBankToEdit}
+        bankForm={model.bankForm}
+        onBankSubmit={model.onBankSubmit}
+        updateBankMutation={model.updateBankMutation}
+        deleteBankMutation={model.deleteBankMutation}
+        handleDeleteBankAccount={model.handleDeleteBankAccount}
+        accountToEdit={model.accountToEdit}
+        setAccountToEdit={model.setAccountToEdit}
+        supplierToEdit={model.supplierToEdit}
+        setSupplierToEdit={model.setSupplierToEdit}
+        customerToEdit={model.customerToEdit}
+        setCustomerToEdit={model.setCustomerToEdit}
+        employeeToEdit={model.employeeToEdit}
+        setEmployeeToEdit={model.setEmployeeToEdit}
+        editForm={model.editForm}
+        onEditSubmit={() => {}}
+        updateLedgerMutation={{}}
+        handleDeleteAccount={() => {}}
+        pendingDelete={model.pendingDelete}
+        setPendingDelete={model.setPendingDelete}
+        waRuleDialogOpen={model.waRuleDialogOpen}
+        setWaRuleDialogOpen={model.setWaRuleDialogOpen}
+        waChatSearch={model.waChatSearch}
+        setWaChatSearch={model.setWaChatSearch}
+        waRuleDraft={model.waRuleDraft}
+        setWaRuleDraft={model.setWaRuleDraft}
+        filteredWaChats={model.filteredWaChats}
+        saveWaRuleMutation={model.saveWaRuleMutation}
+        waChatsLoading={model.waChatsLoading}
+      />
+
+      <Tabs defaultValue="view" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="view">View Accounts</TabsTrigger>
+          <TabsTrigger value="find">Find Voucher</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="view" className="space-y-4">
+          {!selectedAccount ? (
+            <div className="space-y-4">
+              {/* Search — command-palette style */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Search accounts by name or code…"
+                  value={model.searchTerm}
+                  onChange={(e) => model.setSearchTerm(e.target.value)}
+                  className="pl-9 pr-9"
+                  data-testid="input-accounts-search"
+                />
+                {model.searchTerm && (
+                  <button
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => model.setSearchTerm("")}
+                    data-testid="button-accounts-search-clear"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {model.accountsLoading ? (
+                <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
+                  Loading accounts…
+                </div>
+              ) : model.accountsError ? (
+                <ErrorState
+                  title="Could not load accounts"
+                  description={
+                    model.accountsQueryError instanceof Error
+                      ? model.accountsQueryError.message
+                      : "Accounts could not be loaded."
+                  }
+                  actionLabel="Try again"
+                  onAction={() => void model.refetchAccounts()}
+                  data-testid="accounts-error"
+                />
+              ) : model.searchTerm ? (
+                /* Command-palette result list when searching */
+                <AccountSearchResults model={model} />
+              ) : (
+                /* Full account table when not searching */
+                <AccountTable
+                  filteredAccounts={model.filteredAccounts}
+                  expandedParents={model.expandedParents}
+                  toggleParent={model.toggleParent}
+                  handleAccountChange={model.handleAccountChange}
+                  hideBalances={model.hideBalances}
+                  formatAmount={(amt) => model.formatAmountForAccount(amt, undefined)}
+                  onEdit={model.openEditAccountDialog}
+                />
+              )}
+            </div>
+          ) : (
+            <AccountStatementView
+              selectedAccount={selectedAccount}
+              onClose={closeSelectedAccount}
+              periodFilter={model.periodFilter}
+              setPeriodFilter={model.setPeriodFilter}
+              vouchersWithBalance={model.vouchersWithBalance}
+              closingBalance={model.closingBalance}
+              openingBalance={model.broughtForwardBalance}
+              transactionsLoading={model.transactionsLoading}
+              transactionError={(model.transactionsQueryError as Error | null)?.message ?? null}
+              selectedVoucherIds={model.selectedVoucherIds}
+              toggleSelectAll={model.toggleSelectAll}
+              setShowBulkDeleteConfirm={model.setShowBulkDeleteConfirm}
+              showDeletedVouchers={model.showDeletedVouchers}
+              setShowDeletedVouchers={model.setShowDeletedVouchers}
+              formatAmount={(amt) => model.formatAmountForAccount(amt, selectedAccount?.type)}
+              hideBalances={model.hideBalances}
+              printRef={model.printRef}
+              appMode={model.appMode}
+              formatDisplayDate={model.formatDisplayDate}
+              toggleVoucherSelection={model.toggleVoucherSelection}
+              handleOpenVoucher={model.handleOpenVoucher}
+              waRule={selectedAccountIsLedger ? (model.waRule ?? null) : null}
+              openWaRuleDialog={selectedAccountIsLedger ? model.openWaRuleDialog : () => {}}
+              sendWaStatementMutation={model.sendWaStatementMutation}
+              isBrokerSupplier={false}
+              factoryStatementLoading={false}
+              brokerStatementLoading={false}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="find">
+          <FindVoucherTab model={model} />
+        </TabsContent>
+      </Tabs>
+
+      {/* ── Edit Account Dialog ─────────────────────────────────────────── */}
+      <EditAccountDialog model={model} />
+
+      <AccountsConfirmDialogs model={model} />
+    </div>
+  );
+}
