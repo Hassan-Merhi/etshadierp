@@ -23,6 +23,7 @@ import {
   getGoldenCoastAccountDefinition,
   type GoldenCoastAccountRole,
 } from "../../services/accounting/goldenCoastPhase2Accounts";
+import { GOLDEN_COAST_PHASE5_SOURCE_TYPE } from "../../services/accounting/goldenCoastPhase5PosSale";
 import {
   GOLDEN_COAST_PHASE11_SPLIT_PCT,
   GoldenCoastPhase11CloseError,
@@ -167,21 +168,60 @@ async function accountPeriodActivity(
 async function salesItemsPeriodActivity(
   conn: DbLike,
   companyId: number,
+  salesAccountId: number,
+  cogsAccountId: number,
   start: string,
   end: string
 ): Promise<{ revenue: string; cogs: string }> {
   const result = await conn.execute(sql`
+    WITH itemized AS (
+      SELECT
+        COALESCE(SUM(CAST(si.total_sales AS numeric)), 0)::numeric AS revenue,
+        COALESCE(SUM(CAST(si.total_cost AS numeric)), 0)::numeric AS cogs
+      FROM sales_items si
+      JOIN vouchers v ON v.id = si.voucher_id
+      WHERE v.company_id = ${companyId}
+        AND v.voucher_type = 'Sales'
+        AND v.deleted_at IS NULL
+        AND COALESCE(v.optional, false) = false
+        AND v.voucher_date >= ${start}::date
+        AND v.voucher_date <= ${end}::date
+    ),
+    legacy_phase6 AS (
+      SELECT
+        COALESCE(SUM(
+          CASE WHEN ve.ledger_account_id = ${salesAccountId}
+            THEN CAST(ve.credit_amount AS numeric) - CAST(ve.debit_amount AS numeric)
+            ELSE 0
+          END
+        ), 0)::numeric AS revenue,
+        COALESCE(SUM(
+          CASE WHEN ve.ledger_account_id = ${cogsAccountId}
+            THEN CAST(ve.debit_amount AS numeric) - CAST(ve.credit_amount AS numeric)
+            ELSE 0
+          END
+        ), 0)::numeric AS cogs
+      FROM accounting_posting_requests apr
+      JOIN vouchers v ON v.id = apr.voucher_id
+      JOIN voucher_entries ve ON ve.voucher_id = v.id
+      WHERE apr.company_id = ${companyId}
+        AND apr.source_type = ${GOLDEN_COAST_PHASE5_SOURCE_TYPE}
+        AND v.company_id = ${companyId}
+        AND v.deleted_at IS NULL
+        AND COALESCE(v.optional, false) = false
+        AND COALESCE(v.effective_date, v.voucher_date) >= ${start}::date
+        AND COALESCE(v.effective_date, v.voucher_date) <= ${end}::date
+        AND NOT EXISTS (
+          SELECT 1
+          FROM sales_items si2
+          WHERE si2.voucher_id = v.id
+        )
+    )
     SELECT
-      COALESCE(SUM(CAST(si.total_sales AS numeric)), 0)::text AS revenue,
-      COALESCE(SUM(CAST(si.total_cost AS numeric)), 0)::text AS cogs
-    FROM sales_items si
-    JOIN vouchers v ON v.id = si.voucher_id
-    WHERE v.company_id = ${companyId}
-      AND v.voucher_type = 'Sales'
-      AND v.deleted_at IS NULL
-      AND COALESCE(v.optional, false) = false
-      AND v.voucher_date >= ${start}::date
-      AND v.voucher_date <= ${end}::date
+      (itemized.revenue + legacy_phase6.revenue)::text AS revenue,
+      (itemized.cogs + legacy_phase6.cogs)::text AS cogs
+    FROM itemized
+    CROSS JOIN legacy_phase6
   `);
   const row = resultRows(result)[0];
   return {
@@ -222,7 +262,7 @@ async function buildPlan(conn: DbLike, companyId: number, body: unknown) {
   const accounts = await resolveAccounts(conn, companyId);
   const { start, end } = monthBounds(close.periodMonth);
   const [salesItems, shared] = await Promise.all([
-    salesItemsPeriodActivity(conn, companyId, start, end),
+    salesItemsPeriodActivity(conn, companyId, accounts.salesAccountId, accounts.cogsAccountId, start, end),
     accountPeriodActivity(conn, companyId, accounts.sharedChargesAccountId, start, end),
   ]);
   const revenue = new Decimal(salesItems.revenue);
