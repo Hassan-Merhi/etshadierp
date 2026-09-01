@@ -111,7 +111,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       // ── 2. Classify accounts ──────────────────────────────────────────────
       const parentCompanyId = await storage.getParentCompanyId();
       const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
-      // SP formula: Cash + Stock (inventory) → What We Have; sp_payable and Loan/Loans → What We Owe.
+      // SP formula: Cash + Customer A/R + Stock (inventory) → What We Have; sp_payable and Loan/Loans → What We Owe.
       const isSupplierPartner = company?.companyType === "supplier_partner";
       const accountsForClassify = isSupplierPartner
         ? companyAccounts.filter(
@@ -119,6 +119,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
               a.accountType === "Cash" ||
               a.accountType === "Loan" ||
               a.accountType === "Loans" ||
+              a.subType === "Accounts Receivable" ||
               a.subType === "sp_payable"
           )
         : companyAccounts.filter(
