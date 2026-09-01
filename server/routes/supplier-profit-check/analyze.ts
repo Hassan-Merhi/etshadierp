@@ -4,6 +4,8 @@
  * Source rows are resolved to one canonical stock item and aggregated before
  * profitability is calculated. This prevents duplicate proforma/container
  * lines from multiplying quantities, landing costs, or profit in the client.
+ * Legacy/imported proforma rows that no longer resolve are retained with a
+ * synthetic negative id so their quantity is never silently dropped.
  */
 import type { Express, Request, Response, RequestHandler } from "express";
 import { pool } from "../../db";
@@ -55,18 +57,25 @@ export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: R
 
         const itemsResult = await pool.query(
           `
-          WITH resolved AS (
+          WITH source_rows AS (
             SELECT
-              si.id,
+              spl.id AS source_line_id,
+              spl.barcode AS source_barcode,
+              spl.item_name AS source_item_name,
+              spl.qty::numeric AS qty,
+              spl.price_per_bale::numeric AS price_per_bale,
+              si.id AS stock_item_id,
               si.code,
               si.name,
               si.stock_group_id,
               sg.name AS stock_group_name,
-              spl.qty::numeric AS qty,
-              spl.price_per_bale::numeric AS price_per_bale
+              CASE
+                WHEN si.id IS NOT NULL THEN 'stock:' || si.id::text
+                ELSE 'raw:' || lower(spl.barcode)
+              END AS group_key
             FROM supplier_proforma_lines spl
             JOIN supplier_proformas sp ON sp.id = spl.proforma_id
-            JOIN LATERAL (
+            LEFT JOIN LATERAL (
               SELECT candidate.id, candidate.code, candidate.name, candidate.stock_group_id
               FROM stock_items candidate
               WHERE candidate.company_id = $2
@@ -92,22 +101,21 @@ export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: R
               AND sp.supplier_id = $3
           )
           SELECT
-            resolved.id,
-            resolved.code,
-            resolved.name,
-            resolved.stock_group_id,
-            resolved.stock_group_name,
-            SUM(resolved.qty)::numeric AS proforma_qty,
-            MAX(resolved.price_per_bale)::numeric AS proforma_price,
-            resolved.code AS proforma_barcode
-          FROM resolved
-          GROUP BY
-            resolved.id,
-            resolved.code,
-            resolved.name,
-            resolved.stock_group_id,
-            resolved.stock_group_name
-          ORDER BY resolved.code, resolved.id
+            CASE
+              WHEN MAX(source_rows.stock_item_id) IS NOT NULL THEN MAX(source_rows.stock_item_id)
+              ELSE -MIN(source_rows.source_line_id)
+            END AS id,
+            COALESCE(MAX(source_rows.code), MIN(source_rows.source_barcode)) AS code,
+            COALESCE(MAX(source_rows.name), MIN(source_rows.source_item_name), MIN(source_rows.source_barcode)) AS name,
+            MAX(source_rows.stock_group_id) AS stock_group_id,
+            MAX(source_rows.stock_group_name) AS stock_group_name,
+            SUM(source_rows.qty)::numeric AS proforma_qty,
+            MAX(source_rows.price_per_bale)::numeric AS proforma_price,
+            MIN(source_rows.source_barcode) AS proforma_barcode,
+            (MAX(source_rows.stock_item_id) IS NULL) AS unresolved
+          FROM source_rows
+          GROUP BY source_rows.group_key
+          ORDER BY code, id
         `,
           [proformaId, companyId, supplierId]
         );

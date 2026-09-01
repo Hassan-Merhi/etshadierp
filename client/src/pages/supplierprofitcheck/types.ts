@@ -4,7 +4,7 @@
  * Extracted from SupplierProfitCheck.tsx during the Phase 4 god-file split.
  */
 
-import {ALL_COLUMNS} from "./utils";
+import { ALL_COLUMNS } from "./utils";
 
 export type ColKey = (typeof ALL_COLUMNS)[number]["key"];
 
@@ -31,6 +31,7 @@ interface AnalysisRow {
   status: string;
   proformaQty: number | null;
   proformaBarcode: string | null;
+  unresolved?: boolean;
 }
 
 export interface OtwContainer {

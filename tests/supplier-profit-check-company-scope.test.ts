@@ -69,7 +69,7 @@ describe("supplier profit check company scope", () => {
     expect(harness.query).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps a selected proforma scoped to company and supplier", async () => {
+  it("keeps a selected proforma scoped to company and supplier and preserves unresolved source qty", async () => {
     harness.query
       .mockReturnValueOnce(result([{ id: 2 }]))
       .mockReturnValueOnce(
@@ -83,6 +83,18 @@ describe("supplier profit check company scope", () => {
             proforma_qty: "3",
             proforma_price: "12",
             proforma_barcode: "SH-1",
+            unresolved: false,
+          },
+          {
+            id: -91,
+            code: "LEGACY-1",
+            name: "Legacy supplier item",
+            stock_group_id: null,
+            stock_group_name: null,
+            proforma_qty: "500",
+            proforma_price: "30",
+            proforma_barcode: "LEGACY-1",
+            unresolved: true,
           },
         ])
       )
@@ -96,9 +108,16 @@ describe("supplier profit check company scope", () => {
     await analyze(req({ supplierId: 2, sourceType: "proforma", proformaId: 31 }), res);
 
     expect(harness.query.mock.calls[1]?.[1]).toEqual([31, 4, 2]);
-    expect(res.body).toHaveLength(1);
+    expect(res.body).toHaveLength(2);
     expect(res.body[0].stockItemId).toBe(7);
     expect(res.body[0].proformaQty).toBe(3);
+    expect(res.body[1]).toMatchObject({
+      stockItemId: -91,
+      code: "LEGACY-1",
+      proformaQty: 500,
+      poPrice: 30,
+      unresolved: true,
+    });
   });
 
   it("uses the active company when resolving the supplier stock group", async () => {

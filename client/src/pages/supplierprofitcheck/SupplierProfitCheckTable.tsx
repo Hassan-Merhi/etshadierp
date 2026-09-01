@@ -89,22 +89,29 @@ function ProfitRow({ row, index, model }: { row: ComputedRow; index: number; mod
   const isNoData = row.computedStatus === "no_sales_data";
   const isNoGroupPrice = model.sellPriceSource === "location_group" && row.groupSellingPrice == null;
   const rowClass = [
-    isLosing
-      ? "border-l-2 border-l-red-500 bg-red-500/5"
-      : isNoGroupPrice
-        ? "border-l-2 border-l-amber-400 bg-amber-500/5"
-        : isNoData
-          ? "bg-amber-500/3"
-          : index % 2 === 1
-            ? "bg-muted/20"
-            : "",
+    row.unresolved
+      ? "border-l-2 border-l-amber-500 bg-amber-500/5"
+      : isLosing
+        ? "border-l-2 border-l-red-500 bg-red-500/5"
+        : isNoGroupPrice
+          ? "border-l-2 border-l-amber-400 bg-amber-500/5"
+          : isNoData
+            ? "bg-amber-500/3"
+            : index % 2 === 1
+              ? "bg-muted/20"
+              : "",
     "hover:bg-muted/40 transition-colors",
   ].join(" ");
 
   return (
     <TableRow className={rowClass} data-testid={`row-item-${row.stockItemId}`}>
       {visibility.code && <TableCell className="font-mono text-xs text-muted-foreground py-2.5">{row.code}</TableCell>}
-      {visibility.name && <TableCell className="font-medium text-sm py-2.5">{row.name}</TableCell>}
+      {visibility.name && (
+        <TableCell className="font-medium text-sm py-2.5">
+          <div>{row.name}</div>
+          {row.unresolved && <div className="text-[10px] text-amber-500 font-medium">Unresolved stock code</div>}
+        </TableCell>
+      )}
       {visibility.salesQty && (
         <TableCell className="text-right font-mono text-sm py-2.5">
           {row.salesQty > 0 ? (
@@ -141,7 +148,13 @@ function ProfitRow({ row, index, model }: { row: ComputedRow; index: number; mod
       )}
       {visibility.status && (
         <TableCell className="py-2.5">
-          <StatusBadge status={row.computedStatus} />
+          {row.unresolved ? (
+            <span className="inline-flex items-center rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+              Unresolved
+            </span>
+          ) : (
+            <StatusBadge status={row.computedStatus} />
+          )}
         </TableCell>
       )}
       {visibility.qtyToOrder && <QuantityCell row={row} model={model} />}
@@ -173,6 +186,13 @@ function ProfitRow({ row, index, model }: { row: ComputedRow; index: number; mod
 }
 
 function AverageSellCell({ row, model }: { row: ComputedRow; model: ProfitModel }) {
+  if (row.unresolved) {
+    return (
+      <TableCell className="text-right text-sm font-medium py-2.5">
+        <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">Link item first</span>
+      </TableCell>
+    );
+  }
   if (model.sellPriceSource === "location_group") {
     return (
       <TableCell className="text-right text-sm font-medium py-2.5">
@@ -210,6 +230,20 @@ function AverageSellCell({ row, model }: { row: ComputedRow; model: ProfitModel 
 }
 
 function DubaiPriceCell({ row, model }: { row: ComputedRow; model: ProfitModel }) {
+  if (row.unresolved) {
+    return (
+      <TableCell className="text-right text-sm py-2.5 bg-amber-500/5">
+        {row.poPrice != null ? (
+          <div className="flex flex-col items-end gap-0.5">
+            <span className="font-mono text-sm text-amber-600 dark:text-amber-400">${fmt(row.poPrice)}</span>
+            <span className="text-[10px] text-muted-foreground leading-tight">proforma price</span>
+          </div>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        )}
+      </TableCell>
+    );
+  }
   return (
     <TableCell className="text-right text-sm py-2.5 bg-amber-500/5">
       <div className="flex flex-col items-end gap-0.5">
