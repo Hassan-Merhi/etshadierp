@@ -212,7 +212,7 @@
     "@types/ws": "^8.5.13",
     "@vitest/coverage-v8": "4.1.11",
     "drizzle-kit": "^0.31.10",
-    "eslint": "^10.9.0",
+    "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-unused-imports": "^4.4.1",
@@ -221,7 +221,7 @@
     "supertest": "^7.2.2",
     "tsx": "^4.20.5",
     "typescript": "5.9.3",
-    "typescript-eslint": "^8.65.0",
+    "typescript-eslint": "^8.68.0",
     "vitest": "^4.1.11"
   },
   "optionalDependencies": {
