@@ -1,0 +1,76 @@
+name: ChatGPT One-shot Format PR 1126
+
+on:
+  push:
+    branches:
+      - sync/latest-main-with-local-accounting-fixes-20260901
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chatgpt-format-pr1126
+  cancel-in-progress: false
+
+jobs:
+  format:
+    name: Format exact PR files and self-remove
+    if: github.event.head_commit.message == 'chore(ci): run one-shot formatter for PR 1126'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact branch head without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: sync/latest-main-with-local-accounting-fixes-20260901
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.19.0'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Format only files reported by CI
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/i18n/phase3RemainingTranslations.part24.ts \
+            client/src/pages/NetProfitDetails.tsx \
+            server/routes/ledger/write.ts \
+            server/routes/stats/statsNetProfitRoutes.ts \
+            tests/net-position-helper.test.ts
+          node node_modules/prettier/bin/prettier.cjs --check \
+            client/src/i18n/phase3RemainingTranslations.part24.ts \
+            client/src/pages/NetProfitDetails.tsx \
+            server/routes/ledger/write.ts \
+            server/routes/stats/statsNetProfitRoutes.ts \
+            tests/net-position-helper.test.ts
+          git diff --check
+
+      - name: Commit formatting and remove this one-shot workflow
+        env:
+          CI_REPAIR_BOT_TOKEN: ${{ secrets.CI_REPAIR_BOT_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${CI_REPAIR_BOT_TOKEN:-}" ]]; then
+            echo '::error::CI_REPAIR_BOT_TOKEN is required so the pushed commit triggers required CI.'
+            exit 1
+          fi
+          git add \
+            client/src/i18n/phase3RemainingTranslations.part24.ts \
+            client/src/pages/NetProfitDetails.tsx \
+            server/routes/ledger/write.ts \
+            server/routes/stats/statsNetProfitRoutes.ts \
+            tests/net-position-helper.test.ts
+          git rm .github/workflows/chatgpt-format-pr1126.yml
+          git diff --cached --check
+          git config user.name 'ets-ci-repair[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: format accounting sync changes'
+          export GH_TOKEN="$CI_REPAIR_BOT_TOKEN"
+          gh auth setup-git
+          git push origin HEAD:refs/heads/sync/latest-main-with-local-accounting-fixes-20260901
