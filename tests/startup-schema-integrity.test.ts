@@ -24,7 +24,7 @@ import { describe, expect, it } from "vitest";
 import { startupMigrations } from "../server/startup-schema";
 
 /** Statement count of the reviewed composed array. */
-const EXPECTED_STATEMENT_COUNT = 1346;
+const EXPECTED_STATEMENT_COUNT = 1352;
 
 /**
  * sha256 of JSON.stringify(startupMigrations) for the reviewed composed array.
@@ -73,6 +73,12 @@ const EXPECTED_STATEMENT_COUNT = 1346;
  * table and its two indexes for multi-sheet workbook imports, taking the count
  * from 1343 to 1346.
  *
+ * Re-pinned again when stage 024 was expanded with six legacy stock_items
+ * catch-up statements for stock_group_id, grade_id, category_id, opening_qty,
+ * opening_rate and opening_value. They are ordered before the existing five
+ * stage-024 statements, taking the composed array from 1346 to 1352 while
+ * preserving the reviewed stage ordering before stage 025.
+ *
  * Re-pinned again when three VALIDATE statements were removed from
  * 007-schema-catchup-may-2026.ts, taking the count from 1288 to 1285. They
  * validated factory_raw_stock, factory_fx_allocations and
@@ -82,7 +88,7 @@ const EXPECTED_STATEMENT_COUNT = 1346;
  * parent table and raised foreign_key_violation on every boot of a database
  * holding factory rows. Only those three were deleted and no statement moved.
  */
-const EXPECTED_CONTENT_HASH = "27e03f62db703dd9d1ab4dfc57248237e67d31bfd0ed17eb25e534af2c753660";
+const EXPECTED_CONTENT_HASH = "b56332511b904c3774f3a16bd3b7eaa7adb0e4118f0db6a8b27b42fbddeeddf6";
 
 function contentHash(statements: string[]): string {
   return crypto.createHash("sha256").update(JSON.stringify(statements)).digest("hex");
