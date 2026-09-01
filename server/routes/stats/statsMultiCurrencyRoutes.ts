@@ -113,8 +113,12 @@ function applyCurrentCashTranslation(payload: NetPositionPayload, summaries: Cas
     new Decimal(forUsRounded).minus(onUsRounded).plus(equityContribution).toNumber()
   );
 
-  payload.forUs.accounts = forUsAccounts.sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
-  payload.onUs.accounts = onUsAccounts.sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+  payload.forUs.accounts = forUsAccounts
+    .filter((row) => Math.abs(Number(row.value || 0)) >= 0.005)
+    .sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+  payload.onUs.accounts = onUsAccounts
+    .filter((row) => Math.abs(Number(row.value || 0)) >= 0.005)
+    .sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
   payload.forUs.total = forUsRounded;
   payload.onUs.total = onUsRounded;
   payload.forUs.breakdown = rebuildBreakdown(payload.forUs.accounts);
