@@ -52,6 +52,29 @@ interface PeriodFilterProps {
   "data-testid"?: string;
 }
 
+/**
+ * Parse the YYYY-MM-DD strings used by report filters without ever returning
+ * an Invalid Date. Persisted browser state can outlive schema/UI changes, so a
+ * string being present is not enough to trust it as a calendar value.
+ */
+export function parsePeriodFilterDate(dateValue: string): Date | undefined {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) return undefined;
+
+  const [year, month, day] = dateValue.split("-").map(Number);
+  const parsed = new Date(year, month - 1, day, 12, 0, 0, 0);
+
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
 function getPresetDates(preset: PeriodPreset): { fromDate: string; toDate: string } {
   const today = new Date();
   const formatDate = (d: Date) => format(d, "yyyy-MM-dd");
@@ -124,8 +147,11 @@ export function PeriodFilter({
   const isMobile = useIsMobile();
   const [calendarOpen, setCalendarOpen] = useState(false);
 
-  const fromDateObj = value.fromDate ? new Date(value.fromDate + "T12:00:00") : undefined;
-  const toDateObj = value.toDate ? new Date(value.toDate + "T12:00:00") : undefined;
+  // Never pass an Invalid Date into react-day-picker/date-fns. Old session
+  // storage or manually edited state may contain malformed/impossible dates,
+  // and date-fns throws RangeError("Invalid time value") when formatting them.
+  const fromDateObj = parsePeriodFilterDate(value.fromDate);
+  const toDateObj = parsePeriodFilterDate(value.toDate);
 
   const calendarRange: DateRange | undefined =
     fromDateObj || toDateObj ? { from: fromDateObj, to: toDateObj } : undefined;
@@ -245,7 +271,7 @@ export function PeriodFilter({
                 selected={calendarRange}
                 onSelect={handleRangeSelect}
                 numberOfMonths={isMobile ? 1 : 2}
-                defaultMonth={fromDateObj ?? new Date()}
+                defaultMonth={fromDateObj ?? toDateObj ?? new Date()}
               />
             </DialogBody>
             {calendarRange?.from && !calendarRange?.to && (
