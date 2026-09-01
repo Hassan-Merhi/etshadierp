@@ -6,6 +6,30 @@ export interface ExcelRange {
   e: { r: number; c: number };
 }
 
+type SpreadsheetValue = unknown;
+type SpreadsheetRow = SpreadsheetValue[];
+
+interface SheetMetadata {
+  "!cols"?: Array<{ wch?: number }>;
+  "!freeze"?: { xSplit?: number; ySplit?: number };
+  "!merges"?: ExcelRange[];
+}
+
+interface ArraySheet extends SheetMetadata {
+  aoa: SpreadsheetRow[];
+}
+
+interface JsonSheet<Row extends object = Record<string, unknown>> extends SheetMetadata {
+  data: Row[];
+  headers: string[];
+}
+
+type SheetData = ArraySheet | JsonSheet<object>;
+
+function readRowValue(row: object, header: string): unknown {
+  return (row as Record<string, unknown>)[header];
+}
+
 const colToNum = (col: string): number => {
   let num = 0;
   for (let i = 0; i < col.length; i++) {
@@ -36,10 +60,7 @@ const parseOrigin = (origin: string | { r: number; c: number } | undefined): { r
 export const utils = {
   book_new: () => new ExcelJS.Workbook(),
 
-  json_to_sheet: (
-    data: Record<string, any>[],
-    options?: { header?: string[] }
-  ): { data: Record<string, any>[]; headers: string[]; [key: string]: any } => {
+  json_to_sheet: <Row extends object>(data: Row[], options?: { header?: string[] }): JsonSheet<Row> => {
     if (!data || data.length === 0) {
       return { data: [], headers: options?.header ?? [] };
     }
@@ -47,13 +68,13 @@ export const utils = {
     return { data, headers };
   },
 
-  aoa_to_sheet: (data: any[][]): { aoa: any[][]; [key: string]: any } => {
+  aoa_to_sheet: (data: SpreadsheetRow[] | null | undefined): ArraySheet => {
     return { aoa: data ?? [] };
   },
 
   sheet_add_aoa: (
-    sheet: { aoa?: any[][] } & Record<string, any>,
-    rows: any[][],
+    sheet: ArraySheet,
+    rows: SpreadsheetRow[],
     options?: { origin?: string | { r: number; c: number } }
   ) => {
     if (!sheet.aoa) sheet.aoa = [];
@@ -89,19 +110,19 @@ export const utils = {
     return numToCol(cell.c) + (cell.r + 1);
   },
 
-  book_append_sheet: (workbook: ExcelJS.Workbook, sheetData: any, name: string) => {
+  book_append_sheet: (workbook: ExcelJS.Workbook, sheetData: SheetData, name: string) => {
     const worksheet = workbook.addWorksheet(name);
 
     if ("aoa" in sheetData) {
-      for (const row of sheetData.aoa as any[][]) {
+      for (const row of sheetData.aoa) {
         worksheet.addRow(row || []);
       }
     } else if ("data" in sheetData && "headers" in sheetData) {
       worksheet.addRow(sheetData.headers);
       for (const item of sheetData.data) {
-        const row: any[] = [];
+        const row: SpreadsheetRow = [];
         for (const header of sheetData.headers) {
-          row.push(item[header] ?? "");
+          row.push(readRowValue(item, header) ?? "");
         }
         worksheet.addRow(row);
       }
@@ -129,17 +150,17 @@ export const utils = {
     return worksheet;
   },
 
-  sheet_to_json: <T = Record<string, any>>(
+  sheet_to_json: <T = Record<string, unknown>>(
     worksheet: ExcelJS.Worksheet,
     options?: { header?: number | string; defval?: unknown }
   ): T[] => {
-    const data: any[] = [];
+    const data: T[] = [];
     const headers: string[] = [];
     const defval = options?.defval;
 
     if (options?.header === 1) {
       worksheet.eachRow((row) => {
-        const rowData: any[] = [];
+        const rowData: SpreadsheetRow = [];
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
           let value = cell.value;
           if (value && typeof value === "object" && "result" in value) {
@@ -150,9 +171,9 @@ export const utils = {
           }
           rowData[colNumber - 1] = value;
         });
-        data.push(rowData);
+        data.push(rowData as unknown as T);
       });
-      return data as T[];
+      return data;
     }
 
     worksheet.eachRow((row, rowNumber) => {
@@ -161,7 +182,7 @@ export const utils = {
           headers[colNumber - 1] = String(cell.value || "");
         });
       } else {
-        const rowData: Record<string, any> = {};
+        const rowData: Record<string, unknown> = {};
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
           const header = headers[colNumber - 1];
           if (header) {
@@ -181,12 +202,12 @@ export const utils = {
           }
         }
         if (Object.keys(rowData).length > 0) {
-          data.push(rowData as T);
+          data.push(rowData as unknown as T);
         }
       }
     });
 
-    return data as T[];
+    return data;
   },
 };
 

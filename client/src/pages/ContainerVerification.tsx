@@ -186,7 +186,7 @@ export default function ContainerVerification() {
           .map((r) => ({
             barcode: String(r.Barcode || r.barcode || "").trim(),
             itemName: String(r["Item Name"] || r.itemName || r.Name || "").trim(),
-            qty: parseInt(r.Qty || r.qty || r.Quantity || 0) || 0,
+            qty: parseInt(String(r.Qty || r.qty || r.Quantity || 0), 10) || 0,
             weightPerBale: String(r["Weight per Bale"] || r.weightPerBale || r.Weight || "0"),
             pricePerBale: String(r["Price per Bale"] || r.pricePerBale || r.Price || "0"),
           }))
