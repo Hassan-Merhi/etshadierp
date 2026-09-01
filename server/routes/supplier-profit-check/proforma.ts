@@ -1,10 +1,11 @@
 /**
  * Supplier Profit Check proforma persistence.
  *
- * All writes are transactional and every incoming item is resolved to the
- * active company's canonical stock item before lines are replaced. Duplicate
- * codes/aliases collapse to one line with summed quantity, so autosave cannot
- * perpetuate duplicate Profit Check rows.
+ * All writes are transactional and every resolvable incoming item is normalized
+ * to the active company's canonical stock item before lines are replaced.
+ * Duplicate codes/aliases collapse to one line with summed quantity. Unresolved
+ * supplier codes are preserved as raw proforma lines instead of being dropped or
+ * blocking autosave, so Profit Check can keep the source quantity intact.
  */
 import type { Express, Request, Response, RequestHandler } from "express";
 import type { PoolClient } from "pg";
@@ -32,7 +33,7 @@ interface IncomingProformaItem {
 }
 
 interface ConsolidatedLine {
-  stockItemId: number;
+  stockItemId: number | null;
   barcode: string;
   itemName: string;
   qty: number;
@@ -104,18 +105,11 @@ async function resolveAndConsolidateItems(
   for (const row of resolvedResult.rows) {
     resolvedByIndex.set(Number(row.ord) - 1, { id: Number(row.id), code: row.code, name: row.name });
   }
-  if (resolvedByIndex.size !== positiveItems.length) {
-    const missing = positiveItems
-      .filter((_, index) => !resolvedByIndex.has(index))
-      .map(({ code }) => code)
-      .join(", ");
-    throw new ProfitCheckInputError(`Unknown stock item code(s): ${missing}`);
-  }
 
   const grouped = new Map<
-    number,
+    string,
     {
-      stockItemId: number;
+      stockItemId: number | null;
       barcode: string;
       itemName: string;
       qty: number;
@@ -125,14 +119,19 @@ async function resolveAndConsolidateItems(
     }
   >();
 
-  positiveItems.forEach(({ item, qty }, index) => {
-    const resolved = resolvedByIndex.get(index)!;
+  positiveItems.forEach(({ item, code, qty }, index) => {
+    const resolved = resolvedByIndex.get(index);
+    const stockItemId = resolved?.id ?? null;
+    const barcode = resolved?.code ?? code;
+    const rawItemName = String(item.itemName ?? item.name ?? "").trim();
+    const itemName = resolved?.name ?? rawItemName || code;
+    const groupKey = stockItemId != null ? `stock:${stockItemId}` : `raw:${code.toLowerCase()}`;
     const suppliedPrice = optionalNonNegativeNumber(item.supplierPrice);
     const weight = optionalNonNegativeNumber(item.weight) ?? 0;
-    const current = grouped.get(resolved.id) ?? {
-      stockItemId: resolved.id,
-      barcode: resolved.code,
-      itemName: resolved.name,
+    const current = grouped.get(groupKey) ?? {
+      stockItemId,
+      barcode,
+      itemName,
       qty: 0,
       pricedQty: 0,
       weightedPrice: 0,
@@ -144,22 +143,27 @@ async function resolveAndConsolidateItems(
       current.pricedQty += qty;
       current.weightedPrice += qty * suppliedPrice;
     }
-    grouped.set(resolved.id, current);
+    grouped.set(groupKey, current);
   });
 
-  const stockItemIds = [...grouped.keys()];
-  const overrideResult = await client.query(
-    `
-    SELECT spo.stock_item_id, spo.po_price::numeric AS po_price
-    FROM supplier_profit_po_overrides spo
-    JOIN stock_items si ON si.id = spo.stock_item_id
-    WHERE spo.supplier_id = $1
-      AND si.company_id = $2
-      AND si.deleted_at IS NULL
-      AND spo.stock_item_id = ANY($3::int[])
-  `,
-    [supplierId, companyId, stockItemIds]
-  );
+  const stockItemIds = [...grouped.values()]
+    .map((line) => line.stockItemId)
+    .filter((stockItemId): stockItemId is number => stockItemId != null);
+  const overrideResult =
+    stockItemIds.length > 0
+      ? await client.query(
+          `
+          SELECT spo.stock_item_id, spo.po_price::numeric AS po_price
+          FROM supplier_profit_po_overrides spo
+          JOIN stock_items si ON si.id = spo.stock_item_id
+          WHERE spo.supplier_id = $1
+            AND si.company_id = $2
+            AND si.deleted_at IS NULL
+            AND spo.stock_item_id = ANY($3::int[])
+        `,
+          [supplierId, companyId, stockItemIds]
+        )
+      : { rows: [] };
   const overrideMap = new Map<number, number>();
   for (const row of overrideResult.rows) {
     const price = Number(row.po_price);
@@ -172,7 +176,9 @@ async function resolveAndConsolidateItems(
     itemName: line.itemName,
     qty: line.qty,
     weightPerBale: line.qty > 0 ? line.weightedWeight / line.qty : 0,
-    pricePerBale: overrideMap.get(line.stockItemId) ?? (line.pricedQty > 0 ? line.weightedPrice / line.pricedQty : 0),
+    pricePerBale:
+      (line.stockItemId != null ? overrideMap.get(line.stockItemId) : undefined) ??
+      (line.pricedQty > 0 ? line.weightedPrice / line.pricedQty : 0),
   }));
 }
 
