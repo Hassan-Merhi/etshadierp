@@ -16,4 +16,24 @@ export const currentMainSupplierPartnerTranslations = [
     ar: "تتطلب نقطة بيع Golden Coast معرّف بيع ثابتاً من العميل.",
     fr: "Le point de vente Golden Coast nécessite un identifiant de vente côté client stable.",
   },
+  {
+    en: "Unresolved stock code",
+    ar: "رمز مخزون غير محلول",
+    fr: "Code de stock non résolu",
+  },
+  {
+    en: "Unresolved",
+    ar: "غير محلول",
+    fr: "Non résolu",
+  },
+  {
+    en: "Link item first",
+    ar: "اربط الصنف أولاً",
+    fr: "Lier d’abord l’article",
+  },
+  {
+    en: "proforma price",
+    ar: "سعر الفاتورة الأولية",
+    fr: "prix proforma",
+  },
 ] as const satisfies readonly Phase4SupplierPartnerEntry[];
