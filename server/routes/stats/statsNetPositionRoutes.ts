@@ -9,7 +9,7 @@ import { logAudit, calculateHistoricalLocationInventory } from "../_helpers";
 import { getClientDate } from "../../lib/dateUtils";
 import { inventory, containers, vouchers, suppliers, locations, factoryWorkerAdvances } from "@shared/schema";
 import { eq, and, or, inArray, sql, isNull, lte } from "drizzle-orm";
-import { classifyNetPositionAccounts, round2 } from "../../netPositionHelper";
+import { classifyEquityAccounts, classifyNetPositionAccounts, round2 } from "../../netPositionHelper";
 
 export function registerStatsNetPositionRoutes(app: Express) {
   app.get("/api/stats/net-position-excel", requireAuth, requireNonPOS, async (req, res) => {
@@ -111,10 +111,16 @@ export function registerStatsNetPositionRoutes(app: Express) {
       // ── 2. Classify accounts ──────────────────────────────────────────────
       const parentCompanyId = await storage.getParentCompanyId();
       const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
-      // SP formula: Cash + Stock (inventory) → What We Have; sp_payable only → What We Owe.
+      // SP formula: Cash + Stock (inventory) → What We Have; sp_payable and Loan/Loans → What We Owe.
       const isSupplierPartner = company?.companyType === "supplier_partner";
       const accountsForClassify = isSupplierPartner
-        ? companyAccounts.filter((a) => a.accountType === "Cash" || a.subType === "sp_payable")
+        ? companyAccounts.filter(
+            (a) =>
+              a.accountType === "Cash" ||
+              a.accountType === "Loan" ||
+              a.accountType === "Loans" ||
+              a.subType === "sp_payable"
+          )
         : companyAccounts.filter(
             (a) =>
               a.subType !== "sp_stock" &&
@@ -124,6 +130,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
         includeSupplierTypeAccounts: shouldIncludeSuppliers,
       });
+      const equity = classifyEquityAccounts(companyAccounts, accountBalances);
       let forUsTotal = classified.forUsTotal;
       let onUsTotal = classified.onUsTotal;
       const forUsAccounts = [...classified.forUsAccounts];
@@ -263,7 +270,8 @@ export function registerStatsNetPositionRoutes(app: Express) {
         });
       }
 
-      const netPosition = round2(forUsTotal - onUsTotal);
+      const equityContribution = isSupplierPartner ? equity.total : 0;
+      const netPosition = round2(forUsTotal - onUsTotal + equityContribution);
       forUsTotal = round2(forUsTotal);
       onUsTotal = round2(onUsTotal);
 
