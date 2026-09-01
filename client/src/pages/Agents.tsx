@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
+import { selectAccountsArray, type AccountsAllPayload } from "@/lib/accountsAllPayload";
 import { drCrClass } from "@/lib/formatNumber";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -111,15 +112,11 @@ export default function Agents() {
 
   useEscapeBack(selectedAccount ? () => setSelectedAccount(null) : null);
 
-  // /api/accounts/all returns { accounts: [...], asOfDate } — extract the array.
-  const { data: allAccounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
+  // Preserve the server envelope in the shared cache and normalize only for
+  // this screen. That keeps navigation safe for pages that share this query key.
+  const { data: allAccounts = [], isLoading: accountsLoading } = useQuery<AccountsAllPayload<Account>, Error, Account[]>({
     queryKey: ["/api/accounts/all", selectedCompany?.id],
-    queryFn: async () => {
-      const response = await fetch("/api/accounts/all");
-      if (!response.ok) throw new Error("Failed to fetch accounts");
-      const data = await response.json();
-      return Array.isArray(data) ? data : (data.accounts ?? []);
-    },
+    select: selectAccountsArray,
     enabled: !!selectedCompany,
   });
 
