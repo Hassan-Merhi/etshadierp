@@ -1,6 +1,17 @@
 import type { Phase3SharedUiEntry } from "./sharedUiPhase3TranslationTypes";
 
 export const phase3RemainingTranslationsPart24: readonly Phase3SharedUiEntry[] = [
+  { en: "Partner Equity", ar: "حقوق ملكية الشركاء", fr: "Capitaux propres des partenaires" },
+{
+  en: "PO Import company scope does not match the active company.",
+  ar: "نطاق شركة استيراد أمر الشراء لا يطابق الشركة النشطة.",
+  fr: "Le périmètre de société de l’importation du bon de commande ne correspond pas à la société active.",
+},
+{
+  en: "Upload company scope does not match the active company.",
+  ar: "نطاق شركة الرفع لا يطابق الشركة النشطة.",
+  fr: "Le périmètre de société du téléversement ne correspond pas à la société active.",
+},
   { en: "Clear categories", ar: "مسح الفئات", fr: "Effacer les catégories" },
   { en: "Clear suppliers", ar: "مسح الموردين", fr: "Effacer les fournisseurs" },
   { en: "Offloaded date", ar: "تاريخ التفريغ", fr: "Date de déchargement" },
