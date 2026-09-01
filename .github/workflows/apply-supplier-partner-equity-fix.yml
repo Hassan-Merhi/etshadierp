@@ -1,0 +1,38 @@
+name: Apply supplier partner equity fix
+
+on:
+  push:
+    branches:
+      - fix/supplier-partner-equity-net-position
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/supplier-partner-equity-net-position
+          fetch-depth: 0
+
+      - name: Apply staged patch
+        run: |
+          git apply --check .github/patches/supplier-partner-equity-net-position.patch
+          git apply .github/patches/supplier-partner-equity-net-position.patch
+
+      - name: Remove one-time patch machinery
+        run: |
+          rm .github/patches/supplier-partner-equity-net-position.patch
+          rm .github/workflows/apply-supplier-partner-equity-fix.yml
+
+      - name: Commit and push fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: include supplier partner equity in net position"
+          git push origin HEAD:fix/supplier-partner-equity-net-position
