@@ -19,10 +19,79 @@ jobs:
           ref: fix/supplier-partner-equity-net-position
           fetch-depth: 0
 
-      - name: Apply staged patch
+      - name: Apply deterministic source edits
+        shell: bash
         run: |
-          git apply --check .github/patches/supplier-partner-equity-net-position.patch
-          git apply .github/patches/supplier-partner-equity-net-position.patch
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"Expected exactly one match in {path}, found {count}: {old[:80]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          route = "server/routes/stats/statsNetProfitRoutes.ts"
+          replace_once(
+              route,
+              '''      const isSupplierPartner = companyRecord?.companyType === "supplier_partner";\n      const accountsForClassify = isSupplierPartner''',
+              '''      const isSupplierPartner = companyRecord?.companyType === "supplier_partner";\n      const equityIncludedInNetPosition = isSupplierPartner;\n      const accountsForClassify = isSupplierPartner''',
+          )
+          replace_once(
+              route,
+              '''      // Net Position = Pure sign-based: Sum(positive balances) - Sum(negative balances)\n      // Positive balance = asset (what we have)\n      // Negative balance = liability (what we owe)\n      // This is a simplified calculation: Assets - Liabilities only\n      const netPosition = round2(forUsTotal - onUsTotal);''',
+              '''      // Net Position remains Assets - Liabilities for regular companies.\n      // Supplier-partner companies also include signed partner equity directly:\n      // debit equity increases the position, while credit equity reduces it.\n      const equityNetPositionContribution = equityIncludedInNetPosition ? equity.total : 0;\n      const netPosition = round2(forUsTotal - onUsTotal + equityNetPositionContribution);''',
+          )
+          replace_once(
+              route,
+              '''      const netWorth = round2(forUsTotal - onUsTotal);''',
+              '''      const netWorth = netPosition;''',
+          )
+          replace_once(
+              route,
+              '''        equity: {\n          total: equity.total,\n          accounts: equity.accounts,\n        },\n        netPosition,''',
+              '''        equity: {\n          total: equity.total,\n          accounts: equity.accounts,\n          includedInNetPosition: equityIncludedInNetPosition,\n        },\n        netPosition,''',
+          )
+          replace_once(
+              route,
+              '''        equity,\n        ownersCapital,''',
+              '''        equity: {\n          ...equity,\n          includedInNetPosition: equityIncludedInNetPosition,\n        },\n        ownersCapital,''',
+          )
+
+          client = "client/src/pages/NetProfitDetails.tsx"
+          replace_once(
+              client,
+              '''  equity?: { total: number; accounts: AccountItem[] };''',
+              '''  equity?: { total: number; accounts: AccountItem[]; includedInNetPosition?: boolean };''',
+          )
+          replace_once(
+              client,
+              '''  const forUsTotal = data?.forUsTotal || 0;\n  const onUsTotal = data?.onUsTotal || 0;\n  const netPos = data?.netPosition || 0;\n  const isPositive = netPos >= 0;''',
+              '''  const forUsTotal = data?.forUsTotal || 0;\n  const onUsTotal = data?.onUsTotal || 0;\n  const netPos = data?.netPosition || 0;\n  const equityTotal = data?.equity?.total ?? 0;\n  const equityIncludedInNetPosition = data?.equity?.includedInNetPosition === true;\n  const equitySide = equityTotal === 0 ? null : equityTotal > 0 ? "Dr" : "Cr";\n  const isPositive = netPos >= 0;''',
+          )
+          replace_once(
+              client,
+              '''          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">''',
+              '''          <div\n            className={`grid grid-cols-1 ${equityIncludedInNetPosition ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-3"} divide-y sm:divide-y-0 sm:divide-x divide-border`}\n          >''',
+          )
+          replace_once(
+              client,
+              '''            {/* Net Position */}''',
+              '''            {equityIncludedInNetPosition && (\n              <div className="p-5 flex items-center gap-4 bg-violet-50/40 dark:bg-violet-950/20">\n                <div className="p-2.5 rounded-xl bg-violet-100 dark:bg-violet-900/50 shrink-0">\n                  <Scale className="h-5 w-5 text-violet-600 dark:text-violet-400" />\n                </div>\n                <div className="min-w-0">\n                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-0.5">\n                    Partner Equity\n                  </p>\n                  <p className="text-2xl font-bold font-mono tabular-nums text-violet-600 dark:text-violet-400 truncate">\n                    {formatAmount(Math.abs(equityTotal))}\n                    {equitySide && <span className="text-xs font-normal ml-1">{equitySide}</span>}\n                  </p>\n                  <p className="text-xs text-muted-foreground mt-0.5">\n                    {data?.equity?.accounts?.length || 0} equity accounts · included in Net Position\n                  </p>\n                </div>\n              </div>\n            )}\n\n            {/* Net Position */}''',
+          )
+          replace_once(
+              client,
+              '''      {/* ── Assets + Liabilities side by side ── */}''',
+              '''      {equityIncludedInNetPosition && (\n        <SidePanel\n          id="equity"\n          title="Partner Capital / Equity"\n          subtitle={`${data?.equity?.accounts?.length || 0} equity accounts — included in Net Position total`}\n          side="equity"\n          total={equityTotal}\n          accounts={data?.equity?.accounts || []}\n          formatAmount={formatAmount}\n        />\n      )}\n\n      {/* ── Assets + Liabilities side by side ── */}''',
+          )
+          replace_once(
+              client,
+              '''      {/* ── Partner capital / equity ── */}\n      <SidePanel\n        id="equity"\n        title="Partner Capital / Equity"\n        subtitle={`${data?.equity?.accounts?.length || 0} equity accounts — excluded from Net Position totals`}\n        side="equity"\n        total={data?.equity?.total ?? 0}\n        accounts={data?.equity?.accounts || []}\n        formatAmount={formatAmount}\n      />''',
+              '''      {/* ── Partner capital / equity ── */}\n      {!equityIncludedInNetPosition && (\n        <SidePanel\n          id="equity"\n          title="Partner Capital / Equity"\n          subtitle={`${data?.equity?.accounts?.length || 0} equity accounts — excluded from Net Position totals`}\n          side="equity"\n          total={equityTotal}\n          accounts={data?.equity?.accounts || []}\n          formatAmount={formatAmount}\n        />\n      )}''',
+          )
+          PY
 
       - name: Remove one-time patch machinery
         run: |
