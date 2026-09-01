@@ -55,6 +55,14 @@ jobs:
       ERP_SMOKE_PASSWORD: ux-ci-${{ github.run_id }}-${{ github.run_attempt }}
       ERP_SMOKE_REQUIRE_AUTHENTICATED: "1"
       ERP_SMOKE_REQUIRE_EXACT_ROUTES: "1"
+      # The smoke performs 189 full SPA navigations (21 routes x 3 languages x
+      # 3 viewports). The per-wait budget asserts that a route renders at all,
+      # not that it renders quickly, and 45s was tight enough that a single
+      # arbitrary case timed out on a busy shared runner - observed on three
+      # separate runs, each on a different language/viewport pair and one of
+      # them on a branch carrying no product code. Give the readiness waits
+      # room; the job as a whole is still bounded by timeout-minutes.
+      ERP_SMOKE_TIMEOUT_MS: "120000"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
