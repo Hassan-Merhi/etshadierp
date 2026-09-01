@@ -1,0 +1,94 @@
+name: Apply supplier partner customer net position fix
+
+on:
+  push:
+    branches:
+      - fix/supplier-partner-customer-net-position
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/supplier-partner-customer-net-position
+          fetch-depth: 0
+
+      - name: Include customer receivables in supplier partner net position
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              data = p.read_text()
+              count = data.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one match, found {count}")
+              p.write_text(data.replace(old, new, 1))
+
+          replace_once(
+              "server/routes/stats/statsNetProfitRoutes.ts",
+              '      // SP formula: What We Have = Cash + Stock (from inventory table); What We Owe includes supplier cash payable and Loan/Loans balances.\n      // Other SP ledger accounts (OTW, prepaid, intercompany, clearing accounts, etc.) remain excluded unless explicitly part of the formula.',
+              '      // SP formula: What We Have = Cash + Customer A/R + Stock (from inventory table); What We Owe includes supplier cash payable and Loan/Loans balances.\n      // Other SP ledger accounts (OTW, prepaid, intercompany, clearing accounts, etc.) remain excluded unless explicitly part of the formula.'
+          )
+          replace_once(
+              "server/routes/stats/statsNetProfitRoutes.ts",
+              '              a.accountType === "Loans" ||\n              a.subType === "sp_payable"',
+              '              a.accountType === "Loans" ||\n              a.subType === "Accounts Receivable" ||\n              a.subType === "sp_payable"'
+          )
+
+          replace_once(
+              "server/helpers/calculateNetPositionAsOf.ts",
+              '  // SP formula: What We Have = Cash + SP-HADI-IC receivable (Hadi holds the cash on SP\'s behalf);\n  // What We Owe = Supplier Cash Payable only.',
+              '  // SP formula: What We Have = Cash + Customer A/R + SP-HADI-IC receivable (Hadi holds the cash on SP\'s behalf);\n  // What We Owe = Supplier Cash Payable plus Loan/Loans balances.'
+          )
+          replace_once(
+              "server/helpers/calculateNetPositionAsOf.ts",
+              '          a.accountType === "Loans" ||\n          a.subType === "sp_payable" ||',
+              '          a.accountType === "Loans" ||\n          a.subType === "Accounts Receivable" ||\n          a.subType === "sp_payable" ||'
+          )
+
+          replace_once(
+              "server/routes/stats/statsNetPositionRoutes.ts",
+              '      // SP formula: Cash + Stock (inventory) → What We Have; sp_payable and Loan/Loans → What We Owe.',
+              '      // SP formula: Cash + Customer A/R + Stock (inventory) → What We Have; sp_payable and Loan/Loans → What We Owe.'
+          )
+          replace_once(
+              "server/routes/stats/statsNetPositionRoutes.ts",
+              '              a.accountType === "Loans" ||\n              a.subType === "sp_payable"',
+              '              a.accountType === "Loans" ||\n              a.subType === "Accounts Receivable" ||\n              a.subType === "sp_payable"'
+          )
+
+          test = Path("tests/supplier-partner-net-position-inclusion.test.ts")
+          data = test.read_text()
+          data = data.replace(
+              '  it("includes Loan/Loans and signed equity in the live Net Position", () => {',
+              '  it("includes customer receivables, Loan/Loans, and signed equity in the live Net Position", () => {'
+          )
+          data = data.replace(
+              '    expect(source).toContain(\'a.accountType === "Loans"\');\n',
+              '    expect(source).toContain(\'a.accountType === "Loans"\');\n    expect(source).toContain(\'a.subType === "Accounts Receivable"\');\n',
+              1
+          )
+          old = '      expect(source).toContain(\'a.accountType === "Loans"\');\n      expect(source).toContain("equityContribution");'
+          new = '      expect(source).toContain(\'a.accountType === "Loans"\');\n      expect(source).toContain(\'a.subType === "Accounts Receivable"\');\n      expect(source).toContain("equityContribution");'
+          if old not in data:
+              raise SystemExit("test: historical/export insertion point not found")
+          test.write_text(data.replace(old, new, 1))
+          PY
+
+      - name: Remove one-time workflow
+        run: rm .github/workflows/apply-supplier-partner-customer-net-position.yml
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: include customer receivables in supplier partner net position"
+          git push origin HEAD:fix/supplier-partner-customer-net-position
