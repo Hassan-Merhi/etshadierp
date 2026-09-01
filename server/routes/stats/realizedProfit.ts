@@ -16,7 +16,7 @@ export function buildRealizedProfitQuery(
   toDate: string | null | undefined
 ): RealizedProfitQuery {
   const params: Array<number | string> = [companyId];
-  const predicates = ["v.company_id = $1", "v.voucher_type = 'Sales'", "v.deleted_at IS NULL"];
+  const predicates = ["v.voucher_type = 'Sales'", "v.deleted_at IS NULL"];
 
   if (baselineDate) {
     params.push(baselineDate);
@@ -32,7 +32,8 @@ export function buildRealizedProfitQuery(
       SELECT COALESCE(SUM(si.profit::numeric), 0) AS total
       FROM sales_items si
       JOIN vouchers v ON si.voucher_id = v.id
-      WHERE ${predicates.join("\n        AND ")}
+      WHERE v.company_id = $1
+        AND ${predicates.join("\n        AND ")}
     `,
     params,
   };

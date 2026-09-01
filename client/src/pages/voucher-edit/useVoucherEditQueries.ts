@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { selectAccountsArray, type AccountsAllPayload } from "@/lib/accountsAllPayload";
 import { stockItemKeys } from "@/lib/queryKeys";
 import { VoucherData, BankAccount, LedgerAccount, Supplier, StockItem, Location } from "./VoucherEditHelpers";
 import { AccountWithBalance } from "./VoucherAccountHelpers";
@@ -47,8 +48,9 @@ export function useVoucherEditQueries({ id, selectedCompanyId }: UseVoucherEditQ
     queryKey: ["/api/locations"],
   });
 
-  const { data: allAccountsData = [] } = useQuery<AccountWithBalance[]>({
+  const { data: allAccountsData = [] } = useQuery<AccountsAllPayload<AccountWithBalance>, Error, AccountWithBalance[]>({
     queryKey: ["/api/accounts/all", selectedCompanyId],
+    select: selectAccountsArray,
     enabled: !!selectedCompanyId,
   });
 
