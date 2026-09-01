@@ -158,6 +158,7 @@ export const companySettings = pgTable("company_settings", {
   timezone: text("timezone"),
   spPosPayableAccountId: integer("sp_pos_payable_account_id"),
   spPosProfitAccountId: integer("sp_pos_profit_account_id"),
+  spPosProfitBaselineDate: date("sp_pos_profit_baseline_date"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -179,6 +180,7 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings)
     timezone: z.string().optional(),
     spPosPayableAccountId: z.number().nullable().optional(),
     spPosProfitAccountId: z.number().nullable().optional(),
+    spPosProfitBaselineDate: z.string().nullable().optional(),
   });
 
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;

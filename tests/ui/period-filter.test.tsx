@@ -1,7 +1,12 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { PeriodFilter, getDefaultPeriodValue, type PeriodFilterValue } from "@/components/ui/period-filter";
+import {
+  PeriodFilter,
+  getDefaultPeriodValue,
+  parsePeriodFilterDate,
+  type PeriodFilterValue,
+} from "@/components/ui/period-filter";
 
 vi.mock("@/contexts/DateFormatContext", () => ({
   useDateFormat: () => ({
@@ -162,5 +167,31 @@ describe("PeriodFilter interactions", () => {
   it("falls back to a placeholder when a custom period has no dates", () => {
     render(<PeriodFilter value={{ fromDate: "", toDate: "", preset: "custom" }} onChange={vi.fn()} />);
     expect(screen.getByText("Custom Range")).toBeInTheDocument();
+  });
+
+  it("rejects malformed and impossible persisted date strings", () => {
+    expect(parsePeriodFilterDate("not-a-date")).toBeUndefined();
+    expect(parsePeriodFilterDate("2026-02-31")).toBeUndefined();
+    expect(parsePeriodFilterDate("2026-13-01")).toBeUndefined();
+    expect(parsePeriodFilterDate("2026-02-28")).toBeInstanceOf(Date);
+  });
+
+  it("does not crash when stale persisted custom dates are invalid", async () => {
+    const user = userEvent.setup();
+
+    expect(() =>
+      renderFilter({
+        fromDate: "not-a-date",
+        toDate: "2026-02-31",
+        preset: "custom",
+      })
+    ).not.toThrow();
+
+    expect(screen.getByText("Custom Range")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("period-filter-dropdown"));
+    await user.click(await screen.findByTestId("period-preset-custom"));
+
+    expect(await screen.findByTestId("period-custom-range-dialog")).toBeInTheDocument();
   });
 });

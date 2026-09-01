@@ -1,5 +1,5 @@
 import { getErrorDetails } from "@shared/errorUtils";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +36,26 @@ function fmt(v: number, dec = 2) {
     : `$${n.toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec })}`;
 }
 
+function toLocalDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentMonthRange(now = new Date()) {
+  const year = now.getFullYear();
+  const monthIndex = now.getMonth();
+  const firstDay = new Date(year, monthIndex, 1);
+  const lastDay = new Date(year, monthIndex + 1, 0);
+
+  return {
+    key: `${year}-${String(monthIndex + 1).padStart(2, "0")}`,
+    from: toLocalDateInputValue(firstDay),
+    to: toLocalDateInputValue(lastDay),
+  };
+}
+
 export default function SpReports() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
@@ -45,19 +65,32 @@ export default function SpReports() {
     defaultValue: "profit",
     omitDefault: true,
   });
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-
-  const [exportFrom, setExportFrom] = useState(() => {
-    const d = new Date();
-    d.setDate(1);
-    return d.toISOString().slice(0, 10);
-  });
-  const [exportTo, setExportTo] = useState(new Date().toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(() => getCurrentMonthRange().from);
+  const [endDate, setEndDate] = useState(() => getCurrentMonthRange().to);
+  const [exportFrom, setExportFrom] = useState(() => getCurrentMonthRange().from);
+  const [exportTo, setExportTo] = useState(() => getCurrentMonthRange().to);
   const [exportLocationId, setExportLocationId] = useState<string>("all");
   const [exportCashAccountId, setExportCashAccountId] = useState<string>("none");
   const [exporting, setExporting] = useState(false);
   const [exportingV2, setExportingV2] = useState(false);
+
+  useEffect(() => {
+    let activeMonthKey = getCurrentMonthRange().key;
+
+    const syncReportRangesToCurrentMonth = () => {
+      const currentMonth = getCurrentMonthRange();
+      if (currentMonth.key === activeMonthKey) return;
+
+      activeMonthKey = currentMonth.key;
+      setStartDate(currentMonth.from);
+      setEndDate(currentMonth.to);
+      setExportFrom(currentMonth.from);
+      setExportTo(currentMonth.to);
+    };
+
+    const intervalId = window.setInterval(syncReportRangesToCurrentMonth, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const profitUrl = `/api/sp/report/profit${
     startDate || endDate
@@ -73,6 +106,16 @@ export default function SpReports() {
     queryKey: ["/api/accounts/all", selectedCompany?.id],
   });
   const accounts = extractAccounts(accountsResponse);
+
+  useEffect(() => {
+    const gcSalesCash = accounts.find((account) => account.name.trim().toLowerCase() === "gc sales cash");
+    if (!gcSalesCash) return;
+
+    setExportCashAccountId((current) => {
+      const currentAccountStillExists = accounts.some((account) => String(account.id) === current);
+      return currentAccountStillExists ? current : String(gcSalesCash.id);
+    });
+  }, [accounts, selectedCompany?.id]);
 
   const handleExportSalesForm = async () => {
     if (!exportFrom || !exportTo) {
@@ -312,14 +355,14 @@ export default function SpReports() {
                   </Select>
                 </div>
                 <div className="min-w-48">
-                  <label className="text-xs text-muted-foreground">Opening Cash Account (optional)</label>
+                  <label className="text-xs text-muted-foreground">Opening Cash Account</label>
                   <Select
                     value={exportCashAccountId}
                     onValueChange={setExportCashAccountId}
                     data-testid="select-sp-export-cash-account"
                   >
                     <SelectTrigger className="mt-1" data-testid="select-sp-export-cash-account-trigger">
-                      <SelectValue placeholder="No account (manual entry)" />
+                      <SelectValue placeholder="GC Sales Cash" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No account (manual entry)</SelectItem>
@@ -376,8 +419,8 @@ export default function SpReports() {
                   <span className="font-medium text-foreground">Export System Sales Form</span> — clean from-scratch
                   workbook built from your live system data. Opening &amp; closing stock match the Location Inventory
                   page. Supports any date range. Three sheets: ENTRY (visible) plus Costing and Sales (hidden). Items
-                  with no opening, closing, or sales activity are omitted. Optionally select an Opening Cash Account to
-                  auto-fill day-1 cash from the ledger balance.
+                  with no opening, closing, or sales activity are omitted. Opening cash defaults to GC Sales Cash when
+                  that account exists for the selected company.
                 </p>
               </div>
             </CardContent>

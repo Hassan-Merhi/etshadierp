@@ -520,6 +520,10 @@ export const supplierPartnerAndAi: string[] = [
   // Intercompany POS: allow skipping the source voucher so SP Net Position is unaffected
   `ALTER TABLE intercompany_pos_configs ADD COLUMN IF NOT EXISTS skip_source_voucher boolean NOT NULL DEFAULT false`,
 
+  // SP POS realized-profit fresh-start date. NULL preserves the legacy
+  // all-time calculation for companies that have not configured one.
+  `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS sp_pos_profit_baseline_date date`,
+
   // Employee attendance: add missing unique constraint so ON CONFLICT works
   `DO $$ BEGIN
       IF NOT EXISTS (

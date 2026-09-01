@@ -11,8 +11,9 @@ import { _getCached, _setCached } from "../../services/shared/ttlCache";
 import { computeRentalOutstanding } from "./netProfitRentalSection";
 import { computeStockInHand } from "./netProfitStockSection";
 import { loadNetProfitData } from "./netProfitDataLoad";
-import { firstRow } from "../../lib/queryResult";
 import { getNetPositionCurrencySummary } from "../../services/accounting/netPositionCurrency";
+import { storage } from "../../storage";
+import { getSupplierPartnerPosProfit } from "./realizedProfit";
 
 export function registerStatsNetProfitRoutes(app: Express) {
   app.get("/api/stats/net-profit", requireAuth, requireNonPOS, async (req, res) => {
@@ -38,9 +39,10 @@ export function registerStatsNetProfitRoutes(app: Express) {
 
       // All the report's raw inputs - company row, ledger accounts and the three
       // grouped balance maps - are loaded in ./netProfitDataLoad.
-      const [netPositionCurrency, reportData] = await Promise.all([
+      const [netPositionCurrency, reportData, companySettings] = await Promise.all([
         getNetPositionCurrencySummary(companyId, toDate),
         loadNetProfitData(companyId, toDate),
+        storage.getCompanySettings(companyId),
       ]);
       const {
         companyRecord,
@@ -86,20 +88,12 @@ export function registerStatsNetProfitRoutes(app: Express) {
       }
 
       // 1. Classify balance-sheet accounts (assets vs liabilities) via shared helper.
-      // SP formula: What We Have = Cash + Customer A/R + Stock (from inventory table); What We Owe includes supplier cash payable and Loan/Loans balances.
-      // Other SP ledger accounts (OTW, prepaid, intercompany, clearing accounts, etc.) remain excluded unless explicitly part of the formula.
+      // SP formula: What We Have = Cash + Stock (from inventory table); What We Owe = Supplier Cash Payable only.
+      // All other SP ledger accounts (OTW, prepaid, intercompany, clearing accounts, etc.) are excluded.
       // For non-SP: exclude sp_stock (inventory table is authoritative) and sp_cost_clearing (double-counts).
       const isSupplierPartner = companyRecord?.companyType === "supplier_partner";
-      const equityIncludedInNetPosition = isSupplierPartner;
       const accountsForClassify = isSupplierPartner
-        ? companyAccounts.filter(
-            (a) =>
-              a.accountType === "Cash" ||
-              a.accountType === "Loan" ||
-              a.accountType === "Loans" ||
-              a.subType === "Accounts Receivable" ||
-              a.subType === "sp_payable"
-          )
+        ? companyAccounts.filter((a) => a.accountType === "Cash" || a.subType === "sp_payable")
         : companyAccounts.filter((a) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing");
       const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
         includeSupplierTypeAccounts: shouldIncludeSuppliers,
@@ -566,11 +560,11 @@ export function registerStatsNetProfitRoutes(app: Express) {
         }
       }
 
-      // Net Position remains Assets - Liabilities for regular companies.
-      // Supplier-partner companies also include signed partner equity directly:
-      // debit equity increases the position, while credit equity reduces it.
-      const equityNetPositionContribution = equityIncludedInNetPosition ? equity.total : 0;
-      const netPosition = round2(forUsTotal - onUsTotal + equityNetPositionContribution);
+      // Net Position = Pure sign-based: Sum(positive balances) - Sum(negative balances)
+      // Positive balance = asset (what we have)
+      // Negative balance = liability (what we owe)
+      // This is a simplified calculation: Assets - Liabilities only
+      const netPosition = round2(forUsTotal - onUsTotal);
 
       const netPositionLabel = netPosition >= 0 ? "We have more than we owe" : "We owe more than we have";
 
@@ -581,18 +575,10 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // Cr Payable) already mathematically reflect the profit in the net position.
       // Adding it again would double-count.
       let spPosProfit = 0;
+      const spPosProfitBaselineDate =
+        isSpCompany && companySettings?.spPosProfitBaselineDate ? companySettings.spPosProfitBaselineDate : null;
       if (isSpCompany) {
-        const spProfitResult = await db.execute(sql`
-          SELECT COALESCE(SUM(CAST(si.profit AS DECIMAL)), 0) AS total
-          FROM sales_items si
-          JOIN vouchers v ON si.voucher_id = v.id
-          WHERE v.company_id  = ${companyId}
-            AND v.voucher_type = 'Sales'
-            AND v.deleted_at  IS NULL
-            ${toDate ? sql`AND v.voucher_date <= ${toDate}` : sql``}
-        `);
-        const spRow = firstRow<{ total: string | null }>(spProfitResult);
-        spPosProfit = round2(parseFloat(spRow?.total || "0"));
+        spPosProfit = round2(await getSupplierPartnerPosProfit(companyId, spPosProfitBaselineDate, toDate));
       }
 
       // Owner's Capital for backward compatibility
@@ -605,7 +591,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       }
 
       // Net Worth and Profit for backward compatibility
-      const netWorth = netPosition;
+      const netWorth = round2(forUsTotal - onUsTotal);
       const netProfit = round2(incomeTotal - expensesTotal);
 
       // Breakdown for display
@@ -629,7 +615,6 @@ export function registerStatsNetProfitRoutes(app: Express) {
         equity: {
           total: equity.total,
           accounts: equity.accounts,
-          includedInNetPosition: equityIncludedInNetPosition,
         },
         netPosition,
       };
@@ -639,6 +624,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
         totalExpenses: expensesTotal,
         netProfit,
         spPosProfit,
+        ...(spPosProfitBaselineDate ? { spPosProfitBaselineDate } : {}),
         forUs: {
           total: forUsTotal,
           breakdown: forUsBreakdown,
@@ -659,10 +645,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
           breakdown: expensesBreakdown,
           accounts: expensesAccounts,
         },
-        equity: {
-          ...equity,
-          includedInNetPosition: equityIncludedInNetPosition,
-        },
+        equity,
         ownersCapital,
         netWorth,
         netPosition,
