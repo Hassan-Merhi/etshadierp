@@ -7,11 +7,10 @@ import {
 
 describe("Phase 4 Supplier Partner translations", () => {
   it("covers every reviewed Supplier Partner phrase exactly once", () => {
-    // 235 frozen Phase 4 phrases plus the 37 current-main Golden Coast POS,
-    // parent-company and carry-forward messages added in
-    // currentMainSupplierPartnerTranslations.
-    expect(supplierPartnerPhase4Translations).toHaveLength(272);
-    expect(new Set(supplierPartnerPhase4Translations.map((entry) => entry.en)).size).toBe(272);
+    // 235 frozen Phase 4 phrases plus the two Golden Coast POS HADI errors
+    // added in currentMainSupplierPartnerTranslations.
+    expect(supplierPartnerPhase4Translations).toHaveLength(237);
+    expect(new Set(supplierPartnerPhase4Translations.map((entry) => entry.en)).size).toBe(237);
 
     for (const entry of supplierPartnerPhase4Translations) {
       expect(entry.en.trim()).not.toBe("");

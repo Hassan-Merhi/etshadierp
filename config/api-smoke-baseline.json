@@ -1,7 +1,0 @@
-{
-  "description": "Endpoints that return 5xx under the smoke sweep's seed data. This list is a ratchet: removing entries is progress, adding one accepts a known-broken endpoint. Regenerate with UPDATE_API_SMOKE_BASELINE=1.",
-  "knownFailing": [
-    "/api/accounts/multi-currency/unresolved-openings",
-    "/api/sessions"
-  ]
-}

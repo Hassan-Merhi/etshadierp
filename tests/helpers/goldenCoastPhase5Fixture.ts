@@ -72,10 +72,10 @@ export interface GoldenCoastPhase5Fixture {
 }
 
 export interface GoldenCoastNormalPosFixture extends GoldenCoastPhase5Fixture {
+  hadiCompanyId: number;
   hadiLocationId: number;
-  /** Alias of hadiGoldenCoastIntercompanyAccountId, kept for the POS suites. */
+  hadiCashAccountId: number;
   hadiIntercompanyAccountId: number;
-  /** Alias of goldenCoastHadiIntercompanyAccountId, kept for the POS suites. */
   goldenCoastIntercompanyAccountId: number;
   deductionClearingAccountId: number;
 }
@@ -225,8 +225,7 @@ export async function setupGoldenCoastPhase5Fixture(prefix: string): Promise<Gol
   // Phase 6 routes every Golden Coast sale's cash to HADI inside the same
   // transaction, so a Golden Coast company without a parent can no longer post
   // a sale at all. Seed the parent and the reciprocal intercompany pair the
-  // collection needs, plus exactly one active HADI Cash ledger — the automatic
-  // destination is deliberately ambiguous, and therefore fatal, with two.
+  // collection needs, plus exactly one active HADI Cash ledger.
   const hadiCompanyCode = stableFixtureCode(prefix, "HDI");
   const [hadiCompany] = await db
     .insert(schema.companies)
@@ -260,10 +259,6 @@ export async function setupGoldenCoastPhase5Fixture(prefix: string): Promise<Gol
     accountType: "Intercompany",
     subType: "hadi_sp_intercompany",
   });
-  // Named to match the Golden Coast payment account: the itemized POS
-  // settlement mirrors the sale's cash account name into HADI, while the
-  // Phase 6 automatic collection only requires this to be the one active
-  // HADI Cash ledger. One account satisfies both.
   const hadiCashAccountId = await insertLedgerAccount({
     companyId: hadiCompany.id,
     code: "HADI-CASH",
@@ -321,21 +316,17 @@ export async function setupGoldenCoastPhase5Fixture(prefix: string): Promise<Gol
  */
 export async function setupGoldenCoastNormalPosFixture(prefix: string): Promise<GoldenCoastNormalPosFixture> {
   const fixture = await setupGoldenCoastPhase5Fixture(prefix);
-
-  // The Phase 5 fixture already seeds the HADI parent, the reciprocal
-  // intercompany pair, and the single active HADI Cash ledger. Reuse them: a
-  // second active sp_hadi_intercompany account on the Golden Coast company
-  // makes the settlement account ambiguous, which the POS path rejects.
+  const hadiCompanyId = fixture.hadiCompanyId;
   const hadiCompanyCode = stableFixtureCode(prefix, "HDI");
+
   const [hadiLocation] = await db
     .insert(schema.locations)
     .values({
-      companyId: fixture.hadiCompanyId,
+      companyId: hadiCompanyId,
       code: `${hadiCompanyCode}-WH1`,
       name: `${prefix}_HadiWarehouse`,
     })
     .returning();
-
   const deductionClearingAccountId = await insertLedgerAccount({
     companyId: fixture.ctx.companyId,
     code: "SP-PAYDDC",
@@ -356,7 +347,9 @@ export async function setupGoldenCoastNormalPosFixture(prefix: string): Promise<
 
   return {
     ...fixture,
+    hadiCompanyId,
     hadiLocationId: hadiLocation.id,
+    hadiCashAccountId: fixture.hadiCashAccountId,
     hadiIntercompanyAccountId: fixture.hadiGoldenCoastIntercompanyAccountId,
     goldenCoastIntercompanyAccountId: fixture.goldenCoastHadiIntercompanyAccountId,
     deductionClearingAccountId,
