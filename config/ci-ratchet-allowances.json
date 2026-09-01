@@ -61,7 +61,8 @@
     "USE /api/factory/customer-orders/:id/verification-summary [requireAuth]",
     "USE /api/factory/customer-orders/:id/verification-summary [authoritativeVerificationStockMiddleware]",
     "USE / [browserMutationFailClosedBoundary]",
-    "USE /api/sp/sales [<anonymous>]"
+    "USE /api/sp/sales [<anonymous>]",
+    "USE /api/po-import/parse [poImportDatabaseScopeContinuityBoundary]"
   ],
   "routeManifestReplacements": [
     {
