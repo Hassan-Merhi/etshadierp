@@ -1,5 +1,6 @@
 import type { Express } from "express";
 
+import { poImportDatabaseScopeContinuityBoundary } from "../middleware/poImportDatabaseScopeContinuity";
 import { tenantCompanyParamBoundary, tenantIsolationBoundary } from "../middleware/tenantIsolationBoundary";
 import { browserMutationFailClosedBoundary } from "../security/browserMutationBoundary";
 import { securityHeadersMiddleware } from "../security/securityHeaders";
@@ -17,5 +18,6 @@ export function registerTenantIsolationBoundary(app: Express): void {
   app.use(securityHeadersMiddleware());
   app.use(browserMutationFailClosedBoundary);
   app.use(tenantIsolationBoundary);
+  app.use("/api/po-import/parse", poImportDatabaseScopeContinuityBoundary);
   app.param("companyId", tenantCompanyParamBoundary);
 }
