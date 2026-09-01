@@ -86,7 +86,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       }
 
       // 1. Classify balance-sheet accounts (assets vs liabilities) via shared helper.
-      // SP formula: What We Have = Cash + Stock (from inventory table); What We Owe includes supplier cash payable and Loan/Loans balances.
+      // SP formula: What We Have = Cash + Customer A/R + Stock (from inventory table); What We Owe includes supplier cash payable and Loan/Loans balances.
       // Other SP ledger accounts (OTW, prepaid, intercompany, clearing accounts, etc.) remain excluded unless explicitly part of the formula.
       // For non-SP: exclude sp_stock (inventory table is authoritative) and sp_cost_clearing (double-counts).
       const isSupplierPartner = companyRecord?.companyType === "supplier_partner";
@@ -97,6 +97,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
               a.accountType === "Cash" ||
               a.accountType === "Loan" ||
               a.accountType === "Loans" ||
+              a.subType === "Accounts Receivable" ||
               a.subType === "sp_payable"
           )
         : companyAccounts.filter((a) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing");

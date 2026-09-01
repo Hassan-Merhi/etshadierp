@@ -108,8 +108,8 @@ export async function calculateNetPositionAsOf(
   const parentCompanyId = await storage.getParentCompanyId();
   const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
 
-  // SP formula: What We Have = Cash + SP-HADI-IC receivable (Hadi holds the cash on SP's behalf);
-  // What We Owe = Supplier Cash Payable only.
+  // SP formula: What We Have = Cash + Customer A/R + SP-HADI-IC receivable (Hadi holds the cash on SP's behalf);
+  // What We Owe = Supplier Cash Payable plus Loan/Loans balances.
   // sp_hadi_intercompany is included so that when cash is transferred to Hadi via interco POS
   // transfer, the receivable offsets the supplier payable and Net Position stays at 0.
   // All other SP ledger accounts (OTW, prepaid, clearing, etc.) are excluded.
@@ -120,6 +120,7 @@ export async function calculateNetPositionAsOf(
           a.accountType === "Cash" ||
           a.accountType === "Loan" ||
           a.accountType === "Loans" ||
+          a.subType === "Accounts Receivable" ||
           a.subType === "sp_payable" ||
           a.subType === "sp_hadi_intercompany"
       )

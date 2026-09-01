@@ -7,10 +7,11 @@ const read = (relativePath: string) => fs.readFileSync(path.join(root, relativeP
 
 // Supplier partners intentionally add signed equity after classifying assets and liabilities.
 describe("supplier partner net position inclusion", () => {
-  it("includes Loan/Loans and signed equity in the live Net Position", () => {
+  it("includes customer receivables, Loan/Loans, and signed equity in the live Net Position", () => {
     const source = read("server/routes/stats/statsNetProfitRoutes.ts");
     expect(source).toContain('a.accountType === "Loan"');
     expect(source).toContain('a.accountType === "Loans"');
+    expect(source).toContain('a.subType === "Accounts Receivable"');
     expect(source).toContain("equityNetPositionContribution");
     expect(source).toContain("forUsTotal - onUsTotal + equityNetPositionContribution");
   });
@@ -29,6 +30,7 @@ describe("supplier partner net position inclusion", () => {
       expect(source).toContain("classifyEquityAccounts");
       expect(source).toContain('a.accountType === "Loan"');
       expect(source).toContain('a.accountType === "Loans"');
+      expect(source).toContain('a.subType === "Accounts Receivable"');
       expect(source).toContain("equityContribution");
       expect(source).toContain("forUsTotal - onUsTotal + equityContribution");
     }
