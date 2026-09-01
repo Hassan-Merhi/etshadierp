@@ -145,7 +145,7 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
 
     const isGoldenCoastEdit = isSpCompanyEdit && (await isGoldenCoastPosCompany(tx, currentCompanyId));
     const clientSaleId = String(lockedVoucher.clientSaleId ?? "").trim();
-    if (isGoldenCoastEdit && clientSaleId && !Boolean(lockedVoucher.isCreditSale)) {
+    if (isGoldenCoastEdit && clientSaleId && !lockedVoucher.isCreditSale) {
       await reverseGoldenCoastPosAccountingTx({
         tx,
         companyId: currentCompanyId,
