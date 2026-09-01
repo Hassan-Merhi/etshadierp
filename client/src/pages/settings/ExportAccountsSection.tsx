@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Download } from "lucide-react";
 import { ExcelJS } from "@/lib/excelHelper";
+import { selectAccountsArray, type AccountsAllPayload } from "@/lib/accountsAllPayload";
 import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema } from "@shared/schema";
 import { useCompany } from "@/contexts/CompanyContext";
 
@@ -36,6 +37,14 @@ type _UserFormData = z.infer<typeof _userFormSchema>;
 type _CompanyFormData = z.infer<typeof _companyFormSchema>;
 type _RoleAssignmentData = z.infer<typeof _roleAssignmentSchema>;
 
+interface ExportAccount {
+  accountId: number;
+  type: string;
+  name: string;
+  balance?: string | number | null;
+  balanceSide?: string | null;
+}
+
 export function ExportAccountsSection() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [fromDate, setFromDate] = useState("");
@@ -45,10 +54,11 @@ export function ExportAccountsSection() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
 
-  const { data: allAccounts = [] } = useQuery<any[]>({
+  const { data: allAccounts = [] } = useQuery<AccountsAllPayload<ExportAccount>, Error, ExportAccount[]>({
     // Include company ID in the cache key so that switching companies forces a
     // fresh fetch instead of reusing a different company's cached response.
     queryKey: ["/api/accounts/all", selectedCompany?.id],
+    select: selectAccountsArray,
   });
 
   const typeLabels: Record<string, string> = {
@@ -99,9 +109,7 @@ export function ExportAccountsSection() {
 
   const selectAll = () =>
     setSelectedIds(
-      new Set(
-        filtered.filter((a) => a.type !== "customer" && parseFloat(a.balance ?? "0") !== 0).map((a) => a.accountId)
-      )
+      new Set(filtered.filter((a) => a.type !== "customer" && Number(a.balance ?? 0) !== 0).map((a) => a.accountId))
     );
   const clearAll = () => setSelectedIds(new Set());
 
@@ -304,7 +312,7 @@ export function ExportAccountsSection() {
                       {acc.balance !== undefined && (
                         <span className="text-xs text-muted-foreground tabular-nums">
                           {acc.balanceSide}{" "}
-                          {Math.abs(acc.balance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                          {Math.abs(Number(acc.balance ?? 0)).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                         </span>
                       )}
                     </label>

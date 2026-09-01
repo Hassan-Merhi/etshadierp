@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { selectAccountsArray, type AccountsAllPayload } from "@/lib/accountsAllPayload";
 import { drCrClass } from "@/lib/formatNumber";
 import { BalanceSheetSectionNav } from "./balance-sheet/BalanceSheetSectionNav";
 import {
@@ -22,8 +23,9 @@ export default function BalanceSheet() {
   const { formatAmount, formatAmountRaw } = useCurrencyContext();
   const [activeSection, setActiveSection] = useState<BalanceSheetSectionKey>("assets");
 
-  const { data: accounts = [], isLoading } = useQuery<BalanceSheetAccount[]>({
+  const { data: accounts = [], isLoading } = useQuery<AccountsAllPayload<BalanceSheetAccount>, Error, BalanceSheetAccount[]>({
     queryKey: ["/api/accounts/all", selectedCompany?.id],
+    select: selectAccountsArray,
     enabled: !!selectedCompany,
   });
 
