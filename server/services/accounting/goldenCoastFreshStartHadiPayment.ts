@@ -33,14 +33,16 @@ export interface GoldenCoastFreshStartHadiPaymentInput {
 }
 
 export interface GoldenCoastFreshStartHadiPaymentAccounts {
-  freshStartEquityAccountId: number;
+  gcSalesCashAccountId: number;
   goldenCoastHadiIntercompanyAccountId: number;
   hadiGoldenCoastIntercompanyAccountId: number;
 }
 
 export interface GoldenCoastFreshStartHadiPaymentPlan extends GoldenCoastFreshStartHadiPaymentInput {
-  outstandingSalesCashBeforeUsd: string;
-  outstandingSalesCashAfterUsd: string;
+  gcSalesCashPayableBeforeUsd: string;
+  gcSalesCashPayableAfterUsd: string;
+  outstandingHadiSalesCashBeforeUsd: string;
+  outstandingHadiSalesCashAfterUsd: string;
   hadiIntercompanyAssetBeforeUsd: string;
   hadiIntercompanyAssetAfterUsd: string;
 }
@@ -138,25 +140,35 @@ export function parseGoldenCoastFreshStartHadiPayment(input: {
   };
 }
 
+/**
+ * A HADI payment can never exceed any of the three independent caps:
+ * 1) GC Sales Cash still owed to Fresh Start,
+ * 2) sale cash still tracked as held by HADI, and
+ * 3) the actual debit asset on GC's HADI intercompany account.
+ */
 export function planGoldenCoastFreshStartHadiPayment(input: {
   payment: GoldenCoastFreshStartHadiPaymentInput;
-  outstandingSalesCashUsd: string | number;
+  gcSalesCashPayableUsd: string | number;
+  outstandingHadiSalesCashUsd: string | number;
   hadiIntercompanyAssetUsd: string | number;
 }): GoldenCoastFreshStartHadiPaymentPlan {
   const amount = positiveMoney(input.payment.amountUsd, "amountUsd");
-  const outstanding = nonNegativeMoney(input.outstandingSalesCashUsd, "outstandingSalesCashUsd");
+  const payable = nonNegativeMoney(input.gcSalesCashPayableUsd, "gcSalesCashPayableUsd");
+  const outstanding = nonNegativeMoney(input.outstandingHadiSalesCashUsd, "outstandingHadiSalesCashUsd");
   const hadiAsset = nonNegativeMoney(input.hadiIntercompanyAssetUsd, "hadiIntercompanyAssetUsd");
-  const maximum = Decimal.min(outstanding, hadiAsset);
+  const maximum = Decimal.min(payable, outstanding, hadiAsset);
   if (amount.gt(maximum)) {
     throw new GoldenCoastFreshStartHadiPaymentError(
-      `Fresh Start payment ${money(amount)} exceeds the available HADI-held Golden Coast sales cash ${money(maximum)}`,
+      `Fresh Start payment ${money(amount)} exceeds the available payable/HADI balance ${money(maximum)}`,
       "GC_FRESH_START_HADI_PAYMENT_EXCEEDS_AVAILABLE"
     );
   }
   return {
     ...input.payment,
-    outstandingSalesCashBeforeUsd: money(outstanding),
-    outstandingSalesCashAfterUsd: money(outstanding.minus(amount)),
+    gcSalesCashPayableBeforeUsd: money(payable),
+    gcSalesCashPayableAfterUsd: money(payable.minus(amount)),
+    outstandingHadiSalesCashBeforeUsd: money(outstanding),
+    outstandingHadiSalesCashAfterUsd: money(outstanding.minus(amount)),
     hadiIntercompanyAssetBeforeUsd: money(hadiAsset),
     hadiIntercompanyAssetAfterUsd: money(hadiAsset.minus(amount)),
   };
@@ -184,6 +196,13 @@ function cashTarget(account: GoldenCoastFreshStartHadiCashAccount): Record<strin
   return account.kind === "bank" ? { bankAccountId: account.id } : { ledgerAccountId: account.id };
 }
 
+/**
+ * Fresh Start is a residual formula in the balance sheet, so this settlement
+ * does not post directly to Fresh Start Equity. It reduces the operational GC
+ * Sales Cash payable and the real HADI asset by the same amount. With Hassan
+ * unchanged, Fresh Start consequently falls dollar-for-dollar in the residual
+ * equity projection.
+ */
 export function buildGoldenCoastFreshStartHadiPaymentPostings(input: {
   plan: GoldenCoastFreshStartHadiPaymentPlan;
   accounts: GoldenCoastFreshStartHadiPaymentAccounts;
@@ -193,7 +212,7 @@ export function buildGoldenCoastFreshStartHadiPaymentPostings(input: {
   actor?: PostingActor;
 }): Array<{ role: "golden_coast" | "hadi"; request: CentralPostingRequest }> {
   const { plan, accounts } = input;
-  positiveId(accounts.freshStartEquityAccountId, "freshStartEquityAccountId");
+  positiveId(accounts.gcSalesCashAccountId, "gcSalesCashAccountId");
   positiveId(accounts.goldenCoastHadiIntercompanyAccountId, "goldenCoastHadiIntercompanyAccountId");
   positiveId(accounts.hadiGoldenCoastIntercompanyAccountId, "hadiGoldenCoastIntercompanyAccountId");
   const amount = money(positiveMoney(plan.amountUsd, "amountUsd"));
@@ -213,7 +232,7 @@ export function buildGoldenCoastFreshStartHadiPaymentPostings(input: {
     },
     entries: [
       {
-        ledgerAccountId: accounts.freshStartEquityAccountId,
+        ledgerAccountId: accounts.gcSalesCashAccountId,
         debitAmount: amount,
         creditAmount: "0",
         narration: gcDescription,
