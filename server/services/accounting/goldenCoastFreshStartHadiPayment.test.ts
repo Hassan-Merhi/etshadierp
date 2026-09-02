@@ -9,7 +9,7 @@ import {
 } from "./goldenCoastFreshStartHadiPayment";
 
 const accounts: GoldenCoastFreshStartHadiPaymentAccounts = {
-  freshStartEquityAccountId: 101,
+  gcSalesCashAccountId: 101,
   goldenCoastHadiIntercompanyAccountId: 102,
   hadiGoldenCoastIntercompanyAccountId: 201,
 };
@@ -29,14 +29,16 @@ function payment() {
 }
 
 describe("Golden Coast Fresh Start payment from HADI", () => {
-  it("reduces both Fresh Start equity and the HADI intercompany asset", () => {
+  it("reduces the GC Sales Cash tracker and the HADI intercompany asset together", () => {
     const parsed = payment();
     const plan = planGoldenCoastFreshStartHadiPayment({
       payment: parsed,
-      outstandingSalesCashUsd: "1000.00",
+      gcSalesCashPayableUsd: "1000.00",
+      outstandingHadiSalesCashUsd: "1000.00",
       hadiIntercompanyAssetUsd: "1000.00",
     });
-    expect(plan.outstandingSalesCashAfterUsd).toBe("700.00");
+    expect(plan.gcSalesCashPayableAfterUsd).toBe("700.00");
+    expect(plan.outstandingHadiSalesCashAfterUsd).toBe("700.00");
     expect(plan.hadiIntercompanyAssetAfterUsd).toBe("700.00");
 
     const digest = goldenCoastFreshStartHadiPaymentDigest({ payment: parsed, accounts });
@@ -64,11 +66,12 @@ describe("Golden Coast Fresh Start payment from HADI", () => {
     );
   });
 
-  it("does not allow a payment above HADI-held sales cash or the intercompany asset", () => {
+  it("uses the smallest payable/HADI balance as the payment cap", () => {
     expect(() =>
       planGoldenCoastFreshStartHadiPayment({
         payment: payment(),
-        outstandingSalesCashUsd: "250.00",
+        gcSalesCashPayableUsd: "250.00",
+        outstandingHadiSalesCashUsd: "1000.00",
         hadiIntercompanyAssetUsd: "1000.00",
       })
     ).toThrow(GoldenCoastFreshStartHadiPaymentError);
@@ -76,7 +79,17 @@ describe("Golden Coast Fresh Start payment from HADI", () => {
     expect(() =>
       planGoldenCoastFreshStartHadiPayment({
         payment: payment(),
-        outstandingSalesCashUsd: "1000.00",
+        gcSalesCashPayableUsd: "1000.00",
+        outstandingHadiSalesCashUsd: "250.00",
+        hadiIntercompanyAssetUsd: "1000.00",
+      })
+    ).toThrow(GoldenCoastFreshStartHadiPaymentError);
+
+    expect(() =>
+      planGoldenCoastFreshStartHadiPayment({
+        payment: payment(),
+        gcSalesCashPayableUsd: "1000.00",
+        outstandingHadiSalesCashUsd: "1000.00",
         hadiIntercompanyAssetUsd: "250.00",
       })
     ).toThrow(GoldenCoastFreshStartHadiPaymentError);
