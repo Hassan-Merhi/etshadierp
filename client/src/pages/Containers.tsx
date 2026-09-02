@@ -9,6 +9,7 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useContainerQueries } from "./containers/useContainerQueries";
 import { useContainerNumberEdit } from "./containers/useContainerNumberEdit";
 import { useContainerImportExport } from "./containers/useContainerImportExport";
+import { useContainerSyncAll } from "./containers/useContainerSyncAll";
 // Split-out components
 import { useContainerFilters } from "./containers/useContainerFilters";
 import { ContainerFilters } from "./containers/ContainerFilters";
@@ -16,6 +17,7 @@ import { ActiveContainersTable } from "./containers/ActiveContainersTable";
 import { ContainerToolbar } from "./containers/ContainerToolbar";
 import { ContainerLoadingState } from "./containers/ContainerLoadingState";
 import { ContainerSpView } from "./containers/ContainerSpView";
+import { ContainerConfirmDialogs } from "./containers/ContainerConfirmDialogs";
 
 export default function Containers() {
   const { formatDisplayDate } = useDateFormat();
@@ -26,6 +28,7 @@ export default function Containers() {
 
   const isSupplierPartner = selectedCompany?.companyType === "supplier_partner";
   const isFactory = selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
+  const canSyncAllVouchers = selectedCompany?.companyType === "erp";
 
   const {
     allContainers,
@@ -54,6 +57,7 @@ export default function Containers() {
   };
 
   const numberEdit = useContainerNumberEdit();
+  const syncAll = useContainerSyncAll();
   const importExport = useContainerImportExport({
     containers,
     filteredOtwContainers: containers.filter((container) => container.status === "OTW"),
@@ -88,6 +92,9 @@ export default function Containers() {
         <ContainerToolbar
           onExportExcel={importExport.exportToExcel}
           onExportAllFull={importExport.exportAllContainersFull}
+          onSyncAll={() => syncAll.setSyncAllConfirmOpen(true)}
+          isSyncing={syncAll.syncAllMutation.isPending}
+          showSyncAll={canSyncAllVouchers}
         />
       </PageHeader>
 
@@ -182,6 +189,12 @@ export default function Containers() {
         }}
         isEditNumberPending={numberEdit.editContainerNumberMutation.isPending}
         getSupplierName={getSupplierName}
+      />
+
+      <ContainerConfirmDialogs
+        syncAllConfirmOpen={syncAll.syncAllConfirmOpen}
+        onSyncAllConfirmOpenChange={syncAll.setSyncAllConfirmOpen}
+        onSyncAllConfirm={() => syncAll.syncAllMutation.mutate()}
       />
 
       {/* Hidden file input for tracking import */}
