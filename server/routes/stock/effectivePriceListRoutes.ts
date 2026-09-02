@@ -13,6 +13,19 @@ import {
 } from "@shared/schema";
 import { getErrorMessage } from "../../lib/httpHandlers";
 
+type EffectivePriceListRow = {
+  stockItemId: number;
+  code: string;
+  name: string;
+  stockGroupName: string;
+  baseSellingPrice: string | null;
+  hasCustomPrice: boolean;
+  sellingPrice: string | null;
+  quantity: string;
+  costPrice?: string | null;
+  offloadingCost?: string | null;
+};
+
 /**
  * Price-list route with price-group inheritance.
  *
@@ -68,7 +81,7 @@ export function registerEffectivePriceListRoutes(app: Express) {
         }
       }
 
-      let rows: any[];
+      let rows: EffectivePriceListRow[];
 
       if (showAll) {
         rows = await db
