@@ -196,7 +196,7 @@ describe("PO import parent accounting", () => {
     expect(parentPosting!.entries).toHaveLength(2);
     expect(parentPosting!.entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ supplier_id: supplierId, debit_amount: "0", credit_amount: "35.00" }),
+        expect.objectContaining({ supplier_id: supplierId, debit_amount: "0.00", credit_amount: "35.00" }),
       ])
     );
 
@@ -237,13 +237,13 @@ describe("PO import parent accounting", () => {
     expect(parentPosting!.entries).toHaveLength(3);
     expect(parentPosting!.entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ supplier_id: supplierId, debit_amount: "0", credit_amount: "100.00" }),
+        expect.objectContaining({ supplier_id: supplierId, debit_amount: "0.00", credit_amount: "100.00" }),
         expect.objectContaining({
           ledger_account_id: parentFreightAccountId,
-          debit_amount: "0",
+          debit_amount: "0.00",
           credit_amount: "10.00",
         }),
-        expect.objectContaining({ debit_amount: "110.00", credit_amount: "0" }),
+        expect.objectContaining({ debit_amount: "110.00", credit_amount: "0.00" }),
       ])
     );
 
@@ -304,7 +304,7 @@ describe("PO import parent accounting", () => {
     expect(parentPosting).not.toBeNull();
     expect(parentPosting!.entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ supplier_id: supplierId, debit_amount: "0", credit_amount: "50.00" }),
+        expect.objectContaining({ supplier_id: supplierId, debit_amount: "0.00", credit_amount: "50.00" }),
       ])
     );
   });
