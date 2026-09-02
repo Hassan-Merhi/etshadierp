@@ -6,9 +6,10 @@ import { buildGenericVoucherPostingRequest } from "./genericVoucherPosting";
 import { GOLDEN_COAST_CUTOVER_DATE } from "./goldenCoastPhase4CutoverFifo";
 
 /**
- * Golden Coast Phase 7 deliberately owns only cash collection/remittance via
- * the configured parent company. POS sale/FIFO/COGS and the Phase 6 special
- * location deduction remain outside this module.
+ * Golden Coast Phase 7 owns physical cash routing through the configured HADI
+ * parent company. The GC Sales Cash role is a payable to Fresh Start, while the
+ * Golden Coast HADI intercompany role is the asset representing money HADI is
+ * holding/using for Golden Coast.
  */
 export const GOLDEN_COAST_PHASE7_SOURCE_TYPE = "golden-coast-phase7-hadi-transfer";
 export const GOLDEN_COAST_PHASE7_MAX_REQUEST_ID_LENGTH = 64;
@@ -17,7 +18,10 @@ const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]+$/;
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MONEY_SCALE = 2;
 
-export type GoldenCoastPhase7Operation = "collect_via_hadi" | "remit_from_hadi";
+export type GoldenCoastPhase7Operation =
+  | "collect_via_hadi"
+  | "remit_from_hadi"
+  | "pay_fresh_start_from_hadi";
 export type GoldenCoastPhase7PostingRole = "golden_coast" | "hadi";
 
 export type GoldenCoastPhase7ErrorCode =
@@ -25,6 +29,7 @@ export type GoldenCoastPhase7ErrorCode =
   | "GC_PHASE7_PRE_CUTOVER_DATE"
   | "GC_PHASE7_COLLECTION_EXCEEDS_BALANCE"
   | "GC_PHASE7_REMITTANCE_EXCEEDS_COLLECTIONS"
+  | "GC_PHASE7_PAYMENT_EXCEEDS_PAYABLE"
   | "GC_PHASE7_SCOPE_INVALID";
 
 export class GoldenCoastPhase7TransferError extends Error {
@@ -57,9 +62,9 @@ export interface GoldenCoastPhase7TransferInput {
 }
 
 export interface GoldenCoastPhase7Balances {
-  /** Current Dr-minus-Cr balance on canonical GC Sales Cash. */
+  /** Signed Dr-minus-Cr balance on canonical GC Sales Cash. Negative means payable. */
   gcSalesCashDebitBalanceUsd: string | number;
-  /** Phase-7-only HADI collections not yet remitted to Golden Coast. */
+  /** Phase-7 HADI collections not yet returned to GC or used to pay Fresh Start. */
   outstandingHadiCollectionsUsd: string | number;
 }
 
@@ -214,16 +219,22 @@ export function parseGoldenCoastPhase7TransferInput(input: {
     throw new GoldenCoastPhase7TransferError("A Phase 7 transfer request body is required");
   }
   const raw = input.body as Record<string, unknown>;
-  if (raw.operation !== "collect_via_hadi" && raw.operation !== "remit_from_hadi") {
-    throw new GoldenCoastPhase7TransferError('operation must be either "collect_via_hadi" or "remit_from_hadi"');
+  if (
+    raw.operation !== "collect_via_hadi" &&
+    raw.operation !== "remit_from_hadi" &&
+    raw.operation !== "pay_fresh_start_from_hadi"
+  ) {
+    throw new GoldenCoastPhase7TransferError(
+      'operation must be "collect_via_hadi", "remit_from_hadi", or "pay_fresh_start_from_hadi"'
+    );
   }
 
   const operation = raw.operation;
   const goldenCoastCashAccount =
     operation === "remit_from_hadi" ? cashAccount(raw.goldenCoastCashAccount, "goldenCoastCashAccount") : null;
-  if (operation === "collect_via_hadi" && raw.goldenCoastCashAccount != null) {
+  if (operation !== "remit_from_hadi" && raw.goldenCoastCashAccount != null) {
     throw new GoldenCoastPhase7TransferError(
-      "goldenCoastCashAccount must not be supplied when HADI collects cash on Golden Coast's behalf"
+      "goldenCoastCashAccount is only allowed when HADI remits cash back to Golden Coast"
     );
   }
 
@@ -241,12 +252,16 @@ export function parseGoldenCoastPhase7TransferInput(input: {
 }
 
 /**
- * Apply the balance rules for a new (non-replay) transfer.
+ * Apply balance rules for a new (non-replay) transfer.
  *
- * Collection can only clear a positive Dr balance on GC Sales Cash. Remittance
- * can only move cash already collected through Phase 7 and not yet remitted;
- * it never consumes unrelated historical balances on the shared intercompany
- * accounts (for example parent-agent offload charges).
+ * `collect_via_hadi` records additional sale cash now held by HADI and increases
+ * the GC Sales Cash payable. It is intentionally not capped by an existing
+ * debit balance: the current Golden Coast model treats GC Sales Cash as a
+ * liability, not as a receivable that HADI collection clears.
+ *
+ * `pay_fresh_start_from_hadi` is the settlement operation the business needs:
+ * HADI pays Fresh Start on GC's behalf, so both the GC payable and HADI-held
+ * intercompany asset fall by the same amount.
  */
 export function planGoldenCoastPhase7Transfer(input: {
   transfer: GoldenCoastPhase7TransferInput;
@@ -257,19 +272,12 @@ export function planGoldenCoastPhase7Transfer(input: {
   const outstanding = balanceMoney(input.balances.outstandingHadiCollectionsUsd, "outstandingHadiCollectionsUsd");
   if (outstanding.lessThan(0)) {
     throw new GoldenCoastPhase7TransferError(
-      "Phase 7 HADI collection history is inconsistent: remittances exceed collections",
+      "Phase 7 HADI collection history is inconsistent: uses exceed collections",
       "GC_PHASE7_SCOPE_INVALID"
     );
   }
 
   if (input.transfer.operation === "collect_via_hadi") {
-    const collectible = Decimal.max(gcSalesCashBalance, 0);
-    if (amount.greaterThan(collectible)) {
-      throw new GoldenCoastPhase7TransferError(
-        `Collection ${money(amount)} exceeds the current collectible GC Sales Cash balance ${money(collectible)}`,
-        "GC_PHASE7_COLLECTION_EXCEEDS_BALANCE"
-      );
-    }
     return {
       ...input.transfer,
       gcSalesCashDebitBalanceBeforeUsd: money(gcSalesCashBalance),
@@ -281,9 +289,28 @@ export function planGoldenCoastPhase7Transfer(input: {
 
   if (amount.greaterThan(outstanding)) {
     throw new GoldenCoastPhase7TransferError(
-      `Remittance ${money(amount)} exceeds unremitted Phase 7 HADI collections ${money(outstanding)}`,
+      `${input.transfer.operation === "pay_fresh_start_from_hadi" ? "Fresh Start payment" : "Remittance"} ${money(
+        amount
+      )} exceeds HADI-held Golden Coast sales cash ${money(outstanding)}`,
       "GC_PHASE7_REMITTANCE_EXCEEDS_COLLECTIONS"
     );
+  }
+
+  if (input.transfer.operation === "pay_fresh_start_from_hadi") {
+    const payable = Decimal.max(gcSalesCashBalance.negated(), 0);
+    if (amount.greaterThan(payable)) {
+      throw new GoldenCoastPhase7TransferError(
+        `Fresh Start payment ${money(amount)} exceeds the current GC Sales Cash payable ${money(payable)}`,
+        "GC_PHASE7_PAYMENT_EXCEEDS_PAYABLE"
+      );
+    }
+    return {
+      ...input.transfer,
+      gcSalesCashDebitBalanceBeforeUsd: money(gcSalesCashBalance),
+      gcSalesCashDebitBalanceAfterUsd: money(gcSalesCashBalance.plus(amount)),
+      outstandingHadiCollectionsBeforeUsd: money(outstanding),
+      outstandingHadiCollectionsAfterUsd: money(outstanding.minus(amount)),
+    };
   }
 
   return {
@@ -336,7 +363,11 @@ export function goldenCoastPhase7SourceId(
   role: GoldenCoastPhase7PostingRole
 ): string {
   const digest = requiredText(transferDigest, "transferDigest", 64);
-  return `${operation}:${digest}:${role}`;
+  // Outstanding-HADI history historically subtracts `remit_from_hadi` source
+  // rows. A Fresh Start payment is also a use of HADI-held GC cash, so keep the
+  // same history prefix while the voucher narration retains the exact purpose.
+  const historyOperation = operation === "pay_fresh_start_from_hadi" ? "remit_from_hadi" : operation;
+  return `${historyOperation}:${digest}:${role}`;
 }
 
 export function goldenCoastPhase7IdempotencyKey(
@@ -382,6 +413,10 @@ function taggedRequest(input: {
  * remit_from_hadi:
  *   Golden Coast  Dr Cash/Bank         / Cr HADI Intercompany
  *   HADI          Dr Golden Coast IC   / Cr Cash/Bank
+ *
+ * pay_fresh_start_from_hadi:
+ *   Golden Coast  Dr GC Sales Cash     / Cr HADI Intercompany
+ *   HADI          Dr Golden Coast IC   / Cr Cash/Bank
  */
 export function buildGoldenCoastPhase7TransferPostings(input: {
   plan: GoldenCoastPhase7TransferPlan;
@@ -403,51 +438,77 @@ export function buildGoldenCoastPhase7TransferPostings(input: {
   }
 
   const amountUsd = money(positiveMoney(plan.amountUsd, "amountUsd"));
-  const suffix = plan.operation === "collect_via_hadi" ? "COLLECT" : "REMIT";
+  const suffix =
+    plan.operation === "collect_via_hadi"
+      ? "COLLECT"
+      : plan.operation === "pay_fresh_start_from_hadi"
+        ? "PAY-FRESH"
+        : "REMIT";
   const gcVoucherNumber = `GC-P7-C${plan.companyId}-${plan.clientRequestId}-${suffix}`;
   const hadiVoucherNumber = `GC-P7-C${plan.companyId}-${plan.clientRequestId}-${suffix}-HADI`;
   const referenceSuffix = plan.reference ? ` — ${plan.reference}` : "";
   const gcDescription = releaseDebtEnglish(
     plan.operation === "collect_via_hadi"
-      ? `Golden Coast sales cash collected via HADI${referenceSuffix}`
-      : `HADI cash remittance to Golden Coast${referenceSuffix}`
+      ? `Golden Coast sales cash placed with HADI${referenceSuffix}`
+      : plan.operation === "pay_fresh_start_from_hadi"
+        ? `Fresh Start paid by HADI for Golden Coast${referenceSuffix}`
+        : `HADI cash remittance to Golden Coast${referenceSuffix}`
   );
   const hadiDescription = releaseDebtEnglish(
     plan.operation === "collect_via_hadi"
-      ? `Cash collected for Golden Coast${referenceSuffix}`
-      : `Cash remitted to Golden Coast${referenceSuffix}`
+      ? `Cash held for Golden Coast${referenceSuffix}`
+      : plan.operation === "pay_fresh_start_from_hadi"
+        ? `Fresh Start payment for Golden Coast${referenceSuffix}`
+        : `Cash remitted to Golden Coast${referenceSuffix}`
   );
 
-  const goldenCoastEntries =
-    plan.operation === "collect_via_hadi"
-      ? [
-          {
-            ledgerAccountId: accounts.goldenCoastHadiIntercompanyAccountId,
-            debitAmount: amountUsd,
-            creditAmount: "0",
-            narration: gcDescription,
-          },
-          {
-            ledgerAccountId: accounts.gcSalesCashAccountId,
-            debitAmount: "0",
-            creditAmount: amountUsd,
-            narration: gcDescription,
-          },
-        ]
-      : [
-          {
-            ...cashTarget(plan.goldenCoastCashAccount as GoldenCoastPhase7CashAccount),
-            debitAmount: amountUsd,
-            creditAmount: "0",
-            narration: gcDescription,
-          },
-          {
-            ledgerAccountId: accounts.goldenCoastHadiIntercompanyAccountId,
-            debitAmount: "0",
-            creditAmount: amountUsd,
-            narration: gcDescription,
-          },
-        ];
+  let goldenCoastEntries: Array<Record<string, unknown>>;
+  if (plan.operation === "collect_via_hadi") {
+    goldenCoastEntries = [
+      {
+        ledgerAccountId: accounts.goldenCoastHadiIntercompanyAccountId,
+        debitAmount: amountUsd,
+        creditAmount: "0",
+        narration: gcDescription,
+      },
+      {
+        ledgerAccountId: accounts.gcSalesCashAccountId,
+        debitAmount: "0",
+        creditAmount: amountUsd,
+        narration: gcDescription,
+      },
+    ];
+  } else if (plan.operation === "pay_fresh_start_from_hadi") {
+    goldenCoastEntries = [
+      {
+        ledgerAccountId: accounts.gcSalesCashAccountId,
+        debitAmount: amountUsd,
+        creditAmount: "0",
+        narration: gcDescription,
+      },
+      {
+        ledgerAccountId: accounts.goldenCoastHadiIntercompanyAccountId,
+        debitAmount: "0",
+        creditAmount: amountUsd,
+        narration: gcDescription,
+      },
+    ];
+  } else {
+    goldenCoastEntries = [
+      {
+        ...cashTarget(plan.goldenCoastCashAccount as GoldenCoastPhase7CashAccount),
+        debitAmount: amountUsd,
+        creditAmount: "0",
+        narration: gcDescription,
+      },
+      {
+        ledgerAccountId: accounts.goldenCoastHadiIntercompanyAccountId,
+        debitAmount: "0",
+        creditAmount: amountUsd,
+        narration: gcDescription,
+      },
+    ];
+  }
 
   const hadiEntries =
     plan.operation === "collect_via_hadi"
