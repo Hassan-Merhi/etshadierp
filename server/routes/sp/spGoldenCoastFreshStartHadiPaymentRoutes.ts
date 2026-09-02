@@ -10,6 +10,7 @@ import {
 } from "@shared/schema";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { db } from "../../db";
+import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { resultRows } from "../../lib/queryResult";
@@ -371,7 +372,10 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
     const companyId = await requireSpCompany(req, res);
     if (!companyId) return;
     if (!(await isGoldenCoastCompany(db, companyId))) {
-      res.status(409).json({ code: "GC_FS_HADI_NOT_CONFIGURED", message: "Golden Coast account setup is not configured" });
+      res.status(409).json({
+        code: "GC_FS_HADI_NOT_CONFIGURED",
+        message: releaseDebtEnglish("Golden Coast account setup is not configured"),
+      });
       return;
     }
     const result = await db.transaction(async (tx) => {
@@ -414,7 +418,10 @@ async function handlePayment(req: Request, res: Response): Promise<void> {
     const companyId = await requireSpCompany(req, res);
     if (!companyId) return;
     if (!(await isGoldenCoastCompany(db, companyId))) {
-      res.status(409).json({ code: "GC_FS_HADI_NOT_CONFIGURED", message: "Golden Coast account setup is not configured" });
+      res.status(409).json({
+        code: "GC_FS_HADI_NOT_CONFIGURED",
+        message: releaseDebtEnglish("Golden Coast account setup is not configured"),
+      });
       return;
     }
 
