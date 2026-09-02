@@ -7,7 +7,6 @@ import { eq, and, isNull, sql } from "drizzle-orm";
 import { db } from "../../db";
 import * as schema from "@shared/schema";
 import type { PurchaseOrder, InsertPurchaseOrder } from "@shared/schema";
-import { getParentCompanyId } from "../accounting";
 
 export async function createPurchaseOrder(
   po: InsertPurchaseOrder,
@@ -51,10 +50,16 @@ export async function createPurchaseOrder(
     const descBase =
       containerNum || supplierDisplayName ? [containerNum, supplierDisplayName].filter(Boolean).join(" ") : "";
 
-    const parentCompanyId = await getParentCompanyId();
+    // Intercompany PO accounting is controlled only by the current company's
+    // explicit companies.parent_company_id link. The legacy global
+    // parentCompanyId setting must never turn an unrelated standalone company
+    // into a subsidiary.
     const allCompanies = await db.select().from(schema.companies);
-    const parentCompany = parentCompanyId ? allCompanies.find((c) => c.id === parentCompanyId) : null;
     const currentCompany = allCompanies.find((c) => c.id === po.companyId);
+    const explicitParentCompanyId = currentCompany?.parentCompanyId ?? null;
+    const parentCompany = explicitParentCompanyId
+      ? allCompanies.find((c) => c.id === explicitParentCompanyId)
+      : null;
 
     let purchasesAccount = await db
       .select()
