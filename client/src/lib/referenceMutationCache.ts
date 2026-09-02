@@ -177,6 +177,19 @@ function matchesReferenceQuery(queryPath: string, queryKey: readonly unknown[]):
   return queryPathname(queryKey) === queryPath;
 }
 
+async function refreshSpProfitReportQueries(options: { client: QueryClient; pathname: string }): Promise<boolean> {
+  if (!/^\/api\/vouchers(?:\/.*)?$/.test(options.pathname)) return false;
+
+  // SP profit depends on posted voucher entries. Refresh every cached date-range
+  // variant after a successful voucher mutation so Shared Charges and net profit
+  // cannot remain stale when a Journal is created, edited, or deleted.
+  await options.client.invalidateQueries({
+    predicate: (query) => queryPathname(query.queryKey) === "/api/sp/report/profit",
+    refetchType: "all",
+  });
+  return true;
+}
+
 async function refreshStockTransferEditorQueries(options: {
   client: QueryClient;
   method: string;
@@ -219,10 +232,11 @@ export async function applyReferenceMutationResponse(options: {
   if (!["POST", "PUT", "PATCH", "DELETE"].includes(method) || !options.response.ok) return false;
 
   const pathname = options.pathname.split("?", 1)[0].replace(/\/+$/, "") || "/";
+  const refreshedSpProfit = await refreshSpProfitReportQueries({ client: options.client, pathname });
   if (await refreshStockTransferEditorQueries({ ...options, method, pathname })) return true;
 
   const rule = REFERENCE_MUTATION_RULES.find((candidate) => candidate.path.test(pathname));
-  if (!rule) return false;
+  if (!rule) return refreshedSpProfit;
 
   const rawPayload =
     options.response.status === 204
