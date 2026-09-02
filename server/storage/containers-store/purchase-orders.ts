@@ -57,9 +57,7 @@ export async function createPurchaseOrder(
     const allCompanies = await db.select().from(schema.companies);
     const currentCompany = allCompanies.find((c) => c.id === po.companyId);
     const explicitParentCompanyId = currentCompany?.parentCompanyId ?? null;
-    const parentCompany = explicitParentCompanyId
-      ? allCompanies.find((c) => c.id === explicitParentCompanyId)
-      : null;
+    const parentCompany = explicitParentCompanyId ? allCompanies.find((c) => c.id === explicitParentCompanyId) : null;
 
     let purchasesAccount = await db
       .select()
