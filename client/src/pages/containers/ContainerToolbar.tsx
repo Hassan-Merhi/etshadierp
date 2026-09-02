@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Download, Plus, ChevronDown } from "lucide-react";
+import { Download, Plus, ChevronDown, RefreshCw } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,13 +8,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
+import { getContainerSyncButtonLabel } from "@/i18n/containerSyncTranslations";
 
 interface ContainerToolbarProps {
   onExportExcel: () => void;
   onExportAllFull: () => void;
+  onSyncAll: () => void;
+  isSyncing: boolean;
+  showSyncAll: boolean;
 }
 
-export function ContainerToolbar({ onExportExcel, onExportAllFull }: ContainerToolbarProps) {
+export function ContainerToolbar({
+  onExportExcel,
+  onExportAllFull,
+  onSyncAll,
+  isSyncing,
+  showSyncAll,
+}: ContainerToolbarProps) {
+  const { language } = useApplicationLanguage();
+  const syncLabel = getContainerSyncButtonLabel(language);
+
   return (
     <div className="flex gap-2 flex-wrap">
       <DropdownMenu>
@@ -37,6 +51,22 @@ export function ContainerToolbar({ onExportExcel, onExportAllFull }: ContainerTo
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {showSyncAll && (
+        <Button
+          type="button"
+          variant="outline"
+          className="gap-2"
+          data-testid="button-sync-all-vouchers"
+          onClick={onSyncAll}
+          disabled={isSyncing}
+          aria-label={syncLabel}
+          title={syncLabel}
+        >
+          <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
+          {syncLabel}
+        </Button>
+      )}
 
       <Link href="/po-import">
         <Button className="gap-2" data-testid="button-add-container">
