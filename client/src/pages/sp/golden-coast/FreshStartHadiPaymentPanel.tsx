@@ -86,7 +86,9 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
 
   const mutation = useMutation({
     mutationFn: async () => {
-      if (!targetCompanyId || !selectedHadiAccount) throw new Error("Fresh Start payment routing is not ready.");
+      if (!targetCompanyId || !selectedHadiAccount) {
+        throw new Error(releaseDebtEnglish("Fresh Start payment routing is not ready."));
+      }
       const response = await apiRequest(
         "POST",
         `${FRESH_START_HADI_PAYMENT}?targetCompanyId=${encodeURIComponent(String(targetCompanyId))}`,
