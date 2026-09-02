@@ -244,10 +244,12 @@ async function guardContainerOffload(req: Request, res: Response, next: NextFunc
       "SELECT parent_company_id FROM companies WHERE id = $1 LIMIT 1",
       [companyId]
     );
-    const parentCompanyId = Number(parentResult.rows[0]?.parent_company_id ?? 1);
+    const explicitParentCompanyId = Number(parentResult.rows[0]?.parent_company_id);
+    const parentCompanyId =
+      Number.isInteger(explicitParentCompanyId) && explicitParentCompanyId > 0 ? explicitParentCompanyId : null;
 
     const parentAgentIds = collectContainerOffloadParentAgentIds(req.body ?? {});
-    if (parentAgentIds.length > 0) {
+    if (parentAgentIds.length > 0 && parentCompanyId) {
       const parentAgentRows = await client.query<{ id: number }>(
         `SELECT id
          FROM ledger_accounts
@@ -269,7 +271,11 @@ async function guardContainerOffload(req: Request, res: Response, next: NextFunc
     const parentFreightAccountIds = uniquePositiveIds(
       purchaseOrders.rows.filter((row) => row.freight_paid_by === "parent").map((row) => row.freight_parent_account_id)
     );
-    if (parentFreightAccountIds.length > 0) {
+    // Only enforce parent-ledger ownership when this company has an explicit
+    // companies.parent_company_id relationship. Standalone/root companies can
+    // carry legacy freightPaidBy='parent' metadata, but that stale global-parent
+    // reference must not block a local container offload.
+    if (parentFreightAccountIds.length > 0 && parentCompanyId) {
       const validCompanyIds = uniquePositiveIds([companyId, parentCompanyId]);
       const parentFreightRows = await client.query<{ id: number }>(
         `SELECT id
