@@ -259,10 +259,7 @@ describe("PO import parent accounting", () => {
   });
 
   it("does not create a parent journal for an unlinked Supplier Partner", async () => {
-    await db
-      .update(schema.companies)
-      .set({ parentCompanyId: null })
-      .where(eq(schema.companies.id, ctx.companyId));
+    await db.update(schema.companies).set({ parentCompanyId: null }).where(eq(schema.companies.id, ctx.companyId));
 
     const result = await agent.post("/api/po-import/import").send(
       importPayload({
@@ -277,17 +274,11 @@ describe("PO import parent accounting", () => {
     expect(result.status).toBe(200);
     expect(await postingFor("PO-SP-UNLINKED")).toBeNull();
 
-    await db
-      .update(schema.companies)
-      .set({ parentCompanyId })
-      .where(eq(schema.companies.id, ctx.companyId));
+    await db.update(schema.companies).set({ parentCompanyId }).where(eq(schema.companies.id, ctx.companyId));
   });
 
   it("keeps the normal linked ERP subsidiary path working", async () => {
-    await db
-      .update(schema.companies)
-      .set({ companyType: "erp" })
-      .where(eq(schema.companies.id, ctx.companyId));
+    await db.update(schema.companies).set({ companyType: "erp" }).where(eq(schema.companies.id, ctx.companyId));
 
     const result = await agent.post("/api/po-import/import").send(
       importPayload({
