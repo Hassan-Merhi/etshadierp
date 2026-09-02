@@ -140,7 +140,13 @@ async function singleLedgerAccount(
 }
 
 async function resolveAccounts(tx: DatabaseTransaction, pair: CompanyPair) {
-  const fresh = await singleLedgerAccount(tx, pair.goldenCoastCompanyId, "gc_partner_capital", "Equity", "Fresh Start Equity");
+  const gcSalesCash = await singleLedgerAccount(
+    tx,
+    pair.goldenCoastCompanyId,
+    "sp_payable",
+    "Liability",
+    "GC Sales Cash"
+  );
   const gcHadi = await singleLedgerAccount(
     tx,
     pair.goldenCoastCompanyId,
@@ -158,11 +164,15 @@ async function resolveAccounts(tx: DatabaseTransaction, pair: CompanyPair) {
   await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
   return {
     ids: {
-      freshStartEquityAccountId: fresh.id,
+      gcSalesCashAccountId: gcSalesCash.id,
       goldenCoastHadiIntercompanyAccountId: gcHadi.id,
       hadiGoldenCoastIntercompanyAccountId: hadiGc.id,
     } satisfies GoldenCoastFreshStartHadiPaymentAccounts,
-    names: { freshStartEquity: fresh.name, goldenCoastHadiIntercompany: gcHadi.name, hadiGoldenCoastIntercompany: hadiGc.name },
+    names: {
+      gcSalesCash: gcSalesCash.name,
+      goldenCoastHadiIntercompany: gcHadi.name,
+      hadiGoldenCoastIntercompany: hadiGc.name,
+    },
   };
 }
 
@@ -300,7 +310,12 @@ async function findReplay(
     { role: "golden_coast" as const, companyId: pair.goldenCoastCompanyId },
     { role: "hadi" as const, companyId: pair.hadiCompanyId },
   ];
-  const found: Array<{ role: "golden_coast" | "hadi"; companyId: number; voucher: typeof vouchers.$inferSelect; entries: (typeof voucherEntries.$inferSelect)[] }> = [];
+  const found: Array<{
+    role: "golden_coast" | "hadi";
+    companyId: number;
+    voucher: typeof vouchers.$inferSelect;
+    entries: (typeof voucherEntries.$inferSelect)[];
+  }> = [];
   let markersFound = 0;
   for (const item of roles) {
     await assertTransactionCompanyScope(tx, item.companyId);
@@ -338,6 +353,19 @@ async function findReplay(
   return found;
 }
 
+async function balancesForPayment(tx: DatabaseTransaction, companyId: number, accounts: GoldenCoastFreshStartHadiPaymentAccounts) {
+  const [gcSalesCashRaw, outstandingHadiSalesCashUsd, hadiIntercompanyAssetRaw] = await Promise.all([
+    debitBalance(tx, companyId, accounts.gcSalesCashAccountId),
+    outstandingHadiSalesCash(tx, companyId),
+    debitBalance(tx, companyId, accounts.goldenCoastHadiIntercompanyAccountId),
+  ]);
+  return {
+    gcSalesCashPayableUsd: Math.max(0, -Number(gcSalesCashRaw)).toFixed(2),
+    outstandingHadiSalesCashUsd: Math.max(0, Number(outstandingHadiSalesCashUsd)).toFixed(2),
+    hadiIntercompanyAssetUsd: Math.max(0, Number(hadiIntercompanyAssetRaw)).toFixed(2),
+  };
+}
+
 async function handleReadiness(req: Request, res: Response): Promise<void> {
   try {
     const companyId = await requireSpCompany(req, res);
@@ -351,22 +379,20 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
       assertHadiAuthorized(pair);
       const accounts = await resolveAccounts(tx, pair);
       await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
-      const [outstandingSalesCashUsd, hadiIntercompanyAssetRaw] = await Promise.all([
-        outstandingHadiSalesCash(tx, companyId),
-        debitBalance(tx, companyId, accounts.ids.goldenCoastHadiIntercompanyAccountId),
-      ]);
+      const balances = await balancesForPayment(tx, companyId, accounts.ids);
       await assertTransactionCompanyScope(tx, pair.hadiCompanyId);
       const hadiCashAccounts = await listHadiCashAccounts(tx, pair.hadiCompanyId);
       await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
-      const outstanding = Math.max(0, Number(outstandingSalesCashUsd));
-      const hadiAsset = Math.max(0, Number(hadiIntercompanyAssetRaw));
-      const maximum = Math.min(outstanding, hadiAsset);
+      const maximum = Math.min(
+        Number(balances.gcSalesCashPayableUsd),
+        Number(balances.outstandingHadiSalesCashUsd),
+        Number(balances.hadiIntercompanyAssetUsd)
+      );
       return {
         pair,
         accounts: { ...accounts.ids, ...accounts.names },
-        outstandingSalesCashUsd: outstanding.toFixed(2),
-        hadiIntercompanyAssetUsd: hadiAsset.toFixed(2),
-        maximumPaymentUsd: maximum.toFixed(2),
+        ...balances,
+        maximumPaymentUsd: Math.max(0, maximum).toFixed(2),
         hadiCashAccounts,
         ready: maximum > 0 && hadiCashAccounts.length > 0,
       };
@@ -406,15 +432,8 @@ async function handlePayment(req: Request, res: Response): Promise<void> {
 
       await validateHadiCashAccount(tx, pair.hadiCompanyId, payment.hadiCashAccount);
       await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
-      const [outstandingSalesCashUsd, hadiIntercompanyAssetRaw] = await Promise.all([
-        outstandingHadiSalesCash(tx, companyId),
-        debitBalance(tx, companyId, accounts.ids.goldenCoastHadiIntercompanyAccountId),
-      ]);
-      const plan = planGoldenCoastFreshStartHadiPayment({
-        payment,
-        outstandingSalesCashUsd,
-        hadiIntercompanyAssetUsd: Math.max(0, Number(hadiIntercompanyAssetRaw)).toFixed(2),
-      });
+      const balances = await balancesForPayment(tx, companyId, accounts.ids);
+      const plan = planGoldenCoastFreshStartHadiPayment({ payment, ...balances });
       const [goldenCoastExchangeRate, hadiExchangeRate] = await Promise.all([
         getCurrentExchangeRate(pair.goldenCoastCompanyId),
         getCurrentExchangeRate(pair.hadiCompanyId),
@@ -464,7 +483,8 @@ async function handlePayment(req: Request, res: Response): Promise<void> {
       paymentDate: outcome.payment.paymentDate,
       balances: outcome.plan
         ? {
-            outstandingSalesCashAfterUsd: outcome.plan.outstandingSalesCashAfterUsd,
+            gcSalesCashPayableAfterUsd: outcome.plan.gcSalesCashPayableAfterUsd,
+            outstandingHadiSalesCashAfterUsd: outcome.plan.outstandingHadiSalesCashAfterUsd,
             hadiIntercompanyAssetAfterUsd: outcome.plan.hadiIntercompanyAssetAfterUsd,
           }
         : null,
