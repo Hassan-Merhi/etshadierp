@@ -33,14 +33,15 @@ interface FreshStartHadiReadiness {
     hadiCompanyName: string;
   };
   accounts: {
-    freshStartEquityAccountId: number;
+    gcSalesCashAccountId: number;
     goldenCoastHadiIntercompanyAccountId: number;
     hadiGoldenCoastIntercompanyAccountId: number;
-    freshStartEquity: string;
+    gcSalesCash: string;
     goldenCoastHadiIntercompany: string;
     hadiGoldenCoastIntercompany: string;
   };
-  outstandingSalesCashUsd: string;
+  gcSalesCashPayableUsd: string;
+  outstandingHadiSalesCashUsd: string;
   hadiIntercompanyAssetUsd: string;
   maximumPaymentUsd: string;
   hadiCashAccounts: CashAccountOption[];
@@ -108,7 +109,7 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
       queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0] ?? "").includes("/api/stats/net-profit") });
       toast({
         title: releaseDebtEnglish(result.replayed ? "Fresh Start payment replay confirmed" : "Fresh Start payment posted"),
-        description: releaseDebtEnglish("Fresh Start equity and the HADI intercompany asset were refreshed."),
+        description: releaseDebtEnglish("GC Sales Cash payable and the HADI intercompany asset were reduced together."),
       });
     },
     onError: (error: ClientErrorLike) => {
@@ -126,7 +127,7 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
             </CardTitle>
             <CardDescription>
               {releaseDebtEnglish(
-                "Use this only when HADI actually sends Golden Coast money to Fresh Start. Moving money between GC and HADI is not a Fresh Start payment."
+                "Use this only when HADI actually pays Fresh Start. A normal GC↔HADI transfer only moves an asset and does not reduce Fresh Start."
               )}
             </CardDescription>
           </div>
@@ -142,10 +143,14 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
           blockedText={releaseDebtEnglish("No Fresh Start payment is currently available from HADI.")}
         />
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-4">
+          <div className="rounded-md border p-3">
+            <p className="text-xs text-muted-foreground">{releaseDebtEnglish("GC Sales Cash payable")}</p>
+            <p className="mt-1 font-semibold tabular-nums">{money(data?.gcSalesCashPayableUsd)}</p>
+          </div>
           <div className="rounded-md border p-3">
             <p className="text-xs text-muted-foreground">{releaseDebtEnglish("Sales cash still held by HADI")}</p>
-            <p className="mt-1 font-semibold tabular-nums">{money(data?.outstandingSalesCashUsd)}</p>
+            <p className="mt-1 font-semibold tabular-nums">{money(data?.outstandingHadiSalesCashUsd)}</p>
           </div>
           <div className="rounded-md border p-3">
             <p className="text-xs text-muted-foreground">{releaseDebtEnglish("GC HADI intercompany asset")}</p>
@@ -159,10 +164,15 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
 
         <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
           <span className="font-medium text-foreground">{releaseDebtEnglish("Golden Coast")}: </span>
-          {releaseDebtEnglish("Dr Fresh Start Equity / Cr HADI Intercompany")}
+          {releaseDebtEnglish("Dr GC Sales Cash payable / Cr HADI Intercompany")}
           <span className="mx-2">•</span>
           <span className="font-medium text-foreground">{releaseDebtEnglish("HADI")}: </span>
           {releaseDebtEnglish("Dr Golden Coast Intercompany / Cr selected Cash or Bank")}
+          <p className="mt-2 text-xs">
+            {releaseDebtEnglish(
+              "Fresh Start Equity is not posted here. It decreases automatically in Net Position because Net Assets fell while Hassan's account stayed unchanged."
+            )}
+          </p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
