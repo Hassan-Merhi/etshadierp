@@ -51,22 +51,6 @@ function parsedRemit(overrides: Record<string, unknown> = {}): GoldenCoastPhase7
   });
 }
 
-function parsedPayFreshStart(overrides: Record<string, unknown> = {}): GoldenCoastPhase7TransferInput {
-  return parseGoldenCoastPhase7TransferInput({
-    companyId: 14,
-    parentCompanyId: 1,
-    body: {
-      operation: "pay_fresh_start_from_hadi",
-      transferDate: "2026-09-12",
-      amountUsd: "300.00",
-      clientRequestId: "pay-fresh-001",
-      reference: "Fresh Start settlement",
-      hadiCashAccount: { kind: "bank", id: 301 },
-      ...overrides,
-    },
-  });
-}
-
 function expectTransferError(fn: () => unknown, code?: GoldenCoastPhase7TransferError["code"]): void {
   try {
     fn();
@@ -78,39 +62,53 @@ function expectTransferError(fn: () => unknown, code?: GoldenCoastPhase7Transfer
 }
 
 describe("Golden Coast Phase 7 HADI transfer planner", () => {
-  it("parses collection, remittance, and Fresh Start payment with the right cash targets", () => {
-    expect(parsedCollect()).toMatchObject({ operation: "collect_via_hadi", goldenCoastCashAccount: null });
-    expect(parsedRemit()).toMatchObject({
-      operation: "remit_from_hadi",
-      goldenCoastCashAccount: { kind: "ledger", id: 401 },
-    });
-    expect(parsedPayFreshStart()).toMatchObject({
-      operation: "pay_fresh_start_from_hadi",
+  it("parses a HADI collection without inventing a Golden Coast cash destination", () => {
+    const transfer = parsedCollect();
+    expect(transfer).toMatchObject({
+      companyId: 14,
+      parentCompanyId: 1,
+      operation: "collect_via_hadi",
+      amountUsd: "600.00",
+      clientRequestId: "collect-001",
       goldenCoastCashAccount: null,
       hadiCashAccount: { kind: "bank", id: 301 },
     });
   });
 
-  it("only allows a Golden Coast cash destination on remittance back to GC", () => {
+  it("requires a Golden Coast cash destination for a HADI remittance", () => {
+    const transfer = parsedRemit();
+    expect(transfer.goldenCoastCashAccount).toEqual({ kind: "ledger", id: 401 });
+
     expectTransferError(() => parsedRemit({ goldenCoastCashAccount: null }));
-    expectTransferError(() => parsedCollect({ goldenCoastCashAccount: { kind: "ledger", id: 401 } }));
-    expectTransferError(() => parsedPayFreshStart({ goldenCoastCashAccount: { kind: "ledger", id: 401 } }));
   });
 
-  it("rejects invalid operations, bad amounts, pre-cutover dates, and same-company routing", () => {
+  it("rejects a Golden Coast cash account on collection because HADI physically holds that cash", () => {
+    expectTransferError(() => parsedCollect({ goldenCoastCashAccount: { kind: "ledger", id: 401 } }));
+  });
+
+  it("rejects an invalid operation", () => {
     expectTransferError(() => parsedCollect({ operation: "generic_transfer" }));
+  });
+
+  it("rejects zero, negative and over-precision amounts", () => {
     expectTransferError(() => parsedCollect({ amountUsd: "0" }));
     expectTransferError(() => parsedCollect({ amountUsd: "-1" }));
     expectTransferError(() => parsedCollect({ amountUsd: "1.001" }));
+  });
+
+  it("rejects pre-cutover transfer dates", () => {
     expectTransferError(() => parsedCollect({ transferDate: "2026-08-31" }), "GC_PHASE7_PRE_CUTOVER_DATE");
+  });
+
+  it("rejects same-company parent routing", () => {
     expectTransferError(
       () =>
         parseGoldenCoastPhase7TransferInput({
           companyId: 14,
           parentCompanyId: 14,
           body: {
-            operation: "pay_fresh_start_from_hadi",
-            transferDate: "2026-09-12",
+            operation: "collect_via_hadi",
+            transferDate: "2026-09-10",
             amountUsd: "10",
             clientRequestId: "same-company",
             hadiCashAccount: { kind: "bank", id: 1 },
@@ -120,89 +118,121 @@ describe("Golden Coast Phase 7 HADI transfer planner", () => {
     );
   });
 
-  it("collection increases the GC payable and HADI-held amount even when GC Sales Cash is already credit", () => {
+  it("rejects unsupported or missing cash account targets", () => {
+    expectTransferError(() => parsedCollect({ hadiCashAccount: { kind: "customer", id: 301 } }));
+    expectTransferError(() => parsedCollect({ hadiCashAccount: null }));
+  });
+
+  it("plans a partial HADI collection against the current GC Sales Cash debit balance", () => {
     const plan = planGoldenCoastPhase7Transfer({
       transfer: parsedCollect(),
       balances: {
-        gcSalesCashDebitBalanceUsd: "-1000.00",
-        outstandingHadiCollectionsUsd: "1000.00",
+        gcSalesCashDebitBalanceUsd: "1800.00",
+        outstandingHadiCollectionsUsd: "100.00",
       },
     });
-    expect(plan.gcSalesCashDebitBalanceBeforeUsd).toBe("-1000.00");
-    expect(plan.gcSalesCashDebitBalanceAfterUsd).toBe("-1600.00");
-    expect(plan.outstandingHadiCollectionsAfterUsd).toBe("1600.00");
-  });
 
-  it("Fresh Start payment reduces both the GC payable and HADI-held sales cash", () => {
-    const plan = planGoldenCoastPhase7Transfer({
-      transfer: parsedPayFreshStart(),
-      balances: {
-        gcSalesCashDebitBalanceUsd: "-1000.00",
-        outstandingHadiCollectionsUsd: "1000.00",
-      },
-    });
-    expect(plan.gcSalesCashDebitBalanceAfterUsd).toBe("-700.00");
-    expect(plan.outstandingHadiCollectionsBeforeUsd).toBe("1000.00");
+    expect(plan.gcSalesCashDebitBalanceBeforeUsd).toBe("1800.00");
+    expect(plan.gcSalesCashDebitBalanceAfterUsd).toBe("1200.00");
+    expect(plan.outstandingHadiCollectionsBeforeUsd).toBe("100.00");
     expect(plan.outstandingHadiCollectionsAfterUsd).toBe("700.00");
   });
 
-  it("rejects a Fresh Start payment above the payable", () => {
+  it("allows an exact collection that clears the collectible GC Sales Cash debit balance", () => {
+    const transfer = parsedCollect({ amountUsd: "1800" });
+    const plan = planGoldenCoastPhase7Transfer({
+      transfer,
+      balances: { gcSalesCashDebitBalanceUsd: "1800", outstandingHadiCollectionsUsd: "0" },
+    });
+    expect(plan.gcSalesCashDebitBalanceAfterUsd).toBe("0.00");
+    expect(plan.outstandingHadiCollectionsAfterUsd).toBe("1800.00");
+  });
+
+  it("fails closed when a collection exceeds the collectible GC Sales Cash balance", () => {
     expectTransferError(
       () =>
         planGoldenCoastPhase7Transfer({
-          transfer: parsedPayFreshStart({ amountUsd: "1000.01" }),
-          balances: { gcSalesCashDebitBalanceUsd: "-1000", outstandingHadiCollectionsUsd: "1500" },
+          transfer: parsedCollect({ amountUsd: "1800.01" }),
+          balances: { gcSalesCashDebitBalanceUsd: "1800", outstandingHadiCollectionsUsd: "0" },
         }),
-      "GC_PHASE7_PAYMENT_EXCEEDS_PAYABLE"
+      "GC_PHASE7_COLLECTION_EXCEEDS_BALANCE"
     );
   });
 
-  it("rejects a Fresh Start payment above the HADI-held amount", () => {
+  it("treats a credit GC Sales Cash balance as having zero collectible amount", () => {
     expectTransferError(
       () =>
         planGoldenCoastPhase7Transfer({
-          transfer: parsedPayFreshStart({ amountUsd: "500.01" }),
-          balances: { gcSalesCashDebitBalanceUsd: "-1000", outstandingHadiCollectionsUsd: "500" },
+          transfer: parsedCollect({ amountUsd: "1" }),
+          balances: { gcSalesCashDebitBalanceUsd: "-50", outstandingHadiCollectionsUsd: "0" },
+        }),
+      "GC_PHASE7_COLLECTION_EXCEEDS_BALANCE"
+    );
+  });
+
+  it("plans a HADI remittance only against unremitted Phase 7 collections", () => {
+    const plan = planGoldenCoastPhase7Transfer({
+      transfer: parsedRemit(),
+      balances: {
+        gcSalesCashDebitBalanceUsd: "1200.00",
+        outstandingHadiCollectionsUsd: "700.00",
+      },
+    });
+
+    expect(plan.gcSalesCashDebitBalanceAfterUsd).toBe("1200.00");
+    expect(plan.outstandingHadiCollectionsBeforeUsd).toBe("700.00");
+    expect(plan.outstandingHadiCollectionsAfterUsd).toBe("450.00");
+  });
+
+  it("rejects remittance of unrelated historical intercompany balances", () => {
+    expectTransferError(
+      () =>
+        planGoldenCoastPhase7Transfer({
+          transfer: parsedRemit({ amountUsd: "700.01" }),
+          balances: {
+            gcSalesCashDebitBalanceUsd: "1200.00",
+            outstandingHadiCollectionsUsd: "700.00",
+          },
         }),
       "GC_PHASE7_REMITTANCE_EXCEEDS_COLLECTIONS"
     );
   });
 
-  it("remittance back to GC reduces HADI-held cash but does not settle the Fresh Start payable", () => {
-    const plan = planGoldenCoastPhase7Transfer({
-      transfer: parsedRemit(),
-      balances: { gcSalesCashDebitBalanceUsd: "-1200", outstandingHadiCollectionsUsd: "700" },
-    });
-    expect(plan.gcSalesCashDebitBalanceAfterUsd).toBe("-1200.00");
-    expect(plan.outstandingHadiCollectionsAfterUsd).toBe("450.00");
-  });
-
-  it("fails closed if HADI-use history exceeds HADI collections", () => {
+  it("fails closed if Phase 7 history reports more remitted than collected", () => {
     expectTransferError(
       () =>
         planGoldenCoastPhase7Transfer({
-          transfer: parsedPayFreshStart({ amountUsd: "1" }),
-          balances: { gcSalesCashDebitBalanceUsd: "-100", outstandingHadiCollectionsUsd: "-0.01" },
+          transfer: parsedRemit({ amountUsd: "1" }),
+          balances: {
+            gcSalesCashDebitBalanceUsd: "100",
+            outstandingHadiCollectionsUsd: "-0.01",
+          },
         }),
       "GC_PHASE7_SCOPE_INVALID"
     );
   });
 
-  it("builds collection as GC Dr HADI IC / Cr GC Sales Cash and HADI Dr cash / Cr GC intercompany", () => {
+  it("builds collection journals as GC Dr intercompany / Cr GC Sales Cash and HADI Dr cash / Cr intercompany", () => {
     const transfer = parsedCollect();
     const plan = planGoldenCoastPhase7Transfer({
       transfer,
-      balances: { gcSalesCashDebitBalanceUsd: "0", outstandingHadiCollectionsUsd: "0" },
+      balances: { gcSalesCashDebitBalanceUsd: "1800", outstandingHadiCollectionsUsd: "0" },
     });
+    const transferDigest = goldenCoastPhase7TransferDigest({ transfer, accounts });
     const batch = buildGoldenCoastPhase7TransferPostings({
       plan,
       accounts,
-      transferDigest: goldenCoastPhase7TransferDigest({ transfer, accounts }),
+      transferDigest,
       goldenCoastExchangeRate: null,
       hadiExchangeRate: null,
     });
+
     const gc = batch.postings.find((posting) => posting.role === "golden_coast")?.request;
     const hadi = batch.postings.find((posting) => posting.role === "hadi")?.request;
+    expect(gc?.voucher.companyId).toBe(14);
+    expect(hadi?.voucher.companyId).toBe(1);
+    expect(gc?.voucher.totalAmount).toBe("600.00");
+    expect(hadi?.voucher.totalAmount).toBe("600.00");
     expect(gc?.entries).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ ledgerAccountId: 102, debitAmount: "600", creditAmount: "0" }),
@@ -217,85 +247,100 @@ describe("Golden Coast Phase 7 HADI transfer planner", () => {
     );
   });
 
-  it("builds Fresh Start payment as GC Dr payable / Cr HADI IC and HADI Dr GC IC / Cr cash", () => {
-    const transfer = parsedPayFreshStart();
-    const plan = planGoldenCoastPhase7Transfer({
-      transfer,
-      balances: { gcSalesCashDebitBalanceUsd: "-1000", outstandingHadiCollectionsUsd: "1000" },
-    });
-    const batch = buildGoldenCoastPhase7TransferPostings({
-      plan,
-      accounts,
-      transferDigest: goldenCoastPhase7TransferDigest({ transfer, accounts }),
-      goldenCoastExchangeRate: null,
-      hadiExchangeRate: null,
-    });
-    const gc = batch.postings.find((posting) => posting.role === "golden_coast")?.request;
-    const hadi = batch.postings.find((posting) => posting.role === "hadi")?.request;
-    expect(gc?.entries).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ ledgerAccountId: 101, debitAmount: "300", creditAmount: "0" }),
-        expect.objectContaining({ ledgerAccountId: 102, debitAmount: "0", creditAmount: "300" }),
-      ])
-    );
-    expect(hadi?.entries).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ ledgerAccountId: 201, debitAmount: "300", creditAmount: "0" }),
-        expect.objectContaining({ bankAccountId: 301, debitAmount: "0", creditAmount: "300" }),
-      ])
-    );
-  });
-
-  it("builds remittance back to GC without touching GC Sales Cash", () => {
+  it("builds remittance journals as GC Dr cash / Cr intercompany and HADI Dr intercompany / Cr cash", () => {
     const transfer = parsedRemit();
     const plan = planGoldenCoastPhase7Transfer({
       transfer,
-      balances: { gcSalesCashDebitBalanceUsd: "-1200", outstandingHadiCollectionsUsd: "700" },
+      balances: { gcSalesCashDebitBalanceUsd: "1200", outstandingHadiCollectionsUsd: "700" },
     });
+    const transferDigest = goldenCoastPhase7TransferDigest({ transfer, accounts });
     const batch = buildGoldenCoastPhase7TransferPostings({
       plan,
       accounts,
-      transferDigest: goldenCoastPhase7TransferDigest({ transfer, accounts }),
+      transferDigest,
       goldenCoastExchangeRate: null,
       hadiExchangeRate: null,
     });
+
     const gc = batch.postings.find((posting) => posting.role === "golden_coast")?.request;
+    const hadi = batch.postings.find((posting) => posting.role === "hadi")?.request;
     expect(gc?.entries).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ ledgerAccountId: 401, debitAmount: "250", creditAmount: "0" }),
         expect.objectContaining({ ledgerAccountId: 102, debitAmount: "0", creditAmount: "250" }),
       ])
     );
+    expect(hadi?.entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ ledgerAccountId: 201, debitAmount: "250", creditAmount: "0" }),
+        expect.objectContaining({ bankAccountId: 301, debitAmount: "0", creditAmount: "250" }),
+      ])
+    );
     expect(gc?.entries.some((entry) => entry.ledgerAccountId === 101)).toBe(false);
   });
 
-  it("uses payload-bound deterministic digests and stable company/request idempotency", () => {
-    const original = parsedPayFreshStart();
-    const same = parsedPayFreshStart();
-    const changed = parsedPayFreshStart({ amountUsd: "301" });
+  it("keeps Fresh Start equity, Hassan equity, Hassan Savings, Sales, COGS and inventory out of Phase 7 postings", () => {
+    const transfer = parsedCollect();
+    const plan = planGoldenCoastPhase7Transfer({
+      transfer,
+      balances: { gcSalesCashDebitBalanceUsd: "1800", outstandingHadiCollectionsUsd: "0" },
+    });
+    const transferDigest = goldenCoastPhase7TransferDigest({ transfer, accounts });
+    const batch = buildGoldenCoastPhase7TransferPostings({
+      plan,
+      accounts,
+      transferDigest,
+      goldenCoastExchangeRate: null,
+      hadiExchangeRate: null,
+    });
+    const ledgerIds = batch.postings.flatMap((posting) =>
+      posting.request.entries.map((entry) => entry.ledgerAccountId).filter((id): id is number => id != null)
+    );
+    expect(new Set(ledgerIds)).toEqual(new Set([101, 102, 201]));
+  });
+
+  it("uses payload-bound deterministic digests", () => {
+    const original = parsedCollect();
+    const same = parsedCollect();
+    const changedAmount = parsedCollect({ amountUsd: "601" });
+    const changedHadiAccount = parsedCollect({ hadiCashAccount: { kind: "bank", id: 302 } });
+
     expect(goldenCoastPhase7TransferDigest({ transfer: original, accounts })).toBe(
       goldenCoastPhase7TransferDigest({ transfer: same, accounts })
     );
     expect(goldenCoastPhase7TransferDigest({ transfer: original, accounts })).not.toBe(
-      goldenCoastPhase7TransferDigest({ transfer: changed, accounts })
+      goldenCoastPhase7TransferDigest({ transfer: changedAmount, accounts })
     );
+    expect(goldenCoastPhase7TransferDigest({ transfer: original, accounts })).not.toBe(
+      goldenCoastPhase7TransferDigest({ transfer: changedHadiAccount, accounts })
+    );
+  });
+
+  it("keeps one company/request identity across operations so changed economic data conflicts on replay", () => {
     expect(goldenCoastPhase7IdempotencyKey(14, "request-1", "golden_coast")).toBe(
       `${GOLDEN_COAST_PHASE7_SOURCE_TYPE}:14:request-1:golden_coast`
     );
-  });
-
-  it("records Fresh Start payments as HADI cash uses in the existing outstanding-history prefix", () => {
-    expect(goldenCoastPhase7SourceId("pay_fresh_start_from_hadi", "abc123", "golden_coast")).toBe(
-      "remit_from_hadi:abc123:golden_coast"
+    expect(goldenCoastPhase7IdempotencyKey(14, "request-1", "hadi")).toBe(
+      `${GOLDEN_COAST_PHASE7_SOURCE_TYPE}:14:request-1:hadi`
     );
   });
 
-  it("refuses a collapsed GC Sales Cash/intercompany mapping", () => {
-    const transfer = parsedPayFreshStart();
-    const badAccounts = { ...accounts, goldenCoastHadiIntercompanyAccountId: accounts.gcSalesCashAccountId };
+  it("tags source IDs with operation, digest and posting role", () => {
+    expect(goldenCoastPhase7SourceId("collect_via_hadi", "abc123", "golden_coast")).toBe(
+      "collect_via_hadi:abc123:golden_coast"
+    );
+    expect(goldenCoastPhase7SourceId("remit_from_hadi", "abc123", "hadi")).toBe("remit_from_hadi:abc123:hadi");
+  });
+
+  it("refuses a collapsed GC Sales Cash/intercompany account mapping", () => {
+    const transfer = parsedCollect();
+    const badAccounts = {
+      ...accounts,
+      goldenCoastHadiIntercompanyAccountId: accounts.gcSalesCashAccountId,
+    };
     const plan = planGoldenCoastPhase7Transfer({
       transfer,
-      balances: { gcSalesCashDebitBalanceUsd: "-1000", outstandingHadiCollectionsUsd: "1000" },
+      balances: { gcSalesCashDebitBalanceUsd: "1800", outstandingHadiCollectionsUsd: "0" },
     });
     expectTransferError(
       () =>
