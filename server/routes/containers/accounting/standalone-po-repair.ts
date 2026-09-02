@@ -25,7 +25,7 @@ async function isStandaloneErpCompany(companyId: number): Promise<boolean> {
     storage.getParentCompanyId(),
   ]);
 
-  if (!company) throw new Error("ACTIVE_COMPANY_NOT_FOUND");
+  if (!company) return false;
   if (company.parentCompanyId) return false;
 
   // The legacy global parent setting may identify the root company itself, but
