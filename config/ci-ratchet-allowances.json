@@ -62,7 +62,9 @@
     "USE /api/factory/customer-orders/:id/verification-summary [authoritativeVerificationStockMiddleware]",
     "USE / [browserMutationFailClosedBoundary]",
     "USE /api/sp/sales [<anonymous>]",
-    "USE /api/po-import/parse [poImportDatabaseScopeContinuityBoundary]"
+    "USE /api/po-import/parse [poImportDatabaseScopeContinuityBoundary]",
+    "USE /api/containers/sync-all-vouchers [requireAuth]",
+    "USE /api/containers/sync-all-vouchers [standalonePoRepairBoundary]"
   ],
   "routeManifestReplacements": [
     {
@@ -83,11 +85,11 @@
     },
     {
       "expected": "GET /api/sp/migration/runs [requireAuth > <anonymous> > <anonymous>]",
-      "actual": "GET /api/sp/migration/runs [requireAuth > <anonymous> > <anonymous> > <anonymous>]"
+      "actual": "GET /api/sp/migration/runs [requireAuth > <anonymous> > <anonymous> > <anonymous> > <anonymous>]"
     },
     {
       "expected": "POST /api/sp/migration/rehearsal [requireAuth > <anonymous> > <anonymous>]",
-      "actual": "POST /api/sp/migration/rehearsal [requireAuth > <anonymous> > <anonymous> > <anonymous>]"
+      "actual": "POST /api/sp/migration/rehearsal [requireAuth > <anonymous> > <anonymous> > <anonymous> > <anonymous>]"
     },
     {
       "expected": "POST /api/sp/migration/rollback [requireAuth > <anonymous> > <anonymous>]",
