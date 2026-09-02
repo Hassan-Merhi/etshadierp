@@ -2,8 +2,9 @@
 //
 // Supplier rows are company-owned through suppliers.company_id. A supplier may
 // be read or posted only from its owning company. The legacy parent-company
-// setting is retained solely as a compatibility fallback for rows observed
-// before the company-scope migration has run.
+// setting is retained solely for historical opening-balance ownership when no
+// active company context is available; it must never make an explicitly
+// unlinked company behave like a child company.
 
 import Decimal from "decimal.js";
 import { storage } from "../../storage";
@@ -24,22 +25,18 @@ export class ParentCompanyNotConfiguredError extends Error {
 }
 
 /**
- * Resolves the legacy company that owned supplier opening balances before
- * suppliers.company_id existed. Never guesses via lowest company ID. Concurrent
- * callers share one in-flight resolution to avoid repeated configuration reads.
+ * Resolves the accounting parent for a company-scoped request.
+ *
+ * When a companyId is supplied, companies.parent_company_id is authoritative:
+ * an explicit parent link returns that parent; no link means the company is
+ * standalone/root and therefore resolves to itself. The legacy global setting
+ * is consulted only by callers that do not have a company context.
  */
 export async function resolveParentCompanyId(companyId?: number | null): Promise<number> {
-  // Prefer the explicit company relationship. This is the authoritative
-  // tenant-scoped configuration for current supplier rows and does not depend
-  // on the legacy global system setting.
   if (companyId) {
     const currentCompany = await storage.getCompanyById(companyId);
     if (currentCompany?.parentCompanyId) return currentCompany.parentCompanyId;
-
-    // A root company is identified safely by an explicit child link, never by
-    // its numeric ID or position in the company list.
-    const linkedChild = (await storage.getAllCompanies()).some((company) => company.parentCompanyId === companyId);
-    if (linkedChild) return companyId;
+    return companyId;
   }
 
   if (parentCompanyResolution) return parentCompanyResolution;
@@ -65,8 +62,19 @@ export async function resolveParentCompanyId(companyId?: number | null): Promise
 
 export async function isParentCompanyContext(companyId?: number | null): Promise<boolean> {
   if (!companyId) return true;
-  const parentCompanyId = await resolveParentCompanyId(companyId);
-  return companyId === parentCompanyId;
+
+  const currentCompany = await storage.getCompanyById(companyId);
+  if (currentCompany?.parentCompanyId) return false;
+
+  // A company explicitly referenced by a child is unquestionably a parent.
+  const linkedChild = (await storage.getAllCompanies()).some((company) => company.parentCompanyId === companyId);
+  if (linkedChild) return true;
+
+  // For a standalone company, the old global setting may still identify the
+  // owner of historical supplier opening balances, but it does not create an
+  // intercompany relationship for current transactions.
+  const legacyParentCompanyId = await storage.getParentCompanyId();
+  return legacyParentCompanyId === companyId;
 }
 
 export interface SupplierBalanceContextResult {
