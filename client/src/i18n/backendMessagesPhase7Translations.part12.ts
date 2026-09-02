@@ -17,4 +17,9 @@ export const backendMessagesPhase7TranslationsPart12: readonly Phase7BackendMess
     ar: "حساب الشحن الخاص بالشركة الأم المحدد لا ينتمي إلى الشركة الأم المرتبطة",
     fr: "Le compte de fret de la société mère sélectionné n’appartient pas à la société mère liée",
   },
+  {
+    en: "Configured intercompany credit account ${configuredAccountId} is missing, inactive, or belongs to another company",
+    ar: "حساب الائتمان بين الشركات المُكوّن ${configuredAccountId} مفقود أو غير نشط أو ينتمي إلى شركة أخرى",
+    fr: "Le compte de crédit intersociétés configuré ${configuredAccountId} est introuvable, inactif ou appartient à une autre société",
+  },
 ];

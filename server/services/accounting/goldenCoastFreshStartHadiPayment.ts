@@ -49,7 +49,8 @@ export interface GoldenCoastFreshStartHadiPaymentPlan extends GoldenCoastFreshSt
 
 function positiveId(value: unknown, field: string): number {
   const id = Number(value);
-  if (!Number.isInteger(id) || id <= 0) throw new GoldenCoastFreshStartHadiPaymentError(`${field} must be a positive integer`);
+  if (!Number.isInteger(id) || id <= 0)
+    throw new GoldenCoastFreshStartHadiPaymentError(`${field} must be a positive integer`);
   return id;
 }
 

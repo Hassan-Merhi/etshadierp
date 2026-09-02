@@ -200,6 +200,9 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // explicit request identities alive until teardown, so clear this test
     // ledger before deleting the fixture company's vouchers.
     await pool.query("DELETE FROM accounting_posting_requests WHERE company_id = $1", [company.id]);
+    // Purchase orders retain a restricting voucher_id foreign key, so their
+    // headers must be removed before the vouchers they created.
+    await db.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.companyId, company.id));
     await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, company.id));
     // stock_adjustment_items.stock_item_id is a foreign key against stock_items,
     // so any adjustment line left by a test blocks the stock_items delete below
@@ -224,10 +227,61 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, company.id));
     await db.delete(schema.locations).where(eq(schema.locations.companyId, company.id));
     await pool.query("DELETE FROM factory_transporters WHERE company_id = $1", [company.id]);
+    await db.delete(schema.companySettings).where(eq(schema.companySettings.companyId, company.id));
     await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.companyId, company.id));
     await db.delete(schema.userSecurityPermissions).where(eq(schema.userSecurityPermissions.companyId, company.id));
     await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.companyId, company.id));
     await db.delete(schema.userLocations).where(eq(schema.userLocations.companyId, company.id));
+
+    // Normal container records are also created by PO tests. Remove their
+    // restricting child rows before deleting the containers themselves.
+    await pool.query(
+      "DELETE FROM container_offload_items WHERE offload_id IN (SELECT id FROM container_offloads WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1))",
+      [company.id]
+    );
+    await pool.query(
+      "DELETE FROM container_freight_payments WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query(
+      "DELETE FROM container_freight_payments WHERE container_freight_id IN (SELECT id FROM container_freight WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query(
+      "DELETE FROM container_offloads WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query(
+      "DELETE FROM container_charges WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query(
+      "DELETE FROM supplier_container_loaded_items WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query("DELETE FROM container_sales WHERE company_id = $1", [company.id]);
+    await pool.query(
+      "DELETE FROM container_documents WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query(
+      "DELETE FROM import_logs WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query(
+      "DELETE FROM container_tracking_events WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query(
+      "DELETE FROM container_tracking_checks WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query("DELETE FROM container_freight WHERE company_id = $1", [company.id]);
+    await db.delete(schema.containers).where(eq(schema.containers.companyId, company.id));
+    // Supplier company scoping was added by a startup migration before the
+    // shared Drizzle definition was updated. Use SQL so stale company-owned
+    // suppliers cannot keep the fixture company alive.
+    await pool.query("DELETE FROM suppliers WHERE company_id = $1", [company.id]);
 
     // A crashed/interrupted factory test can leave rows in factory_* tables
     // referencing this company; those FKs otherwise block the company delete

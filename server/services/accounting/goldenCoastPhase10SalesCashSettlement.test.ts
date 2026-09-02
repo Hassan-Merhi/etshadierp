@@ -148,8 +148,12 @@ describe("Golden Coast Phase 10 direct Fresh Start payment", () => {
     const differentBank = settlement({ paymentAccount: { kind: "bank", id: 92 } });
     const differentReference = settlement({ reference: "Different payment" });
 
-    expect(goldenCoastPhase10SettlementDigest({ settlement: differentBank, gcSalesCashAccountId: 44 })).not.toBe(digest);
-    expect(goldenCoastPhase10SettlementDigest({ settlement: differentReference, gcSalesCashAccountId: 44 })).not.toBe(digest);
+    expect(goldenCoastPhase10SettlementDigest({ settlement: differentBank, gcSalesCashAccountId: 44 })).not.toBe(
+      digest
+    );
+    expect(goldenCoastPhase10SettlementDigest({ settlement: differentReference, gcSalesCashAccountId: 44 })).not.toBe(
+      digest
+    );
     expect(goldenCoastPhase10SettlementDigest({ settlement: base, gcSalesCashAccountId: 45 })).not.toBe(digest);
     expect(goldenCoastPhase10IdempotencyKey(7, base.clientRequestId)).toContain(base.clientRequestId);
   });

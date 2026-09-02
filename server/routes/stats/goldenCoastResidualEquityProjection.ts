@@ -1,16 +1,10 @@
 import type { Express } from "express";
-import { getAccountNetBalance, round2, type AccountBalance } from "../../netPositionHelper";
+import { getAccountNetBalance, round2, type AccountBalance, type AccountLike } from "../../netPositionHelper";
 import { logger } from "../../lib/logger";
 import { loadNetProfitData } from "./netProfitDataLoad";
 
-type LedgerRow = {
-  id: number;
-  name: string;
-  code?: string | null;
-  accountType?: string | null;
+type LedgerRow = AccountLike & {
   subType?: string | null;
-  openingBalance?: string | null;
-  openingBalanceSide?: string | null;
   active?: boolean | null;
   deletedAt?: unknown;
 };
@@ -24,7 +18,22 @@ type DisplayAccount = {
   balanceSide?: "Dr" | "Cr";
 };
 
-type NetProfitResponse = Record<string, any>;
+type NetProfitSection = {
+  accounts?: unknown;
+  total?: unknown;
+  breakdown?: unknown;
+  [key: string]: unknown;
+};
+
+type NetProfitResponse = {
+  [key: string]: unknown;
+  forUs?: NetProfitSection;
+  onUs?: NetProfitSection;
+  forUsTotal?: unknown;
+  onUsTotal?: unknown;
+  equity?: Record<string, unknown>;
+  netPositionBreakdown?: Record<string, unknown>;
+};
 
 const ASSET_TYPES = new Set(["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash", "Customer"]);
 const LIABILITY_TYPES = new Set(["Liability", "Loan", "Loans", "Duty Agent", "Transporter Agent"]);
@@ -52,15 +61,12 @@ function accountBalance(accountId: number, balances: Map<number, AccountBalance>
  * posted entirely through vouchers in the opposite direction, fall back to the
  * current ledger magnitude rather than turning Hassan's claim negative.
  */
-export function goldenCoastHassanClaim(
-  account: LedgerRow,
-  balances: Map<number, AccountBalance>
-): number {
+export function goldenCoastHassanClaim(account: LedgerRow, balances: Map<number, AccountBalance>): number {
   const movement = accountBalance(account.id, balances);
   const openingClaim = Math.abs(numberValue(account.openingBalance));
   const creditNormalClaim = round2(openingClaim + movement.credit - movement.debit);
   if (creditNormalClaim >= -0.005) return Math.max(0, creditNormalClaim);
-  return round2(Math.abs(getAccountNetBalance(account as any, balances)));
+  return round2(Math.abs(getAccountNetBalance(account, balances)));
 }
 
 function displayCategory(account: LedgerRow, side: "asset" | "liability"): string {
@@ -82,7 +88,10 @@ function addBreakdown(accounts: DisplayAccount[]): Array<{ name: string; value: 
     .sort((a, b) => b.value - a.value);
 }
 
-function removeAccountById(accounts: DisplayAccount[], accountId: number): { accounts: DisplayAccount[]; removed: number } {
+function removeAccountById(
+  accounts: DisplayAccount[],
+  accountId: number
+): { accounts: DisplayAccount[]; removed: number } {
   let removed = 0;
   const kept = accounts.filter((account) => {
     if (Number(account.id ?? 0) !== accountId) return true;
@@ -168,7 +177,7 @@ export function projectGoldenCoastResidualEquity(input: {
     const isLiability = LIABILITY_TYPES.has(account.accountType || "");
     if (!isAsset && !isLiability) continue;
 
-    const net = round2(getAccountNetBalance(account as any, accountBalances));
+    const net = round2(getAccountNetBalance(account, accountBalances));
     if (Math.abs(net) < 0.005) continue;
 
     if (isLiability) {

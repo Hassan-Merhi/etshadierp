@@ -77,10 +77,7 @@ function baseBody(input: { tracker: number; cash?: number; stock?: number }) {
   return {
     forUs: {
       total: stock + cash,
-      breakdown: [
-        { name: "Inventory", value: stock },
-        ...(cash ? [{ name: "Cash", value: cash }] : []),
-      ],
+      breakdown: [{ name: "Inventory", value: stock }, ...(cash ? [{ name: "Cash", value: cash }] : [])],
       accounts: [
         { name: "Stock In Hand / Stock on Floor", code: "COMPUTED", value: stock, category: "Inventory" },
         ...(cash ? [{ id: 5, name: "GC Cash", code: "GC-CASH", value: cash, category: "Cash" }] : []),
@@ -89,9 +86,7 @@ function baseBody(input: { tracker: number; cash?: number; stock?: number }) {
     onUs: {
       total: input.tracker,
       breakdown: [{ name: "Liability", value: input.tracker }],
-      accounts: [
-        { id: 3, name: "GC Sales Cash", code: "SP-PAY", value: input.tracker, category: "Liability" },
-      ],
+      accounts: [{ id: 3, name: "GC Sales Cash", code: "SP-PAY", value: input.tracker, category: "Liability" }],
     },
     equity: {
       total: 497239,

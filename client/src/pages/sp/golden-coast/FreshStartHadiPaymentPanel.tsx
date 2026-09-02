@@ -107,15 +107,25 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
       setReference("");
       setRequestId(makeRequestId("gc-fs-hadi"));
       invalidateReadiness();
-      queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0] ?? "").includes(FRESH_START_HADI_READINESS) });
-      queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0] ?? "").includes("/api/stats/net-profit") });
+      queryClient.invalidateQueries({
+        predicate: (query) => String(query.queryKey[0] ?? "").includes(FRESH_START_HADI_READINESS),
+      });
+      queryClient.invalidateQueries({
+        predicate: (query) => String(query.queryKey[0] ?? "").includes("/api/stats/net-profit"),
+      });
       toast({
-        title: releaseDebtEnglish(result.replayed ? "Fresh Start payment replay confirmed" : "Fresh Start payment posted"),
+        title: releaseDebtEnglish(
+          result.replayed ? "Fresh Start payment replay confirmed" : "Fresh Start payment posted"
+        ),
         description: releaseDebtEnglish("GC Sales Cash payable and the HADI intercompany asset were reduced together."),
       });
     },
     onError: (error: ClientErrorLike) => {
-      toast({ title: releaseDebtEnglish("Fresh Start payment failed"), description: error.message, variant: "destructive" });
+      toast({
+        title: releaseDebtEnglish("Fresh Start payment failed"),
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -245,7 +255,11 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
           disabled={!canSubmit || mutation.isPending}
           data-testid="button-gc-fs-hadi-submit"
         >
-          {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <HandCoins className="mr-2 h-4 w-4" />}
+          {mutation.isPending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <HandCoins className="mr-2 h-4 w-4" />
+          )}
           {releaseDebtEnglish("Post Fresh Start payment")}
         </Button>
       </CardContent>

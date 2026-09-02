@@ -54,14 +54,14 @@ describe("Golden Coast Fresh Start payment from HADI", () => {
 
     expect(gc.entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ ledgerAccountId: 101, debitAmount: "300.00", creditAmount: "0" }),
-        expect.objectContaining({ ledgerAccountId: 102, debitAmount: "0", creditAmount: "300.00" }),
+        expect.objectContaining({ ledgerAccountId: 101, debitAmount: "300", creditAmount: "0" }),
+        expect.objectContaining({ ledgerAccountId: 102, debitAmount: "0", creditAmount: "300" }),
       ])
     );
     expect(hadi.entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ ledgerAccountId: 201, debitAmount: "300.00", creditAmount: "0" }),
-        expect.objectContaining({ bankAccountId: 301, debitAmount: "0", creditAmount: "300.00" }),
+        expect.objectContaining({ ledgerAccountId: 201, debitAmount: "300", creditAmount: "0" }),
+        expect.objectContaining({ bankAccountId: 301, debitAmount: "0", creditAmount: "300" }),
       ])
     );
   });

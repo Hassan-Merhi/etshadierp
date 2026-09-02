@@ -327,7 +327,9 @@ async function findReplayedSettlement(
       settlement.paymentAccount.kind === "bank"
         ? Number(entry.bankAccountId ?? 0) === settlement.paymentAccount.id
         : Number(entry.ledgerAccountId ?? 0) === settlement.paymentAccount.id;
-    return targetMatches && amountEquals(entry.debitAmount, "0") && amountEquals(entry.creditAmount, settlement.amountUsd);
+    return (
+      targetMatches && amountEquals(entry.debitAmount, "0") && amountEquals(entry.creditAmount, settlement.amountUsd)
+    );
   });
   if (!salesCashDebit || !paymentCredit) {
     throw new GoldenCoastPhase10RouteError(
