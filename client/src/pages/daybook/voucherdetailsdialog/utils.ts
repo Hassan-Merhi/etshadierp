@@ -16,7 +16,7 @@ export const STOCK_ENTRY_VOUCHER_TYPES = [
 ];
 
 /** Voucher types rendered as a single "Amount" column instead of debit/credit. */
-export const SINGLE_AMOUNT_VOUCHER_TYPES = ["Payment", "Receipt", "Journal"];
+export const SINGLE_AMOUNT_VOUCHER_TYPES = ["Payment", "Receipt"];
 
 export function isStockEntryVoucherType(voucherType: string | undefined): boolean {
   return STOCK_ENTRY_VOUCHER_TYPES.includes(voucherType ?? "");
