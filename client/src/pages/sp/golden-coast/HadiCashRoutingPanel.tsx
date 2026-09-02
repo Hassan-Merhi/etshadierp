@@ -1,9 +1,9 @@
 /**
  * Phase 7 — HADI cash routing.
  *
- * Both directions (HADI collects Golden Coast sales cash, HADI remits it back)
- * are validated on the server: this panel only picks an approved account, an
- * amount inside the server-reported cap, and a stable client request id.
+ * Golden Coast sales cash is physically held/used by HADI while GC Sales Cash
+ * remains the payable owed to Fresh Start. The normal settlement action here is
+ * therefore "HADI pays Fresh Start": both balances fall together on the server.
  */
 import type { ClientErrorLike } from "@/lib/clientError";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -36,11 +36,16 @@ import {
   useReadinessInvalidation,
 } from "./shared";
 
+function positivePayable(signedDebitMinusCredit: unknown): number {
+  const signed = Number(signedDebitMinusCredit ?? 0);
+  return Number.isFinite(signed) ? Math.max(-signed, 0) : 0;
+}
+
 export function HadiCashRoutingPanel({ companyKey }: { companyKey: CompanyKey }) {
   const { toast } = useToast();
   const invalidateReadiness = useReadinessInvalidation();
 
-  const [phase7Operation, setPhase7Operation] = useState<Phase7Operation>("collect_via_hadi");
+  const [phase7Operation, setPhase7Operation] = useState<Phase7Operation>("pay_fresh_start_from_hadi");
   const [phase7Date, setPhase7Date] = useState(todayIso);
   const [phase7Amount, setPhase7Amount] = useState("");
   const [phase7HadiAccount, setPhase7HadiAccount] = useState("");
@@ -71,17 +76,19 @@ export function HadiCashRoutingPanel({ companyKey }: { companyKey: CompanyKey })
 
   const rotatePhase7 = () => setPhase7RequestId(makeRequestId("gc-p7"));
 
+  const gcSalesCashPayable = positivePayable(phase7?.balances?.gcSalesCashDebitBalanceUsd);
+  const hadiHeldSalesCash = Math.max(Number(phase7?.balances?.outstandingHadiCollectionsUsd ?? 0) || 0, 0);
   const phase7Maximum =
-    phase7Operation === "collect_via_hadi"
-      ? (phase7?.balances?.gcSalesCashDebitBalanceUsd ?? "0")
-      : (phase7?.balances?.outstandingHadiCollectionsUsd ?? "0");
+    phase7Operation === "pay_fresh_start_from_hadi"
+      ? Math.min(gcSalesCashPayable, hadiHeldSalesCash).toFixed(2)
+      : hadiHeldSalesCash.toFixed(2);
   const phase7HadiChoice = selectedAccount(phase7HadiAccount, phase7?.hadiCashAccounts ?? []);
   const phase7GcChoice = selectedAccount(phase7GcAccount, phase7?.goldenCoastCashAccounts ?? []);
   const phase7CanSubmit =
     phase7?.canTransfer === true &&
     allowedAmount(phase7Amount, phase7Maximum) &&
     phase7HadiChoice != null &&
-    (phase7Operation === "collect_via_hadi" || phase7GcChoice != null);
+    (phase7Operation !== "remit_from_hadi" || phase7GcChoice != null);
 
   const phase7Mutation = useMutation({
     mutationFn: async () => {
@@ -113,7 +120,7 @@ export function HadiCashRoutingPanel({ companyKey }: { companyKey: CompanyKey })
       setPhase7RequestId(makeRequestId("gc-p7"));
       toast({
         title: releaseDebtEnglish(result.replayed ? "HADI transfer replay confirmed" : "HADI transfer posted"),
-        description: releaseDebtEnglish("Live balances were refreshed from the server."),
+        description: releaseDebtEnglish("Live payable and intercompany balances were refreshed from the server."),
       });
     },
     onError: (error: ClientErrorLike) => {
@@ -131,7 +138,7 @@ export function HadiCashRoutingPanel({ companyKey }: { companyKey: CompanyKey })
             </CardTitle>
             <CardDescription>
               {releaseDebtEnglish(
-                "Phase 7 validates both companies, live balances, cash accounts, and intercompany routing on the server."
+                "HADI holds Golden Coast sales cash. Paying Fresh Start reduces the GC Sales Cash payable and HADI intercompany balance together."
               )}
             </CardDescription>
           </div>
@@ -155,12 +162,12 @@ export function HadiCashRoutingPanel({ companyKey }: { companyKey: CompanyKey })
         ) : null}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-md border p-3">
-            <p className="text-xs text-muted-foreground">{releaseDebtEnglish("GC Sales Cash")}</p>
-            <p className="mt-1 font-semibold tabular-nums">{money(phase7?.balances?.gcSalesCashDebitBalanceUsd)}</p>
+            <p className="text-xs text-muted-foreground">{releaseDebtEnglish("GC Sales Cash payable")}</p>
+            <p className="mt-1 font-semibold tabular-nums">{money(gcSalesCashPayable)}</p>
           </div>
           <div className="rounded-md border p-3">
-            <p className="text-xs text-muted-foreground">{releaseDebtEnglish("Outstanding with HADI")}</p>
-            <p className="mt-1 font-semibold tabular-nums">{money(phase7?.balances?.outstandingHadiCollectionsUsd)}</p>
+            <p className="text-xs text-muted-foreground">{releaseDebtEnglish("HADI holding for GC")}</p>
+            <p className="mt-1 font-semibold tabular-nums">{money(hadiHeldSalesCash)}</p>
           </div>
           <div className="rounded-md border p-3 sm:col-span-2">
             <p className="text-xs text-muted-foreground">{releaseDebtEnglish("Company pair")}</p>
@@ -185,9 +192,11 @@ export function HadiCashRoutingPanel({ companyKey }: { companyKey: CompanyKey })
               }}
               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             >
-              <option value="collect_via_hadi">{releaseDebtEnglish("HADI collects Golden Coast sales cash")}</option>
+              <option value="pay_fresh_start_from_hadi">
+                {releaseDebtEnglish("HADI pays Fresh Start for Golden Coast")}
+              </option>
               <option value="remit_from_hadi">
-                {releaseDebtEnglish("HADI remits collected cash to Golden Coast")}
+                {releaseDebtEnglish("HADI returns Golden Coast cash to Golden Coast")}
               </option>
             </select>
           </div>
@@ -281,9 +290,9 @@ export function HadiCashRoutingPanel({ companyKey }: { companyKey: CompanyKey })
           ) : (
             <Banknote className="mr-2 h-4 w-4" />
           )}
-          {phase7Operation === "collect_via_hadi"
-            ? releaseDebtEnglish("Post HADI collection")
-            : releaseDebtEnglish("Post HADI remittance")}
+          {phase7Operation === "pay_fresh_start_from_hadi"
+            ? releaseDebtEnglish("Pay Fresh Start from HADI")
+            : releaseDebtEnglish("Return cash to Golden Coast")}
         </Button>
       </CardContent>
     </Card>
