@@ -276,6 +276,20 @@ export async function loadNetProfitData(companyId: number, toDate: string | null
   const hasMigratedEntries = resultRows(hasMigratedResult)[0]?.has_migrated === true;
   const companyBaseCurrency = companyRecord?.baseCurrency || "USD";
 
+  // Golden Coast physically routes each POS receipt into HADI. In the ledger
+  // that balance is correctly typed Intercompany, but the Supplier Partner Net
+  // Position screen historically filters SP accounts down to Cash + payable.
+  // Present only the GC-side HADI receivable as Cash-like report metadata so it
+  // lands in What We Have without mutating the actual chart-of-accounts type.
+  // This keeps the operational intercompany validation strict while making the
+  // balance sheet reflect the asset HADI owes back to Golden Coast.
+  const reportCompanyAccounts =
+    companyRecord?.companyType === "supplier_partner"
+      ? companyAccounts.map((account) =>
+          account.subType === "sp_hadi_intercompany" ? { ...account, accountType: "Cash" } : account
+        )
+      : companyAccounts;
+
   // Build accountBalances from grouped SQL result.
   // Account-company scoped: migrated accounts carry their full balance to the
   // destination company regardless of which company their vouchers belong to.
@@ -315,7 +329,7 @@ export async function loadNetProfitData(companyId: number, toDate: string | null
   }
   return {
     companyRecord,
-    companyAccounts,
+    companyAccounts: reportCompanyAccounts,
     parentCompanyId,
     hasMigratedEntries,
     companyBaseCurrency,
