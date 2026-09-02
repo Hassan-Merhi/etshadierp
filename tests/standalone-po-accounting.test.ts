@@ -3,6 +3,7 @@ import { and, eq, like } from "drizzle-orm";
 
 import { db, pool } from "../server/db";
 import { storage } from "../server/storage";
+import { resolveParentCompanyId } from "../server/routes/helpers/supplierBalanceHelpers";
 import * as schema from "../shared/schema";
 import { companyScopedSuppliers } from "../shared/schema/supplierCompanyScope";
 import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
@@ -92,6 +93,10 @@ afterAll(async () => {
 }, 30000);
 
 describe("standalone purchase-order accounting", () => {
+  it("keeps supplier parent resolution inside an explicitly unlinked company", async () => {
+    await expect(resolveParentCompanyId(ctx.companyId)).resolves.toBe(ctx.companyId);
+  });
+
   it("posts Purchases and Supplier inside the unlinked company and does not touch the global parent", async () => {
     const po = await storage.createPurchaseOrder(
       {
@@ -117,12 +122,14 @@ describe("standalone purchase-order accounting", () => {
       .select({ voucherId: schema.purchaseOrders.voucherId })
       .from(schema.purchaseOrders)
       .where(eq(schema.purchaseOrders.id, po.id));
-    expect(storedPo?.voucherId).toBeTruthy();
+    const voucherId = storedPo?.voucherId;
+    expect(voucherId).toBeTruthy();
+    if (!voucherId) throw new Error("Standalone PO did not create a purchase voucher");
 
     const [purchaseVoucher] = await db
       .select({ companyId: schema.vouchers.companyId })
       .from(schema.vouchers)
-      .where(eq(schema.vouchers.id, storedPo!.voucherId!));
+      .where(eq(schema.vouchers.id, voucherId));
     expect(purchaseVoucher.companyId).toBe(ctx.companyId);
 
     const entries = await db
@@ -133,7 +140,7 @@ describe("standalone purchase-order accounting", () => {
         creditAmount: schema.voucherEntries.creditAmount,
       })
       .from(schema.voucherEntries)
-      .where(eq(schema.voucherEntries.voucherId, storedPo!.voucherId!));
+      .where(eq(schema.voucherEntries.voucherId, voucherId));
 
     expect(entries).toEqual(
       expect.arrayContaining([
