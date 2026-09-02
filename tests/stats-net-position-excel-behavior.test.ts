@@ -95,6 +95,7 @@ const harness = vi.hoisted(() => {
       getParentCompanyId: vi.fn(),
     },
     classifyNetPositionAccounts: vi.fn(),
+    classifyEquityAccounts: vi.fn(),
     calculateHistoricalLocationInventory: vi.fn(),
     logAudit: vi.fn(),
   };
@@ -115,6 +116,7 @@ vi.mock("../server/lib/httpHandlers", () => ({ getErrorMessage: (error: any) => 
 vi.mock("../server/lib/logger", () => ({ logger: { error: vi.fn() } }));
 vi.mock("../server/netPositionHelper", () => ({
   classifyNetPositionAccounts: harness.classifyNetPositionAccounts,
+  classifyEquityAccounts: harness.classifyEquityAccounts,
   round2: (value: number) => Math.round((value + Number.EPSILON) * 100) / 100,
 }));
 vi.mock("exceljs", () => ({ default: { Workbook: harness.FakeWorkbook } }));
@@ -213,6 +215,9 @@ describe("net position Excel behavior", () => {
       ],
       onUsAccounts: [{ name: "Loan", code: "LOAN", value: 50, category: "Liability" }],
     });
+    // Only supplier-partner exports fold equity into the position; this fixture is an ERP company,
+    // so the stub stays empty and the totals below are unaffected by it.
+    harness.classifyEquityAccounts.mockReturnValue({ total: 0, accounts: [] });
   });
 
   it("builds the consolidated net position from accounts, stock, worker advances, suppliers, and OTW stock", async () => {

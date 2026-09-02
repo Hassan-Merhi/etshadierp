@@ -18,6 +18,10 @@ import { requireAuth } from "../../auth";
 import { ledgerAccounts, purchaseOrders, voucherEntries, type Container } from "@shared/schema";
 import { eq, and, sql, isNull, like } from "drizzle-orm";
 import { firstRow } from "../../lib/queryResult";
+import {
+  ParentCompanyPostingScopeError,
+  runWithVerifiedParentCompanyScope,
+} from "../../services/security/parentCompanyPostingScope";
 
 export function registerPoImportRoutes(app: Express) {
   app.post("/api/po-import/validate", requireAuth, async (req, res) => {
@@ -699,7 +703,6 @@ export function registerPoImportRoutes(app: Express) {
               creditAmount: subsidiaryVoucherAmount.toFixed(2),
               narration: `PO ${poNumber} - Credit from ${subsidiaryName}`,
             });
-
           }
         } else {
           // === PARENT/STANDALONE COMPANY: Create direct supplier entry ===
@@ -770,8 +773,11 @@ export function registerPoImportRoutes(app: Express) {
           }
         }
 
-        if (isSubsidiary) {
-          await createParentIntercompanyPosting();
+        if (isSubsidiary && parentCompanyId) {
+          // Every write in there lands in the parent company, which this request is not pinned
+          // to, so it runs under the scope that re-verifies the parent link and the caller's
+          // membership before the database scope moves.
+          await runWithVerifiedParentCompanyScope(parentCompanyId, createParentIntercompanyPosting);
         }
 
         const po = await storage.createPurchaseOrder(
@@ -872,6 +878,10 @@ export function registerPoImportRoutes(app: Express) {
       });
     } catch (error: unknown) {
       logger.error("PO Import error:", { error: error });
+      if (error instanceof ParentCompanyPostingScopeError) {
+        res.status(error.status).json({ code: error.code, message: error.message });
+        return;
+      }
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
