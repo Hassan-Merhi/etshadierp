@@ -21,7 +21,7 @@ export const GOLDEN_COAST_TABS = ["overview", "hadi", "savings", "sales-cash", "
 export type GoldenCoastTab = (typeof GOLDEN_COAST_TABS)[number];
 
 export type CashAccountKind = "ledger" | "bank";
-export type Phase7Operation = "collect_via_hadi" | "remit_from_hadi";
+export type Phase7Operation = "collect_via_hadi" | "remit_from_hadi" | "pay_fresh_start_from_hadi";
 
 /** Query-key discriminator so a company switch cannot reuse another company's readiness. */
 export type CompanyKey = number | string;
@@ -49,7 +49,9 @@ export interface Phase7Readiness {
     hadiGoldenCoastIntercompanyAccountName: string;
   } | null;
   balances: {
+    /** Signed Dr-minus-Cr balance. A negative number is the payable owed to Fresh Start. */
     gcSalesCashDebitBalanceUsd: string;
+    /** HADI-held Golden Coast sales cash not yet returned or used to pay Fresh Start. */
     outstandingHadiCollectionsUsd: string;
   } | null;
   hadiCashAccounts: CashAccountOption[];
