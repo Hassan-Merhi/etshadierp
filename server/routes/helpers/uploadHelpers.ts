@@ -34,15 +34,17 @@ function continueInSessionTenantScope(req: Request, res: Response, next: NextFun
   }
 
   const tenantScope =
-    currentScope?.kind === "tenant"
-      ? currentScope
-      : createTenantDatabaseScope(companyId, [], "active-company");
+    currentScope?.kind === "tenant" ? currentScope : createTenantDatabaseScope(companyId, [], "active-company");
 
   runWithDatabaseScopeRuntimeContext(tenantScope, () => next());
 }
 
 function withPostMultipartTenantScope(middleware: RequestHandler): RequestHandler {
-  return (req, res, next) => {
+  // The route manifest records each handler slot by function name, and this wrapper occupies the
+  // multipart slot that Multer used to fill directly. Keeping the name means the snapshot still
+  // reads `multerMiddleware` for every upload route, so a genuine handler-chain change stays
+  // visible instead of being buried under a rename of every upload route at once.
+  const multerMiddleware: RequestHandler = (req, res, next) => {
     middleware(req, res, (error?: unknown) => {
       if (error) {
         next(error);
@@ -52,6 +54,7 @@ function withPostMultipartTenantScope(middleware: RequestHandler): RequestHandle
       continueInSessionTenantScope(req, res, next);
     });
   };
+  return multerMiddleware;
 }
 
 /**
