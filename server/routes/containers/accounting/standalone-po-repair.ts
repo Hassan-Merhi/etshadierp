@@ -25,7 +25,7 @@ async function isStandaloneErpCompany(companyId: number): Promise<boolean> {
     storage.getParentCompanyId(),
   ]);
 
-  if (!company) throw new Error("Active company not found");
+  if (!company) throw new Error("ACTIVE_COMPANY_NOT_FOUND");
   if (company.parentCompanyId) return false;
 
   // The legacy global parent setting may identify the root company itself, but
@@ -283,9 +283,6 @@ export async function standalonePoRepairBoundary(req: Request, res: Response, ne
       notFoundParentVouchers: [],
       missingParentFreightAccount: [],
       errors: repair.errors,
-      message:
-        `Scanned ${repair.scannedPOs} standalone-company POs. ` +
-        `Repaired ${repair.repairedStandaloneSupplierVouchers} supplier voucher(s).`,
     });
   } catch (error: unknown) {
     logger.error("[StandalonePORepair] Fatal repair error", { error });
