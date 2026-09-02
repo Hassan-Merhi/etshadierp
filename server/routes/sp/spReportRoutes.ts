@@ -100,12 +100,17 @@ export function registerSpReportRoutes(app: Express) {
 
       const grossProfit = totalRevenue - totalCogs;
 
-      // Shared charges: debits to the sp_shared_charges account in the period
+      // Shared Charges can be posted on either side depending on the settlement flow.
+      // Report the net charge magnitude so a credit-side GC settlement still appears as
+      // a positive charge while debit-side SP expense postings continue to work.
       const sharedAcct = await getSpAccount(companyId, "sp_shared_charges");
       let totalSharedCharges = 0;
       if (sharedAcct) {
         const sharedRows = await db.execute(sql`
-          SELECT COALESCE(SUM(CAST(ve.debit_amount AS DECIMAL)), 0) as total
+          SELECT ABS(
+            COALESCE(SUM(CAST(ve.debit_amount AS DECIMAL)), 0)
+            - COALESCE(SUM(CAST(ve.credit_amount AS DECIMAL)), 0)
+          ) AS total
           FROM voucher_entries ve
           JOIN vouchers v ON ve.voucher_id = v.id
           WHERE ve.ledger_account_id = ${sharedAcct.id}

@@ -196,7 +196,7 @@ describe("PO import parent accounting", () => {
     expect(parentPosting!.entries).toHaveLength(2);
     expect(parentPosting!.entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ supplier_id: supplierId, debit_amount: "0", credit_amount: "35.00" }),
+        expect.objectContaining({ supplier_id: supplierId, debit_amount: "0.00", credit_amount: "35.00" }),
       ])
     );
 
@@ -237,13 +237,13 @@ describe("PO import parent accounting", () => {
     expect(parentPosting!.entries).toHaveLength(3);
     expect(parentPosting!.entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ supplier_id: supplierId, debit_amount: "0", credit_amount: "100.00" }),
+        expect.objectContaining({ supplier_id: supplierId, debit_amount: "0.00", credit_amount: "100.00" }),
         expect.objectContaining({
           ledger_account_id: parentFreightAccountId,
-          debit_amount: "0",
+          debit_amount: "0.00",
           credit_amount: "10.00",
         }),
-        expect.objectContaining({ debit_amount: "110.00", credit_amount: "0" }),
+        expect.objectContaining({ debit_amount: "110.00", credit_amount: "0.00" }),
       ])
     );
 
@@ -259,10 +259,7 @@ describe("PO import parent accounting", () => {
   });
 
   it("does not create a parent journal for an unlinked Supplier Partner", async () => {
-    await db
-      .update(schema.companies)
-      .set({ parentCompanyId: null })
-      .where(eq(schema.companies.id, ctx.companyId));
+    await db.update(schema.companies).set({ parentCompanyId: null }).where(eq(schema.companies.id, ctx.companyId));
 
     const result = await agent.post("/api/po-import/import").send(
       importPayload({
@@ -277,17 +274,11 @@ describe("PO import parent accounting", () => {
     expect(result.status).toBe(200);
     expect(await postingFor("PO-SP-UNLINKED")).toBeNull();
 
-    await db
-      .update(schema.companies)
-      .set({ parentCompanyId })
-      .where(eq(schema.companies.id, ctx.companyId));
+    await db.update(schema.companies).set({ parentCompanyId }).where(eq(schema.companies.id, ctx.companyId));
   });
 
   it("keeps the normal linked ERP subsidiary path working", async () => {
-    await db
-      .update(schema.companies)
-      .set({ companyType: "erp" })
-      .where(eq(schema.companies.id, ctx.companyId));
+    await db.update(schema.companies).set({ companyType: "erp" }).where(eq(schema.companies.id, ctx.companyId));
 
     const result = await agent.post("/api/po-import/import").send(
       importPayload({
@@ -304,7 +295,7 @@ describe("PO import parent accounting", () => {
     expect(parentPosting).not.toBeNull();
     expect(parentPosting!.entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ supplier_id: supplierId, debit_amount: "0", credit_amount: "50.00" }),
+        expect.objectContaining({ supplier_id: supplierId, debit_amount: "0.00", credit_amount: "50.00" }),
       ])
     );
   });
