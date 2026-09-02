@@ -1,13 +1,12 @@
 import { createHash } from "node:crypto";
 import Decimal from "decimal.js";
-import { and, asc, eq, ilike, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, isNull } from "drizzle-orm";
 import {
   accountingPostingRequests,
   bankAccounts,
   companies,
   ledgerAccounts,
   locations,
-  salesItems,
   voucherEntries,
   vouchers,
 } from "@shared/schema";
@@ -24,16 +23,8 @@ import {
 import { createDatabasePostingDependencies } from "../accounting/databasePostingDependencies";
 
 /**
- * The standard POS sale remains the source document. These postings bridge the
- * itemized POS document into Golden Coast's partner-capital, P&L and HADI cash
- * model without changing the source voucher itself.
- *
- * Economic model:
- *   - the full customer sale becomes a distribution out of Fresh Start equity;
- *   - Sales/COGS carry the current-period result until the 50/50 monthly close;
- *   - GC Sales Cash remains the payable created by the normal SP POS voucher;
- *   - physical cash is moved to HADI and becomes a Golden Coast intercompany asset.
- *
+ * The standard POS sale remains the source document. These postings only move
+ * the cash and payable balances required by Golden Coast's HADI arrangement.
  * They intentionally use a separate source type so legacy Phase 5/6 vouchers
  * are never mistaken for the new itemized POS flow.
  */
@@ -41,12 +32,7 @@ export const GOLDEN_COAST_POS_SETTLEMENT_SOURCE_TYPE = "golden-coast-pos-settlem
 
 type PersistedPostingResult = CentralPostingResult<typeof vouchers.$inferSelect, typeof voucherEntries.$inferSelect>;
 type CashTarget = { kind: "ledger" | "bank"; id: number; name: string };
-type SettlementRole =
-  | "capital_revenue"
-  | "sale_cogs"
-  | "payable_reclass"
-  | "gc_cash_transfer"
-  | "hadi_cash_receipt";
+type SettlementRole = "payable_reclass" | "gc_cash_transfer" | "hadi_cash_receipt";
 
 const postingDependencies = createDatabasePostingDependencies();
 
@@ -207,24 +193,6 @@ async function resolvePair(tx: DbTransaction, companyId: number): Promise<{ pare
   return { parentCompanyId };
 }
 
-async function itemizedSaleCostUsd(tx: DbTransaction, companyId: number, clientSaleId: string): Promise<string> {
-  const [row] = await tx
-    .select({
-      totalCost: sql<string>`COALESCE(SUM(CAST(${salesItems.totalCost} AS numeric)), 0)::text`,
-    })
-    .from(salesItems)
-    .innerJoin(vouchers, eq(vouchers.id, salesItems.voucherId))
-    .where(
-      and(
-        eq(vouchers.companyId, companyId),
-        eq(vouchers.clientSaleId, clientSaleId),
-        eq(vouchers.voucherType, "Sales"),
-        isNull(vouchers.deletedAt)
-      )
-    );
-  return money(String(row?.totalCost ?? "0"));
-}
-
 async function buildPosting(input: {
   companyId: number;
   locationId: number | null;
@@ -313,34 +281,6 @@ export async function postGoldenCoastPosAccountingTx(input: {
     "GC Sales Cash",
     getGoldenCoastAccountDefinition("gc_sales_cash").acceptedAccountTypes
   );
-  const freshStartEquity = await activeSingleAccount(
-    tx,
-    companyId,
-    getGoldenCoastAccountDefinition("fresh_start_equity").subType,
-    "Fresh Start FZ Equity",
-    getGoldenCoastAccountDefinition("fresh_start_equity").acceptedAccountTypes
-  );
-  const salesRevenue = await activeSingleAccount(
-    tx,
-    companyId,
-    "sp_sales",
-    "Golden Coast Sales",
-    ["Income", "Direct Income"]
-  );
-  const cogsAccount = await activeSingleAccount(
-    tx,
-    companyId,
-    "sp_cogs",
-    "Golden Coast Cost of Goods Sold",
-    ["Direct Expense", "Expense"]
-  );
-  const stockInHand = await activeSingleAccount(
-    tx,
-    companyId,
-    getGoldenCoastAccountDefinition("stock_in_hand").subType,
-    "Golden Coast Stock in Hand",
-    getGoldenCoastAccountDefinition("stock_in_hand").acceptedAccountTypes
-  );
   const gcIntercompany = await activeSingleAccount(
     tx,
     companyId,
@@ -348,7 +288,6 @@ export async function postGoldenCoastPosAccountingTx(input: {
     "Golden Coast HADI intercompany account",
     ["Intercompany"]
   );
-  const cogs = await itemizedSaleCostUsd(tx, companyId, input.clientSaleId);
 
   await assertTransactionCompanyScope(tx, parentCompanyId);
   const hadiCash = await findMatchingHadiCashTarget(tx, parentCompanyId, sourceCash.name);
@@ -371,70 +310,14 @@ export async function postGoldenCoastPosAccountingTx(input: {
     saleDate: input.saleDate,
     amount,
     payable,
-    cogs,
     sourceCash,
     hadiCash,
     gcSalesCash: gcSalesCash.id,
-    freshStartEquity: freshStartEquity.id,
-    salesRevenue: salesRevenue.id,
-    cogsAccount: cogsAccount.id,
-    stockInHand: stockInHand.id,
     supplierPayable: input.supplierPayableAccountId,
   });
   const label = input.revision;
   const actor = input.actor;
   const postings: Array<{ companyId: number; request: Promise<CentralPostingRequest> }> = [];
-
-  // The normal Supplier Partner POS voucher already credits the GC Sales Cash
-  // payable (plus any configured deduction). This companion voucher converts
-  // the same gross sale out of Fresh Start's capital and into current-period
-  // Sales. The monthly close later debits Sales and distributes only net profit
-  // 50/50, so the gross distribution is never counted twice.
-  postings.push({
-    companyId,
-    request: buildPosting({
-      companyId,
-      locationId: input.locationId,
-      voucherDate: input.saleDate,
-      voucherNumber: `GC-POS-${input.clientSaleId}-${label}-CAPITAL`,
-      description: "Golden Coast POS Fresh Start capital converted to sales payable",
-      amount,
-      clientRequestId: `${input.clientSaleId}:${label}:capital`,
-      sourceId: sourceId(input.clientSaleId, settlementDigest, label, "capital_revenue"),
-      idempotencyKey: idempotencyKey(companyId, input.clientSaleId, label, "capital_revenue"),
-      entries: [
-        { ledgerAccountId: freshStartEquity.id, debitAmount: amount, creditAmount: "0" },
-        { ledgerAccountId: salesRevenue.id, debitAmount: "0", creditAmount: amount },
-      ],
-      actor,
-    }),
-  });
-
-  // The inventory table is the authoritative quantity/value source for Net
-  // Position, while the hidden Stock in Hand ledger is the double-entry bridge
-  // used by the monthly close. Posting COGS here lets the close zero Sales/COGS
-  // cleanly instead of creating a one-sided historical balance.
-  if (new Decimal(cogs).greaterThan(0)) {
-    postings.push({
-      companyId,
-      request: buildPosting({
-        companyId,
-        locationId: input.locationId,
-        voucherDate: input.saleDate,
-        voucherNumber: `GC-POS-${input.clientSaleId}-${label}-COGS`,
-        description: "Golden Coast POS COGS recognition",
-        amount: cogs,
-        clientRequestId: `${input.clientSaleId}:${label}:cogs`,
-        sourceId: sourceId(input.clientSaleId, settlementDigest, label, "sale_cogs"),
-        idempotencyKey: idempotencyKey(companyId, input.clientSaleId, label, "sale_cogs"),
-        entries: [
-          { ledgerAccountId: cogsAccount.id, debitAmount: cogs, creditAmount: "0" },
-          { ledgerAccountId: stockInHand.id, debitAmount: "0", creditAmount: cogs },
-        ],
-        actor,
-      }),
-    });
-  }
 
   if (new Decimal(payable).greaterThan(0) && input.supplierPayableAccountId !== gcSalesCash.id) {
     postings.push({
@@ -521,8 +404,7 @@ function sourceLabel(
   const parts = sourceIdValue.slice(prefix.length).split(":");
   if (parts.length !== 3 || parts[1] === "reversal") return null;
   if (!/^(?:create|edit\d+)$/.test(parts[1])) return null;
-  if (!["capital_revenue", "sale_cogs", "payable_reclass", "gc_cash_transfer", "hadi_cash_receipt"].includes(parts[2]))
-    return null;
+  if (!["payable_reclass", "gc_cash_transfer", "hadi_cash_receipt"].includes(parts[2])) return null;
   return { digest: parts[0], revision: parts[1], role: parts[2] as SettlementRole };
 }
 
@@ -531,7 +413,7 @@ function revisionRank(value: string): number {
 }
 
 /**
- * Reverses only the latest settlement postings belonging to the itemized sale.
+ * Reverses only the latest settlement pair belonging to the itemized sale.
  * Legacy Phase 5/6 postings have another source type and are intentionally
  * untouched.
  */

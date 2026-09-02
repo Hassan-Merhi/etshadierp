@@ -17,7 +17,6 @@ import {
   type PostingActor,
 } from "../../services/accounting/centralPostingEngine";
 import { createDatabasePostingDependencies } from "../../services/accounting/databasePostingDependencies";
-import { buildGenericVoucherPostingRequest } from "../../services/accounting/genericVoucherPosting";
 import {
   GOLDEN_COAST_PHASE7_SOURCE_TYPE,
   buildGoldenCoastPhase7TransferPostings,
@@ -36,7 +35,6 @@ import { assertTransactionCompanyScope } from "../../services/security/transacti
 import { getCurrentExchangeRate } from "../helpers/exchangeRateHelpers";
 
 const postingDependencies = createDatabasePostingDependencies();
-const GOLDEN_COAST_PHASE6_CAPITAL_RELEASE_SOURCE_TYPE = "golden-coast-phase6-fresh-start-capital-release";
 
 type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type DbLike = typeof db | DatabaseTransaction;
@@ -210,30 +208,6 @@ async function activeIntercompanyAccount(
   return { id: Number(rows[0].id), name: String(rows[0].name) };
 }
 
-async function activeFreshStartEquityAccount(tx: DatabaseTransaction, companyId: number): Promise<{ id: number; name: string }> {
-  await assertTransactionCompanyScope(tx, companyId);
-  const rows = await tx
-    .select({ id: ledgerAccounts.id, name: ledgerAccounts.name, accountType: ledgerAccounts.accountType })
-    .from(ledgerAccounts)
-    .where(
-      and(
-        eq(ledgerAccounts.companyId, companyId),
-        eq(ledgerAccounts.subType, "gc_partner_capital"),
-        eq(ledgerAccounts.active, true),
-        isNull(ledgerAccounts.deletedAt)
-      )
-    )
-    .orderBy(asc(ledgerAccounts.id))
-    .limit(2);
-  if (rows.length !== 1 || rows[0].accountType !== "Equity") {
-    throw new GoldenCoastPhase6AutoHadiError(
-      "Fresh Start FZ Equity is missing, ambiguous, or not typed as Equity; run Golden Coast account setup first.",
-      "GC_PHASE6_AUTO_HADI_ACCOUNT_INVALID"
-    );
-  }
-  return { id: Number(rows[0].id), name: String(rows[0].name) };
-}
-
 async function resolveAutomaticRoleAccounts(
   tx: DatabaseTransaction,
   pair: GoldenCoastAutomaticHadiPair,
@@ -385,57 +359,6 @@ async function outstandingPhase7HadiCollections(tx: DatabaseTransaction, company
   return String(resultRows(query)[0]?.outstanding ?? "0");
 }
 
-async function postFreshStartCapitalReleaseTx(input: {
-  tx: DatabaseTransaction;
-  companyId: number;
-  freshStartEquityAccountId: number;
-  gcSalesCashAccountId: number;
-  saleDate: string;
-  amountUsd: string;
-  clientRequestId: string;
-  actor?: PostingActor;
-}): Promise<void> {
-  await assertTransactionCompanyScope(input.tx, input.companyId);
-  const amount = new Decimal(input.amountUsd).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2);
-  const description = releaseDebtEnglish("Golden Coast sale converted from Fresh Start capital to GC Sales Cash payable");
-  const built = buildGenericVoucherPostingRequest({
-    companyId: input.companyId,
-    clientRequestId: input.clientRequestId,
-    voucher: {
-      voucherNumber: `GC-P6-C${input.companyId}-${input.clientRequestId}-CAP`,
-      voucherType: "Journal",
-      voucherDate: input.saleDate,
-      description,
-      currency: "USD",
-    },
-    entries: [
-      {
-        ledgerAccountId: input.freshStartEquityAccountId,
-        debitAmount: amount,
-        creditAmount: "0",
-        narration: description,
-      },
-      {
-        ledgerAccountId: input.gcSalesCashAccountId,
-        debitAmount: "0",
-        creditAmount: amount,
-        narration: description,
-      },
-    ],
-    exchangeRate: null,
-    actor: input.actor,
-  });
-  const request = {
-    ...built.request,
-    source: {
-      sourceType: GOLDEN_COAST_PHASE6_CAPITAL_RELEASE_SOURCE_TYPE,
-      sourceId: `${input.clientRequestId}:${amount}:${input.freshStartEquityAccountId}:${input.gcSalesCashAccountId}`,
-      idempotencyKey: `${GOLDEN_COAST_PHASE6_CAPITAL_RELEASE_SOURCE_TYPE}:${input.companyId}:${input.clientRequestId}`,
-    },
-  };
-  await postBalancedVoucherTx(input.tx, request, postingDependencies);
-}
-
 async function findPostedVoucher(
   tx: DatabaseTransaction,
   companyId: number,
@@ -554,7 +477,6 @@ export async function postGoldenCoastAutomaticHadiCollectionTx(input: {
   );
 
   const accounts = await resolveAutomaticRoleAccounts(input.tx, pair, input.gcSalesCashAccountId);
-  const freshStartEquity = await activeFreshStartEquityAccount(input.tx, pair.goldenCoastCompanyId);
   const hadiCashAccount = await resolveAutomaticHadiCashAccount(input.tx, pair.hadiCompanyId);
   await assertTransactionCompanyScope(input.tx, pair.goldenCoastCompanyId);
 
@@ -569,21 +491,6 @@ export async function postGoldenCoastAutomaticHadiCollectionTx(input: {
       reference: `Automatic HADI collection for Golden Coast POS sale ${input.clientRequestId}`,
       hadiCashAccount: { kind: hadiCashAccount.kind, id: hadiCashAccount.id },
     },
-  });
-
-  // Phase 5's revenue document debits GC Sales Cash and credits Sales. Convert
-  // that gross sale out of Fresh Start capital before the HADI collection posts.
-  // The following Phase 7 collection then leaves GC Sales Cash with the intended
-  // credit payable balance and HADI Intercompany with the matching debit asset.
-  await postFreshStartCapitalReleaseTx({
-    tx: input.tx,
-    companyId: pair.goldenCoastCompanyId,
-    freshStartEquityAccountId: freshStartEquity.id,
-    gcSalesCashAccountId: accounts.gcSalesCashAccountId,
-    saleDate: input.saleDate,
-    amountUsd: transfer.amountUsd,
-    clientRequestId: input.clientRequestId,
-    actor: input.actor,
   });
 
   const transferDigest = goldenCoastPhase7TransferDigest({ transfer, accounts });

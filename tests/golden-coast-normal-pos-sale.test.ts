@@ -21,7 +21,6 @@ const SALE_DATE = "2026-09-05";
 const SETTLEMENT_SOURCE_TYPE = "golden-coast-pos-settlement";
 
 let fixture: GoldenCoastNormalPosFixture;
-let freshStartEquityAccountId: number;
 
 async function accountBalance(accountId: number): Promise<number> {
   const { rows } = await pool.query(
@@ -32,19 +31,6 @@ async function accountBalance(accountId: number): Promise<number> {
     [accountId]
   );
   return Number(rows[0].balance);
-}
-
-async function accountIdBySubType(companyId: number, subType: string): Promise<number> {
-  const { rows } = await pool.query(
-    `SELECT id
-     FROM ledger_accounts
-     WHERE company_id = $1 AND sub_type = $2 AND active = true AND deleted_at IS NULL
-     ORDER BY id
-     LIMIT 2`,
-    [companyId, subType]
-  );
-  if (rows.length !== 1) throw new Error(`Expected one ${subType} account, found ${rows.length}`);
-  return Number(rows[0].id);
 }
 
 async function settlementVoucherIds(clientSaleId: string): Promise<number[]> {
@@ -84,7 +70,6 @@ function saleBody() {
 
 beforeAll(async () => {
   fixture = await setupGoldenCoastNormalPosFixture(TEST_PREFIX);
-  freshStartEquityAccountId = await accountIdBySubType(fixture.ctx.companyId, "gc_partner_capital");
 }, 90_000);
 
 afterAll(async () => {
@@ -93,15 +78,11 @@ afterAll(async () => {
 }, 60_000);
 
 describe("Golden Coast normal itemized POS sale", () => {
-  it("posts the sale, converts Fresh Start equity, recognizes P&L, and routes cash to HADI", async () => {
+  it("posts the sale items, full cash debit, payable, and one location deduction", async () => {
     const beforeSelectedCash = await accountBalance(fixture.ctx.cashAccountId);
     const beforeHadiCash = await accountBalance(fixture.hadiCashAccountId);
     const beforeGoldenCoastIntercompany = await accountBalance(fixture.goldenCoastIntercompanyAccountId);
     const beforeHadiIntercompany = await accountBalance(fixture.hadiIntercompanyAccountId);
-    const beforeFreshStartEquity = await accountBalance(freshStartEquityAccountId);
-    const beforeSales = await accountBalance(fixture.salesAccountId);
-    const beforeCogs = await accountBalance(fixture.cogsAccountId);
-    const beforeStockLedger = await accountBalance(fixture.stockInHandAccountId);
 
     const response = await fixture.agent.post("/api/pos/sales").send(saleBody());
 
@@ -118,18 +99,10 @@ describe("Golden Coast normal itemized POS sale", () => {
     );
 
     const { rows: saleItemRows } = await pool.query(
-      `SELECT COUNT(*)::int AS count,
-              COALESCE(SUM(total_cost::numeric), 0)::numeric AS total_cost
-       FROM sales_items
-       WHERE voucher_id = $1`,
+      `SELECT COUNT(*)::int AS count FROM sales_items WHERE voucher_id = $1`,
       [response.body.voucher.id]
     );
     expect(saleItemRows[0].count).toBe(1);
-    const totalCost = Number(saleItemRows[0].total_cost);
-
-    // Physical customer cash is immediately handed to HADI, so the selected GC
-    // cash account returns to its starting balance while the reciprocal
-    // intercompany balances carry the full $500.
     expect(await accountBalance(fixture.ctx.cashAccountId)).toBeCloseTo(beforeSelectedCash, 2);
     expect(await accountBalance(fixture.hadiCashAccountId)).toBeCloseTo(beforeHadiCash + 500, 2);
     expect(await accountBalance(fixture.goldenCoastIntercompanyAccountId)).toBeCloseTo(
@@ -137,31 +110,17 @@ describe("Golden Coast normal itemized POS sale", () => {
       2
     );
     expect(await accountBalance(fixture.hadiIntercompanyAccountId)).toBeCloseTo(beforeHadiIntercompany - 500, 2);
-
-    // The normal SP source voucher creates the payable. The companion GC
-    // postings release the full gross sale from Fresh Start capital, recognize
-    // Sales/COGS, and mirror the inventory cost in the hidden stock ledger.
     expect(await accountBalance(fixture.saleSideAccountId)).toBeCloseTo(-460, 2);
-    expect(await accountBalance(freshStartEquityAccountId)).toBeCloseTo(beforeFreshStartEquity + 500, 2);
-    expect(await accountBalance(fixture.salesAccountId)).toBeCloseTo(beforeSales - 500, 2);
-    expect(await accountBalance(fixture.cogsAccountId)).toBeCloseTo(beforeCogs + totalCost, 2);
-    expect(await accountBalance(fixture.stockInHandAccountId)).toBeCloseTo(beforeStockLedger - totalCost, 2);
-
     const settlementIds = await settlementVoucherIds("normal-pos-sale");
-    expect(settlementIds).toHaveLength(4);
-    const settlementEntries = (
-      await Promise.all(settlementIds.map((voucherId) => voucherEntriesFor(voucherId)))
-    ).flat();
+    expect(settlementIds).toHaveLength(2);
+    const goldenCoastSettlementEntries = await voucherEntriesFor(settlementIds[0]);
     expect(
-      settlementEntries.some(
-        (entry) => entry.ledgerAccountId === fixture.ctx.cashAccountId && entry.creditAmount === "500.00"
-      )
-    ).toBe(true);
+      goldenCoastSettlementEntries.find((entry) => entry.ledgerAccountId === fixture.ctx.cashAccountId)?.creditAmount
+    ).toBe("500.00");
+    const hadiSettlementEntries = await voucherEntriesFor(settlementIds[1]);
     expect(
-      settlementEntries.some(
-        (entry) => entry.ledgerAccountId === fixture.hadiCashAccountId && entry.debitAmount === "500.00"
-      )
-    ).toBe(true);
+      hadiSettlementEntries.find((entry) => entry.ledgerAccountId === fixture.hadiCashAccountId)?.debitAmount
+    ).toBe("500.00");
     await expectBalancedSettlementVouchers("normal-pos-sale");
   });
 
@@ -172,7 +131,6 @@ describe("Golden Coast normal itemized POS sale", () => {
     });
     expect(first.status).toBe(200);
     const beforeRetry = await settlementVoucherIds("normal-pos-sale-retry");
-    expect(beforeRetry).toHaveLength(4);
 
     const retry = await fixture.agent.post("/api/pos/sales").send({
       ...saleBody(),
@@ -184,7 +142,7 @@ describe("Golden Coast normal itemized POS sale", () => {
     expect(await settlementVoucherIds("normal-pos-sale-retry")).toEqual(beforeRetry);
   });
 
-  it("reverses and rebuilds every paired accounting bridge on PATCH edit", async () => {
+  it("reverses and rebuilds the paired settlement on PATCH edit", async () => {
     const beforeEdit = await accountBalance(fixture.hadiCashAccountId);
     const beforePayable = await accountBalance(fixture.saleSideAccountId);
     const beforeDeduction = await accountBalance(fixture.deductionClearingAccountId);
@@ -219,7 +177,7 @@ describe("Golden Coast normal itemized POS sale", () => {
     expect(await accountBalance(fixture.hadiCashAccountId)).toBeCloseTo(beforeEdit + 400, 2);
     expect(await accountBalance(fixture.saleSideAccountId)).toBeCloseTo(beforePayable - 380, 2);
     expect(await accountBalance(fixture.deductionClearingAccountId)).toBeCloseTo(beforeDeduction - 20, 2);
-    expect(await settlementVoucherIds("normal-pos-sale-edit")).toHaveLength(12);
+    expect(await settlementVoucherIds("normal-pos-sale-edit")).toHaveLength(6);
     await expectBalancedSettlementVouchers("normal-pos-sale-edit");
 
     const { rows: inventoryRows } = await pool.query(
