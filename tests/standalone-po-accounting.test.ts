@@ -144,8 +144,8 @@ describe("standalone purchase-order accounting", () => {
 
     expect(entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ supplierId, debitAmount: "0", creditAmount: "125.00" }),
-        expect.objectContaining({ debitAmount: "125.00", creditAmount: "0" }),
+        expect.objectContaining({ supplierId, debitAmount: "0.00", creditAmount: "125.00" }),
+        expect.objectContaining({ debitAmount: "125.00", creditAmount: "0.00" }),
       ])
     );
 
