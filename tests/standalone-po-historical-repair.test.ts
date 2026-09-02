@@ -180,7 +180,10 @@ describe("historical standalone PO accounting repair", () => {
     expect(result.normalizedStandaloneParentFreight).toBe(1);
 
     const [storedPo] = await db
-      .select({ freightPaidBy: schema.purchaseOrders.freightPaidBy, freightParentAccountId: schema.purchaseOrders.freightParentAccountId })
+      .select({
+        freightPaidBy: schema.purchaseOrders.freightPaidBy,
+        freightParentAccountId: schema.purchaseOrders.freightParentAccountId,
+      })
       .from(schema.purchaseOrders)
       .where(eq(schema.purchaseOrders.id, poId));
     expect(storedPo.freightPaidBy).toBe("supplier");
@@ -200,7 +203,12 @@ describe("historical standalone PO accounting repair", () => {
     expect(entries).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ supplierId: null, debitAmount: "100.00", creditAmount: "0.00" }),
-        expect.objectContaining({ supplierId, ledgerAccountId: null, debitAmount: "0.00", creditAmount: "100.00" }),
+        expect.objectContaining({
+          supplierId,
+          ledgerAccountId: null,
+          debitAmount: "0.00",
+          creditAmount: "100.00",
+        }),
       ])
     );
     expect(entries.some((entry) => entry.ledgerAccountId === parentCreditAccountId)).toBe(false);
