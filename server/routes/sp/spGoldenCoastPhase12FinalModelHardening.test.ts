@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 
 const phase6RouteSource = readFileSync(new URL("./spGoldenCoastPhase6PosSaleRoutes.ts", import.meta.url), "utf8");
 const phase6AutoHadiSource = readFileSync(new URL("./goldenCoastPhase6AutoHadi.ts", import.meta.url), "utf8");
-const phase6AutoHadiCoreSource = readFileSync(new URL("./goldenCoastPhase6AutoHadiCore.ts", import.meta.url), "utf8");
 const phase7RouteSource = readFileSync(new URL("./spGoldenCoastPhase7HadiTransferRoutes.ts", import.meta.url), "utf8");
 const phase7ServiceSource = readFileSync(
   new URL("../../services/accounting/goldenCoastPhase7HadiTransfer.ts", import.meta.url),
@@ -33,15 +32,15 @@ describe("Golden Coast Phase 12 final accounting-model hardening", () => {
     );
   });
 
-  it("atomically routes Phase 6 sale cash into HADI before Phase 15 creates the credit payable", () => {
+  it("atomically routes each Phase 6 sale into HADI and then creates the Phase 15 credit payable", () => {
     expect(phase6RouteSource).toContain("postGoldenCoastAutomaticHadiCollectionTx");
     expect(phase6RouteSource).toContain("hadi_collection_${item.role}");
-    expect(phase6AutoHadiCoreSource).toContain('operation: "collect_via_hadi"');
-    expect(phase6AutoHadiCoreSource).toContain("buildGoldenCoastPhase7TransferPostings");
-    expect(phase6AutoHadiCoreSource).toContain("postBalancedVoucherTx");
-    expect(phase6AutoHadiSource).toContain("core.postGoldenCoastAutomaticHadiCollectionTx(input)");
+    expect(phase6AutoHadiSource).toContain('operation: "collect_via_hadi"');
+    expect(phase6AutoHadiSource).toContain("buildGoldenCoastPhase7TransferPostings");
     expect(phase6AutoHadiSource).toContain("buildGoldenCoastPhase15SalesPayablePosting");
-    expect(phase6AutoHadiSource.indexOf("core.postGoldenCoastAutomaticHadiCollectionTx(input)")).toBeLessThan(
+    expect(phase6AutoHadiSource).toContain("Automatic POS collection is sale-scoped, not balance-scoped");
+    expect(phase6AutoHadiSource).not.toContain("planGoldenCoastPhase7Transfer({");
+    expect(phase6AutoHadiSource.indexOf("buildGoldenCoastPhase7TransferPostings({")).toBeLessThan(
       phase6AutoHadiSource.lastIndexOf("postPhase15SalesPayableBridge({")
     );
   });
