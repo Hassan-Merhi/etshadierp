@@ -67,8 +67,7 @@
     "USE /api/sp/sales [<anonymous>]",
     "USE /api/po-import/parse [poImportDatabaseScopeContinuityBoundary]",
     "USE /api/containers/sync-all-vouchers [requireAuth]",
-    "USE /api/containers/sync-all-vouchers [standalonePoRepairBoundary]",
-    "USE /api/stats/net-profit [<anonymous>]"
+    "USE /api/containers/sync-all-vouchers [standalonePoRepairBoundary]"
   ],
   "routeManifestReplacements": [
     {
