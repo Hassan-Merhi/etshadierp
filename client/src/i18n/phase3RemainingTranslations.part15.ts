@@ -688,6 +688,7 @@ export const phase3RemainingTranslationsPart15: readonly Phase3SharedUiEntry[] =
   },
   { en: "Optional description", ar: "الوصف الاختياري", fr: "Description facultative" },
   { en: "Optional friendly name", ar: "الاسم الصديق", fr: "Nom amical facultatif" },
+  { en: "Optional narration for this account", ar: "بيان اختياري لهذا الحساب", fr: "Narration facultative pour ce compte" },
   {
     en: "Optional journal transitions must use the compatibility route",
     ar: "يجب أن تستخدم عمليات الانتقال في المجلة الاختيارية مسار التوافق",
