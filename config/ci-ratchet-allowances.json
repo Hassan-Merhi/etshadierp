@@ -42,7 +42,6 @@
     "POST /api/insurance/import/preview [<anonymous> > requireAuth > multerMiddleware > <anonymous>]",
     "POST /api/insurance/import/apply [<anonymous> > requireAuth > <anonymous>]",
     "POST /api/insurance/admin/clear-all [<anonymous> > requireAuth > <anonymous> > <anonymous>]",
-    "GET /api/pos/price-list [requireAuth > <anonymous>]",
     "PUT /api/supplier-profit-check/po-overrides/bulk [requireAuth > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
