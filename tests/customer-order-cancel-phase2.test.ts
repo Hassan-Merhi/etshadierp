@@ -114,6 +114,16 @@ describe("customer order cancellation phase 2", () => {
     expect(harness.recalculateOrderTotals).not.toHaveBeenCalled();
   });
 
+  it("skips the bulk bale update when an order has no linked bales", async () => {
+    harness.baleIds = [];
+
+    const response = await request(app).post("/api/factory/customer-orders/77/cancel");
+
+    expect(response.status).toBe(200);
+    // Only the order-status update remains; no empty IN (...) statement is emitted.
+    expect(harness.txUpdate).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps the V5 archive, release, link cleanup and total recalculation in the same transaction", async () => {
     harness.order = order({ proformaIdUsed: 55 });
 
