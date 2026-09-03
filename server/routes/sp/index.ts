@@ -61,7 +61,9 @@ export function registerSpRoutes(app: Express) {
   void runSpSupplierVoucherStartup()
     .then((repairedCount) => {
       if (repairedCount > 0) {
-        logger.info("[SP] Repaired Goods-OTW voucher supplier links", { repairedCount });
+        logger.info("[SP] Repaired Goods-OTW voucher supplier links", {
+          repairedCount,
+        });
       }
     })
     .catch((error) => {

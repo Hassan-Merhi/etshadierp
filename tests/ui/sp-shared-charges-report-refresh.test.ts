@@ -28,9 +28,11 @@ describe("Supplier Partner profit report refresh", () => {
     expect(invalidateQueries).toHaveBeenCalledTimes(1);
     const options = invalidateQueries.mock.calls[0][0];
     expect(options.refetchType).toBe("all");
-    expect(options.predicate({ queryKey: ["/api/sp/report/profit?startDate=2026-09-01&endDate=2026-09-30"] })).toBe(
-      true
-    );
+    expect(
+      options.predicate({
+        queryKey: ["/api/sp/report/profit?startDate=2026-09-01&endDate=2026-09-30"],
+      })
+    ).toBe(true);
     expect(options.predicate({ queryKey: ["/api/sp/report/stock"] })).toBe(false);
   });
 

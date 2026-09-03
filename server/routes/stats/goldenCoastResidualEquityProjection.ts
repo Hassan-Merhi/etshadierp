@@ -276,8 +276,18 @@ export function projectGoldenCoastResidualEquity(input: {
 
   return {
     ...body,
-    forUs: { ...body.forUs, total: forUsTotal, breakdown: forUsBreakdown, accounts: forUsAccounts },
-    onUs: { ...body.onUs, total: onUsTotal, breakdown: onUsBreakdown, accounts: onUsAccounts },
+    forUs: {
+      ...body.forUs,
+      total: forUsTotal,
+      breakdown: forUsBreakdown,
+      accounts: forUsAccounts,
+    },
+    onUs: {
+      ...body.onUs,
+      total: onUsTotal,
+      breakdown: onUsBreakdown,
+      accounts: onUsAccounts,
+    },
     equity,
     netPosition,
     netWorth: netPosition,

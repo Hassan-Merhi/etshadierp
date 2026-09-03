@@ -75,10 +75,30 @@ export async function repairStandalonePurchaseOrderAccounting(companyId: number)
     };
   }
 
-  // Reading the canonical account is harmless, but creating it is deferred
-  // until a PO is actually confirmed to need repair. A no-op sync must never
-  // mutate the chart of accounts just because this compatibility boundary ran.
-  let purchasesAccount = await storage.getLedgerAccountByCode("PURCHASES", companyId);
+  // The Purchases account is resolved lazily, on the first PO that actually
+  // needs repairing. Creating it up front made a no-op repair — a standalone
+  // company with no purchase orders, or none needing repair — leave a new
+  // ledger account behind, which is a real mutation for a call that reports
+  // having changed nothing.
+  let purchasesAccount: Awaited<ReturnType<typeof storage.getLedgerAccountByCode>> | null = null;
+  const resolvePurchasesAccount = async () => {
+    if (purchasesAccount) return purchasesAccount;
+    purchasesAccount = await storage.getLedgerAccountByCode("PURCHASES", companyId);
+    if (!purchasesAccount) {
+      purchasesAccount = await storage.createLedgerAccount({
+        companyId,
+        code: "PURCHASES",
+        name: "Purchases",
+        accountType: "Expense",
+        subType: "Direct Expense",
+        openingBalance: "0",
+        openingBalanceSide: "Dr",
+        active: true,
+      });
+    }
+    return purchasesAccount;
+  };
+
   const purchaseOrdersForCompany = await storage.getAllPurchaseOrders(companyId);
   let repairedStandaloneSupplierVouchers = 0;
   let normalizedStandaloneParentFreight = 0;
@@ -157,18 +177,7 @@ export async function repairStandalonePurchaseOrderAccounting(companyId: number)
 
       if (!needsRepair) continue;
 
-      if (!purchasesAccount) {
-        purchasesAccount = await storage.createLedgerAccount({
-          companyId,
-          code: "PURCHASES",
-          name: "Purchases",
-          accountType: "Expense",
-          subType: "Direct Expense",
-          openingBalance: "0",
-          openingBalanceSide: "Dr",
-          active: true,
-        });
-      }
+      const purchasesLedgerAccount = await resolvePurchasesAccount();
 
       await db.transaction(async (tx) => {
         const debitEntry = debitEntries[0];
@@ -180,7 +189,7 @@ export async function repairStandalonePurchaseOrderAccounting(companyId: number)
           await tx
             .update(voucherEntries)
             .set({
-              ledgerAccountId: purchasesAccount!.id,
+              ledgerAccountId: purchasesLedgerAccount!.id,
               supplierId: null,
               ...normalizedUsdFields(grossTotal, 0),
               narration: `PO ${po.poNumber} - Purchases (standalone repair)`,
@@ -191,7 +200,7 @@ export async function repairStandalonePurchaseOrderAccounting(companyId: number)
             .insert(voucherEntries)
             .values({
               voucherId: po.voucherId!,
-              ledgerAccountId: purchasesAccount!.id,
+              ledgerAccountId: purchasesLedgerAccount!.id,
               supplierId: null,
               ...normalizedUsdFields(grossTotal, 0),
               narration: `PO ${po.poNumber} - Purchases (standalone repair)`,

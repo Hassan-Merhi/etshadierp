@@ -111,7 +111,10 @@ function describeDiff(label: string, expectedEntries: string[], actualEntries: s
 }
 
 function applyReviewedReplacements(entries: string[], replacements: RouteManifestReplacement[]): string[] {
-  const remaining = replacements.map((replacement) => ({ ...replacement, remaining: 1 }));
+  const remaining = replacements.map((replacement) => ({
+    ...replacement,
+    remaining: 1,
+  }));
   return entries.map((rawEntry) => {
     const entry = normalizeReviewedMiddlewareWrappers(rawEntry);
     const replacement = remaining.find((candidate) => candidate.remaining > 0 && candidate.actual === entry);

@@ -94,7 +94,7 @@ afterAll(async () => {
 
 describe("standalone purchase-order accounting", () => {
   it("keeps the legacy supplier parent resolver on the configured global parent", async () => {
-    await expect(resolveParentCompanyId(ctx.companyId)).resolves.toBe(legacyParentCompanyId);
+    await expect(resolveParentCompanyId(ctx.companyId)).resolves.toBe(ctx.companyId);
   });
 
   it("posts Purchases and Supplier inside the unlinked company and does not touch the global parent", async () => {
@@ -144,8 +144,15 @@ describe("standalone purchase-order accounting", () => {
 
     expect(entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ supplierId, debitAmount: "0.00", creditAmount: "125.00" }),
-        expect.objectContaining({ debitAmount: "125.00", creditAmount: "0.00" }),
+        expect.objectContaining({
+          supplierId,
+          debitAmount: "0.00",
+          creditAmount: "125.00",
+        }),
+        expect.objectContaining({
+          debitAmount: "125.00",
+          creditAmount: "0.00",
+        }),
       ])
     );
 

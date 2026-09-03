@@ -47,7 +47,10 @@ import {
 import { requireSpCompany } from "./spHelpers";
 
 const postingDependencies = createDatabasePostingDependencies();
-const phase10RequestBudget = privilegedRequestBudget({ maxBodyBytes: 16 * 1024, maxCollectionItems: 10 });
+const phase10RequestBudget = privilegedRequestBudget({
+  maxBodyBytes: 16 * 1024,
+  maxCollectionItems: 10,
+});
 const PHASE10_ROLE = "gc_sales_cash" as const satisfies GoldenCoastAccountRole;
 
 type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -97,7 +100,11 @@ async function resolveGcSalesCashAccount(
 ): Promise<{ id: number; name: string; accountType: string }> {
   const definition = getGoldenCoastAccountDefinition(PHASE10_ROLE);
   const rows = await conn
-    .select({ id: ledgerAccounts.id, name: ledgerAccounts.name, accountType: ledgerAccounts.accountType })
+    .select({
+      id: ledgerAccounts.id,
+      name: ledgerAccounts.name,
+      accountType: ledgerAccounts.accountType,
+    })
     .from(ledgerAccounts)
     .where(
       and(
@@ -119,7 +126,11 @@ async function resolveGcSalesCashAccount(
       409
     );
   }
-  const account = { id: Number(rows[0].id), name: String(rows[0].name), accountType: String(rows[0].accountType) };
+  const account = {
+    id: Number(rows[0].id),
+    name: String(rows[0].name),
+    accountType: String(rows[0].accountType),
+  };
   if (!definition.acceptedAccountTypes.includes(account.accountType)) {
     throw new GoldenCoastPhase10RouteError(
       `GC Sales Cash must use account type ${definition.acceptedAccountTypes.join(" or ")}, not ${account.accountType}`,
@@ -232,7 +243,11 @@ async function validatePaymentAccount(
 async function listPaymentAccounts(conn: DbLike, companyId: number) {
   const [ledgerRows, bankRows] = await Promise.all([
     conn
-      .select({ id: ledgerAccounts.id, name: ledgerAccounts.name, accountType: ledgerAccounts.accountType })
+      .select({
+        id: ledgerAccounts.id,
+        name: ledgerAccounts.name,
+        accountType: ledgerAccounts.accountType,
+      })
       .from(ledgerAccounts)
       .where(
         and(
@@ -256,7 +271,12 @@ async function listPaymentAccounts(conn: DbLike, companyId: number) {
       name: row.name,
       type: row.accountType,
     })),
-    ...bankRows.map((row) => ({ kind: "bank" as const, id: Number(row.id), name: row.name, type: "Bank Account" })),
+    ...bankRows.map((row) => ({
+      kind: "bank" as const,
+      id: Number(row.id),
+      name: row.name,
+      type: "Bank Account",
+    })),
   ];
 }
 
@@ -330,7 +350,10 @@ async function findReplayedSettlement(
 ) {
   const idempotencyKey = goldenCoastPhase10IdempotencyKey(companyId, settlement.clientRequestId);
   const [marker] = await tx
-    .select({ voucherId: accountingPostingRequests.voucherId, sourceId: accountingPostingRequests.sourceId })
+    .select({
+      voucherId: accountingPostingRequests.voucherId,
+      sourceId: accountingPostingRequests.sourceId,
+    })
     .from(accountingPostingRequests)
     .where(
       and(
@@ -475,7 +498,10 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
       });
       return;
     }
-    const settlement = parseGoldenCoastPhase10SettlementInput({ companyId, body: req.body });
+    const settlement = parseGoldenCoastPhase10SettlementInput({
+      companyId,
+      body: req.body,
+    });
     const actor = actorFromRequest(req);
 
     const outcome = await db.transaction(async (tx) => {
@@ -543,7 +569,10 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
         new Decimal(datedBalanceUsd),
         new Decimal(allPostedBalanceUsd)
       ).toString();
-      const plan = planGoldenCoastPhase10Settlement({ settlement, gcSalesCashDebitBalanceUsd });
+      const plan = planGoldenCoastPhase10Settlement({
+        settlement,
+        gcSalesCashDebitBalanceUsd,
+      });
       const request = buildGoldenCoastPhase10SettlementPosting({
         plan,
         gcSalesCashAccountId: gcSalesCashAccount.id,
