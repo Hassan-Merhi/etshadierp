@@ -67,7 +67,8 @@
     "USE /api/sp/sales [<anonymous>]",
     "USE /api/po-import/parse [poImportDatabaseScopeContinuityBoundary]",
     "USE /api/containers/sync-all-vouchers [requireAuth]",
-    "USE /api/containers/sync-all-vouchers [standalonePoRepairBoundary]"
+    "USE /api/containers/sync-all-vouchers [standalonePoRepairBoundary]",
+    "USE /api/stats/net-profit [<anonymous>]"
   ],
   "routeManifestReplacements": [
     {
@@ -147,6 +148,6 @@
       "tests/supplier-partner-net-position-inclusion.test.ts",
       "tests/supplier-partner-customer-authoritative-net-position.test.ts"
     ],
-    "maxAdditionalTextAssertions": 689
+    "maxAdditionalTextAssertions": 692
   }
 }
