@@ -5,7 +5,7 @@
  * rather than introducing a second sale path. Every other card opens the tab
  * that owns the flow.
  */
-import { ArrowRightLeft, CalendarCheck2, CircleDollarSign, ShoppingCart, WalletCards } from "lucide-react";
+import { HandCoins, CalendarCheck2, CircleDollarSign, ShoppingCart, WalletCards } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
@@ -21,19 +21,19 @@ export function GoldenCoastOverview({ onOpenTab }: { onOpenTab: (tab: GoldenCoas
         phase: "Phase 6",
         title: releaseDebtEnglish("POS sales"),
         description: releaseDebtEnglish(
-          "Use the existing POS sale flow. Phase 6 owns Golden Coast sale, FIFO, and COGS posting."
+          "Use the existing POS sale flow. Golden Coast sale proceeds route to HADI automatically and Phase 15 creates the Fresh Start sales payable."
         ),
         icon: ShoppingCart,
         href: "/pos",
         tab: null,
       },
       {
-        phase: "Phase 7",
-        title: releaseDebtEnglish("HADI cash routing"),
+        phase: "Phase 16",
+        title: releaseDebtEnglish("Pay Fresh Start from HADI"),
         description: releaseDebtEnglish(
-          "Collect Golden Coast sales cash through HADI or remit collected cash back to Golden Coast."
+          "Settle all or part of the live GC Sales Cash payable from the sales proceeds HADI is still holding."
         ),
-        icon: ArrowRightLeft,
+        icon: HandCoins,
         href: null,
         tab: "hadi" as GoldenCoastTab,
       },
@@ -51,7 +51,7 @@ export function GoldenCoastOverview({ onOpenTab }: { onOpenTab: (tab: GoldenCoas
         phase: "Phase 10",
         title: releaseDebtEnglish("GC Sales Cash settlement"),
         description: releaseDebtEnglish(
-          "Settle all or part of the current collectible GC Sales Cash balance directly into Golden Coast cash or bank."
+          "Use the direct settlement alternative only when Golden Coast itself pays the current GC Sales Cash payable."
         ),
         icon: CircleDollarSign,
         href: null,
