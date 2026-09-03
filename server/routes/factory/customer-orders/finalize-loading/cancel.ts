@@ -17,6 +17,7 @@ import { factoryBales, customerOrders, customerOrderBales, customers, factoryDay
 import { eq, and, sql, inArray } from "drizzle-orm";
 
 type CustomerOrder = typeof customerOrders.$inferSelect;
+const ORDER_CANCEL_CONFLICT = "ORDER_CANCEL_CONFLICT";
 
 function getOrderIdentifier(order: CustomerOrder, orderId: number): string {
   const orderNumber = (order as CustomerOrder & { orderNumber?: string | null }).orderNumber;
@@ -125,7 +126,7 @@ export function registerOrderCancelRoutes(app: Express) {
           .returning();
 
         if (!cancelledOrder) {
-          throw new Error("Order changed while cancellation was in progress");
+          throw new Error(ORDER_CANCEL_CONFLICT);
         }
 
         const [cancelCustomer] = await tx
@@ -166,8 +167,12 @@ export function registerOrderCancelRoutes(app: Express) {
 
       return res.json(updated);
     } catch (error: unknown) {
+      const message = getErrorMessage(error);
+      if (message === ORDER_CANCEL_CONFLICT) {
+        return res.status(409).json({ message: "Only DRAFT or LOADING orders can be cancelled" });
+      }
       logger.error("Error cancelling order:", { error });
-      return res.status(500).json({ message: getErrorMessage(error) });
+      return res.status(500).json({ message });
     }
   });
 
