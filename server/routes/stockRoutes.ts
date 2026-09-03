@@ -4,7 +4,6 @@ import { registerStockGroupsItemsRoutes } from "./stock/groups-items";
 import { registerStockTransferAdjRoutes } from "./stock/transfer-adj";
 import { registerStockMergeRoutes } from "./stock/merge";
 import { registerStockItemManageRoutes } from "./stock/stockItemManageRoutes";
-import { registerEffectivePriceListRoutes } from "./stock/effectivePriceListRoutes";
 import { registerStockPriceListImportRoutes } from "./stock/stockPriceListImportRoutes";
 
 export function registerStockRoutes(app: Express) {
@@ -14,8 +13,5 @@ export function registerStockRoutes(app: Express) {
   registerStockTransferAdjRoutes(app);
   registerStockMergeRoutes(app);
   registerStockItemManageRoutes(app);
-  // Must be before the legacy price-list registration because Express resolves
-  // duplicate routes in registration order.
-  registerEffectivePriceListRoutes(app);
   registerStockPriceListImportRoutes(app);
 }
