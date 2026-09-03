@@ -69,7 +69,7 @@ export async function getConfiguredIntercompanyCreditAccount(
     .limit(1);
 
   if (!account) {
-    throw new Error("INTERCOMPANY_CREDIT_ACCOUNT_INVALID");
+    throw new Error("intercompany_credit_account_invalid");
   }
 
   return account;
