@@ -35,6 +35,7 @@ type NetProfitResponse = {
   onUsTotal?: unknown;
   equity?: Record<string, unknown>;
   netPositionBreakdown?: Record<string, unknown>;
+  currencyRevaluation?: Record<string, unknown>;
 };
 
 const ASSET_TYPES = new Set(["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash", "Customer"]);
@@ -106,7 +107,22 @@ function addBreakdown(accounts: DisplayAccount[]): Array<{ name: string; value: 
     .sort((a, b) => b.value - a.value);
 }
 
-function currentCashTranslationAdjustment(forUsAccounts: DisplayAccount[], onUsAccounts: DisplayAccount[]): number {
+function currentTranslatedLedgerAccountIds(body: NetProfitResponse): number[] {
+  const raw = body.currencyRevaluation?.currentTranslatedLedgerAccountIds;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((id) => Number(id))
+    .filter((id) => Number.isInteger(id) && id > 0);
+}
+
+function currentCashTranslationAdjustment(
+  body: NetProfitResponse,
+  forUsAccounts: DisplayAccount[],
+  onUsAccounts: DisplayAccount[]
+): number {
+  const aggregate = Number(body.currencyRevaluation?.currentCashBankTranslationDifference);
+  if (Number.isFinite(aggregate)) return round2(aggregate);
+
   return round2(
     [...forUsAccounts, ...onUsAccounts]
       .filter((account) => account.currencyRevalued === true)
@@ -171,12 +187,14 @@ export function projectGoldenCoastResidualEquity(input: {
       .map((account) => Number(account.id ?? 0))
       .filter((id) => Number.isInteger(id) && id > 0)
   );
+  for (const accountId of currentTranslatedLedgerAccountIds(body)) existingIds.add(accountId);
 
   // The generic Supplier Partner dashboard intentionally uses a narrow account
   // set. Golden Coast needs the complete real balance sheet: OTW, prepaid,
   // Cash/Bank, customer balances, HADI Intercompany and liabilities including
   // the canonical GC Sales Cash payable. Internal clearing/duplicate-stock
-  // accounts remain excluded.
+  // accounts remain excluded. Current-translated cash ledger IDs remain marked
+  // as represented even when translation made the display row exactly zero.
   for (const account of roles.active) {
     if (existingIds.has(account.id)) continue;
     if (INTERNAL_SP_SUBTYPES.has(account.subType || "")) continue;
@@ -249,7 +267,7 @@ export function projectGoldenCoastResidualEquity(input: {
   const freshStartClaim = round2(freshLedgerClaim - legacyOpeningPayableReclassification);
   const hassanClaim = goldenCoastPartnerClaim(roles.hassan, accountBalances);
   const partnerCapitalTotal = round2(freshStartClaim + hassanClaim);
-  const currencyTranslationAdjustment = currentCashTranslationAdjustment(forUsAccounts, onUsAccounts);
+  const currencyTranslationAdjustment = currentCashTranslationAdjustment(body, forUsAccounts, onUsAccounts);
   const unclosedEarnings = round2(netPosition - partnerCapitalTotal - currencyTranslationAdjustment);
   const gcSalesCashPayable = currentCreditNormalPayable(roles.gcSalesCash, accountBalances);
   const freshStartTotalEntitlement = round2(freshStartClaim + gcSalesCashPayable);
