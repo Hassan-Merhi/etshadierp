@@ -10,13 +10,13 @@ import { registerStockInSalesReportRoutes } from "./stats/stockInSalesReportRout
 import { registerGoldenCoastResidualEquityProjection } from "./stats/goldenCoastResidualEquityProjection";
 
 export function registerStatsRoutes(app: Express) {
-  // Must be first: installs the response middleware that adjusts only live
-  // cash/bank rows before the existing Net Position engine sends its response.
-  registerStatsMultiCurrencyRoutes(app);
-  // Golden Coast uses Fresh Start as the residual equity claim:
-  // Net Assets - Hassan Dakik Account. Install this before the base route so it
-  // can project that presentation without changing any other company type.
+  // Golden Coast's Phase 17 balance-sheet projection must be registered before
+  // the live cash/bank translation middleware. Express response wrappers unwind
+  // in reverse order, so the currency layer runs first and Golden Coast then
+  // performs the final Assets - Liabilities = Equity reconciliation on the
+  // translated totals. Ordinary companies pass through unchanged.
   registerGoldenCoastResidualEquityProjection(app);
+  registerStatsMultiCurrencyRoutes(app);
   registerStatsNetProfitRoutes(app);
   registerStatsNetPositionRoutes(app);
   registerStatsDataRoutes(app);
