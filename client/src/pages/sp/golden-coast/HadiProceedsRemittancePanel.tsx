@@ -9,12 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { releaseDebtEnglish } from "@/i18n/finalCloseoutTranslations";
 import { apiRequest } from "@/lib/queryClient";
-import {
-  PHASE7_READINESS,
-  PHASE7_TRANSFER,
-  type CompanyKey,
-  type Phase7Readiness,
-} from "./contracts";
+import { PHASE7_READINESS, PHASE7_TRANSFER, type CompanyKey, type Phase7Readiness } from "./contracts";
 import {
   AccountPicker,
   ReadinessState,
@@ -120,7 +115,11 @@ export function HadiProceedsRemittancePanel({ companyKey }: { companyKey: Compan
       });
     },
     onError: (error: ClientErrorLike) => {
-      toast({ title: releaseDebtEnglish("HADI remittance failed"), description: error.message, variant: "destructive" });
+      toast({
+        title: releaseDebtEnglish("HADI remittance failed"),
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -145,7 +144,11 @@ export function HadiProceedsRemittancePanel({ companyKey }: { companyKey: Compan
         <ReadinessState
           loading={probe.isLoading || authorized.isLoading || heldBalances.isLoading}
           error={heldBalances.error ?? authorized.error ?? probe.error}
-          ready={Number(maximum) > 0 && (routing?.hadiCashAccounts?.length ?? 0) > 0 && (routing?.goldenCoastCashAccounts?.length ?? 0) > 0}
+          ready={
+            Number(maximum) > 0 &&
+            (routing?.hadiCashAccounts?.length ?? 0) > 0 &&
+            (routing?.goldenCoastCashAccounts?.length ?? 0) > 0
+          }
           readyText={releaseDebtEnglish("HADI has Golden Coast sale proceeds available to remit.")}
           blockedText={releaseDebtEnglish("No HADI-held Golden Coast proceeds are currently available to remit.")}
         />
@@ -167,16 +170,23 @@ export function HadiProceedsRemittancePanel({ companyKey }: { companyKey: Compan
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="gc-p16-remit-date">{releaseDebtEnglish("Remittance date")}</label>
+            <label className="text-sm font-medium" htmlFor="gc-p16-remit-date">
+              {releaseDebtEnglish("Remittance date")}
+            </label>
             <Input
               id="gc-p16-remit-date"
               type="date"
               value={transferDate}
-              onChange={(event) => { setTransferDate(event.target.value); rotateRequest(); }}
+              onChange={(event) => {
+                setTransferDate(event.target.value);
+                rotateRequest();
+              }}
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="gc-p16-remit-amount">{releaseDebtEnglish("Amount (USD)")}</label>
+            <label className="text-sm font-medium" htmlFor="gc-p16-remit-amount">
+              {releaseDebtEnglish("Amount (USD)")}
+            </label>
             <Input
               id="gc-p16-remit-amount"
               type="number"
@@ -184,35 +194,53 @@ export function HadiProceedsRemittancePanel({ companyKey }: { companyKey: Compan
               step="0.01"
               max={maximum}
               value={amount}
-              onChange={(event) => { setAmount(event.target.value); rotateRequest(); }}
+              onChange={(event) => {
+                setAmount(event.target.value);
+                rotateRequest();
+              }}
               data-testid="input-gc-p16-remit-amount"
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="gc-p16-remit-hadi">{releaseDebtEnglish("HADI paying account")}</label>
+            <label className="text-sm font-medium" htmlFor="gc-p16-remit-hadi">
+              {releaseDebtEnglish("HADI paying account")}
+            </label>
             <AccountPicker
               id="gc-p16-remit-hadi"
               value={hadiAccount}
               accounts={routing?.hadiCashAccounts ?? []}
-              onChange={(value) => { setHadiAccount(value); rotateRequest(); }}
+              onChange={(value) => {
+                setHadiAccount(value);
+                rotateRequest();
+              }}
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="gc-p16-remit-gc">{releaseDebtEnglish("Golden Coast receiving account")}</label>
+            <label className="text-sm font-medium" htmlFor="gc-p16-remit-gc">
+              {releaseDebtEnglish("Golden Coast receiving account")}
+            </label>
             <AccountPicker
               id="gc-p16-remit-gc"
               value={gcAccount}
               accounts={routing?.goldenCoastCashAccounts ?? []}
-              onChange={(value) => { setGcAccount(value); rotateRequest(); }}
+              onChange={(value) => {
+                setGcAccount(value);
+                rotateRequest();
+              }}
             />
           </div>
           <div className="space-y-2 md:col-span-2">
-            <label className="text-sm font-medium" htmlFor="gc-p16-remit-reference">{releaseDebtEnglish("Reference (optional)")}</label>
+            <label className="text-sm font-medium" htmlFor="gc-p16-remit-reference">
+              {releaseDebtEnglish("Reference (optional)")}
+            </label>
             <Input
               id="gc-p16-remit-reference"
               value={reference}
               maxLength={200}
-              onChange={(event) => { setReference(event.target.value); rotateRequest(); }}
+              onChange={(event) => {
+                setReference(event.target.value);
+                rotateRequest();
+              }}
             />
           </div>
         </div>
@@ -222,7 +250,11 @@ export function HadiProceedsRemittancePanel({ companyKey }: { companyKey: Compan
           disabled={!canSubmit || mutation.isPending}
           data-testid="button-gc-p16-remit-submit"
         >
-          {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowDownToLine className="mr-2 h-4 w-4" />}
+          {mutation.isPending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <ArrowDownToLine className="mr-2 h-4 w-4" />
+          )}
           {releaseDebtEnglish("Remit proceeds to Golden Coast")}
         </Button>
       </CardContent>

@@ -15,10 +15,7 @@ import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { resultRows } from "../../lib/queryResult";
-import {
-  privilegedMutationRateLimit,
-  privilegedRequestBudget,
-} from "../../middleware/privilegedEndpointSecurity";
+import { privilegedMutationRateLimit, privilegedRequestBudget } from "../../middleware/privilegedEndpointSecurity";
 import {
   PostingValidationError,
   postBalancedVoucherTx,
@@ -85,11 +82,21 @@ export function goldenCoastPhase16LegacyHadiRetiredPayload() {
 async function resolvePair(tx: DatabaseTransaction, companyId: number): Promise<CompanyPair> {
   await assertTransactionCompanyScope(tx, companyId);
   const [gc] = await tx
-    .select({ id: companies.id, name: companies.name, parentCompanyId: companies.parentCompanyId, active: companies.active })
+    .select({
+      id: companies.id,
+      name: companies.name,
+      parentCompanyId: companies.parentCompanyId,
+      active: companies.active,
+    })
     .from(companies)
     .where(and(eq(companies.id, companyId), eq(companies.active, true)))
     .limit(1);
-  if (!gc) throw new GoldenCoastPhase16HadiError("Golden Coast company is missing or inactive", "GC_PHASE16_COMPANY_INVALID", 409);
+  if (!gc)
+    throw new GoldenCoastPhase16HadiError(
+      "Golden Coast company is missing or inactive",
+      "GC_PHASE16_COMPANY_INVALID",
+      409
+    );
   const hadiCompanyId = Number(gc.parentCompanyId ?? 0);
   if (!Number.isInteger(hadiCompanyId) || hadiCompanyId <= 0 || hadiCompanyId === companyId) {
     throw new GoldenCoastPhase16HadiError(
@@ -105,7 +112,12 @@ async function resolvePair(tx: DatabaseTransaction, companyId: number): Promise<
     .where(and(eq(companies.id, hadiCompanyId), eq(companies.active, true)))
     .limit(1);
   await assertTransactionCompanyScope(tx, companyId);
-  if (!hadi) throw new GoldenCoastPhase16HadiError("Configured HADI company is missing or inactive", "GC_PHASE16_PARENT_INVALID", 409);
+  if (!hadi)
+    throw new GoldenCoastPhase16HadiError(
+      "Configured HADI company is missing or inactive",
+      "GC_PHASE16_PARENT_INVALID",
+      409
+    );
   return {
     goldenCoastCompanyId: Number(gc.id),
     goldenCoastCompanyName: String(gc.name),
@@ -253,7 +265,8 @@ async function debitBalance(tx: DatabaseTransaction, companyId: number, accountI
   `);
   const raw = String(resultRows(result)[0]?.balance ?? "0");
   const parsed = new Decimal(raw);
-  if (!parsed.isFinite()) throw new GoldenCoastPhase16HadiError("HADI intercompany balance is invalid", "GC_PHASE16_BALANCE_INVALID", 409);
+  if (!parsed.isFinite())
+    throw new GoldenCoastPhase16HadiError("HADI intercompany balance is invalid", "GC_PHASE16_BALANCE_INVALID", 409);
   return parsed;
 }
 
@@ -306,7 +319,10 @@ function amountEquals(left: unknown, right: unknown): boolean {
   }
 }
 
-function entryMatchesCashTarget(entry: typeof voucherEntries.$inferSelect, account: GoldenCoastPhase7CashAccount): boolean {
+function entryMatchesCashTarget(
+  entry: typeof voucherEntries.$inferSelect,
+  account: GoldenCoastPhase7CashAccount
+): boolean {
   return account.kind === "bank"
     ? Number(entry.bankAccountId ?? 0) === account.id
     : Number(entry.ledgerAccountId ?? 0) === account.id;
@@ -318,7 +334,11 @@ async function findReplay(
   transfer: GoldenCoastPhase7TransferInput,
   accounts: GoldenCoastPhase7RoleAccounts,
   digest: string
-): Promise<Array<{ role: GoldenCoastPhase7PostingRole; voucher: typeof vouchers.$inferSelect; entries: (typeof voucherEntries.$inferSelect)[] }> | null> {
+): Promise<Array<{
+  role: GoldenCoastPhase7PostingRole;
+  voucher: typeof vouchers.$inferSelect;
+  entries: (typeof voucherEntries.$inferSelect)[];
+}> | null> {
   const roles: Array<{ role: GoldenCoastPhase7PostingRole; companyId: number }> = [
     { role: "golden_coast", companyId: pair.goldenCoastCompanyId },
     { role: "hadi", companyId: pair.hadiCompanyId },
@@ -337,7 +357,9 @@ async function findReplay(
     const [marker] = await tx
       .select({ voucherId: accountingPostingRequests.voucherId, sourceId: accountingPostingRequests.sourceId })
       .from(accountingPostingRequests)
-      .where(and(eq(accountingPostingRequests.companyId, item.companyId), eq(accountingPostingRequests.idempotencyKey, key)))
+      .where(
+        and(eq(accountingPostingRequests.companyId, item.companyId), eq(accountingPostingRequests.idempotencyKey, key))
+      )
       .limit(1);
     if (!marker) continue;
     markers += 1;
@@ -351,7 +373,13 @@ async function findReplay(
     const [voucher] = await tx
       .select()
       .from(vouchers)
-      .where(and(eq(vouchers.id, Number(marker.voucherId)), eq(vouchers.companyId, item.companyId), isNull(vouchers.deletedAt)))
+      .where(
+        and(
+          eq(vouchers.id, Number(marker.voucherId)),
+          eq(vouchers.companyId, item.companyId),
+          isNull(vouchers.deletedAt)
+        )
+      )
       .limit(1);
     if (!voucher || !amountEquals(voucher.totalAmount, transfer.amountUsd)) {
       throw new GoldenCoastPhase16HadiError(
@@ -362,7 +390,11 @@ async function findReplay(
     }
     const entries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id));
     if (entries.length !== 2) {
-      throw new GoldenCoastPhase16HadiError("HADI remittance replay voucher entries were altered", "GC_PHASE16_IDEMPOTENCY_INCONSISTENT", 409);
+      throw new GoldenCoastPhase16HadiError(
+        "HADI remittance replay voucher entries were altered",
+        "GC_PHASE16_IDEMPOTENCY_INCONSISTENT",
+        409
+      );
     }
     const amount = transfer.amountUsd;
     if (item.role === "golden_coast") {
@@ -380,7 +412,11 @@ async function findReplay(
           amountEquals(entry.creditAmount, amount)
       );
       if (!cashDebit || !icCredit) {
-        throw new GoldenCoastPhase16HadiError("Golden Coast remittance replay entries were altered", "GC_PHASE16_IDEMPOTENCY_INCONSISTENT", 409);
+        throw new GoldenCoastPhase16HadiError(
+          "Golden Coast remittance replay entries were altered",
+          "GC_PHASE16_IDEMPOTENCY_INCONSISTENT",
+          409
+        );
       }
     } else {
       const icDebit = entries.find(
@@ -396,7 +432,11 @@ async function findReplay(
           amountEquals(entry.creditAmount, amount)
       );
       if (!icDebit || !cashCredit) {
-        throw new GoldenCoastPhase16HadiError("HADI remittance replay entries were altered", "GC_PHASE16_IDEMPOTENCY_INCONSISTENT", 409);
+        throw new GoldenCoastPhase16HadiError(
+          "HADI remittance replay entries were altered",
+          "GC_PHASE16_IDEMPOTENCY_INCONSISTENT",
+          409
+        );
       }
     }
     found.push({ role: item.role, companyId: item.companyId, voucher, entries });
@@ -405,7 +445,11 @@ async function findReplay(
   await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
   if (markers === 0) return null;
   if (markers !== roles.length) {
-    throw new GoldenCoastPhase16HadiError("HADI remittance has a partial cross-company replay pair", "GC_PHASE16_IDEMPOTENCY_INCONSISTENT", 409);
+    throw new GoldenCoastPhase16HadiError(
+      "HADI remittance has a partial cross-company replay pair",
+      "GC_PHASE16_IDEMPOTENCY_INCONSISTENT",
+      409
+    );
   }
   return found.map(({ role, voucher, entries }) => ({ role, voucher, entries }));
 }
@@ -416,12 +460,15 @@ function respondKnownError(res: Response, error: unknown): boolean {
     return true;
   }
   if (error instanceof GoldenCoastPhase7TransferError) {
-    const conflict = error.code === "GC_PHASE7_REMITTANCE_EXCEEDS_COLLECTIONS" || error.code === "GC_PHASE7_SCOPE_INVALID";
+    const conflict =
+      error.code === "GC_PHASE7_REMITTANCE_EXCEEDS_COLLECTIONS" || error.code === "GC_PHASE7_SCOPE_INVALID";
     res.status(conflict ? 409 : 400).json({ code: error.code, message: error.message });
     return true;
   }
   if (error instanceof PostingValidationError) {
-    res.status(error.code === "POSTING_IDEMPOTENCY_CORRUPT" ? 409 : 400).json({ code: error.code, message: error.message });
+    res
+      .status(error.code === "POSTING_IDEMPOTENCY_CORRUPT" ? 409 : 400)
+      .json({ code: error.code, message: error.message });
     return true;
   }
   return false;
@@ -434,7 +481,10 @@ async function handleRemittance(req: Request, res: Response): Promise<void> {
     companyId = await requireSpCompany(req, res);
     if (!companyId) return;
     if (!(await isGoldenCoastCompany(db, companyId))) {
-      res.status(409).json({ code: "GC_PHASE16_NOT_CONFIGURED", message: releaseDebtEnglish("Golden Coast account setup is not configured") });
+      res.status(409).json({
+        code: "GC_PHASE16_NOT_CONFIGURED",
+        message: releaseDebtEnglish("Golden Coast account setup is not configured"),
+      });
       return;
     }
 
@@ -454,13 +504,20 @@ async function handleRemittance(req: Request, res: Response): Promise<void> {
         );
       }
 
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase7:${pair.goldenCoastCompanyId}`}))`);
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase7:${pair.goldenCoastCompanyId}`}))`
+      );
       await tx.execute(
         sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase7:${pair.goldenCoastCompanyId}:${transfer.clientRequestId}`}))`
       );
       const accounts = await resolveAccounts(tx, pair);
       await validateCashAccount(tx, pair.hadiCompanyId, transfer.hadiCashAccount, "HADI cash account");
-      await validateCashAccount(tx, pair.goldenCoastCompanyId, transfer.goldenCoastCashAccount, "Golden Coast receiving account");
+      await validateCashAccount(
+        tx,
+        pair.goldenCoastCompanyId,
+        transfer.goldenCoastCashAccount,
+        "Golden Coast receiving account"
+      );
       const digest = goldenCoastPhase7TransferDigest({ transfer, accounts });
       const replayed = await findReplay(tx, pair, transfer, accounts, digest);
       if (replayed) return { replayed: true as const, pair, transfer, plan: null, postings: replayed };
@@ -504,7 +561,11 @@ async function handleRemittance(req: Request, res: Response): Promise<void> {
         await assertTransactionCompanyScope(tx, markerCompanyId);
         const posted = (await postBalancedVoucherTx(tx, item.request, postingDependencies)) as PersistedPostingResult;
         if (posted.replayed) {
-          throw new GoldenCoastPhase16HadiError("HADI remittance replayed unexpectedly during a new transaction", "GC_PHASE16_IDEMPOTENCY_INCONSISTENT", 409);
+          throw new GoldenCoastPhase16HadiError(
+            "HADI remittance replayed unexpectedly during a new transaction",
+            "GC_PHASE16_IDEMPOTENCY_INCONSISTENT",
+            409
+          );
         }
         postings.push({ role: item.role, voucher: posted.voucher, entries: posted.entries });
       }

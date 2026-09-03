@@ -15,9 +15,17 @@ function money(value: number | string) {
 }
 
 async function resolveAccount(tx: DbTransaction, companyId: number, subType: string) {
-  const [account] = await tx.select({ id: ledgerAccounts.id })
+  const [account] = await tx
+    .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
-    .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.subType, subType), eq(ledgerAccounts.active, true), isNull(ledgerAccounts.deletedAt)))
+    .where(
+      and(
+        eq(ledgerAccounts.companyId, companyId),
+        eq(ledgerAccounts.subType, subType),
+        eq(ledgerAccounts.active, true),
+        isNull(ledgerAccounts.deletedAt)
+      )
+    )
     .limit(1);
   if (!account) throw new Error(`Missing Golden Coast account ${subType}`);
   return Number(account.id);
@@ -37,10 +45,15 @@ export async function settleGoldenCoastFreshStartPayableTx(input: {
   const amount = money(input.amountUsd);
   if (new Decimal(amount).lte(0)) throw new Error("Settlement amount must be positive");
 
-  const payable = await resolveAccount(input.tx, input.companyId, getGoldenCoastAccountDefinition("gc_sales_cash").subType);
-  const creditAccount = input.source === "GC_CASH"
-    ? input.cashAccountId
-    : input.gcIntercompanyAccountId ?? await resolveAccount(input.tx, input.companyId, "sp_hadi_intercompany");
+  const payable = await resolveAccount(
+    input.tx,
+    input.companyId,
+    getGoldenCoastAccountDefinition("gc_sales_cash").subType
+  );
+  const creditAccount =
+    input.source === "GC_CASH"
+      ? input.cashAccountId
+      : (input.gcIntercompanyAccountId ?? (await resolveAccount(input.tx, input.companyId, "sp_hadi_intercompany")));
 
   if (!creditAccount) throw new Error("Missing settlement credit account");
 

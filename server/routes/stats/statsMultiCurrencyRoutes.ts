@@ -173,6 +173,13 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
 
     try {
       const revaluation = await getCashBankRevaluation(companyId);
+      const resolvedAccounts = revaluation.accounts.filter((row) => row.currentTranslatedBaseBalance !== null);
+      const currentTranslatedLedgerAccountIds = resolvedAccounts
+        .filter((row) => row.accountKind === "ledger")
+        .map((row) => row.id);
+      const currentCashBankTranslationDifference = round2(
+        resolvedAccounts.reduce((total, row) => total.plus(row.translationDifference ?? 0), new Decimal(0)).toNumber()
+      );
       const originalJson = res.json.bind(res);
       res.json = ((payload) => {
         // The existing report engine caches its object. Clone before adjusting so
@@ -198,6 +205,8 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
             })),
           appliedToCurrentSnapshotOnly: true,
           reportTotalsProvisional,
+          currentTranslatedLedgerAccountIds,
+          currentCashBankTranslationDifference,
         };
         return originalJson(adjusted);
       }) as typeof res.json;

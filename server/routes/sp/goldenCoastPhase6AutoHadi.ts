@@ -1,13 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
-import {
-  accountingPostingRequests,
-  bankAccounts,
-  ledgerAccounts,
-  voucherEntries,
-  vouchers,
-} from "@shared/schema";
+import { accountingPostingRequests, bankAccounts, ledgerAccounts, voucherEntries, vouchers } from "@shared/schema";
 import { db } from "../../db";
 import { resultRows } from "../../lib/queryResult";
 import {
@@ -41,10 +35,7 @@ export {
   resolveGoldenCoastAutomaticHadiPair,
   selectGoldenCoastAutomaticHadiCashAccount,
 } from "./goldenCoastPhase6AutoHadiCore";
-export type {
-  GoldenCoastAutomaticHadiAccount,
-  GoldenCoastAutomaticHadiPair,
-} from "./goldenCoastPhase6AutoHadiCore";
+export type { GoldenCoastAutomaticHadiAccount, GoldenCoastAutomaticHadiPair } from "./goldenCoastPhase6AutoHadiCore";
 
 const postingDependencies = createDatabasePostingDependencies();
 type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -174,31 +165,25 @@ async function resolveAutomaticHadiCashAccount(
     .orderBy(asc(bankAccounts.id));
 
   return core.selectGoldenCoastAutomaticHadiCashAccount({
-    cashLedgers: cashLedgers.map(
-      (row): AutomaticCashCandidate => ({
+    cashLedgers: cashLedgers.map((row): AutomaticCashCandidate => ({
+      kind: "ledger",
+      id: Number(row.id),
+      name: String(row.name),
+      source: "cash-ledger",
+    })),
+    fallbackAccounts: [
+      ...bankLedgers.map((row): AutomaticCashCandidate => ({
         kind: "ledger",
         id: Number(row.id),
         name: String(row.name),
-        source: "cash-ledger",
-      })
-    ),
-    fallbackAccounts: [
-      ...bankLedgers.map(
-        (row): AutomaticCashCandidate => ({
-          kind: "ledger",
-          id: Number(row.id),
-          name: String(row.name),
-          source: "bank-ledger",
-        })
-      ),
-      ...banks.map(
-        (row): AutomaticCashCandidate => ({
-          kind: "bank",
-          id: Number(row.id),
-          name: String(row.name),
-          source: "bank-account",
-        })
-      ),
+        source: "bank-ledger",
+      })),
+      ...banks.map((row): AutomaticCashCandidate => ({
+        kind: "bank",
+        id: Number(row.id),
+        name: String(row.name),
+        source: "bank-account",
+      })),
     ],
   });
 }
@@ -384,9 +369,7 @@ function verifyPhase15SalesPayablePosting(input: {
   const allowed = new Set([input.freshStartEquityAccountId, input.gcSalesCashAccountId]);
   const invalidEntry = entries.find(
     (entry) =>
-      entry.bankAccountId != null ||
-      entry.ledgerAccountId == null ||
-      !allowed.has(Number(entry.ledgerAccountId))
+      entry.bankAccountId != null || entry.ledgerAccountId == null || !allowed.has(Number(entry.ledgerAccountId))
   );
   const freshNetDebit = entryNetDebit(entries, input.freshStartEquityAccountId);
   const payableNetDebit = entryNetDebit(entries, input.gcSalesCashAccountId);
@@ -522,10 +505,7 @@ export async function postGoldenCoastAutomaticHadiCollectionTx(input: {
     gcSalesCashPayableBeforeUsd: gcSalesCashPayableBalance(amountUsd),
     gcSalesCashPayableAfterUsd: gcSalesCashPayableBalance("0.00"),
     outstandingHadiCollectionsBeforeUsd: outstanding.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2),
-    outstandingHadiCollectionsAfterUsd: outstanding
-      .plus(amount)
-      .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
-      .toFixed(2),
+    outstandingHadiCollectionsAfterUsd: outstanding.plus(amount).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2),
   };
   const [goldenCoastExchangeRate, hadiExchangeRate] = await Promise.all([
     getCurrentExchangeRate(pair.goldenCoastCompanyId),

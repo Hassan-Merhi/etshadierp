@@ -126,9 +126,7 @@ export function buildGoldenCoastPhase15SalesPayablePosting(input: {
   const clientRequestId = requiredText(sale.clientRequestId, "clientRequestId", 64);
   const saleDigest = requiredText(sale.saleDigest, "saleDigest", 64);
   const postingDigest = requiredText(input.digest, "digest", 64);
-  const description = releaseDebtEnglish(
-    `Golden Coast sale payable reclassification — ${clientRequestId}`
-  );
+  const description = releaseDebtEnglish(`Golden Coast sale payable reclassification — ${clientRequestId}`);
 
   const built = buildGenericVoucherPostingRequest({
     companyId,

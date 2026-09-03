@@ -21,7 +21,10 @@ function sale(overrides: Partial<GoldenCoastPhase15SalesPayableInput> = {}): Gol
   };
 }
 
-function netDebit(entries: Array<{ ledgerAccountId?: number | null; debitAmount: string; creditAmount: string }>, id: number) {
+function netDebit(
+  entries: Array<{ ledgerAccountId?: number | null; debitAmount: string; creditAmount: string }>,
+  id: number
+) {
   return entries
     .filter((entry) => entry.ledgerAccountId === id)
     .reduce((sum, entry) => sum + Number(entry.debitAmount) - Number(entry.creditAmount), 0);

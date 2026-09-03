@@ -82,15 +82,13 @@ describe("Golden Coast Phase 16 — HADI credit-payable settlement", () => {
       hadiCash: await netDebit(fixture.hadiCashAccountId),
     };
 
-    const response = await fixture.agent
-      .post(`${LEGACY_PHASE7_URL}?targetCompanyId=${fixture.hadiCompanyId}`)
-      .send({
-        operation: "collect_via_hadi",
-        transferDate: GOLDEN_COAST_PHASE5_SALE_DATE,
-        amountUsd: "100.00",
-        clientRequestId: "phase16-legacy-mutation",
-        hadiCashAccount: { kind: "ledger", id: fixture.hadiCashAccountId },
-      });
+    const response = await fixture.agent.post(`${LEGACY_PHASE7_URL}?targetCompanyId=${fixture.hadiCompanyId}`).send({
+      operation: "collect_via_hadi",
+      transferDate: GOLDEN_COAST_PHASE5_SALE_DATE,
+      amountUsd: "100.00",
+      clientRequestId: "phase16-legacy-mutation",
+      hadiCashAccount: { kind: "ledger", id: fixture.hadiCashAccountId },
+    });
 
     expect(response.status).toBe(409);
     expect(response.body.code).toBe("GC_PHASE16_LEGACY_HADI_TRANSFER_RETIRED");
@@ -186,16 +184,14 @@ describe("Golden Coast Phase 16 — HADI credit-payable settlement", () => {
     // The sale originally put $600 in HADI, but HADI already paid $250 to Fresh
     // Start. Phase 16 must cap remittance at the remaining $350, not the old
     // gross Phase 7 collection history of $600.
-    const tooLarge = await fixture.agent
-      .post(`${LEGACY_PHASE7_URL}?targetCompanyId=${fixture.hadiCompanyId}`)
-      .send({
-        operation: "remit_from_hadi",
-        transferDate: GOLDEN_COAST_PHASE5_SALE_DATE,
-        amountUsd: "350.01",
-        clientRequestId: "phase16-remit-too-large",
-        hadiCashAccount: { kind: "ledger", id: fixture.hadiCashAccountId },
-        goldenCoastCashAccount: { kind: "ledger", id: fixture.ctx.cashAccountId },
-      });
+    const tooLarge = await fixture.agent.post(`${LEGACY_PHASE7_URL}?targetCompanyId=${fixture.hadiCompanyId}`).send({
+      operation: "remit_from_hadi",
+      transferDate: GOLDEN_COAST_PHASE5_SALE_DATE,
+      amountUsd: "350.01",
+      clientRequestId: "phase16-remit-too-large",
+      hadiCashAccount: { kind: "ledger", id: fixture.hadiCashAccountId },
+      goldenCoastCashAccount: { kind: "ledger", id: fixture.ctx.cashAccountId },
+    });
     expect(tooLarge.status).toBe(409);
     expect(tooLarge.body.code).toBe("GC_PHASE7_REMITTANCE_EXCEEDS_COLLECTIONS");
 
