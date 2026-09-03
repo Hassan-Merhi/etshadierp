@@ -48,7 +48,8 @@ export function resolveAuthenticatedAppRoute({
   const factoryDefaultPage = computeFactoryDefaultPage(myAccess);
   const isFactoryBootstrapExemptRoute =
     currentLocation === "/my-settings" || currentLocation === "/intercompany-requests";
-  const isFactoryBootstrapRoute = isFactoryCompany && (isFactoryRoute || !isFactoryBootstrapExemptRoute);
+  const isFactoryBootstrapRoute =
+    isFactoryCompany && (isFactoryRoute || !isFactoryBootstrapExemptRoute);
 
   let decision: AuthenticatedAppRouteDecision = { kind: "continue" };
 
