@@ -109,9 +109,7 @@ function applyCurrentCashTranslation(payload: NetPositionPayload, summaries: Cas
   const onUsRounded = round2(onUsTotal.toNumber());
   const equityContribution =
     payload.equity?.includedInNetPosition === true ? new Decimal(payload.equity.total ?? 0) : new Decimal(0);
-  const netPosition = round2(
-    new Decimal(forUsRounded).minus(onUsRounded).plus(equityContribution).toNumber()
-  );
+  const netPosition = round2(new Decimal(forUsRounded).minus(onUsRounded).plus(equityContribution).toNumber());
 
   payload.forUs.accounts = forUsAccounts
     .filter((row) => Math.abs(Number(row.value || 0)) >= 0.005)
@@ -149,6 +147,15 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
 
     try {
       const revaluation = await getCashBankRevaluation(companyId);
+      const resolvedAccounts = revaluation.accounts.filter((row) => row.currentTranslatedBaseBalance !== null);
+      const currentTranslatedLedgerAccountIds = resolvedAccounts
+        .filter((row) => row.accountKind === "ledger")
+        .map((row) => row.id);
+      const currentCashBankTranslationDifference = round2(
+        resolvedAccounts
+          .reduce((total, row) => total.plus(row.translationDifference ?? 0), new Decimal(0))
+          .toNumber()
+      );
       const originalJson = res.json.bind(res);
       res.json = ((payload) => {
         // The existing report engine caches its object. Clone before adjusting so
@@ -173,6 +180,8 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
             })),
           appliedToCurrentSnapshotOnly: true,
           reportTotalsProvisional,
+          currentTranslatedLedgerAccountIds,
+          currentCashBankTranslationDifference,
         };
         return originalJson(adjusted);
       }) as typeof res.json;
