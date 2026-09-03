@@ -5,6 +5,7 @@
  * first-match, so that order is behaviour.
  */
 import type { Express } from "express";
+import { rateLimit } from "express-rate-limit";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { eq } from "drizzle-orm";
 import { db } from "../../db";
@@ -14,22 +15,61 @@ import { stockItems } from "@shared/schema";
 
 import { MONTH_NAMES_INV, dayBefore, fetchStockMovements } from "./_helpers";
 
+const inventoryMovementLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 export function registerInventoryMovementReportRoutes(app: Express) {
   // GET /api/inventory/movement — monthly summary
-  app.get("/api/inventory/movement", requireAuth, async (req, res) => {
+  app.get("/api/inventory/movement", requireAuth, inventoryMovementLimiter, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { stockItemId: siStr, locationId: locStr, startDate, endDate } = req.query;
-      if (!siStr) return res.status(400).json({ message: "stockItemId required" });
+      const {
+        stockItemId: stockItemIdRaw,
+        locationId: locationIdRaw,
+        startDate: startDateRaw,
+        endDate: endDateRaw,
+      } = req.query;
+      if (typeof stockItemIdRaw !== "string") {
+        return res.status(400).json({ message: "stockItemId must be a single positive integer" });
+      }
+      if (locationIdRaw !== undefined && typeof locationIdRaw !== "string") {
+        return res.status(400).json({ message: "locationId must be a single positive integer" });
+      }
+      if (startDateRaw !== undefined && typeof startDateRaw !== "string") {
+        return res.status(400).json({ message: "startDate must be a single YYYY-MM-DD value" });
+      }
+      if (endDateRaw !== undefined && typeof endDateRaw !== "string") {
+        return res.status(400).json({ message: "endDate must be a single YYYY-MM-DD value" });
+      }
 
-      const stockItemId = parseInt(siStr as string);
-      const locationId = locStr ? parseInt(locStr as string) : null;
+      const stockItemId = Number.parseInt(stockItemIdRaw, 10);
+      if (!Number.isSafeInteger(stockItemId) || stockItemId <= 0) {
+        return res.status(400).json({ message: "stockItemId must be a single positive integer" });
+      }
+
+      let locationId: number | null = null;
+      if (locationIdRaw) {
+        const parsedLocationId = Number.parseInt(locationIdRaw, 10);
+        if (!Number.isSafeInteger(parsedLocationId) || parsedLocationId <= 0) {
+          return res.status(400).json({ message: "locationId must be a single positive integer" });
+        }
+        locationId = parsedLocationId;
+      }
+
       // When no dates supplied (All Time preset), span from a safe epoch to today.
       const today = new Date().toISOString().slice(0, 10);
-      const sd = (startDate as string) || "2000-01-01";
-      const ed = (endDate as string) || today;
+      const sd = startDateRaw || "2000-01-01";
+      const ed = endDateRaw || today;
+      const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+      if (!datePattern.test(sd) || !datePattern.test(ed) || sd > ed) {
+        return res.status(400).json({ message: "Invalid inventory movement date range" });
+      }
 
       // Opening balance for the period.
       // NOTE: stockItems.openingQty/openingRate are COMPANY-WIDE master fields, not
@@ -64,11 +104,14 @@ export function registerInventoryMovementReportRoutes(app: Express) {
 
       periodMovements.sort((a, b) => a.date.localeCompare(b.date));
 
-      // Build list of months in the range
-      const startY = parseInt(sd.slice(0, 4)),
-        startM = parseInt(sd.slice(5, 7));
-      const endY = parseInt(ed.slice(0, 4)),
-        endM = parseInt(ed.slice(5, 7));
+      // Build list of months in the range. The date format is already validated above,
+      // so split the scalar strings instead of using String/Array-ambiguous slice calls.
+      const [startYearPart, startMonthPart] = sd.split("-");
+      const [endYearPart, endMonthPart] = ed.split("-");
+      const startY = Number.parseInt(startYearPart, 10),
+        startM = Number.parseInt(startMonthPart, 10);
+      const endY = Number.parseInt(endYearPart, 10),
+        endM = Number.parseInt(endMonthPart, 10);
       const months: { year: number; month: number; monthName: string }[] = [];
       let y = startY,
         m = startM;
@@ -131,19 +174,40 @@ export function registerInventoryMovementReportRoutes(app: Express) {
   });
 
   // GET /api/inventory/movement/drill — transaction-level drill for one month
-  app.get("/api/inventory/movement/drill", requireAuth, async (req, res) => {
+  app.get("/api/inventory/movement/drill", requireAuth, inventoryMovementLimiter, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { stockItemId: siStr, locationId: locStr, year: yearStr, month: monthStr } = req.query;
-      if (!siStr || !yearStr || !monthStr)
-        return res.status(400).json({ message: "stockItemId, year, month required" });
+      const { stockItemId: stockItemIdRaw, locationId: locationIdRaw, year: yearRaw, month: monthRaw } = req.query;
+      if (typeof stockItemIdRaw !== "string" || typeof yearRaw !== "string" || typeof monthRaw !== "string") {
+        return res.status(400).json({ message: "stockItemId, year, month must be single integer values" });
+      }
+      if (locationIdRaw !== undefined && typeof locationIdRaw !== "string") {
+        return res.status(400).json({ message: "locationId must be a single positive integer" });
+      }
 
-      const stockItemId = parseInt(siStr as string);
-      const locationId = locStr ? parseInt(locStr as string) : null;
-      const year = parseInt(yearStr as string);
-      const month = parseInt(monthStr as string);
+      const stockItemId = Number.parseInt(stockItemIdRaw, 10);
+      const year = Number.parseInt(yearRaw, 10);
+      const month = Number.parseInt(monthRaw, 10);
+      if (!Number.isSafeInteger(stockItemId) || stockItemId <= 0) {
+        return res.status(400).json({ message: "stockItemId must be a single positive integer" });
+      }
+      if (!Number.isSafeInteger(year) || year < 2000 || year > 9999) {
+        return res.status(400).json({ message: "year must be a valid four-digit year" });
+      }
+      if (!Number.isSafeInteger(month) || month < 1 || month > 12) {
+        return res.status(400).json({ message: "month must be between 1 and 12" });
+      }
+
+      let locationId: number | null = null;
+      if (locationIdRaw) {
+        const parsedLocationId = Number.parseInt(locationIdRaw, 10);
+        if (!Number.isSafeInteger(parsedLocationId) || parsedLocationId <= 0) {
+          return res.status(400).json({ message: "locationId must be a single positive integer" });
+        }
+        locationId = parsedLocationId;
+      }
 
       const mStart = `${year}-${String(month).padStart(2, "0")}-01`;
       const lastDay = new Date(year, month, 0).getDate();
