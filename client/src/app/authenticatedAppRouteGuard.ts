@@ -77,13 +77,13 @@ export function resolveAuthenticatedAppRoute({
     // Factory-only bootstrap data must never gate an ERP/non-Factory company.
     // The company type alone is enough to reject a stale /factory/* route.
     decision = { kind: "redirect", to: "/" };
-  } else if (isFactoryBootstrapRoute && myAccessLoading) {
+  } else if (isFactoryBootstrapRoute && myAccessLoading && myAccess === undefined) {
     decision = { kind: "loading" };
   } else if (isFactoryBootstrapRoute && myAccess === undefined && !myAccessError) {
     decision = { kind: "loading" };
-  } else if (isFactoryBootstrapRoute && myAccessError) {
-    // React Query has exhausted its configured retries. Only now surface the
-    // recovery state; transient and not-yet-loaded states stay as loading.
+  } else if (isFactoryBootstrapRoute && myAccess === undefined && myAccessError) {
+    // React Query has exhausted its configured retries before any usable access
+    // data was loaded. A background refetch error must not evict cached access.
     decision = { kind: "bootstrap-error" };
   } else if (
     isFactoryCompany &&
