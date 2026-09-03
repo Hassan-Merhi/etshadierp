@@ -6,20 +6,16 @@ function read(relativePath: string): string {
   return readFileSync(resolve(process.cwd(), relativePath), "utf8");
 }
 
-function functionBody(source: string, functionName: string): string {
-  const start = source.indexOf(`export async function ${functionName}`);
-  expect(start).toBeGreaterThanOrEqual(0);
-  return source.slice(start);
-}
-
 describe("Phase 4 hot-path performance regressions", () => {
-  it("targets a single cash/bank account instead of rebuilding company-wide revaluation", () => {
-    const source = read("server/services/accounting/cashBankRevaluationService.ts");
-    const singleAccountPath = functionBody(source, "getCashBankAccountSummary");
+  it("targets one ledger account instead of rebuilding company-wide revaluation", () => {
+    const source = read("server/services/accounting/cashLedgerAccountSummaryService.ts");
+    const route = read("server/routes/accountCurrencyRoutes.ts");
 
-    expect(singleAccountPath).toContain("loadSingleAccount(companyId, accountKind, accountId)");
-    expect(singleAccountPath).toContain("loadAggregates(companyId, accountKind, [accountId])");
-    expect(singleAccountPath).not.toContain("getCashBankRevaluation(companyId)");
+    expect(source).toContain("ve.ledger_account_id = $2");
+    expect(source).toContain("loadLedgerAccount(companyId, accountId)");
+    expect(source).toContain("loadLedgerAggregate(companyId, accountId)");
+    expect(source).not.toContain("getCashBankRevaluation");
+    expect(route).toContain("getCashLedgerAccountSummary(companyId, id)");
   });
 
   it("aggregates /api/accounts/all movements in PostgreSQL instead of materializing voucher rows", () => {
