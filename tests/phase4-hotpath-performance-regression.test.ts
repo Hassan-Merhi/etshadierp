@@ -38,7 +38,7 @@ describe("Phase 4 hot-path performance regressions", () => {
     expect(source).toContain("const activeOrderCheck");
     expect(source).toContain("const currentCountExpression = enforceOverload");
     expect(source).toContain("currentCount: currentCountExpression");
-    expect(source).toContain(': sql<number>`0`;');
+    expect(source).toContain(": sql<number>`0`;");
     expect(source).toContain("isNull(customerOrders.deletedAt)");
   });
 });
