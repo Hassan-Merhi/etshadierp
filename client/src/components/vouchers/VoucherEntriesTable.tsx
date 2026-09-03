@@ -25,6 +25,7 @@ export interface VoucherEntry {
   accountId: number;
   accountName: string;
   amount: string;
+  narration?: string;
 }
 
 interface VoucherEntriesTableProps {
@@ -75,6 +76,7 @@ export function VoucherEntriesTable({
   const [mobileEditOpen, setMobileEditOpen] = useState(false);
   const [mobileSearch, setMobileSearch] = useState("");
   const [mobileAmountStr, setMobileAmountStr] = useState("");
+  const [mobileNarration, setMobileNarration] = useState("");
   const mobileAmountInputRef = useRef<HTMLInputElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
@@ -82,6 +84,7 @@ export function VoucherEntriesTable({
     if (!mobileEditOpen || mobileEditIndex === null) return;
     const current = form.getValues(`entries.${mobileEditIndex}.amount`) || "";
     setMobileAmountStr(current);
+    setMobileNarration(form.getValues(`entries.${mobileEditIndex}.narration`) || "");
     onRowFocus(mobileEditIndex, "account");
     setSidebarSearchValue("");
     setMobileSearch("");
@@ -120,6 +123,7 @@ export function VoucherEntriesTable({
           : numVal.toFixed(2)
         : "";
       form.setValue(`entries.${mobileEditIndex}.amount`, finalAmount);
+      form.setValue(`entries.${mobileEditIndex}.narration`, mobileNarration);
       if (isPositive && onAmountCommit) onAmountCommit(mobileEditIndex);
     }
     setMobileEditOpen(false);
@@ -169,10 +173,7 @@ export function VoucherEntriesTable({
       e.preventDefault();
       if (filteredSidebarAccounts.length === 0) return;
       setSidebarHighlightedIndex(
-        Math.min(
-          sidebarHighlightedIndex < 0 ? 0 : sidebarHighlightedIndex + 1,
-          filteredSidebarAccounts.length - 1
-        )
+        Math.min(sidebarHighlightedIndex < 0 ? 0 : sidebarHighlightedIndex + 1, filteredSidebarAccounts.length - 1)
       );
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
@@ -286,7 +287,8 @@ export function VoucherEntriesTable({
               <th className="text-center px-2 py-2 font-semibold w-8">#</th>
               <th className="text-left px-2 py-2 font-semibold">Account</th>
               <th className="text-left px-2 py-2 font-semibold w-24 hidden lg:table-cell">Type</th>
-              <th className="text-right px-2 py-2 font-semibold w-[26%]">Amount</th>
+              <th className="text-right px-2 py-2 font-semibold w-[22%]">Amount</th>
+              <th className="text-left px-2 py-2 font-semibold w-[24%] hidden md:table-cell">Narration</th>
               <th className="text-right px-2 py-2 font-semibold w-28 hidden lg:table-cell">Running</th>
               <th className="w-10"></th>
             </tr>
@@ -375,6 +377,25 @@ export function VoucherEntriesTable({
                       )}
                     />
                   </td>
+                  <td className="px-2 py-1.5 hidden md:table-cell">
+                    <FormField
+                      control={form.control}
+                      name={`entries.${index}.narration`}
+                      render={({ field: narrationField }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input
+                              {...narrationField}
+                              placeholder="Optional note"
+                              className="text-sm h-8"
+                              data-testid={`input-narration-${index}`}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </td>
                   <td className="px-2 py-1.5 align-top pt-3 text-right hidden lg:table-cell">
                     <span
                       className="text-xs font-mono tabular-nums text-muted-foreground"
@@ -403,7 +424,7 @@ export function VoucherEntriesTable({
           </tbody>
           <tfoot className="bg-muted/30 border-t">
             <tr>
-              <td colSpan={6} className="px-2 py-2">
+              <td colSpan={7} className="px-2 py-2">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <Button
                     type="button"
@@ -460,6 +481,9 @@ export function VoucherEntriesTable({
                   <span className={`inline-block text-[10px] font-medium px-1.5 py-0 rounded mt-0.5 ${typeBadge.cls}`}>
                     {typeBadge.label}
                   </span>
+                )}
+                {entry?.narration && (
+                  <p className="text-[10px] text-muted-foreground truncate mt-0.5 italic">{entry.narration}</p>
                 )}
               </div>
               <div className="shrink-0 flex items-center gap-1.5">
@@ -549,7 +573,8 @@ export function VoucherEntriesTable({
                   mobileEditIndex !== null &&
                   entries[mobileEditIndex]?.accountId === account.id &&
                   entries[mobileEditIndex]?.accountType === account.type;
-                const balance = typeof account.balance === "string" ? parseFloat(account.balance) : (account.balance ?? null);
+                const balance =
+                  typeof account.balance === "string" ? parseFloat(account.balance) : (account.balance ?? null);
                 return (
                   <button
                     key={`${account.type}-${account.id}`}
@@ -587,6 +612,16 @@ export function VoucherEntriesTable({
                 onChange={(event) => setMobileAmountStr(event.target.value)}
                 className="flex-1 font-mono text-right h-12 text-lg"
                 data-testid="input-mobile-entry-amount"
+              />
+            </div>
+            <div className="flex items-center gap-3 mt-3">
+              <span className="text-sm text-muted-foreground shrink-0 w-16">Narration</span>
+              <Input
+                value={mobileNarration}
+                onChange={(event) => setMobileNarration(event.target.value)}
+                placeholder="Optional note"
+                className="flex-1 h-10"
+                data-testid="input-mobile-entry-narration"
               />
             </div>
           </div>

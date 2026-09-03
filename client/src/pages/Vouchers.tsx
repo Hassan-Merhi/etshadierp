@@ -73,7 +73,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const isFactoryCompany = selectedCompany?.companyType === "factory";
   const isPropertiesCompany = selectedCompany?.companyType === "properties";
   const [isAutoCreating, setIsAutoCreating] = useState(false);
-  const { formatHistoricalBaseAmount: formatAmount, selectedCurrency, exchangeRate: dailyExchangeRate } = useCurrencyContext();
+  const {
+    formatHistoricalBaseAmount: formatAmount,
+    selectedCurrency,
+    exchangeRate: dailyExchangeRate,
+  } = useCurrencyContext();
   const [transactionRate, setTransactionRate] = useState<number | null>(null);
   const exchangeRate = transactionRate || dailyExchangeRate;
   const [voucherEffectiveDate, setVoucherEffectiveDate] = useState<string>("");
@@ -202,6 +206,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       paymentAccountName: "",
       voucherDate: new Date(),
       entries: [{ accountType: "ledger", accountId: 0, accountName: "", amount: "" }],
+      paymentAccountNarration: "",
       notes: "",
       optional: false,
     },
@@ -329,6 +334,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         paymentAccountType: formData.paymentAccountType,
         paymentAccountId: formData.paymentAccountId,
         paymentAccountName: formData.paymentAccountName,
+        paymentAccountNarration: formData.paymentAccountNarration,
         entries: formData.entries,
         notes: autoDesc,
         optional: formData.optional,
@@ -372,6 +378,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           paymentAccountName: "",
           voucherDate: new Date(),
           entries: [{ accountType: "ledger", accountId: 0, accountName: "", amount: "" }],
+          paymentAccountNarration: "",
           notes: "",
           optional: false,
         });
@@ -403,6 +410,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           paymentAccountName: "",
           voucherDate: new Date(),
           entries: [{ accountType: "ledger", accountId: 0, accountName: "", amount: "" }],
+          paymentAccountNarration: "",
           notes: "",
           optional: false,
         });
@@ -451,13 +459,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         id: account.id,
         name: account.name,
         type: account.type as
-          | "customer"
-          | "ledger"
-          | "bank"
-          | "supplier"
-          | "employee"
-          | "fixedAsset"
-          | "factorySupplier",
+          "customer" | "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "factorySupplier",
         code: "",
       };
       handleSidebarAccountSelect(accountObj);

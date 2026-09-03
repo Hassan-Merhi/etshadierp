@@ -225,7 +225,17 @@ export function StockMovementDialog({
                               {txn.particulars}
                             </button>
                           ) : (
-                            txn.particulars
+                            <>
+                              <span>{txn.particulars}</span>
+                              {txn.isOpeningBalance && (
+                                <span
+                                  className="block text-xs font-normal text-muted-foreground mt-0.5"
+                                  data-testid={`text-opening-balance-location-${idx}`}
+                                >
+                                  {stockMovementItem?.locationName || "All Locations"}
+                                </span>
+                              )}
+                            </>
                           )}
                         </td>
                         <td className="px-4 py-2 border-r text-xs text-muted-foreground whitespace-nowrap">

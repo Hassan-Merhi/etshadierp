@@ -125,6 +125,7 @@ function AccountEntryRows({
   "selectedVoucher" | "viewVoucherEntries" | "entryBalances" | "formatAmount" | "resolveEntryName"
 >) {
   const isSingleAmount = isSingleAmountVoucherType(selectedVoucher.voucherType);
+  const showEntryBalances = selectedVoucher.voucherType === "Journal";
   const displayEntries = isSingleAmount
     ? viewVoucherEntries.filter((entry) => {
         if (selectedVoucher.voucherType === "Payment") return parseFloat(entry.debitAmount || "0") > 0;
@@ -139,7 +140,7 @@ function AccountEntryRows({
         <TableRow key={entry.id}>
           <TableCell>
             <div className="font-medium">{resolveEntryName(entry)}</div>
-            {isSingleAmount && (
+            {(isSingleAmount || showEntryBalances) && entryBalances[entry.id] !== undefined && (
               <div className="text-xs text-muted-foreground mt-0.5">
                 Balance: {formatAmount(entryBalances[entry.id] ?? "0")}
               </div>
