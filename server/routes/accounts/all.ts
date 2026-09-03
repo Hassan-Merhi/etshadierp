@@ -13,6 +13,7 @@ import {
   ParentCompanyNotConfiguredError,
   resolveParentCompanyId,
   getSupplierBalanceForContext,
+  isSupplierVisibleToCompany,
 } from "../helpers/supplierBalanceHelpers";
 import { vouchers, voucherEntries, customerBalances, customerOrders } from "@shared/schema";
 import { eq, and, inArray, sql, isNull, isNotNull } from "drizzle-orm";
@@ -44,7 +45,13 @@ export function registerAccountListRoutes(app: Express) {
       const ledgers = ledgersAll.filter((a) => !["sp_stock", "sp_opnbal"].includes(a.subType ?? ""));
       const isFactoryCompany = currentCompany?.companyType === "factory";
       const isPropertiesCompany = currentCompany?.companyType === "properties";
-      const suppliers = isFactoryCompany || isPropertiesCompany ? [] : allSuppliers;
+      // getAllSuppliers() is not company-scoped, so foreign tenants' rows have to
+      // be dropped here rather than left to the child-company activity filter
+      // below, which a company resolving to itself never applies.
+      const suppliers =
+        isFactoryCompany || isPropertiesCompany
+          ? []
+          : allSuppliers.filter((supplier) => isSupplierVisibleToCompany(supplier, companyId));
 
       // Build a map of ledgerAccountId → customer opening balance.
       // For customer-linked ledger accounts, the customer record is the
