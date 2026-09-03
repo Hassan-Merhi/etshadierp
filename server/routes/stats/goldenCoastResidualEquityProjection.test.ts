@@ -148,6 +148,7 @@ describe("Golden Coast Phase 17 balance-sheet projection", () => {
     expect(result.equity.freshStartClaim).toBe(42122);
     expect(result.equity.hassanClaim).toBe(289242);
     expect(result.equity.unclosedEarnings).toBe(0);
+    expect(result.equity.currencyTranslationAdjustment).toBe(0);
     expect(result.equity.freshStartTotalEntitlement).toBe(207997);
     expect(result.onUs.accounts).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: 3, value: 165875, category: "Liability" })])
@@ -176,6 +177,7 @@ describe("Golden Coast Phase 17 balance-sheet projection", () => {
     expect(result.equity.hassanClaim).toBe(289242);
     expect(result.equity.partnerCapitalTotal).toBe(330364);
     expect(result.equity.unclosedEarnings).toBe(400);
+    expect(result.equity.currencyTranslationAdjustment).toBe(0);
     expect(result.equity.total).toBe(330764);
     expect(result.equity.freshStartTotalEntitlement).toBe(207997);
     expect(result.equity.accounts).toEqual(
@@ -228,6 +230,38 @@ describe("Golden Coast Phase 17 balance-sheet projection", () => {
     expect(result.equity.unclosedEarnings).toBe(0);
     expect(result.equity.total).toBe(330764);
     expect(result.equity.freshStartTotalEntitlement).toBe(208197);
+    expect(result.equity.accounts.some((account: { code?: string }) => account.code === "GC-UNCL-PNL")).toBe(false);
+  });
+
+  it("keeps live cash FX translation separate from Phase 11 distributable earnings", () => {
+    const fixture = accounts({ cash: 100, freshCredit: 100 });
+    const body = baseBody({ tracker: OPENING_GC_SALES_CASH, cash: 110 });
+    const translatedCash = body.forUs.accounts.find((account) => account.id === 5);
+    if (!translatedCash) throw new Error("Cash fixture missing");
+    Object.assign(translatedCash, {
+      category: "Cash / Bank (Current Translation)",
+      currencyRevalued: true,
+      historicalBaseBalance: "100.00",
+      currentTranslatedBaseBalance: "110.00",
+      translationDifference: "10.00",
+    });
+
+    const result = projectGoldenCoastResidualEquity({
+      body,
+      companyAccounts: fixture.rows,
+      accountBalances: fixture.balances,
+    });
+
+    expect(result.forUs.total).toBe(497349);
+    expect(result.onUs.total).toBe(165875);
+    expect(result.netPosition).toBe(331474);
+    expect(result.equity.partnerCapitalTotal).toBe(331464);
+    expect(result.equity.currencyTranslationAdjustment).toBe(10);
+    expect(result.equity.unclosedEarnings).toBe(0);
+    expect(result.equity.total).toBe(331474);
+    expect(result.equity.accounts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "GC-FX-TRANS", value: 10, balanceSide: "Cr" })])
+    );
     expect(result.equity.accounts.some((account: { code?: string }) => account.code === "GC-UNCL-PNL")).toBe(false);
   });
 
