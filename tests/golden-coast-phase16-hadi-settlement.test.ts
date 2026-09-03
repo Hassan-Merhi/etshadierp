@@ -73,7 +73,7 @@ afterAll(async () => {
 }, 60_000);
 
 describe("Golden Coast Phase 16 — HADI credit-payable settlement", () => {
-  it("retires the old manual debit-model mutation without changing any ledger balance", async () => {
+  it("retires manual HADI collection without changing any ledger balance", async () => {
     const freshStartEquity = await roleAccountId(fixture.ctx.companyId, "gc_partner_capital");
     const before = {
       payable: await netDebit(fixture.saleSideAccountId),
@@ -100,7 +100,7 @@ describe("Golden Coast Phase 16 — HADI credit-payable settlement", () => {
     expect(await netDebit(fixture.hadiCashAccountId)).toBeCloseTo(before.hadiCash, 2);
   });
 
-  it("pays Fresh Start from HADI by reducing the credit payable and HADI asset without another equity hit", async () => {
+  it("pays Fresh Start from HADI, then remits only the still-held proceeds back to Golden Coast", async () => {
     const freshStartEquity = await roleAccountId(fixture.ctx.companyId, "gc_partner_capital");
     const hassanEquity = await roleAccountId(fixture.ctx.companyId, "gc_owner_capital");
     const beforeSale = {
@@ -108,6 +108,7 @@ describe("Golden Coast Phase 16 — HADI credit-payable settlement", () => {
       fresh: await netDebit(freshStartEquity),
       hassan: await netDebit(hassanEquity),
       gcHadi: await netDebit(fixture.goldenCoastHadiIntercompanyAccountId),
+      gcCash: await netDebit(fixture.ctx.cashAccountId),
       hadiCash: await netDebit(fixture.hadiCashAccountId),
       hadiGc: await netDebit(fixture.hadiGoldenCoastIntercompanyAccountId),
     };
@@ -126,6 +127,7 @@ describe("Golden Coast Phase 16 — HADI credit-payable settlement", () => {
       fresh: await netDebit(freshStartEquity),
       hassan: await netDebit(hassanEquity),
       gcHadi: await netDebit(fixture.goldenCoastHadiIntercompanyAccountId),
+      gcCash: await netDebit(fixture.ctx.cashAccountId),
       hadiCash: await netDebit(fixture.hadiCashAccountId),
       hadiGc: await netDebit(fixture.hadiGoldenCoastIntercompanyAccountId),
     };
@@ -155,30 +157,89 @@ describe("Golden Coast Phase 16 — HADI credit-payable settlement", () => {
       hadiIntercompanyAssetAfterUsd: "350.00",
     });
 
-    expect((await netDebit(fixture.saleSideAccountId)) - afterSale.payable).toBeCloseTo(250, 2);
-    expect((await netDebit(freshStartEquity)) - afterSale.fresh).toBeCloseTo(0, 2);
-    expect((await netDebit(hassanEquity)) - afterSale.hassan).toBeCloseTo(0, 2);
-    expect((await netDebit(fixture.goldenCoastHadiIntercompanyAccountId)) - afterSale.gcHadi).toBeCloseTo(-250, 2);
-    expect((await netDebit(fixture.hadiCashAccountId)) - afterSale.hadiCash).toBeCloseTo(-250, 2);
-    expect((await netDebit(fixture.hadiGoldenCoastIntercompanyAccountId)) - afterSale.hadiGc).toBeCloseTo(250, 2);
-    expect((await phase16PaymentMarkerCount()) - markersBefore).toBe(2);
-
-    const beforeReplay = {
+    const afterPayment = {
       payable: await netDebit(fixture.saleSideAccountId),
       fresh: await netDebit(freshStartEquity),
+      hassan: await netDebit(hassanEquity),
       gcHadi: await netDebit(fixture.goldenCoastHadiIntercompanyAccountId),
+      gcCash: await netDebit(fixture.ctx.cashAccountId),
       hadiCash: await netDebit(fixture.hadiCashAccountId),
-      markers: await phase16PaymentMarkerCount(),
+      hadiGc: await netDebit(fixture.hadiGoldenCoastIntercompanyAccountId),
     };
-    const replay = await fixture.agent
+    expect(afterPayment.payable - afterSale.payable).toBeCloseTo(250, 2);
+    expect(afterPayment.fresh - afterSale.fresh).toBeCloseTo(0, 2);
+    expect(afterPayment.hassan - afterSale.hassan).toBeCloseTo(0, 2);
+    expect(afterPayment.gcHadi - afterSale.gcHadi).toBeCloseTo(-250, 2);
+    expect(afterPayment.hadiCash - afterSale.hadiCash).toBeCloseTo(-250, 2);
+    expect(afterPayment.hadiGc - afterSale.hadiGc).toBeCloseTo(250, 2);
+    expect((await phase16PaymentMarkerCount()) - markersBefore).toBe(2);
+
+    const paymentReplay = await fixture.agent
       .post(`${FRESH_START_PAYMENT_URL}?targetCompanyId=${fixture.hadiCompanyId}`)
       .send(paymentBody);
-    expect(replay.status).toBe(200);
-    expect(replay.body.replayed).toBe(true);
-    expect(await netDebit(fixture.saleSideAccountId)).toBeCloseTo(beforeReplay.payable, 2);
-    expect(await netDebit(freshStartEquity)).toBeCloseTo(beforeReplay.fresh, 2);
-    expect(await netDebit(fixture.goldenCoastHadiIntercompanyAccountId)).toBeCloseTo(beforeReplay.gcHadi, 2);
-    expect(await netDebit(fixture.hadiCashAccountId)).toBeCloseTo(beforeReplay.hadiCash, 2);
-    expect(await phase16PaymentMarkerCount()).toBe(beforeReplay.markers);
+    expect(paymentReplay.status).toBe(200);
+    expect(paymentReplay.body.replayed).toBe(true);
+    expect(await netDebit(fixture.saleSideAccountId)).toBeCloseTo(afterPayment.payable, 2);
+    expect(await netDebit(freshStartEquity)).toBeCloseTo(afterPayment.fresh, 2);
+    expect(await phase16PaymentMarkerCount()).toBe(markersBefore + 2);
+
+    // The sale originally put $600 in HADI, but HADI already paid $250 to Fresh
+    // Start. Phase 16 must cap remittance at the remaining $350, not the old
+    // gross Phase 7 collection history of $600.
+    const tooLarge = await fixture.agent
+      .post(`${LEGACY_PHASE7_URL}?targetCompanyId=${fixture.hadiCompanyId}`)
+      .send({
+        operation: "remit_from_hadi",
+        transferDate: GOLDEN_COAST_PHASE5_SALE_DATE,
+        amountUsd: "350.01",
+        clientRequestId: "phase16-remit-too-large",
+        hadiCashAccount: { kind: "ledger", id: fixture.hadiCashAccountId },
+        goldenCoastCashAccount: { kind: "ledger", id: fixture.ctx.cashAccountId },
+      });
+    expect(tooLarge.status).toBe(409);
+    expect(tooLarge.body.code).toBe("GC_PHASE7_REMITTANCE_EXCEEDS_COLLECTIONS");
+
+    const remitBody = {
+      operation: "remit_from_hadi",
+      transferDate: GOLDEN_COAST_PHASE5_SALE_DATE,
+      amountUsd: "350.00",
+      clientRequestId: "phase16-remit-remainder",
+      reference: "Return remaining HADI-held proceeds",
+      hadiCashAccount: { kind: "ledger", id: fixture.hadiCashAccountId },
+      goldenCoastCashAccount: { kind: "ledger", id: fixture.ctx.cashAccountId },
+    };
+    const remittance = await fixture.agent
+      .post(`${LEGACY_PHASE7_URL}?targetCompanyId=${fixture.hadiCompanyId}`)
+      .send(remitBody);
+    expect(remittance.status).toBe(201);
+    expect(remittance.body.replayed).toBe(false);
+    expect(remittance.body.outstandingHadiSalesCashAfterUsd).toBe("0.00");
+
+    const afterRemit = {
+      payable: await netDebit(fixture.saleSideAccountId),
+      fresh: await netDebit(freshStartEquity),
+      hassan: await netDebit(hassanEquity),
+      gcHadi: await netDebit(fixture.goldenCoastHadiIntercompanyAccountId),
+      gcCash: await netDebit(fixture.ctx.cashAccountId),
+      hadiCash: await netDebit(fixture.hadiCashAccountId),
+      hadiGc: await netDebit(fixture.hadiGoldenCoastIntercompanyAccountId),
+    };
+    expect(afterRemit.payable).toBeCloseTo(afterPayment.payable, 2);
+    expect(afterRemit.fresh).toBeCloseTo(afterPayment.fresh, 2);
+    expect(afterRemit.hassan).toBeCloseTo(afterPayment.hassan, 2);
+    expect(afterRemit.gcHadi - afterPayment.gcHadi).toBeCloseTo(-350, 2);
+    expect(afterRemit.gcCash - afterPayment.gcCash).toBeCloseTo(350, 2);
+    expect(afterRemit.hadiCash - afterPayment.hadiCash).toBeCloseTo(-350, 2);
+    expect(afterRemit.hadiGc - afterPayment.hadiGc).toBeCloseTo(350, 2);
+
+    const remitReplay = await fixture.agent
+      .post(`${LEGACY_PHASE7_URL}?targetCompanyId=${fixture.hadiCompanyId}`)
+      .send(remitBody);
+    expect(remitReplay.status).toBe(200);
+    expect(remitReplay.body.replayed).toBe(true);
+    expect(await netDebit(fixture.goldenCoastHadiIntercompanyAccountId)).toBeCloseTo(afterRemit.gcHadi, 2);
+    expect(await netDebit(fixture.ctx.cashAccountId)).toBeCloseTo(afterRemit.gcCash, 2);
+    expect(await netDebit(fixture.hadiCashAccountId)).toBeCloseTo(afterRemit.hadiCash, 2);
+    expect(await netDebit(fixture.hadiGoldenCoastIntercompanyAccountId)).toBeCloseTo(afterRemit.hadiGc, 2);
   });
 });
