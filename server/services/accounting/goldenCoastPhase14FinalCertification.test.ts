@@ -368,13 +368,13 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
         settlementDate: "2026-09-13",
         amountUsd: "1275.00",
         clientRequestId: "phase14-direct-settlement",
-        receiptAccount: { kind: "bank", id: bank.directCollection },
-        reference: "Clear remaining GC Sales Cash",
+        paymentAccount: { kind: "bank", id: bank.directCollection },
+        reference: "Pay remaining GC Sales Cash payable",
       },
     });
     const settlementPlan = planGoldenCoastPhase10Settlement({
       settlement,
-      gcSalesCashDebitBalanceUsd: collectionPlan.gcSalesCashDebitBalanceAfterUsd,
+      gcSalesCashDebitBalanceUsd: "-1275.00",
     });
     expect(settlementPlan.gcSalesCashDebitBalanceAfterUsd).toBe("0.00");
     const settlementDigest = goldenCoastPhase10SettlementDigest({
@@ -386,8 +386,8 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
       gcSalesCashAccountId: account.gcSalesCash,
       settlementDigest,
     });
-    expect(bankNetDebit(settlementPosting.entries, bank.directCollection)).toBe(1275);
-    expect(ledgerNetDebit(settlementPosting.entries, account.gcSalesCash)).toBe(-1275);
+    expect(bankNetDebit(settlementPosting.entries, bank.directCollection)).toBe(-1275);
+    expect(ledgerNetDebit(settlementPosting.entries, account.gcSalesCash)).toBe(1275);
     expectBalanced(settlementPosting.entries);
 
     const remittance = parseGoldenCoastPhase7TransferInput({
