@@ -182,6 +182,105 @@ async function loadAccounts(companyId: number): Promise<AccountRow[]> {
   return rows;
 }
 
+async function loadSingleAccount(
+  companyId: number,
+  accountKind: "ledger" | "bank",
+  accountId: number,
+): Promise<AccountRow | null> {
+  if (accountKind === "ledger") {
+    const [row] = await db
+      .select({
+        id: ledgerAccounts.id,
+        name: ledgerAccounts.name,
+        code: ledgerAccounts.code,
+        accountType: ledgerAccounts.accountType,
+        openingBalance: ledgerAccounts.openingBalance,
+        openingBalanceSide: ledgerAccounts.openingBalanceSide,
+        openingBalanceNativeAmount: ledgerAccounts.openingBalanceNativeAmount,
+        openingBalanceCurrency: ledgerAccounts.openingBalanceCurrency,
+        openingBalanceHistoricalRate: ledgerAccounts.openingBalanceHistoricalRate,
+        openingBalanceBaseAmount: ledgerAccounts.openingBalanceBaseAmount,
+      })
+      .from(ledgerAccounts)
+      .where(
+        and(
+          eq(ledgerAccounts.id, accountId),
+          eq(ledgerAccounts.companyId, companyId),
+          isNull(ledgerAccounts.deletedAt),
+          or(eq(ledgerAccounts.accountType, "Bank"), eq(ledgerAccounts.accountType, "Cash")),
+        ),
+      )
+      .limit(1);
+
+    if (!row) return null;
+    return {
+      accountKind: "ledger",
+      id: row.id,
+      linkedLedgerId: null,
+      name: row.name,
+      code: row.code,
+      accountType: row.accountType,
+      openingBalance: row.openingBalance,
+      openingBalanceSide: row.openingBalanceSide,
+      openingBalanceNativeAmount: row.openingBalanceNativeAmount,
+      openingBalanceCurrency: row.openingBalanceCurrency,
+      openingBalanceHistoricalRate: row.openingBalanceHistoricalRate,
+      openingBalanceBaseAmount: row.openingBalanceBaseAmount,
+    };
+  }
+
+  const [row] = await db
+    .select({
+      id: bankAccounts.id,
+      linkedLedgerId: bankAccounts.linkedLedgerId,
+      name: bankAccounts.name,
+      code: bankAccounts.code,
+      openingBalance: bankAccounts.openingBalance,
+      openingBalanceSide: bankAccounts.openingBalanceSide,
+      openingBalanceNativeAmount: bankAccounts.openingBalanceNativeAmount,
+      openingBalanceCurrency: bankAccounts.openingBalanceCurrency,
+      openingBalanceHistoricalRate: bankAccounts.openingBalanceHistoricalRate,
+      openingBalanceBaseAmount: bankAccounts.openingBalanceBaseAmount,
+    })
+    .from(bankAccounts)
+    .where(
+      and(eq(bankAccounts.id, accountId), eq(bankAccounts.companyId, companyId), isNull(bankAccounts.deletedAt)),
+    )
+    .limit(1);
+
+  if (!row) return null;
+  if (row.linkedLedgerId) {
+    const [representedLedger] = await db
+      .select({ id: ledgerAccounts.id })
+      .from(ledgerAccounts)
+      .where(
+        and(
+          eq(ledgerAccounts.id, row.linkedLedgerId),
+          eq(ledgerAccounts.companyId, companyId),
+          isNull(ledgerAccounts.deletedAt),
+          or(eq(ledgerAccounts.accountType, "Bank"), eq(ledgerAccounts.accountType, "Cash")),
+        ),
+      )
+      .limit(1);
+    if (representedLedger) return null;
+  }
+
+  return {
+    accountKind: "bank",
+    id: row.id,
+    linkedLedgerId: row.linkedLedgerId ?? null,
+    name: row.name,
+    code: row.code,
+    accountType: "Bank",
+    openingBalance: row.openingBalance,
+    openingBalanceSide: row.openingBalanceSide,
+    openingBalanceNativeAmount: row.openingBalanceNativeAmount,
+    openingBalanceCurrency: row.openingBalanceCurrency,
+    openingBalanceHistoricalRate: row.openingBalanceHistoricalRate,
+    openingBalanceBaseAmount: row.openingBalanceBaseAmount,
+  };
+}
+
 async function loadAggregates(
   companyId: number,
   accountKind: "ledger" | "bank",
@@ -273,15 +372,112 @@ async function loadAggregates(
   return result.rows;
 }
 
+function summarizeAccount(
+  account: AccountRow,
+  rows: AggregateRow[],
+  currentCfaPerUsd: Decimal | null,
+): CashBankCurrencySummary {
+  const native = new Map<string, Decimal>();
+  let historicalBase = new Decimal(0);
+  let unresolvedLegacyEntryCount = 0;
+  let unresolvedLegacyNetRaw = new Decimal(0);
+
+  for (const row of rows) {
+    if (row.entry_currency === UNRESOLVED_BUCKET) {
+      unresolvedLegacyEntryCount += Number.parseInt(row.unresolved_count || "0", 10) || 0;
+      unresolvedLegacyNetRaw = unresolvedLegacyNetRaw.plus(row.unresolved_raw_net || 0);
+      continue;
+    }
+    const currency = normalizeStoredCurrency(row.entry_currency) || "USD";
+    native.set(currency, (native.get(currency) || new Decimal(0)).plus(amount(row.native_debit).minus(row.native_credit)));
+    historicalBase = historicalBase.plus(row.hist_base_debit).minus(row.hist_base_credit);
+  }
+
+  const openingRaw = signedOpeningBalance(account);
+  const openingCurrency = normalizeStoredCurrency(account.openingBalanceCurrency);
+  let openingBalanceCurrencyUnresolved = false;
+  let unresolvedOpeningBalanceRaw: string | null = null;
+
+  if (!openingRaw.isZero()) {
+    if (
+      openingCurrency &&
+      account.openingBalanceNativeAmount != null &&
+      account.openingBalanceBaseAmount != null
+    ) {
+      native.set(openingCurrency, (native.get(openingCurrency) || new Decimal(0)).plus(openingRaw));
+      const openingBase = amount(account.openingBalanceBaseAmount);
+      historicalBase = historicalBase.plus(account.openingBalanceSide === "Cr" ? openingBase.neg() : openingBase);
+    } else {
+      openingBalanceCurrencyUnresolved = true;
+      unresolvedOpeningBalanceRaw = openingRaw.toDecimalPlaces(DP_AMOUNT).toFixed(DP_AMOUNT);
+    }
+  }
+
+  const nativeBalancesByCurrency: NativeBalancesByCurrency = {};
+  for (const [currency, value] of native) {
+    if (!value.isZero()) nativeBalancesByCurrency[currency] = value.toDecimalPlaces(DP_AMOUNT).toFixed(DP_AMOUNT);
+  }
+
+  const unresolvedTranslationCurrencies: string[] = [];
+  let translated = new Decimal(0);
+  let currentRateMissing = false;
+
+  for (const [currency, value] of native) {
+    if (currency === "USD") {
+      translated = translated.plus(value);
+    } else if (currency === "CFA") {
+      if (!currentCfaPerUsd) {
+        currentRateMissing = true;
+        unresolvedTranslationCurrencies.push(currency);
+      } else {
+        translated = translated.plus(value.div(currentCfaPerUsd));
+      }
+    } else {
+      unresolvedTranslationCurrencies.push(currency);
+    }
+  }
+
+  const totalsProvisional =
+    openingBalanceCurrencyUnresolved ||
+    unresolvedLegacyEntryCount > 0 ||
+    currentRateMissing ||
+    unresolvedTranslationCurrencies.length > 0;
+
+  const currentTranslatedBaseBalance = totalsProvisional
+    ? null
+    : translated.toDecimalPlaces(DP_AMOUNT).toFixed(DP_AMOUNT);
+  const translationDifference = totalsProvisional
+    ? null
+    : translated.minus(historicalBase).toDecimalPlaces(DP_AMOUNT).toFixed(DP_AMOUNT);
+
+  return {
+    accountKind: account.accountKind,
+    id: account.id,
+    linkedLedgerId: account.linkedLedgerId,
+    name: account.name,
+    code: account.code,
+    accountType: account.accountType,
+    nativeBalancesByCurrency,
+    historicalBaseBalance: historicalBase.toDecimalPlaces(DP_AMOUNT).toFixed(DP_AMOUNT),
+    currentTranslatedBaseBalance,
+    translationDifference,
+    currentCfaPerUsd: currentCfaPerUsd?.toDecimalPlaces(DP_RATE).toFixed(DP_RATE) ?? null,
+    currentRateMissing,
+    openingBalanceCurrencyUnresolved,
+    unresolvedOpeningBalanceRaw,
+    unresolvedLegacyEntryCount,
+    unresolvedLegacyNetRaw: unresolvedLegacyNetRaw.toDecimalPlaces(DP_AMOUNT).toFixed(DP_AMOUNT),
+    unresolvedTranslationCurrencies: [...new Set(unresolvedTranslationCurrencies)],
+    totalsProvisional,
+  };
+}
+
 export async function getCashBankRevaluation(companyId: number): Promise<{
   accounts: CashBankCurrencySummary[];
   currentCfaPerUsd: string | null;
   unresolvedAccountCount: number;
 }> {
-  const [accounts, currentCfaPerUsd] = await Promise.all([
-    loadAccounts(companyId),
-    getLatestCfaPerUsd(companyId),
-  ]);
+  const [accounts, currentCfaPerUsd] = await Promise.all([loadAccounts(companyId), getLatestCfaPerUsd(companyId)]);
 
   const ledgerIds = accounts.filter((row) => row.accountKind === "ledger").map((row) => row.id);
   const bankIds = accounts.filter((row) => row.accountKind === "bank").map((row) => row.id);
@@ -291,7 +487,10 @@ export async function getCashBankRevaluation(companyId: number): Promise<{
   ]);
 
   const rowMap = new Map<string, AggregateRow[]>();
-  for (const [kind, rows] of [["ledger", ledgerRows], ["bank", bankRows]] as const) {
+  for (const [kind, rows] of [
+    ["ledger", ledgerRows],
+    ["bank", bankRows],
+  ] as const) {
     for (const row of rows) {
       const key = `${kind}:${row.account_id}`;
       const list = rowMap.get(key) || [];
@@ -300,102 +499,9 @@ export async function getCashBankRevaluation(companyId: number): Promise<{
     }
   }
 
-  const summaries = accounts.map((account): CashBankCurrencySummary => {
-    const rows = rowMap.get(`${account.accountKind}:${account.id}`) || [];
-    const native = new Map<string, Decimal>();
-    let historicalBase = new Decimal(0);
-    let unresolvedLegacyEntryCount = 0;
-    let unresolvedLegacyNetRaw = new Decimal(0);
-
-    for (const row of rows) {
-      if (row.entry_currency === UNRESOLVED_BUCKET) {
-        unresolvedLegacyEntryCount += Number.parseInt(row.unresolved_count || "0", 10) || 0;
-        unresolvedLegacyNetRaw = unresolvedLegacyNetRaw.plus(row.unresolved_raw_net || 0);
-        continue;
-      }
-      const currency = normalizeStoredCurrency(row.entry_currency) || "USD";
-      native.set(currency, (native.get(currency) || new Decimal(0)).plus(amount(row.native_debit).minus(row.native_credit)));
-      historicalBase = historicalBase.plus(row.hist_base_debit).minus(row.hist_base_credit);
-    }
-
-    const openingRaw = signedOpeningBalance(account);
-    const openingCurrency = normalizeStoredCurrency(account.openingBalanceCurrency);
-    let openingBalanceCurrencyUnresolved = false;
-    let unresolvedOpeningBalanceRaw: string | null = null;
-
-    if (!openingRaw.isZero()) {
-      if (
-        openingCurrency &&
-        account.openingBalanceNativeAmount != null &&
-        account.openingBalanceBaseAmount != null
-      ) {
-        native.set(openingCurrency, (native.get(openingCurrency) || new Decimal(0)).plus(openingRaw));
-        const openingBase = amount(account.openingBalanceBaseAmount);
-        historicalBase = historicalBase.plus(account.openingBalanceSide === "Cr" ? openingBase.neg() : openingBase);
-      } else {
-        openingBalanceCurrencyUnresolved = true;
-        unresolvedOpeningBalanceRaw = openingRaw.toDecimalPlaces(DP_AMOUNT).toFixed(DP_AMOUNT);
-      }
-    }
-
-    const nativeBalancesByCurrency: NativeBalancesByCurrency = {};
-    for (const [currency, value] of native) {
-      if (!value.isZero()) nativeBalancesByCurrency[currency] = value.toDecimalPlaces(DP_AMOUNT).toFixed(DP_AMOUNT);
-    }
-
-    const unresolvedTranslationCurrencies: string[] = [];
-    let translated = new Decimal(0);
-    let currentRateMissing = false;
-
-    for (const [currency, value] of native) {
-      if (currency === "USD") {
-        translated = translated.plus(value);
-      } else if (currency === "CFA") {
-        if (!currentCfaPerUsd) {
-          currentRateMissing = true;
-          unresolvedTranslationCurrencies.push(currency);
-        } else {
-          translated = translated.plus(value.div(currentCfaPerUsd));
-        }
-      } else {
-        unresolvedTranslationCurrencies.push(currency);
-      }
-    }
-
-    const totalsProvisional =
-      openingBalanceCurrencyUnresolved ||
-      unresolvedLegacyEntryCount > 0 ||
-      currentRateMissing ||
-      unresolvedTranslationCurrencies.length > 0;
-
-    const currentTranslatedBaseBalance = totalsProvisional
-      ? null
-      : translated.toDecimalPlaces(DP_AMOUNT).toFixed(DP_AMOUNT);
-    const translationDifference = totalsProvisional
-      ? null
-      : translated.minus(historicalBase).toDecimalPlaces(DP_AMOUNT).toFixed(DP_AMOUNT);
-
-    return {
-      accountKind: account.accountKind,
-      id: account.id,
-      linkedLedgerId: account.linkedLedgerId,
-      name: account.name,
-      code: account.code,
-      accountType: account.accountType,
-      nativeBalancesByCurrency,
-      historicalBaseBalance: historicalBase.toDecimalPlaces(DP_AMOUNT).toFixed(DP_AMOUNT),
-      currentTranslatedBaseBalance,
-      translationDifference,
-      currentCfaPerUsd: currentCfaPerUsd?.toDecimalPlaces(DP_RATE).toFixed(DP_RATE) ?? null,
-      currentRateMissing,
-      openingBalanceCurrencyUnresolved,
-      unresolvedOpeningBalanceRaw,
-      unresolvedLegacyEntryCount,
-      unresolvedLegacyNetRaw: unresolvedLegacyNetRaw.toDecimalPlaces(DP_AMOUNT).toFixed(DP_AMOUNT),
-      unresolvedTranslationCurrencies: [...new Set(unresolvedTranslationCurrencies)],
-      totalsProvisional,
-    };
-  });
+  const summaries = accounts.map((account) =>
+    summarizeAccount(account, rowMap.get(`${account.accountKind}:${account.id}`) || [], currentCfaPerUsd),
+  );
 
   return {
     accounts: summaries,
@@ -409,6 +515,15 @@ export async function getCashBankAccountSummary(
   accountKind: "ledger" | "bank",
   accountId: number,
 ): Promise<CashBankCurrencySummary | null> {
-  const result = await getCashBankRevaluation(companyId);
-  return result.accounts.find((row) => row.accountKind === accountKind && row.id === accountId) || null;
+  // Single-account balance reads are latency-sensitive and extremely common in
+  // Daybook/Accounts. Do not rebuild every Cash/Bank account in the company just
+  // to return one ID. Resolve the one account first, then aggregate only that ID.
+  const account = await loadSingleAccount(companyId, accountKind, accountId);
+  if (!account) return null;
+
+  const [rows, currentCfaPerUsd] = await Promise.all([
+    loadAggregates(companyId, accountKind, [accountId]),
+    getLatestCfaPerUsd(companyId),
+  ]);
+  return summarizeAccount(account, rows, currentCfaPerUsd);
 }
