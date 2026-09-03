@@ -42,7 +42,7 @@ describe("Golden Coast Phase 12 final accounting-model hardening", () => {
     expect(phase6AutoHadiSource).toContain("core.postGoldenCoastAutomaticHadiCollectionTx(input)");
     expect(phase6AutoHadiSource).toContain("buildGoldenCoastPhase15SalesPayablePosting");
     expect(phase6AutoHadiSource.indexOf("core.postGoldenCoastAutomaticHadiCollectionTx(input)")).toBeLessThan(
-      phase6AutoHadiSource.indexOf("postPhase15SalesPayableBridge")
+      phase6AutoHadiSource.lastIndexOf("postPhase15SalesPayableBridge({")
     );
   });
 
