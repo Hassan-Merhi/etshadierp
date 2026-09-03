@@ -70,12 +70,16 @@ function rebuildBreakdown(accounts: NetPositionAccountRow[]): Array<{ name: stri
 }
 
 function restoreEquityInclusionContract(payload: NetPositionPayload) {
-  if (payload.equity && payload.equity.includedInNetPosition == null) {
-    payload.equity.includedInNetPosition = false;
+  const equity = payload.equity;
+  if (equity && equity.includedInNetPosition == null) {
+    equity.includedInNetPosition = false;
   }
-  if (payload.netPositionBreakdown?.equity && payload.netPositionBreakdown.equity.includedInNetPosition == null) {
-    payload.netPositionBreakdown.equity.includedInNetPosition = payload.equity?.includedInNetPosition ?? false;
+
+  const breakdownEquity = payload.netPositionBreakdown?.equity;
+  if (breakdownEquity && breakdownEquity.includedInNetPosition == null) {
+    breakdownEquity.includedInNetPosition = equity?.includedInNetPosition ?? false;
   }
+
   return payload;
 }
 
@@ -175,7 +179,8 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
         // repeated requests never reapply translation to the cached reference.
         const reportTotalsProvisional = Boolean(payload?.currencyRevaluation?.reportTotalsProvisional);
         const copy = payload == null ? payload : JSON.parse(JSON.stringify(payload));
-        const adjusted = restoreEquityInclusionContract(applyCurrentCashTranslation(copy, revaluation.accounts));
+        const translated = applyCurrentCashTranslation(copy, revaluation.accounts);
+        const adjusted = restoreEquityInclusionContract(translated);
         if (adjusted?.currency) adjusted.currency.currentCashBankTranslationApplied = true;
         adjusted.currencyRevaluation = {
           currentCfaPerUsd: revaluation.currentCfaPerUsd,
