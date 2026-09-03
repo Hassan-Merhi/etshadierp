@@ -36,20 +36,32 @@ describe("Golden Coast Phase 10 direct Fresh Start payment", () => {
   });
 
   it("accepts receiptAccount as a legacy alias but normalizes it to paymentAccount", () => {
-    const parsed = settlement({ paymentAccount: undefined, receiptAccount: { kind: "ledger", id: 55 } });
+    const parsed = settlement({
+      paymentAccount: undefined,
+      receiptAccount: { kind: "ledger", id: 55 },
+    });
     expect(parsed.paymentAccount).toEqual({ kind: "ledger", id: 55 });
   });
 
   it("rejects pre-cutover dates, invalid request ids and sub-cent amounts", () => {
-    expect(() => settlement({ settlementDate: "2026-08-31" })).toThrow(/cutover date/);
-    expect(() => settlement({ clientRequestId: "bad request" })).toThrow(GoldenCoastPhase10SettlementError);
-    expect(() => settlement({ amountUsd: "1.001" })).toThrow(/at most 2 decimal places/);
+    expect(() => settlement({ settlementDate: "2026-08-31" })).toThrow(
+      /cutover date/,
+    );
+    expect(() => settlement({ clientRequestId: "bad request" })).toThrow(
+      GoldenCoastPhase10SettlementError,
+    );
+    expect(() => settlement({ amountUsd: "1.001" })).toThrow(
+      /at most 2 decimal places/,
+    );
   });
 
   it("allows a partial payment against a credit GC Sales Cash payable", () => {
     const parsed = settlement({ amountUsd: "600.00" });
     expect(
-      planGoldenCoastPhase10Settlement({ settlement: parsed, gcSalesCashDebitBalanceUsd: "-1800.00" })
+      planGoldenCoastPhase10Settlement({
+        settlement: parsed,
+        gcSalesCashDebitBalanceUsd: "-1800.00",
+      }),
     ).toMatchObject({
       gcSalesCashDebitBalanceBeforeUsd: "-1800.00",
       gcSalesCashDebitBalanceAfterUsd: "-1200.00",
@@ -61,10 +73,19 @@ describe("Golden Coast Phase 10 direct Fresh Start payment", () => {
   it("allows an exact full payment but never overpays", () => {
     const parsed = settlement({ amountUsd: "1800.00" });
     expect(
-      planGoldenCoastPhase10Settlement({ settlement: parsed, gcSalesCashDebitBalanceUsd: "-1800.00" })
-    ).toMatchObject({ gcSalesCashDebitBalanceAfterUsd: "0.00", gcSalesCashPayableAfterUsd: "0.00" });
+      planGoldenCoastPhase10Settlement({
+        settlement: parsed,
+        gcSalesCashDebitBalanceUsd: "-1800.00",
+      }),
+    ).toMatchObject({
+      gcSalesCashDebitBalanceAfterUsd: "0.00",
+      gcSalesCashPayableAfterUsd: "0.00",
+    });
     expect(() =>
-      planGoldenCoastPhase10Settlement({ settlement: parsed, gcSalesCashDebitBalanceUsd: "-1799.99" })
+      planGoldenCoastPhase10Settlement({
+        settlement: parsed,
+        gcSalesCashDebitBalanceUsd: "-1799.99",
+      }),
     ).toThrow(/exceeds the current GC Sales Cash payable/);
   });
 
@@ -73,13 +94,13 @@ describe("Golden Coast Phase 10 direct Fresh Start payment", () => {
       planGoldenCoastPhase10Settlement({
         settlement: settlement({ amountUsd: "1.00" }),
         gcSalesCashDebitBalanceUsd: "0",
-      })
+      }),
     ).toThrow(/payable 0.00/);
     expect(() =>
       planGoldenCoastPhase10Settlement({
         settlement: settlement({ amountUsd: "1.00" }),
         gcSalesCashDebitBalanceUsd: "50",
-      })
+      }),
     ).toThrow(/payable 0.00/);
   });
 
@@ -119,7 +140,10 @@ describe("Golden Coast Phase 10 direct Fresh Start payment", () => {
   });
 
   it("credits a selected Cash/Bank ledger account when the payment source is a ledger", () => {
-    const parsed = settlement({ amountUsd: "125.00", paymentAccount: { kind: "ledger", id: 55 } });
+    const parsed = settlement({
+      amountUsd: "125.00",
+      paymentAccount: { kind: "ledger", id: 55 },
+    });
     const plan = planGoldenCoastPhase10Settlement({
       settlement: parsed,
       gcSalesCashDebitBalanceUsd: "-1000.00",
@@ -144,17 +168,35 @@ describe("Golden Coast Phase 10 direct Fresh Start payment", () => {
 
   it("binds idempotency to the material payload, payment routing and canonical account", () => {
     const base = settlement();
-    const digest = goldenCoastPhase10SettlementDigest({ settlement: base, gcSalesCashAccountId: 44 });
-    const differentBank = settlement({ paymentAccount: { kind: "bank", id: 92 } });
+    const digest = goldenCoastPhase10SettlementDigest({
+      settlement: base,
+      gcSalesCashAccountId: 44,
+    });
+    const differentBank = settlement({
+      paymentAccount: { kind: "bank", id: 92 },
+    });
     const differentReference = settlement({ reference: "Different payment" });
 
-    expect(goldenCoastPhase10SettlementDigest({ settlement: differentBank, gcSalesCashAccountId: 44 })).not.toBe(
-      digest
+    expect(
+      goldenCoastPhase10SettlementDigest({
+        settlement: differentBank,
+        gcSalesCashAccountId: 44,
+      }),
+    ).not.toBe(digest);
+    expect(
+      goldenCoastPhase10SettlementDigest({
+        settlement: differentReference,
+        gcSalesCashAccountId: 44,
+      }),
+    ).not.toBe(digest);
+    expect(
+      goldenCoastPhase10SettlementDigest({
+        settlement: base,
+        gcSalesCashAccountId: 45,
+      }),
+    ).not.toBe(digest);
+    expect(goldenCoastPhase10IdempotencyKey(7, base.clientRequestId)).toContain(
+      base.clientRequestId,
     );
-    expect(goldenCoastPhase10SettlementDigest({ settlement: differentReference, gcSalesCashAccountId: 44 })).not.toBe(
-      digest
-    );
-    expect(goldenCoastPhase10SettlementDigest({ settlement: base, gcSalesCashAccountId: 45 })).not.toBe(digest);
-    expect(goldenCoastPhase10IdempotencyKey(7, base.clientRequestId)).toContain(base.clientRequestId);
   });
 });

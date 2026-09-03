@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { AccountBalance } from "../../netPositionHelper";
 import { projectGoldenCoastResidualEquity } from "./goldenCoastResidualEquityProjection";
 
-function accounts(overrides: { hadi?: number; hassanCredit?: number; tracker?: number; cash?: number } = {}) {
+function accounts(
+  overrides: {
+    hadi?: number;
+    hassanCredit?: number;
+    tracker?: number;
+    cash?: number;
+  } = {},
+) {
   const hadi = overrides.hadi ?? 165875;
   const tracker = overrides.tracker ?? hadi;
   const cash = overrides.cash ?? 0;
@@ -67,7 +74,8 @@ function accounts(overrides: { hadi?: number; hassanCredit?: number; tracker?: n
   }
 
   const balances = new Map<number, AccountBalance>();
-  if (overrides.hassanCredit) balances.set(2, { debit: 0, credit: overrides.hassanCredit });
+  if (overrides.hassanCredit)
+    balances.set(2, { debit: 0, credit: overrides.hassanCredit });
   return { rows, balances };
 }
 
@@ -77,22 +85,60 @@ function baseBody(input: { tracker: number; cash?: number; stock?: number }) {
   return {
     forUs: {
       total: stock + cash,
-      breakdown: [{ name: "Inventory", value: stock }, ...(cash ? [{ name: "Cash", value: cash }] : [])],
+      breakdown: [
+        { name: "Inventory", value: stock },
+        ...(cash ? [{ name: "Cash", value: cash }] : []),
+      ],
       accounts: [
-        { name: "Stock In Hand / Stock on Floor", code: "COMPUTED", value: stock, category: "Inventory" },
-        ...(cash ? [{ id: 5, name: "GC Cash", code: "GC-CASH", value: cash, category: "Cash" }] : []),
+        {
+          name: "Stock In Hand / Stock on Floor",
+          code: "COMPUTED",
+          value: stock,
+          category: "Inventory",
+        },
+        ...(cash
+          ? [
+              {
+                id: 5,
+                name: "GC Cash",
+                code: "GC-CASH",
+                value: cash,
+                category: "Cash",
+              },
+            ]
+          : []),
       ],
     },
     onUs: {
       total: input.tracker,
       breakdown: [{ name: "Liability", value: input.tracker }],
-      accounts: [{ id: 3, name: "GC Sales Cash", code: "SP-PAY", value: input.tracker, category: "Liability" }],
+      accounts: [
+        {
+          id: 3,
+          name: "GC Sales Cash",
+          code: "SP-PAY",
+          value: input.tracker,
+          category: "Liability",
+        },
+      ],
     },
     equity: {
       total: 497239,
       accounts: [
-        { id: 1, name: "Fresh Start FZ Equity", code: "GC-FSCAP", value: 207997, balanceSide: "Dr" },
-        { id: 2, name: "Hassan Dakik Equity", code: "GC-HCAP", value: 289242, balanceSide: "Dr" },
+        {
+          id: 1,
+          name: "Fresh Start FZ Equity",
+          code: "GC-FSCAP",
+          value: 207997,
+          balanceSide: "Dr",
+        },
+        {
+          id: 2,
+          name: "Hassan Dakik Equity",
+          code: "GC-HCAP",
+          value: 289242,
+          balanceSide: "Dr",
+        },
       ],
     },
     netPosition: stock + cash - input.tracker,
@@ -126,11 +172,19 @@ describe("Golden Coast residual equity projection", () => {
       expect.arrayContaining([
         expect.objectContaining({ id: 1, value: 207997, balanceSide: "Cr" }),
         expect.objectContaining({ id: 2, value: 289242, balanceSide: "Cr" }),
-      ])
+      ]),
     );
-    expect(result.onUs.accounts.some((account: { id?: number }) => account.id === 3)).toBe(false);
+    expect(
+      result.onUs.accounts.some((account: { id?: number }) => account.id === 3),
+    ).toBe(false);
     expect(result.forUs.accounts).toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: 4, value: 165875, category: "HADI Intercompany" })])
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 4,
+          value: 165875,
+          category: "HADI Intercompany",
+        }),
+      ]),
     );
   });
 
@@ -160,7 +214,11 @@ describe("Golden Coast residual equity projection", () => {
   });
 
   it("leaves half of a closed profit in Fresh Start after Hassan receives his half", () => {
-    const fixture = accounts({ hadi: 166175, tracker: 166175, hassanCredit: 150 });
+    const fixture = accounts({
+      hadi: 166175,
+      tracker: 166175,
+      hassanCredit: 150,
+    });
     const result = projectGoldenCoastResidualEquity({
       body: baseBody({ tracker: 166175 }),
       companyAccounts: fixture.rows,

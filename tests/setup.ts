@@ -35,7 +35,11 @@ function stableTestCompanyCode(prefix: string): string {
     .toUpperCase()
     .slice(0, 4)
     .padEnd(4, "X");
-  const suffix = (hash >>> 0).toString(16).toUpperCase().padStart(8, "0").slice(-4);
+  const suffix = (hash >>> 0)
+    .toString(16)
+    .toUpperCase()
+    .padStart(8, "0")
+    .slice(-4);
   return `${base}${suffix}`;
 }
 
@@ -89,7 +93,7 @@ export async function setupTestApp(): Promise<express.Express> {
       resave: false,
       saveUninitialized: false,
       cookie: { secure: false, httpOnly: true, maxAge: 30 * 60 * 1000 },
-    })
+    }),
   );
 
   const server = await registerRoutes(app);
@@ -105,24 +109,34 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     .where(sql`${schema.companies.name} LIKE ${"%" + prefix + "%"}`);
 
   for (const company of companies) {
-    await pool.query("DELETE FROM audit_log WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM login_history WHERE company_id = $1", [company.id]);
-    await db.delete(schema.inventory).where(eq(schema.inventory.companyId, company.id));
+    await pool.query("DELETE FROM audit_log WHERE company_id = $1", [
+      company.id,
+    ]);
+    await pool.query("DELETE FROM login_history WHERE company_id = $1", [
+      company.id,
+    ]);
+    await db
+      .delete(schema.inventory)
+      .where(eq(schema.inventory.companyId, company.id));
     await db
       .delete(schema.salesItems)
-      .where(sql`${schema.salesItems.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`);
+      .where(
+        sql`${schema.salesItems.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`,
+      );
     await db
       .delete(schema.voucherEntries)
-      .where(sql`${schema.voucherEntries.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`);
+      .where(
+        sql`${schema.voucherEntries.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`,
+      );
     await db
       .delete(schema.stockTransferItems)
       .where(
-        sql`${schema.stockTransferItems.transferId} IN (SELECT stv.id FROM stock_transfer_vouchers stv JOIN vouchers v ON stv.voucher_id = v.id WHERE v.company_id = ${company.id})`
+        sql`${schema.stockTransferItems.transferId} IN (SELECT stv.id FROM stock_transfer_vouchers stv JOIN vouchers v ON stv.voucher_id = v.id WHERE v.company_id = ${company.id})`,
       );
     await db
       .delete(schema.stockTransferVouchers)
       .where(
-        sql`${schema.stockTransferVouchers.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`
+        sql`${schema.stockTransferVouchers.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`,
       );
     // The customer-order family, cleared early for three reasons:
     // customer_order_charges references vouchers, customer_order_bales
@@ -132,43 +146,76 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // or scanned a bale into an order leaves the company undeletable.
     await pool.query(
       "DELETE FROM customer_order_bales WHERE order_id IN (SELECT id FROM customer_orders WHERE company_id = $1)",
-      [company.id]
+      [company.id],
     );
     await pool.query(
       "DELETE FROM customer_order_charges WHERE order_id IN (SELECT id FROM customer_orders WHERE company_id = $1)",
-      [company.id]
+      [company.id],
     );
     await pool.query(
       "DELETE FROM customer_order_lines WHERE order_id IN (SELECT id FROM customer_orders WHERE company_id = $1)",
-      [company.id]
+      [company.id],
     );
-    await pool.query("DELETE FROM factory_shipping_container_rows WHERE company_id = $1", [company.id]);
+    await pool.query(
+      "DELETE FROM factory_shipping_container_rows WHERE company_id = $1",
+      [company.id],
+    );
     // The dispatch-batch family, cleared here for the same reason: batches
     // reference customers and proformas with ON DELETE RESTRICT, and rides
     // reference batches, so all of it must go before the customer delete below.
-    await pool.query("DELETE FROM customer_dispatch_bale_scans WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM customer_dispatch_truck_rides WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM customer_dispatch_batches WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM customer_dispatch_batch_sequences WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM customer_orders WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM proforma_stock_reservations WHERE company_id = $1", [company.id]);
+    await pool.query(
+      "DELETE FROM customer_dispatch_bale_scans WHERE company_id = $1",
+      [company.id],
+    );
+    await pool.query(
+      "DELETE FROM customer_dispatch_truck_rides WHERE company_id = $1",
+      [company.id],
+    );
+    await pool.query(
+      "DELETE FROM customer_dispatch_batches WHERE company_id = $1",
+      [company.id],
+    );
+    await pool.query(
+      "DELETE FROM customer_dispatch_batch_sequences WHERE company_id = $1",
+      [company.id],
+    );
+    await pool.query("DELETE FROM customer_orders WHERE company_id = $1", [
+      company.id,
+    ]);
+    await pool.query(
+      "DELETE FROM proforma_stock_reservations WHERE company_id = $1",
+      [company.id],
+    );
     await pool.query(
       "DELETE FROM customer_proforma_lines WHERE proforma_id IN (SELECT id FROM customer_proformas WHERE company_id = $1)",
-      [company.id]
+      [company.id],
     );
-    await pool.query("DELETE FROM customer_proformas WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM customer_balances WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM customers WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM customer_proformas WHERE company_id = $1", [
+      company.id,
+    ]);
+    await pool.query("DELETE FROM customer_balances WHERE company_id = $1", [
+      company.id,
+    ]);
+    await pool.query("DELETE FROM customers WHERE company_id = $1", [
+      company.id,
+    ]);
     // Transporter transactions reference vouchers with ON DELETE RESTRICT, so
     // they must be cleared before the vouchers themselves — a suite that
     // recorded a transporter charge otherwise leaves the company undeletable.
-    await pool.query("DELETE FROM factory_transporter_transactions WHERE company_id = $1", [company.id]);
+    await pool.query(
+      "DELETE FROM factory_transporter_transactions WHERE company_id = $1",
+      [company.id],
+    );
     // Same constraint, same reason: employee_bonuses.voucher_id is ON DELETE
     // RESTRICT, so a suite that recorded a bonus blocks the voucher delete.
-    await pool.query("DELETE FROM employee_bonuses WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM employee_bonuses WHERE company_id = $1", [
+      company.id,
+    ]);
     // worker_bonuses.cash_account_id is ON DELETE RESTRICT against
     // ledger_accounts, so a paid worker bonus blocks the ledger delete below.
-    await pool.query("DELETE FROM worker_bonuses WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM worker_bonuses WHERE company_id = $1", [
+      company.id,
+    ]);
     // Documents that hang off a voucher with a restricting key: a credit or
     // debit note's lines, a waste dispatch, and a stock adjustment's header and
     // lines (which the waste dispatch also creates, since waste is dispatched
@@ -177,33 +224,42 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // these routes end-to-end coverage.
     await pool.query(
       `DELETE FROM credit_note_items WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`,
-      [company.id]
+      [company.id],
     );
     await pool.query(
       `DELETE FROM stock_adjustment_items WHERE adjustment_id IN (
          SELECT sav.id FROM stock_adjustment_vouchers sav
          JOIN vouchers v ON v.id = sav.voucher_id
          WHERE v.company_id = $1)`,
-      [company.id]
+      [company.id],
     );
     await pool.query(
       `DELETE FROM waste_dispatch_items WHERE dispatch_id IN (SELECT id FROM waste_dispatches WHERE company_id = $1)`,
-      [company.id]
+      [company.id],
     );
-    await pool.query("DELETE FROM waste_dispatches WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM waste_dispatches WHERE company_id = $1", [
+      company.id,
+    ]);
     await pool.query(
       `DELETE FROM stock_adjustment_vouchers WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`,
-      [company.id]
+      [company.id],
     );
     // accounting_posting_requests deliberately uses ON DELETE RESTRICT for
     // vouchers in production. Replay/idempotency tests intentionally keep
     // explicit request identities alive until teardown, so clear this test
     // ledger before deleting the fixture company's vouchers.
-    await pool.query("DELETE FROM accounting_posting_requests WHERE company_id = $1", [company.id]);
+    await pool.query(
+      "DELETE FROM accounting_posting_requests WHERE company_id = $1",
+      [company.id],
+    );
     // Purchase orders retain a restricting voucher_id foreign key, so their
     // headers must be removed before the vouchers they created.
-    await db.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.companyId, company.id));
-    await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, company.id));
+    await db
+      .delete(schema.purchaseOrders)
+      .where(eq(schema.purchaseOrders.companyId, company.id));
+    await db
+      .delete(schema.vouchers)
+      .where(eq(schema.vouchers.companyId, company.id));
     // stock_adjustment_items.stock_item_id is a foreign key against stock_items,
     // so any adjustment line left by a test blocks the stock_items delete below
     // with 'update or delete on table "stock_items" violates foreign key
@@ -213,115 +269,201 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // relying on that.
     await pool.query(
       `DELETE FROM stock_adjustment_items WHERE stock_item_id IN (SELECT id FROM stock_items WHERE company_id = $1)`,
-      [company.id]
+      [company.id],
     );
     // The canonical stock movement journal holds restricting foreign keys to
     // stock_items, locations and companies, so any transfer a test posted keeps
     // its fixture alive. The journal is append-only in production — there is no
     // delete path in the application — which is precisely why the fixture has to
     // clear it explicitly here.
-    await pool.query("DELETE FROM canonical_stock_movement_audit WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM canonical_stock_movement_requests WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM canonical_stock_movements WHERE company_id = $1", [company.id]);
-    await db.delete(schema.stockItems).where(eq(schema.stockItems.companyId, company.id));
-    await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, company.id));
-    await db.delete(schema.locations).where(eq(schema.locations.companyId, company.id));
-    await pool.query("DELETE FROM factory_transporters WHERE company_id = $1", [company.id]);
-    await db.delete(schema.companySettings).where(eq(schema.companySettings.companyId, company.id));
-    await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.companyId, company.id));
-    await db.delete(schema.userSecurityPermissions).where(eq(schema.userSecurityPermissions.companyId, company.id));
-    await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.companyId, company.id));
-    await db.delete(schema.userLocations).where(eq(schema.userLocations.companyId, company.id));
+    await pool.query(
+      "DELETE FROM canonical_stock_movement_audit WHERE company_id = $1",
+      [company.id],
+    );
+    await pool.query(
+      "DELETE FROM canonical_stock_movement_requests WHERE company_id = $1",
+      [company.id],
+    );
+    await pool.query(
+      "DELETE FROM canonical_stock_movements WHERE company_id = $1",
+      [company.id],
+    );
+    await db
+      .delete(schema.stockItems)
+      .where(eq(schema.stockItems.companyId, company.id));
+    await db
+      .delete(schema.stockGroups)
+      .where(eq(schema.stockGroups.companyId, company.id));
+    await db
+      .delete(schema.locations)
+      .where(eq(schema.locations.companyId, company.id));
+    await pool.query("DELETE FROM factory_transporters WHERE company_id = $1", [
+      company.id,
+    ]);
+    await db
+      .delete(schema.companySettings)
+      .where(eq(schema.companySettings.companyId, company.id));
+    await db
+      .delete(schema.ledgerAccounts)
+      .where(eq(schema.ledgerAccounts.companyId, company.id));
+    await db
+      .delete(schema.userSecurityPermissions)
+      .where(eq(schema.userSecurityPermissions.companyId, company.id));
+    await db
+      .delete(schema.userCompanyRoles)
+      .where(eq(schema.userCompanyRoles.companyId, company.id));
+    await db
+      .delete(schema.userLocations)
+      .where(eq(schema.userLocations.companyId, company.id));
 
     // Normal container records are also created by PO tests. Remove their
     // restricting child rows before deleting the containers themselves.
     await pool.query(
       "DELETE FROM container_offload_items WHERE offload_id IN (SELECT id FROM container_offloads WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1))",
-      [company.id]
+      [company.id],
     );
     await pool.query(
       "DELETE FROM container_freight_payments WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1)",
-      [company.id]
+      [company.id],
     );
     await pool.query(
       "DELETE FROM container_freight_payments WHERE container_freight_id IN (SELECT id FROM container_freight WHERE company_id = $1)",
-      [company.id]
+      [company.id],
     );
     await pool.query(
       "DELETE FROM container_offloads WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1)",
-      [company.id]
+      [company.id],
     );
     await pool.query(
       "DELETE FROM container_charges WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1)",
-      [company.id]
+      [company.id],
     );
     await pool.query(
       "DELETE FROM supplier_container_loaded_items WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1)",
-      [company.id]
+      [company.id],
     );
-    await pool.query("DELETE FROM container_sales WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM container_sales WHERE company_id = $1", [
+      company.id,
+    ]);
     await pool.query(
       "DELETE FROM container_documents WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1)",
-      [company.id]
+      [company.id],
     );
     await pool.query(
       "DELETE FROM import_logs WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1)",
-      [company.id]
+      [company.id],
     );
     await pool.query(
       "DELETE FROM container_tracking_events WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1)",
-      [company.id]
+      [company.id],
     );
     await pool.query(
       "DELETE FROM container_tracking_checks WHERE container_id IN (SELECT id FROM containers WHERE company_id = $1)",
-      [company.id]
+      [company.id],
     );
-    await pool.query("DELETE FROM container_freight WHERE company_id = $1", [company.id]);
-    await db.delete(schema.containers).where(eq(schema.containers.companyId, company.id));
+    await pool.query("DELETE FROM container_freight WHERE company_id = $1", [
+      company.id,
+    ]);
+    await db
+      .delete(schema.containers)
+      .where(eq(schema.containers.companyId, company.id));
     // Supplier company scoping was added by a startup migration before the
     // shared Drizzle definition was updated. Use SQL so stale company-owned
     // suppliers cannot keep the fixture company alive.
-    await pool.query("DELETE FROM suppliers WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM suppliers WHERE company_id = $1", [
+      company.id,
+    ]);
 
     // A crashed/interrupted factory test can leave rows in factory_* tables
     // referencing this company; those FKs otherwise block the company delete
     // below on the NEXT run that reuses this prefix. Delete in FK-safe order.
-    await pool.query("DELETE FROM factory_bales WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_bales WHERE company_id = $1", [
+      company.id,
+    ]);
     await pool.query(
       "DELETE FROM factory_mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)",
-      [company.id]
+      [company.id],
     );
-    await pool.query("DELETE FROM factory_mix_batches WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_raw_stock WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_container_other_charges WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_offload_additional_charges WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_container_commissions WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_mix_batches WHERE company_id = $1", [
+      company.id,
+    ]);
+    await pool.query("DELETE FROM factory_raw_stock WHERE company_id = $1", [
+      company.id,
+    ]);
+    await pool.query(
+      "DELETE FROM factory_container_other_charges WHERE company_id = $1",
+      [company.id],
+    );
+    await pool.query(
+      "DELETE FROM factory_offload_additional_charges WHERE company_id = $1",
+      [company.id],
+    );
+    await pool.query(
+      "DELETE FROM factory_container_commissions WHERE company_id = $1",
+      [company.id],
+    );
     // Every table below carries a foreign key to factory_containers and was
     // added after this teardown was written, so the container delete that
     // follows started failing the moment a test actually offloaded one. Found
     // by the raw-stock offload response pin, which is the only test that
     // exercises that path end to end. Kept in one block so the next table with
     // an FK to factory_containers is added here rather than discovered later.
-    await pool.query("DELETE FROM factory_container_receipts WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_container_profit_snapshots WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_duty_audit_log WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_fx_allocations WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_waste_entries WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_containers WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_suppliers WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_daybook_entries WHERE company_id = $1", [company.id]);
+    await pool.query(
+      "DELETE FROM factory_container_receipts WHERE company_id = $1",
+      [company.id],
+    );
+    await pool.query(
+      "DELETE FROM factory_container_profit_snapshots WHERE company_id = $1",
+      [company.id],
+    );
+    await pool.query(
+      "DELETE FROM factory_duty_audit_log WHERE company_id = $1",
+      [company.id],
+    );
+    await pool.query(
+      "DELETE FROM factory_fx_allocations WHERE company_id = $1",
+      [company.id],
+    );
+    await pool.query(
+      "DELETE FROM factory_waste_entries WHERE company_id = $1",
+      [company.id],
+    );
+    await pool.query("DELETE FROM factory_containers WHERE company_id = $1", [
+      company.id,
+    ]);
+    await pool.query("DELETE FROM factory_suppliers WHERE company_id = $1", [
+      company.id,
+    ]);
+    await pool.query(
+      "DELETE FROM factory_daybook_entries WHERE company_id = $1",
+      [company.id],
+    );
     // Employees, once the voucher_entries keyed by employee_id are gone.
-    await pool.query("DELETE FROM employee_advance_repayments WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM employee_advances WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM employees WHERE company_id = $1", [company.id]);
+    await pool.query(
+      "DELETE FROM employee_advance_repayments WHERE company_id = $1",
+      [company.id],
+    );
+    await pool.query("DELETE FROM employee_advances WHERE company_id = $1", [
+      company.id,
+    ]);
+    await pool.query("DELETE FROM employees WHERE company_id = $1", [
+      company.id,
+    ]);
     // Barcode sequence rows are allocated lazily on read — GET
     // /api/production-bales/next-barcode writes one — so a test that only
     // exercises read endpoints can still leave an FK reference behind.
     // POST /api/bale-label-prints/allocate-pool allocates from this table, so a
     // suite that printed labels leaves a row here holding the company down.
-    await pool.query("DELETE FROM reference_sequences WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM bale_sequences WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_bale_sequences WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM reference_sequences WHERE company_id = $1", [
+      company.id,
+    ]);
+    await pool.query("DELETE FROM bale_sequences WHERE company_id = $1", [
+      company.id,
+    ]);
+    await pool.query(
+      "DELETE FROM factory_bale_sequences WHERE company_id = $1",
+      [company.id],
+    );
 
     // Authentication and audit middleware finish asynchronously, so a request
     // that a test already stopped waiting on can still insert an audit_log or
@@ -335,20 +477,31 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // close it completely — nothing short of quiescing the middleware can — so
     // the delete below retries once, re-clearing whatever arrived in between.
     async function clearAsyncReferences(): Promise<void> {
-      await pool.query("DELETE FROM audit_log WHERE company_id = $1", [company.id]);
-      await pool.query("DELETE FROM login_history WHERE company_id = $1", [company.id]);
+      await pool.query("DELETE FROM audit_log WHERE company_id = $1", [
+        company.id,
+      ]);
+      await pool.query("DELETE FROM login_history WHERE company_id = $1", [
+        company.id,
+      ]);
     }
 
     // Durable financial request reservations are company-scoped and must be
     // removed before deleting the fixture company.
-    await pool.query("DELETE FROM financial_operation_requests WHERE company_id = $1", [company.id]);
+    await pool.query(
+      "DELETE FROM financial_operation_requests WHERE company_id = $1",
+      [company.id],
+    );
     await clearAsyncReferences();
 
     try {
-      await db.delete(schema.companies).where(eq(schema.companies.id, company.id));
+      await db
+        .delete(schema.companies)
+        .where(eq(schema.companies.id, company.id));
     } catch (error) {
       await clearAsyncReferences();
-      await db.delete(schema.companies).where(eq(schema.companies.id, company.id));
+      await db
+        .delete(schema.companies)
+        .where(eq(schema.companies.id, company.id));
       void error;
     }
   }
@@ -415,7 +568,7 @@ export async function seedTestData(prefix: string): Promise<TestContext> {
   await pool.query(
     `INSERT INTO system_settings (key, value) VALUES ('parentCompanyId', $1)
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
-    [String(company.id)]
+    [String(company.id)],
   );
 
   await db.insert(schema.userCompanyRoles).values({
@@ -430,7 +583,7 @@ export async function seedTestData(prefix: string): Promise<TestContext> {
       companyId: company.id,
       permission,
       grantedBy: user.id,
-    }))
+    })),
   );
 
   const [location1] = await db
@@ -528,20 +681,36 @@ export async function seedTestData(prefix: string): Promise<TestContext> {
   };
 }
 
-export async function getInventoryQty(locationId: number, stockItemId: number): Promise<number> {
+export async function getInventoryQty(
+  locationId: number,
+  stockItemId: number,
+): Promise<number> {
   const [inv] = await db
     .select()
     .from(schema.inventory)
-    .where(and(eq(schema.inventory.locationId, locationId), eq(schema.inventory.stockItemId, stockItemId)))
+    .where(
+      and(
+        eq(schema.inventory.locationId, locationId),
+        eq(schema.inventory.stockItemId, stockItemId),
+      ),
+    )
     .limit(1);
   return inv ? parseFloat(inv.quantity) : 0;
 }
 
-export async function getInventoryRecord(locationId: number, stockItemId: number) {
+export async function getInventoryRecord(
+  locationId: number,
+  stockItemId: number,
+) {
   const [inv] = await db
     .select()
     .from(schema.inventory)
-    .where(and(eq(schema.inventory.locationId, locationId), eq(schema.inventory.stockItemId, stockItemId)))
+    .where(
+      and(
+        eq(schema.inventory.locationId, locationId),
+        eq(schema.inventory.stockItemId, stockItemId),
+      ),
+    )
     .limit(1);
   return inv;
 }

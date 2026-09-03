@@ -4,12 +4,23 @@ import { HandCoins, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { releaseDebtEnglish } from "@/i18n/finalCloseoutTranslations";
 import { apiRequest } from "@/lib/queryClient";
-import { PHASE7_READINESS, type CashAccountOption, type CompanyKey, type Phase7Readiness } from "./contracts";
+import {
+  PHASE7_READINESS,
+  type CashAccountOption,
+  type CompanyKey,
+  type Phase7Readiness,
+} from "./contracts";
 import {
   AccountPicker,
   ReadinessState,
@@ -22,8 +33,10 @@ import {
   useReadinessInvalidation,
 } from "./shared";
 
-const FRESH_START_HADI_READINESS = "/api/sp/golden-coast/phase7/sales-cash-pay-fresh-start/readiness";
-const FRESH_START_HADI_PAYMENT = "/api/sp/golden-coast/phase7/sales-cash-pay-fresh-start";
+const FRESH_START_HADI_READINESS =
+  "/api/sp/golden-coast/phase7/sales-cash-pay-fresh-start/readiness";
+const FRESH_START_HADI_PAYMENT =
+  "/api/sp/golden-coast/phase7/sales-cash-pay-fresh-start";
 
 interface FreshStartHadiReadiness {
   pair: {
@@ -48,7 +61,11 @@ interface FreshStartHadiReadiness {
   ready: boolean;
 }
 
-export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: CompanyKey }) {
+export function FreshStartHadiPaymentPanel({
+  companyKey,
+}: {
+  companyKey: CompanyKey;
+}) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const invalidateReadiness = useReadinessInvalidation();
@@ -75,7 +92,10 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
   });
 
   const data = readiness.data;
-  const selectedHadiAccount = selectedAccount(hadiAccount, data?.hadiCashAccounts ?? []);
+  const selectedHadiAccount = selectedAccount(
+    hadiAccount,
+    data?.hadiCashAccounts ?? [],
+  );
   const canSubmit =
     data?.ready === true &&
     selectedHadiAccount != null &&
@@ -87,7 +107,9 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
   const mutation = useMutation({
     mutationFn: async () => {
       if (!targetCompanyId || !selectedHadiAccount) {
-        throw new Error(releaseDebtEnglish("Fresh Start payment routing is not ready."));
+        throw new Error(
+          releaseDebtEnglish("Fresh Start payment routing is not ready."),
+        );
       }
       const response = await apiRequest(
         "POST",
@@ -98,7 +120,7 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
           clientRequestId: requestId,
           reference: reference.trim() || null,
           hadiCashAccount: selectedHadiAccount,
-        }
+        },
       );
       return response.json();
     },
@@ -108,16 +130,22 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
       setRequestId(makeRequestId("gc-fs-hadi"));
       invalidateReadiness();
       queryClient.invalidateQueries({
-        predicate: (query) => String(query.queryKey[0] ?? "").includes(FRESH_START_HADI_READINESS),
+        predicate: (query) =>
+          String(query.queryKey[0] ?? "").includes(FRESH_START_HADI_READINESS),
       });
       queryClient.invalidateQueries({
-        predicate: (query) => String(query.queryKey[0] ?? "").includes("/api/stats/net-profit"),
+        predicate: (query) =>
+          String(query.queryKey[0] ?? "").includes("/api/stats/net-profit"),
       });
       toast({
         title: releaseDebtEnglish(
-          result.replayed ? "Fresh Start payment replay confirmed" : "Fresh Start payment posted"
+          result.replayed
+            ? "Fresh Start payment replay confirmed"
+            : "Fresh Start payment posted",
         ),
-        description: releaseDebtEnglish("GC Sales Cash payable and the HADI intercompany asset were reduced together."),
+        description: releaseDebtEnglish(
+          "GC Sales Cash payable and the HADI intercompany asset were reduced together.",
+        ),
       });
     },
     onError: (error: ClientErrorLike) => {
@@ -135,15 +163,18 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <HandCoins className="h-5 w-5" /> {releaseDebtEnglish("Pay Fresh Start from HADI")}
+              <HandCoins className="h-5 w-5" />{" "}
+              {releaseDebtEnglish("Pay Fresh Start from HADI")}
             </CardTitle>
             <CardDescription>
               {releaseDebtEnglish(
-                "Use this only when HADI actually pays Fresh Start. A normal GC↔HADI transfer only moves an asset and does not reduce Fresh Start."
+                "Use this only when HADI actually pays Fresh Start. A normal GC↔HADI transfer only moves an asset and does not reduce Fresh Start.",
               )}
             </CardDescription>
           </div>
-          <Badge variant="secondary">{releaseDebtEnglish("Fresh Start settlement")}</Badge>
+          <Badge variant="secondary">
+            {releaseDebtEnglish("Fresh Start settlement")}
+          </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -151,38 +182,66 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
           loading={phase7Probe.isLoading || readiness.isLoading}
           error={readiness.error ?? phase7Probe.error}
           ready={data?.ready === true}
-          readyText={releaseDebtEnglish("HADI has Golden Coast sales cash available to pay Fresh Start.")}
-          blockedText={releaseDebtEnglish("No Fresh Start payment is currently available from HADI.")}
+          readyText={releaseDebtEnglish(
+            "HADI has Golden Coast sales cash available to pay Fresh Start.",
+          )}
+          blockedText={releaseDebtEnglish(
+            "No Fresh Start payment is currently available from HADI.",
+          )}
         />
 
         <div className="grid gap-3 sm:grid-cols-4">
           <div className="rounded-md border p-3">
-            <p className="text-xs text-muted-foreground">{releaseDebtEnglish("GC Sales Cash payable")}</p>
-            <p className="mt-1 font-semibold tabular-nums">{money(data?.gcSalesCashPayableUsd)}</p>
+            <p className="text-xs text-muted-foreground">
+              {releaseDebtEnglish("GC Sales Cash payable")}
+            </p>
+            <p className="mt-1 font-semibold tabular-nums">
+              {money(data?.gcSalesCashPayableUsd)}
+            </p>
           </div>
           <div className="rounded-md border p-3">
-            <p className="text-xs text-muted-foreground">{releaseDebtEnglish("Sales cash still held by HADI")}</p>
-            <p className="mt-1 font-semibold tabular-nums">{money(data?.outstandingHadiSalesCashUsd)}</p>
+            <p className="text-xs text-muted-foreground">
+              {releaseDebtEnglish("Sales cash still held by HADI")}
+            </p>
+            <p className="mt-1 font-semibold tabular-nums">
+              {money(data?.outstandingHadiSalesCashUsd)}
+            </p>
           </div>
           <div className="rounded-md border p-3">
-            <p className="text-xs text-muted-foreground">{releaseDebtEnglish("GC HADI intercompany asset")}</p>
-            <p className="mt-1 font-semibold tabular-nums">{money(data?.hadiIntercompanyAssetUsd)}</p>
+            <p className="text-xs text-muted-foreground">
+              {releaseDebtEnglish("GC HADI intercompany asset")}
+            </p>
+            <p className="mt-1 font-semibold tabular-nums">
+              {money(data?.hadiIntercompanyAssetUsd)}
+            </p>
           </div>
           <div className="rounded-md border p-3">
-            <p className="text-xs text-muted-foreground">{releaseDebtEnglish("Maximum payment now")}</p>
-            <p className="mt-1 font-semibold tabular-nums">{money(data?.maximumPaymentUsd)}</p>
+            <p className="text-xs text-muted-foreground">
+              {releaseDebtEnglish("Maximum payment now")}
+            </p>
+            <p className="mt-1 font-semibold tabular-nums">
+              {money(data?.maximumPaymentUsd)}
+            </p>
           </div>
         </div>
 
         <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{releaseDebtEnglish("Golden Coast")}: </span>
-          {releaseDebtEnglish("Dr GC Sales Cash payable / Cr HADI Intercompany")}
+          <span className="font-medium text-foreground">
+            {releaseDebtEnglish("Golden Coast")}:{" "}
+          </span>
+          {releaseDebtEnglish(
+            "Dr GC Sales Cash payable / Cr HADI Intercompany",
+          )}
           <span className="mx-2">•</span>
-          <span className="font-medium text-foreground">{releaseDebtEnglish("HADI")}: </span>
-          {releaseDebtEnglish("Dr Golden Coast Intercompany / Cr selected Cash or Bank")}
+          <span className="font-medium text-foreground">
+            {releaseDebtEnglish("HADI")}:{" "}
+          </span>
+          {releaseDebtEnglish(
+            "Dr Golden Coast Intercompany / Cr selected Cash or Bank",
+          )}
           <p className="mt-2 text-xs">
             {releaseDebtEnglish(
-              "Fresh Start Equity is not posted here. It decreases automatically in Net Position because Net Assets fell while Hassan's account stayed unchanged."
+              "Fresh Start Equity is not posted here. It decreases automatically in Net Position because Net Assets fell while Hassan's account stayed unchanged.",
             )}
           </p>
         </div>
@@ -235,7 +294,10 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="gc-fs-hadi-reference">
+            <label
+              className="text-sm font-medium"
+              htmlFor="gc-fs-hadi-reference"
+            >
               {releaseDebtEnglish("Reference (optional)")}
             </label>
             <Input
