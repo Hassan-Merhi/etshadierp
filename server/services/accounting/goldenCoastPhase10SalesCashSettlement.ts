@@ -6,10 +6,12 @@ import { buildGenericVoucherPostingRequest } from "./genericVoucherPosting";
 import { GOLDEN_COAST_CUTOVER_DATE } from "./goldenCoastPhase4CutoverFifo";
 
 /**
- * Golden Coast Phase 10 settles the receivable-like debit carried in GC Sales
- * Cash directly into a Golden Coast Cash/Bank account. It deliberately does
- * not collect through HADI (Phase 7), withdraw Hassan Savings (Phase 9), or
- * touch sales/FIFO/inventory accounting.
+ * Phase 10 is the direct-Golden-Coast alternative to the HADI settlement flow:
+ * Golden Coast pays Fresh Start from one of its own Cash/Bank accounts.
+ *
+ * GC Sales Cash is an operational payable tracker. Fresh Start itself is the
+ * residual equity formula in Net Position, so this payment reduces the tracker
+ * and a real asset; it does not post directly to the Fresh Start equity ledger.
  */
 export const GOLDEN_COAST_PHASE10_SOURCE_TYPE = "golden-coast-phase10-sales-cash-settlement";
 export const GOLDEN_COAST_PHASE10_MAX_REQUEST_ID_LENGTH = 64;
@@ -44,13 +46,15 @@ export interface GoldenCoastPhase10SettlementInput {
   settlementDate: string;
   amountUsd: string;
   clientRequestId: string;
-  receiptAccount: GoldenCoastPhase10CashAccount;
+  paymentAccount: GoldenCoastPhase10CashAccount;
   reference: string | null;
 }
 
 export interface GoldenCoastPhase10SettlementPlan extends GoldenCoastPhase10SettlementInput {
   gcSalesCashDebitBalanceBeforeUsd: string;
   gcSalesCashDebitBalanceAfterUsd: string;
+  gcSalesCashPayableBeforeUsd: string;
+  gcSalesCashPayableAfterUsd: string;
 }
 
 function positiveId(value: unknown, field: string): number {
@@ -146,13 +150,13 @@ function clientRequestId(value: unknown): string {
 
 function cashAccount(value: unknown): GoldenCoastPhase10CashAccount {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new GoldenCoastPhase10SettlementError("receiptAccount is required");
+    throw new GoldenCoastPhase10SettlementError("paymentAccount is required");
   }
   const input = value as Record<string, unknown>;
   if (input.kind !== "ledger" && input.kind !== "bank") {
-    throw new GoldenCoastPhase10SettlementError('receiptAccount.kind must be "ledger" or "bank"');
+    throw new GoldenCoastPhase10SettlementError('paymentAccount.kind must be "ledger" or "bank"');
   }
-  return { kind: input.kind, id: positiveId(input.id, "receiptAccount.id") };
+  return { kind: input.kind, id: positiveId(input.id, "paymentAccount.id") };
 }
 
 /** Parse immutable request data before any mutable balance check. */
@@ -162,7 +166,7 @@ export function parseGoldenCoastPhase10SettlementInput(input: {
 }): GoldenCoastPhase10SettlementInput {
   const companyId = positiveId(input.companyId, "companyId");
   if (!input.body || typeof input.body !== "object" || Array.isArray(input.body)) {
-    throw new GoldenCoastPhase10SettlementError("A Phase 10 sales cash settlement request body is required");
+    throw new GoldenCoastPhase10SettlementError("A Phase 10 Fresh Start payment request body is required");
   }
   const raw = input.body as Record<string, unknown>;
   return {
@@ -170,14 +174,17 @@ export function parseGoldenCoastPhase10SettlementInput(input: {
     settlementDate: settlementDate(raw.settlementDate),
     amountUsd: money(positiveMoney(raw.amountUsd, "amountUsd")),
     clientRequestId: clientRequestId(raw.clientRequestId),
-    receiptAccount: cashAccount(raw.receiptAccount),
+    // receiptAccount is accepted as a compatibility alias for older clients,
+    // but all new UI calls use the correct paymentAccount name.
+    paymentAccount: cashAccount(raw.paymentAccount ?? raw.receiptAccount),
     reference: optionalText(raw.reference, "reference", 200),
   };
 }
 
 /**
- * A direct settlement may be partial, but it can never clear more than the
- * positive Dr-minus-Cr balance currently carried by GC Sales Cash.
+ * GC Sales Cash is credit-normal here: a negative Dr-minus-Cr balance is the
+ * amount still payable to Fresh Start. A payment moves the signed balance
+ * toward zero by debiting GC Sales Cash.
  */
 export function planGoldenCoastPhase10Settlement(input: {
   settlement: GoldenCoastPhase10SettlementInput;
@@ -185,17 +192,19 @@ export function planGoldenCoastPhase10Settlement(input: {
 }): GoldenCoastPhase10SettlementPlan {
   const amount = positiveMoney(input.settlement.amountUsd, "amountUsd");
   const balance = balanceMoney(input.gcSalesCashDebitBalanceUsd, "gcSalesCashDebitBalanceUsd");
-  const collectible = Decimal.max(balance, 0);
-  if (amount.greaterThan(collectible)) {
+  const payable = Decimal.max(balance.negated(), 0);
+  if (amount.greaterThan(payable)) {
     throw new GoldenCoastPhase10SettlementError(
-      `Settlement ${money(amount)} exceeds the current collectible GC Sales Cash balance ${money(collectible)}`,
+      `Payment ${money(amount)} exceeds the current GC Sales Cash payable ${money(payable)}`,
       "GC_PHASE10_SETTLEMENT_EXCEEDS_BALANCE"
     );
   }
   return {
     ...input.settlement,
     gcSalesCashDebitBalanceBeforeUsd: money(balance),
-    gcSalesCashDebitBalanceAfterUsd: money(balance.minus(amount)),
+    gcSalesCashDebitBalanceAfterUsd: money(balance.plus(amount)),
+    gcSalesCashPayableBeforeUsd: money(payable),
+    gcSalesCashPayableAfterUsd: money(payable.minus(amount)),
   };
 }
 
@@ -210,7 +219,7 @@ export function goldenCoastPhase10SettlementDigest(input: {
         settlementDate: input.settlement.settlementDate,
         amountUsd: money(positiveMoney(input.settlement.amountUsd, "amountUsd")),
         clientRequestId: input.settlement.clientRequestId,
-        receiptAccount: input.settlement.receiptAccount,
+        paymentAccount: input.settlement.paymentAccount,
         reference: input.settlement.reference,
         gcSalesCashAccountId: positiveId(input.gcSalesCashAccountId, "gcSalesCashAccountId"),
       })
@@ -232,7 +241,7 @@ function cashTarget(account: GoldenCoastPhase10CashAccount): Record<string, numb
   return account.kind === "bank" ? { bankAccountId: account.id } : { ledgerAccountId: account.id };
 }
 
-/** Dr selected Golden Coast Cash/Bank / Cr canonical GC Sales Cash. */
+/** Dr canonical GC Sales Cash / Cr selected Golden Coast Cash/Bank. */
 export function buildGoldenCoastPhase10SettlementPosting(input: {
   plan: GoldenCoastPhase10SettlementPlan;
   gcSalesCashAccountId: number;
@@ -242,27 +251,27 @@ export function buildGoldenCoastPhase10SettlementPosting(input: {
 }): CentralPostingRequest {
   const gcSalesCashAccountId = positiveId(input.gcSalesCashAccountId, "gcSalesCashAccountId");
   const description = releaseDebtEnglish(
-    `GC Sales Cash settlement${input.plan.reference ? ` — ${input.plan.reference}` : ""}`
+    `Fresh Start payment from Golden Coast${input.plan.reference ? ` — ${input.plan.reference}` : ""}`
   );
   const posting = buildGenericVoucherPostingRequest({
     companyId: input.plan.companyId,
     clientRequestId: input.plan.clientRequestId,
     voucher: {
       voucherNumber: `GC-SCS-C${input.plan.companyId}-${input.plan.clientRequestId}`,
-      voucherType: "Receipt",
+      voucherType: "Payment",
       voucherDate: input.plan.settlementDate,
       description,
       currency: "USD",
     },
     entries: [
       {
-        ...cashTarget(input.plan.receiptAccount),
+        ledgerAccountId: gcSalesCashAccountId,
         debitAmount: input.plan.amountUsd,
         creditAmount: "0",
         narration: description,
       },
       {
-        ledgerAccountId: gcSalesCashAccountId,
+        ...cashTarget(input.plan.paymentAccount),
         debitAmount: "0",
         creditAmount: input.plan.amountUsd,
         narration: description,

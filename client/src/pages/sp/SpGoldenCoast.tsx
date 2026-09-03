@@ -14,6 +14,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";
 import { releaseDebtEnglish } from "@/i18n/finalCloseoutTranslations";
 import { GOLDEN_COAST_TABS, type GoldenCoastTab } from "./golden-coast/contracts";
+import { FreshStartHadiPaymentPanel } from "./golden-coast/FreshStartHadiPaymentPanel";
 import { GcSalesCashPanel } from "./golden-coast/GcSalesCashPanel";
 import { GoldenCoastOverview } from "./golden-coast/GoldenCoastOverview";
 import { HadiCashRoutingPanel } from "./golden-coast/HadiCashRoutingPanel";
@@ -79,8 +80,9 @@ export default function SpGoldenCoast() {
           <GoldenCoastOverview onOpenTab={setTab} />
         </TabsContent>
 
-        <TabsContent value="hadi" className="mt-5">
+        <TabsContent value="hadi" className="mt-5 space-y-5">
           <HadiCashRoutingPanel companyKey={companyKey} />
+          <FreshStartHadiPaymentPanel companyKey={companyKey} />
         </TabsContent>
 
         <TabsContent value="savings" className="mt-5">

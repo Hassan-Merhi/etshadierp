@@ -1235,7 +1235,7 @@
         0
       ],
       "client/src/pages/settings/ExportAccountsSection.tsx": [
-        3,
+        2,
         0,
         0
       ],
@@ -1410,7 +1410,7 @@
         0
       ],
       "client/src/pages/sp/SpReports.tsx": [
-        7,
+        3,
         0,
         0
       ],
@@ -2865,7 +2865,7 @@
         0
       ],
       "server/routes/vouchers/sales-update/sales.ts": [
-        2,
+        0,
         0,
         0
       ],

@@ -6,7 +6,7 @@ import { useParams, useLocation } from "wouter";
 import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +42,14 @@ interface Proforma {
   updatedAt: string;
   lines?: ProformaLine[];
 }
+
+const parseFiniteNumber = (value: number | string | null | undefined) => {
+  const parsed = typeof value === "number" ? value : Number.parseFloat(value ?? "");
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const calculateLineTotal = (qty: number | string, pricePerBale: number | string) =>
+  parseFiniteNumber(qty) * parseFiniteNumber(pricePerBale);
 
 export default function SupplierProformas() {
   const { toast } = useToast();
@@ -321,6 +329,8 @@ export default function SupplierProformas() {
   }
 
   const lines = selectedProforma?.lines || [];
+  const totalQty = lines.reduce((total, line) => total + parseFiniteNumber(line.qty), 0);
+  const totalAmount = lines.reduce((total, line) => total + calculateLineTotal(line.qty, line.pricePerBale), 0);
 
   return (
     <div className="flex flex-col h-full p-4 lg:p-6 overflow-y-auto">
@@ -488,8 +498,8 @@ export default function SupplierProformas() {
                       <TableHead>Barcode</TableHead>
                       <TableHead>Item Name</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Weight/Bale</TableHead>
                       <TableHead className="text-right">Price/Bale</TableHead>
+                      <TableHead className="text-right">Total Amount</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -526,22 +536,15 @@ export default function SupplierProformas() {
                         <TableCell>
                           <Input
                             type="number"
-                            step="0.001"
-                            value={newLine.weightPerBale}
-                            onChange={(e) => setNewLine({ ...newLine, weightPerBale: e.target.value })}
-                            className="h-8 text-xs w-20 text-right"
-                            data-testid="input-new-weight"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
                             step="0.01"
                             value={newLine.pricePerBale}
                             onChange={(e) => setNewLine({ ...newLine, pricePerBale: e.target.value })}
                             className="h-8 text-xs w-20 text-right"
                             data-testid="input-new-price"
                           />
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {calculateLineTotal(newLine.qty, newLine.pricePerBale).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -594,20 +597,14 @@ export default function SupplierProformas() {
                             <TableCell>
                               <Input
                                 type="number"
-                                step="0.001"
-                                value={editLineData.weightPerBale}
-                                onChange={(e) => setEditLineData({ ...editLineData, weightPerBale: e.target.value })}
-                                className="h-8 text-xs w-20 text-right"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
                                 step="0.01"
                                 value={editLineData.pricePerBale}
                                 onChange={(e) => setEditLineData({ ...editLineData, pricePerBale: e.target.value })}
                                 className="h-8 text-xs w-20 text-right"
                               />
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {calculateLineTotal(editLineData.qty, editLineData.pricePerBale).toFixed(2)}
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
@@ -630,10 +627,10 @@ export default function SupplierProformas() {
                             <TableCell className="text-sm">{line.itemName}</TableCell>
                             <TableCell className="text-right font-mono">{line.qty}</TableCell>
                             <TableCell className="text-right font-mono">
-                              {parseFloat(line.weightPerBale).toFixed(3)}
+                              {parseFloat(line.pricePerBale).toFixed(2)}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              {parseFloat(line.pricePerBale).toFixed(2)}
+                              {calculateLineTotal(line.qty, line.pricePerBale).toFixed(2)}
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
@@ -667,6 +664,23 @@ export default function SupplierProformas() {
                       </TableRow>
                     )}
                   </TableBody>
+                  {lines.length > 0 && (
+                    <TableFooter>
+                      <TableRow data-testid="row-proforma-totals">
+                        <TableCell colSpan={2} className="font-semibold">
+                          Total
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-semibold" data-testid="total-proforma-qty">
+                          {totalQty}
+                        </TableCell>
+                        <TableCell />
+                        <TableCell className="text-right font-mono font-semibold" data-testid="total-proforma-amount">
+                          {totalAmount.toFixed(2)}
+                        </TableCell>
+                        <TableCell />
+                      </TableRow>
+                    </TableFooter>
+                  )}
                 </Table>
               </CardContent>
             </Card>

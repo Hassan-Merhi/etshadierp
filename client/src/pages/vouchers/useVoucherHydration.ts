@@ -223,30 +223,23 @@ export function useVoucherHydration({
         // Customers are assets (receivables), not liabilities, so they follow the
         // same debit/credit direction as bank/ledger accounts, NOT the
         // supplier/employee liability path.
-        const isLiabilityPayment =
-          paymentEntry.supplierId || paymentEntry.employeeId || paymentEntry.factorySupplierId;
+        const isLiabilityPayment = paymentEntry.supplierId || paymentEntry.employeeId || paymentEntry.factorySupplierId;
         if (voucherToEdit.voucherType === "Payment") {
           amount = isLiabilityPayment ? entry.creditAmount || "0" : entry.debitAmount || "0";
         } else if (voucherToEdit.voucherType === "Receipt") {
           amount = isLiabilityPayment ? entry.debitAmount || "0" : entry.creditAmount || "0";
         }
 
-        return { accountType, accountId, accountName, amount };
+        return { accountType, accountId, accountName, amount, narration: entry.narration || "" };
       })
       .filter((entry: any) => parseFloat(entry.amount || "0") > 0);
 
     form.reset({
       paymentAccountType: paymentType as
-        | "customer"
-        | "ledger"
-        | "bank"
-        | "supplier"
-        | "employee"
-        | "fixedAsset"
-        | "factorySupplier"
-        | undefined,
+        "customer" | "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "factorySupplier" | undefined,
       paymentAccountId: paymentId,
       paymentAccountName: paymentName,
+      paymentAccountNarration: paymentEntry.narration || "",
       voucherDate: parseDateLocal(voucherToEdit.voucherDate),
       entries:
         formEntries.length > 0
@@ -269,7 +262,24 @@ export function useVoucherHydration({
       setTransactionRate(parseFloat(voucherToEdit.exchangeRate));
     }
     setVoucherEffectiveDate(voucherToEdit.effectiveDate || "");
-  }, [voucherToEdit, allAccounts, bankAccounts, bankAccountsFetched, ledgerAccounts, ledgerAccountsFetched, suppliers, suppliersFetched, employees, fixedAssets, customers, customersFetched, factorySuppliersList, form, setVoucherEffectiveDate, setTransactionRate]);
+  }, [
+    voucherToEdit,
+    allAccounts,
+    bankAccounts,
+    bankAccountsFetched,
+    ledgerAccounts,
+    ledgerAccountsFetched,
+    suppliers,
+    suppliersFetched,
+    employees,
+    fixedAssets,
+    customers,
+    customersFetched,
+    factorySuppliersList,
+    form,
+    setVoucherEffectiveDate,
+    setTransactionRate,
+  ]);
 
   return { hydratedVoucherIdRef };
 }
