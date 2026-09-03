@@ -46,10 +46,9 @@ export function resolveAuthenticatedAppRoute({
   const hasErpAccess = !isFactoryCompany || !myAccess || myAccess.hasErpAccess;
   const hasFactoryAccess = isFactoryCompany && (!myAccess || myAccess.hasFactoryAccess);
   const factoryDefaultPage = computeFactoryDefaultPage(myAccess);
-  const isFactoryBootstrapRoute =
-    isFactoryCompany &&
-    (isFactoryRoute ||
-      (currentLocation !== "/my-settings" && currentLocation !== "/intercompany-requests"));
+  const isFactoryBootstrapExemptRoute =
+    currentLocation === "/my-settings" || currentLocation === "/intercompany-requests";
+  const isFactoryBootstrapRoute = isFactoryCompany && (isFactoryRoute || !isFactoryBootstrapExemptRoute);
 
   let decision: AuthenticatedAppRouteDecision = { kind: "continue" };
 
