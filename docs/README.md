@@ -36,6 +36,7 @@ failure, so a correct document cannot quietly become undiscoverable.
 | [factory-flow.md](factory-flow.md) | Bales, production, payroll, raw materials |
 | [pos-flow.md](pos-flow.md) | Point of sale, including offline |
 | [financial-close-and-migrations.md](financial-close-and-migrations.md) | Period locks and production migrations |
+| [golden-coast-phase16-audit.md](golden-coast-phase16-audit.md) | Golden Coast payable/equity separation invariants and the unmerged phase branches |
 | [multi-currency-phase8-account-api.md](multi-currency-phase8-account-api.md) | Account statement currency contract and safety boundaries |
 
 ## Operating it
