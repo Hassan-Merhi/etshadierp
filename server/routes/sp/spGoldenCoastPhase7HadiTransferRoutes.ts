@@ -44,6 +44,7 @@ import {
   type GoldenCoastPhase7RoleAccounts,
   type GoldenCoastPhase7TransferInput,
 } from "../../services/accounting/goldenCoastPhase7HadiTransfer";
+import { gcSalesCashPayableBalance } from "../../services/accounting/goldenCoastSalesCashPayable";
 import { getCompanyRequestRuntimeContext } from "../../services/security/companyRequestRuntimeContext";
 import { assertTransactionCompanyScope } from "../../services/security/transactionCompanyScope";
 import { getCurrentExchangeRate } from "../helpers/exchangeRateHelpers";
@@ -356,7 +357,12 @@ async function listCashAccounts(conn: DbLike, companyId: number) {
   ];
 }
 
-async function gcSalesCashDebitBalance(conn: DbLike, companyId: number, accountId: number): Promise<string> {
+/**
+ * Raw signed debit-minus-credit on GC Sales Cash. The account is credit-normal,
+ * so callers convert this through `gcSalesCashPayableBalance` before reporting
+ * or planning against what is still owed.
+ */
+async function gcSalesCashSignedBalance(conn: DbLike, companyId: number, accountId: number): Promise<string> {
   const query = await conn.execute(sql`
     SELECT (
       CASE
@@ -517,11 +523,7 @@ function respondKnownError(res: Response, error: unknown): boolean {
     return true;
   }
   if (error instanceof GoldenCoastPhase7TransferError) {
-    const conflictCodes = new Set([
-      "GC_PHASE7_COLLECTION_EXCEEDS_BALANCE",
-      "GC_PHASE7_REMITTANCE_EXCEEDS_COLLECTIONS",
-      "GC_PHASE7_SCOPE_INVALID",
-    ]);
+    const conflictCodes = new Set(["GC_PHASE7_REMITTANCE_EXCEEDS_COLLECTIONS", "GC_PHASE7_SCOPE_INVALID"]);
     res.status(conflictCodes.has(error.code) ? 409 : 400).json({ code: error.code, message: error.message });
     return true;
   }
@@ -550,7 +552,7 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
       const blockers: string[] = [];
       let pair: GoldenCoastPhase7CompanyPair | null = null;
       let accounts: ResolvedPhase7Accounts | null = null;
-      let balances: { gcSalesCashDebitBalanceUsd: string; outstandingHadiCollectionsUsd: string } | null = null;
+      let balances: { gcSalesCashPayableBalanceUsd: string; outstandingHadiCollectionsUsd: string } | null = null;
       let hadiCashAccounts: Awaited<ReturnType<typeof listCashAccounts>> = [];
       let goldenCoastCashAccounts: Awaited<ReturnType<typeof listCashAccounts>> = [];
 
@@ -561,7 +563,9 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
 
         await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
         balances = {
-          gcSalesCashDebitBalanceUsd: await gcSalesCashDebitBalance(tx, companyId, accounts.gcSalesCashAccountId),
+          gcSalesCashPayableBalanceUsd: gcSalesCashPayableBalance(
+            await gcSalesCashSignedBalance(tx, companyId, accounts.gcSalesCashAccountId)
+          ),
           outstandingHadiCollectionsUsd: await outstandingPhase7HadiCollections(tx, companyId),
         };
         goldenCoastCashAccounts = await listCashAccounts(tx, pair.goldenCoastCompanyId);
@@ -658,13 +662,16 @@ async function handlePostTransfer(req: Request, res: Response): Promise<void> {
         return { replayed: true as const, transfer, plan: null, postings: replayed };
       }
 
-      const [gcSalesCashDebitBalanceUsd, outstandingHadiCollectionsUsd] = await Promise.all([
-        gcSalesCashDebitBalance(tx, selectedCompany, accounts.gcSalesCashAccountId),
+      const [gcSalesCashSignedUsd, outstandingHadiCollectionsUsd] = await Promise.all([
+        gcSalesCashSignedBalance(tx, selectedCompany, accounts.gcSalesCashAccountId),
         outstandingPhase7HadiCollections(tx, selectedCompany),
       ]);
       const plan = planGoldenCoastPhase7Transfer({
         transfer,
-        balances: { gcSalesCashDebitBalanceUsd, outstandingHadiCollectionsUsd },
+        balances: {
+          gcSalesCashPayableBalanceUsd: gcSalesCashPayableBalance(gcSalesCashSignedUsd),
+          outstandingHadiCollectionsUsd,
+        },
       });
 
       const [goldenCoastExchangeRate, hadiExchangeRate] = await Promise.all([
@@ -729,8 +736,8 @@ async function handlePostTransfer(req: Request, res: Response): Promise<void> {
       replayed: result.replayed,
       balances: result.plan
         ? {
-            gcSalesCashDebitBalanceBeforeUsd: result.plan.gcSalesCashDebitBalanceBeforeUsd,
-            gcSalesCashDebitBalanceAfterUsd: result.plan.gcSalesCashDebitBalanceAfterUsd,
+            gcSalesCashPayableBalanceBeforeUsd: result.plan.gcSalesCashPayableBalanceBeforeUsd,
+            gcSalesCashPayableBalanceAfterUsd: result.plan.gcSalesCashPayableBalanceAfterUsd,
             outstandingHadiCollectionsBeforeUsd: result.plan.outstandingHadiCollectionsBeforeUsd,
             outstandingHadiCollectionsAfterUsd: result.plan.outstandingHadiCollectionsAfterUsd,
           }

@@ -30,6 +30,7 @@ import {
   type GoldenCoastPhase7RoleAccounts,
   type GoldenCoastPhase7TransferInput,
 } from "../../services/accounting/goldenCoastPhase7HadiTransfer";
+import { gcSalesCashPayableBalance } from "../../services/accounting/goldenCoastSalesCashPayable";
 import { getCompanyRequestRuntimeContext } from "../../services/security/companyRequestRuntimeContext";
 import { assertTransactionCompanyScope } from "../../services/security/transactionCompanyScope";
 import { getCurrentExchangeRate } from "../helpers/exchangeRateHelpers";
@@ -301,7 +302,12 @@ async function resolveAutomaticHadiCashAccount(
   });
 }
 
-async function gcSalesCashDebitBalance(tx: DatabaseTransaction, companyId: number, accountId: number): Promise<string> {
+/** Raw signed Dr-minus-Cr; GC Sales Cash is credit-normal, so convert before use. */
+async function gcSalesCashSignedBalance(
+  tx: DatabaseTransaction,
+  companyId: number,
+  accountId: number
+): Promise<string> {
   await assertTransactionCompanyScope(tx, companyId);
   const query = await tx.execute(sql`
     SELECT (
@@ -506,13 +512,16 @@ export async function postGoldenCoastAutomaticHadiCollectionTx(input: {
     };
   }
 
-  const [gcSalesCashDebitBalanceUsd, outstandingHadiCollectionsUsd] = await Promise.all([
-    gcSalesCashDebitBalance(input.tx, pair.goldenCoastCompanyId, accounts.gcSalesCashAccountId),
+  const [gcSalesCashSignedUsd, outstandingHadiCollectionsUsd] = await Promise.all([
+    gcSalesCashSignedBalance(input.tx, pair.goldenCoastCompanyId, accounts.gcSalesCashAccountId),
     outstandingPhase7HadiCollections(input.tx, pair.goldenCoastCompanyId),
   ]);
   const plan = planGoldenCoastPhase7Transfer({
     transfer,
-    balances: { gcSalesCashDebitBalanceUsd, outstandingHadiCollectionsUsd },
+    balances: {
+      gcSalesCashPayableBalanceUsd: gcSalesCashPayableBalance(gcSalesCashSignedUsd),
+      outstandingHadiCollectionsUsd,
+    },
   });
 
   const [goldenCoastExchangeRate, hadiExchangeRate] = await Promise.all([

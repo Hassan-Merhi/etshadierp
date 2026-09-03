@@ -71,15 +71,18 @@ export function HadiCashRoutingPanel({ companyKey }: { companyKey: CompanyKey })
 
   const rotatePhase7 = () => setPhase7RequestId(makeRequestId("gc-p7"));
 
+  // A collection records sale cash HADI received on Golden Coast's behalf, so it
+  // RAISES the GC Sales Cash payable and has no ceiling on that account. Only a
+  // remittance is capped, by what Phase 7 collected and has not yet returned.
   const phase7Maximum =
-    phase7Operation === "collect_via_hadi"
-      ? (phase7?.balances?.gcSalesCashDebitBalanceUsd ?? "0")
-      : (phase7?.balances?.outstandingHadiCollectionsUsd ?? "0");
+    phase7Operation === "collect_via_hadi" ? null : (phase7?.balances?.outstandingHadiCollectionsUsd ?? "0");
   const phase7HadiChoice = selectedAccount(phase7HadiAccount, phase7?.hadiCashAccounts ?? []);
   const phase7GcChoice = selectedAccount(phase7GcAccount, phase7?.goldenCoastCashAccounts ?? []);
+  const phase7AmountAllowed =
+    phase7Maximum === null ? Number(phase7Amount) > 0 : allowedAmount(phase7Amount, phase7Maximum);
   const phase7CanSubmit =
     phase7?.canTransfer === true &&
-    allowedAmount(phase7Amount, phase7Maximum) &&
+    phase7AmountAllowed &&
     phase7HadiChoice != null &&
     (phase7Operation === "collect_via_hadi" || phase7GcChoice != null);
 
@@ -155,8 +158,8 @@ export function HadiCashRoutingPanel({ companyKey }: { companyKey: CompanyKey })
         ) : null}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-md border p-3">
-            <p className="text-xs text-muted-foreground">{releaseDebtEnglish("GC Sales Cash")}</p>
-            <p className="mt-1 font-semibold tabular-nums">{money(phase7?.balances?.gcSalesCashDebitBalanceUsd)}</p>
+            <p className="text-xs text-muted-foreground">{releaseDebtEnglish("GC Sales Cash payable")}</p>
+            <p className="mt-1 font-semibold tabular-nums">{money(phase7?.balances?.gcSalesCashPayableBalanceUsd)}</p>
           </div>
           <div className="rounded-md border p-3">
             <p className="text-xs text-muted-foreground">{releaseDebtEnglish("Outstanding with HADI")}</p>
@@ -214,7 +217,7 @@ export function HadiCashRoutingPanel({ companyKey }: { companyKey: CompanyKey })
               type="number"
               min="0.01"
               step="0.01"
-              max={phase7Maximum}
+              max={phase7Maximum ?? undefined}
               value={phase7Amount}
               onChange={(event) => {
                 setPhase7Amount(event.target.value);
@@ -223,7 +226,9 @@ export function HadiCashRoutingPanel({ companyKey }: { companyKey: CompanyKey })
               data-testid="input-gc-phase7-amount"
             />
             <p className="text-xs text-muted-foreground">
-              {releaseDebtEnglish("Current server cap")}: {money(phase7Maximum)}
+              {phase7Maximum === null
+                ? releaseDebtEnglish("A collection raises the GC Sales Cash payable and is not capped by it.")
+                : `${releaseDebtEnglish("Current server cap")}: ${money(phase7Maximum)}`}
             </p>
           </div>
           <div className="space-y-2">

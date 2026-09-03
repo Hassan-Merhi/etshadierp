@@ -859,11 +859,7 @@ export async function handlePostSale(req: Request, res: Response): Promise<void>
       return;
     }
     if (error instanceof GoldenCoastPhase7TransferError) {
-      const conflictCodes = new Set([
-        "GC_PHASE7_COLLECTION_EXCEEDS_BALANCE",
-        "GC_PHASE7_REMITTANCE_EXCEEDS_COLLECTIONS",
-        "GC_PHASE7_SCOPE_INVALID",
-      ]);
+      const conflictCodes = new Set(["GC_PHASE7_REMITTANCE_EXCEEDS_COLLECTIONS", "GC_PHASE7_SCOPE_INVALID"]);
       res.status(conflictCodes.has(error.code) ? 409 : 400).json({ code: error.code, message: error.message });
       return;
     }

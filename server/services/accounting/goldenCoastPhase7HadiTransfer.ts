@@ -9,6 +9,13 @@ import { GOLDEN_COAST_CUTOVER_DATE } from "./goldenCoastPhase4CutoverFifo";
  * Golden Coast Phase 7 deliberately owns only cash collection/remittance via
  * the configured parent company. POS sale/FIFO/COGS and the Phase 6 special
  * location deduction remain outside this module.
+ *
+ * A collection records that HADI physically received sale cash on Golden
+ * Coast's behalf: HADI now owes Golden Coast the money, and Golden Coast owes
+ * Fresh Start FZ the corresponding sales value. That is the same pair the live
+ * POS path posts, and it INCREASES the credit-normal GC Sales Cash payable —
+ * so a collection has no ceiling on that account, only a remittance is capped,
+ * by the collections Phase 7 itself has not yet returned.
  */
 export const GOLDEN_COAST_PHASE7_SOURCE_TYPE = "golden-coast-phase7-hadi-transfer";
 export const GOLDEN_COAST_PHASE7_MAX_REQUEST_ID_LENGTH = 64;
@@ -23,7 +30,6 @@ export type GoldenCoastPhase7PostingRole = "golden_coast" | "hadi";
 export type GoldenCoastPhase7ErrorCode =
   | "GC_PHASE7_INPUT_INVALID"
   | "GC_PHASE7_PRE_CUTOVER_DATE"
-  | "GC_PHASE7_COLLECTION_EXCEEDS_BALANCE"
   | "GC_PHASE7_REMITTANCE_EXCEEDS_COLLECTIONS"
   | "GC_PHASE7_SCOPE_INVALID";
 
@@ -57,15 +63,15 @@ export interface GoldenCoastPhase7TransferInput {
 }
 
 export interface GoldenCoastPhase7Balances {
-  /** Current Dr-minus-Cr balance on canonical GC Sales Cash. */
-  gcSalesCashDebitBalanceUsd: string | number;
+  /** Outstanding credit-normal GC Sales Cash payable. */
+  gcSalesCashPayableBalanceUsd: string | number;
   /** Phase-7-only HADI collections not yet remitted to Golden Coast. */
   outstandingHadiCollectionsUsd: string | number;
 }
 
 export interface GoldenCoastPhase7TransferPlan extends GoldenCoastPhase7TransferInput {
-  gcSalesCashDebitBalanceBeforeUsd: string;
-  gcSalesCashDebitBalanceAfterUsd: string;
+  gcSalesCashPayableBalanceBeforeUsd: string;
+  gcSalesCashPayableBalanceAfterUsd: string;
   outstandingHadiCollectionsBeforeUsd: string;
   outstandingHadiCollectionsAfterUsd: string;
 }
@@ -243,17 +249,19 @@ export function parseGoldenCoastPhase7TransferInput(input: {
 /**
  * Apply the balance rules for a new (non-replay) transfer.
  *
- * Collection can only clear a positive Dr balance on GC Sales Cash. Remittance
- * can only move cash already collected through Phase 7 and not yet remitted;
- * it never consumes unrelated historical balances on the shared intercompany
- * accounts (for example parent-agent offload charges).
+ * A collection RAISES the GC Sales Cash payable, so it has no ceiling on that
+ * account: capping it against the account it grows is what made this operation
+ * unusable while GC Sales Cash was misread as a receivable. Remittance can only
+ * move cash already collected through Phase 7 and not yet remitted; it never
+ * consumes unrelated historical balances on the shared intercompany accounts
+ * (for example parent-agent offload charges), and it leaves the payable alone.
  */
 export function planGoldenCoastPhase7Transfer(input: {
   transfer: GoldenCoastPhase7TransferInput;
   balances: GoldenCoastPhase7Balances;
 }): GoldenCoastPhase7TransferPlan {
   const amount = positiveMoney(input.transfer.amountUsd, "amountUsd");
-  const gcSalesCashBalance = balanceMoney(input.balances.gcSalesCashDebitBalanceUsd, "gcSalesCashDebitBalanceUsd");
+  const payable = balanceMoney(input.balances.gcSalesCashPayableBalanceUsd, "gcSalesCashPayableBalanceUsd");
   const outstanding = balanceMoney(input.balances.outstandingHadiCollectionsUsd, "outstandingHadiCollectionsUsd");
   if (outstanding.lessThan(0)) {
     throw new GoldenCoastPhase7TransferError(
@@ -263,17 +271,10 @@ export function planGoldenCoastPhase7Transfer(input: {
   }
 
   if (input.transfer.operation === "collect_via_hadi") {
-    const collectible = Decimal.max(gcSalesCashBalance, 0);
-    if (amount.greaterThan(collectible)) {
-      throw new GoldenCoastPhase7TransferError(
-        `Collection ${money(amount)} exceeds the current collectible GC Sales Cash balance ${money(collectible)}`,
-        "GC_PHASE7_COLLECTION_EXCEEDS_BALANCE"
-      );
-    }
     return {
       ...input.transfer,
-      gcSalesCashDebitBalanceBeforeUsd: money(gcSalesCashBalance),
-      gcSalesCashDebitBalanceAfterUsd: money(gcSalesCashBalance.minus(amount)),
+      gcSalesCashPayableBalanceBeforeUsd: money(payable),
+      gcSalesCashPayableBalanceAfterUsd: money(payable.plus(amount)),
       outstandingHadiCollectionsBeforeUsd: money(outstanding),
       outstandingHadiCollectionsAfterUsd: money(outstanding.plus(amount)),
     };
@@ -288,8 +289,8 @@ export function planGoldenCoastPhase7Transfer(input: {
 
   return {
     ...input.transfer,
-    gcSalesCashDebitBalanceBeforeUsd: money(gcSalesCashBalance),
-    gcSalesCashDebitBalanceAfterUsd: money(gcSalesCashBalance),
+    gcSalesCashPayableBalanceBeforeUsd: money(payable),
+    gcSalesCashPayableBalanceAfterUsd: money(payable),
     outstandingHadiCollectionsBeforeUsd: money(outstanding),
     outstandingHadiCollectionsAfterUsd: money(outstanding.minus(amount)),
   };
@@ -375,7 +376,7 @@ function taggedRequest(input: {
  * Build the two-company accounting pair. Both vouchers must be persisted in the
  * caller's single database transaction.
  *
- * collect_via_hadi:
+ * collect_via_hadi (raises the GC Sales Cash payable):
  *   Golden Coast  Dr HADI Intercompany / Cr GC Sales Cash
  *   HADI          Dr Cash/Bank         / Cr Golden Coast Intercompany
  *

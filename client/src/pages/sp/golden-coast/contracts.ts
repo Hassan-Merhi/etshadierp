@@ -49,7 +49,8 @@ export interface Phase7Readiness {
     hadiGoldenCoastIntercompanyAccountName: string;
   } | null;
   balances: {
-    gcSalesCashDebitBalanceUsd: string;
+    /** Outstanding credit-normal GC Sales Cash payable; a collection raises it. */
+    gcSalesCashPayableBalanceUsd: string;
     outstandingHadiCollectionsUsd: string;
   } | null;
   hadiCashAccounts: CashAccountOption[];

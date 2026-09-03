@@ -114,7 +114,7 @@ describe("Phase 7 HADI cash routing", () => {
       hadiCompanyName: "HADI",
     },
     accounts: null,
-    balances: { gcSalesCashDebitBalanceUsd: "500.00", outstandingHadiCollectionsUsd: "120.00" },
+    balances: { gcSalesCashPayableBalanceUsd: "500.00", outstandingHadiCollectionsUsd: "120.00" },
     hadiCashAccounts: [{ kind: "ledger", id: 11, name: "HADI Cash", type: "cash" }],
     goldenCoastCashAccounts: [{ kind: "bank", id: 22, name: "GC Bank", type: "bank" }],
     blockers: [],
@@ -154,11 +154,19 @@ describe("Phase 7 HADI cash routing", () => {
     });
   });
 
-  it("refuses an amount above the server-reported cap for the selected direction", () => {
+  it("refuses a remittance above the unremitted collections the server reports", () => {
+    render(<HadiCashRoutingPanel companyKey={42} />);
+    fireEvent.change(screen.getByLabelText(/Operation/i), { target: { value: "remit_from_hadi" } });
+    setValue("input-gc-phase7-amount", "120.01");
+
+    expect(screen.getByTestId("button-gc-phase7-submit").hasAttribute("disabled")).toBe(true);
+  });
+
+  it("does not cap a collection against the GC Sales Cash payable it raises", () => {
     render(<HadiCashRoutingPanel companyKey={42} />);
     setValue("input-gc-phase7-amount", "500.01");
 
-    expect(screen.getByTestId("button-gc-phase7-submit").hasAttribute("disabled")).toBe(true);
+    expect(screen.getByTestId("button-gc-phase7-submit").hasAttribute("disabled")).toBe(false);
   });
 
   it("stays blocked while the server reports the pair cannot transfer", () => {

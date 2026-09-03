@@ -56,7 +56,7 @@ describe("Golden Coast Phase 12 final accounting-model hardening", () => {
 
   it("keeps physical cash collection on the existing HADI cash-only intercompany path", () => {
     expect(phase7ServiceSource).toContain('operation !== "collect_via_hadi"');
-    expect(phase7ServiceSource).toContain("gcSalesCashDebitBalanceUsd");
+    expect(phase7ServiceSource).toContain("gcSalesCashPayableBalanceUsd");
     expect(phase7RouteSource).toContain("resolveCompanyPair");
     expect(phase7RouteSource).toContain("postBalancedVoucherTx");
   });
