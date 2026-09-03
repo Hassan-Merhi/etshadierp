@@ -148,6 +148,7 @@ async function createCentralPaymentReceipt(req: Request, res: Response, next: Ne
         voucherDate: body.voucherDate,
         paymentAccountType: body.paymentAccountType,
         paymentAccountId: body.paymentAccountId,
+        paymentAccountNarration: body.paymentAccountNarration,
         entries: body.entries,
         notes: body.notes,
         currency: body.currency || "USD",

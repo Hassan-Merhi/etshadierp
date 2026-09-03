@@ -61,6 +61,19 @@ describe("buildPaymentReceiptPostingRequest", () => {
     });
   });
 
+  it("preserves separate payment-account and contra-entry narrations", async () => {
+    const built = await buildPaymentReceiptPostingRequest(
+      baseInput({
+        notes: "Voucher description",
+        paymentAccountNarration: "Paid from operating account",
+        entries: [{ accountType: "ledger", accountId: 20, amount: "100", narration: "Supplier settlement" }],
+      })
+    );
+
+    expect(built.request.entries[0].narration).toBe("Supplier settlement");
+    expect(built.request.entries[1].narration).toBe("Paid from operating account");
+  });
+
   it("posts a liability-account Payment as payment-account debit and contra credit", async () => {
     const built = await buildPaymentReceiptPostingRequest(
       baseInput({

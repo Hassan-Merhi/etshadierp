@@ -1,53 +1,78 @@
 import type { Express, Request, Response } from "express";
+import { rateLimit } from "express-rate-limit";
+import { and, eq } from "drizzle-orm";
+import { companies, ledgerAccounts, locations } from "@shared/schema";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
-import { sql } from "drizzle-orm";
 import { generateSpSalesFormExcel } from "../../services/sp-sales-form";
 import { generateSpSalesFormExcelV2 } from "../../services/spSalesFormExportV2";
 import { requireSpCompany } from "./spHelpers";
+import { validateStatementDateRange } from "../../lib/accountStatementExportSafety";
 
-type QueryRecord = Record<string, unknown>;
-type QueryResultLike = { rows: QueryRecord[] };
-
-function firstQueryRow(result: QueryResultLike | QueryRecord[]): QueryRecord | undefined {
-  return Array.isArray(result) ? result[0] : result.rows[0];
-}
-
-function readString(row: QueryRecord | undefined, key: string): string {
-  const value = row?.[key];
-  return typeof value === "string" ? value : "";
-}
+const spExportLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ── Sales Form Excel Export (V1 legacy + V2) ─────────────────────────────────
 
 export function registerSpExportRoutes(app: Express) {
-  app.get("/api/sp/sales-form/export", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/sp/sales-form/export", requireAuth, spExportLimiter, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const { fromDate, toDate, locationId } = req.query;
+      const { fromDate: fromDateRaw, toDate: toDateRaw, locationId: locationIdRaw } = req.query;
 
-      if (!fromDate || !toDate) {
-        return res.status(400).json({ message: "fromDate and toDate are required (YYYY-MM-DD)" });
+      if (
+        typeof fromDateRaw !== "string" ||
+        typeof toDateRaw !== "string" ||
+        fromDateRaw.length === 0 ||
+        toDateRaw.length === 0
+      ) {
+        return res.status(400).json({ message: "fromDate and toDate must each be a single YYYY-MM-DD value" });
       }
+      if (locationIdRaw !== undefined && typeof locationIdRaw !== "string") {
+        return res.status(400).json({ message: "locationId must be a single positive integer" });
+      }
+      const dateRange = validateStatementDateRange(fromDateRaw, toDateRaw);
+      if (!dateRange.ok) return res.status(400).json({ message: dateRange.message });
 
-      const locId = locationId ? parseInt(locationId as string) : undefined;
+      let locId: number | undefined;
+      if (locationIdRaw) {
+        const parsedLocationId = Number.parseInt(locationIdRaw, 10);
+        if (!Number.isSafeInteger(parsedLocationId) || parsedLocationId <= 0) {
+          return res.status(400).json({ message: "locationId must be a single positive integer" });
+        }
+        locId = parsedLocationId;
+      }
+      const fromDate = fromDateRaw;
+      const toDate = toDateRaw;
 
-      // Fetch location and company name for the filename
+      // Fetch tenant-scoped location and company names for the filename.
       let locationName = "";
       let companyName = "";
       try {
-        const locRows = await db.execute(sql`SELECT name FROM locations WHERE id = ${locId} LIMIT 1`);
-        locationName = readString(firstQueryRow(locRows), "name");
+        if (locId) {
+          const [locationRow] = await db
+            .select({ name: locations.name })
+            .from(locations)
+            .where(and(eq(locations.id, locId), eq(locations.companyId, companyId)));
+          locationName = locationRow?.name ?? "";
+        }
       } catch {
         // Failure here is non-fatal and the surrounding flow continues deliberately.
       }
       try {
-        const coRows = await db.execute(sql`SELECT name FROM companies WHERE id = ${companyId} LIMIT 1`);
-        companyName = readString(firstQueryRow(coRows), "name");
+        const [companyRow] = await db
+          .select({ name: companies.name })
+          .from(companies)
+          .where(eq(companies.id, companyId));
+        companyName = companyRow?.name ?? "";
       } catch {
         // Failure here is non-fatal and the surrounding flow continues deliberately.
       }
@@ -55,14 +80,14 @@ export function registerSpExportRoutes(app: Express) {
       const buffer = await generateSpSalesFormExcel({
         companyId,
         locationId: locId,
-        fromDate: fromDate as string,
-        toDate: toDate as string,
+        fromDate,
+        toDate,
         locationName,
         supplierName: companyName,
       });
 
-      const from = (fromDate as string).slice(5).replace("-", "");
-      const to = (toDate as string).slice(5).replace("-", "");
+      const from = fromDate.substring(5, 7) + fromDate.substring(8, 10);
+      const to = toDate.substring(5, 7) + toDate.substring(8, 10);
       const safeLoc = locationName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
       const safeCo = companyName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
       const filename = `${safeLoc} ${safeCo} sales form ${from}-${to}.xlsx`.replace(/\s+/g, " ").trim();
@@ -76,28 +101,63 @@ export function registerSpExportRoutes(app: Express) {
   });
 
   // ── V2: from-scratch ExcelJS export (matches system inventory) ────────────
-  app.get("/api/sp/sales-form/export-v2", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/sp/sales-form/export-v2", requireAuth, spExportLimiter, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const { fromDate, toDate, locationId, cashAccountId } = req.query;
+      const {
+        fromDate: fromDateRaw,
+        toDate: toDateRaw,
+        locationId: locationIdRaw,
+        cashAccountId: cashAccountIdRaw,
+      } = req.query;
 
-      if (!fromDate || !toDate) {
-        return res.status(400).json({ message: "fromDate and toDate are required (YYYY-MM-DD)" });
+      if (
+        typeof fromDateRaw !== "string" ||
+        typeof toDateRaw !== "string" ||
+        fromDateRaw.length === 0 ||
+        toDateRaw.length === 0
+      ) {
+        return res.status(400).json({ message: "fromDate and toDate must each be a single YYYY-MM-DD value" });
+      }
+      if (locationIdRaw !== undefined && typeof locationIdRaw !== "string") {
+        return res.status(400).json({ message: "locationId must be a single positive integer" });
+      }
+      if (cashAccountIdRaw !== undefined && typeof cashAccountIdRaw !== "string") {
+        return res.status(400).json({ message: "cashAccountId must be a single positive integer" });
+      }
+      const dateRange = validateStatementDateRange(fromDateRaw, toDateRaw);
+      if (!dateRange.ok) return res.status(400).json({ message: dateRange.message });
+
+      let locId: number | undefined;
+      if (locationIdRaw) {
+        const parsedLocationId = Number.parseInt(locationIdRaw, 10);
+        if (!Number.isSafeInteger(parsedLocationId) || parsedLocationId <= 0) {
+          return res.status(400).json({ message: "locationId must be a single positive integer" });
+        }
+        locId = parsedLocationId;
       }
 
-      const locId = locationId ? parseInt(locationId as string) : undefined;
-      let cashId = cashAccountId ? parseInt(cashAccountId as string) : undefined;
+      let cashId: number | undefined;
+      if (cashAccountIdRaw) {
+        const parsedCashId = Number.parseInt(cashAccountIdRaw, 10);
+        if (!Number.isSafeInteger(parsedCashId) || parsedCashId <= 0) {
+          return res.status(400).json({ message: "cashAccountId must be a single positive integer" });
+        }
+        cashId = parsedCashId;
+      }
+      const fromDate = fromDateRaw;
+      const toDate = toDateRaw;
 
       // Validate the cash account belongs to this company; ignore silently if not.
       if (cashId) {
         try {
-          const r = await db.execute(
-            sql`SELECT id FROM accounts WHERE id = ${cashId} AND company_id = ${companyId} LIMIT 1`
-          );
-          const found = firstQueryRow(r);
-          if (!found) {
+          const [accountRow] = await db
+            .select({ id: ledgerAccounts.id })
+            .from(ledgerAccounts)
+            .where(and(eq(ledgerAccounts.id, cashId), eq(ledgerAccounts.companyId, companyId)));
+          if (!accountRow) {
             logger.warn(
               `[/api/sp/sales-form/export-v2] cashAccountId=${cashId} not found for companyId=${companyId}; ignoring`
             );
@@ -113,15 +173,21 @@ export function registerSpExportRoutes(app: Express) {
       let companyName = "";
       try {
         if (locId) {
-          const r = await db.execute(sql`SELECT name FROM locations WHERE id = ${locId} LIMIT 1`);
-          locationName = readString(firstQueryRow(r), "name");
+          const [locationRow] = await db
+            .select({ name: locations.name })
+            .from(locations)
+            .where(and(eq(locations.id, locId), eq(locations.companyId, companyId)));
+          locationName = locationRow?.name ?? "";
         }
       } catch {
         // Failure here is non-fatal and the surrounding flow continues deliberately.
       }
       try {
-        const r = await db.execute(sql`SELECT name FROM companies WHERE id = ${companyId} LIMIT 1`);
-        companyName = readString(firstQueryRow(r), "name");
+        const [companyRow] = await db
+          .select({ name: companies.name })
+          .from(companies)
+          .where(eq(companies.id, companyId));
+        companyName = companyRow?.name ?? "";
       } catch {
         // Failure here is non-fatal and the surrounding flow continues deliberately.
       }
@@ -129,15 +195,15 @@ export function registerSpExportRoutes(app: Express) {
       const buffer = await generateSpSalesFormExcelV2({
         companyId,
         locationId: locId,
-        fromDate: fromDate as string,
-        toDate: toDate as string,
+        fromDate,
+        toDate,
         locationName,
         supplierName: companyName,
         cashAccountId: cashId,
       });
 
-      const from = (fromDate as string).slice(5).replace("-", "");
-      const to = (toDate as string).slice(5).replace("-", "");
+      const from = fromDate.substring(5, 7) + fromDate.substring(8, 10);
+      const to = toDate.substring(5, 7) + toDate.substring(8, 10);
       const safeLoc = locationName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
       const safeCo = companyName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
       const filename = `${safeLoc} ${safeCo} system sales form ${from}-${to}.xlsx`.replace(/\s+/g, " ").trim();

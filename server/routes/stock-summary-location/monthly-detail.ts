@@ -42,6 +42,9 @@ export function registerLocationMonthlyDetailRoutes(app: Express) {
           date: vouchers.voucherDate,
           ref: vouchers.voucherNumber,
           qty: salesItems.quantity,
+          sellingPrice: salesItems.sellingPrice,
+          totalSales: salesItems.totalSales,
+          costPrice: salesItems.costPrice,
           totalCost: salesItems.totalCost,
         })
         .from(salesItems)
@@ -59,7 +62,21 @@ export function registerLocationMonthlyDetailRoutes(app: Express) {
         );
       for (const r of saleRows) {
         const qty = parseFloat(r.qty);
-        const val = parseFloat(r.totalCost || "0");
+        const totalCost = parseFloat(r.totalCost || "0");
+        const costPrice = parseFloat(r.costPrice || "0");
+        const sellingPrice = parseFloat(r.sellingPrice || "0");
+        const totalSales = parseFloat(r.totalSales || "0");
+        // Keep the inventory valuation as the primary value. Some legacy/imported
+        // sales have totalCost=0 even though costPrice or the recorded sale amount
+        // is populated, so do not make the drill-down look blank in that case.
+        const val =
+          totalCost > 0
+            ? totalCost
+            : costPrice > 0
+              ? costPrice * qty
+              : totalSales > 0
+                ? totalSales
+                : sellingPrice * qty;
         outTx.push({ type: "Sale", date: r.date, reference: r.ref, qty, rate: qty > 0 ? val / qty : 0, value: val });
       }
 
@@ -160,7 +177,10 @@ export function registerLocationMonthlyDetailRoutes(app: Express) {
         else outTx.push({ ...entry, type: "Debit Note" });
       }
 
-      const byDate = (a: { type: string; date: string; reference: string; qty: number; rate: number; value: number; }, b: { type: string; date: string; reference: string; qty: number; rate: number; value: number; }) => new Date(a.date).getTime() - new Date(b.date).getTime();
+      const byDate = (
+        a: { type: string; date: string; reference: string; qty: number; rate: number; value: number },
+        b: { type: string; date: string; reference: string; qty: number; rate: number; value: number }
+      ) => new Date(a.date).getTime() - new Date(b.date).getTime();
       res.json({ inTransactions: inTx.sort(byDate), outTransactions: outTx.sort(byDate) });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });

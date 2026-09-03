@@ -196,6 +196,24 @@ export function JournalEditForm({
                       </FormItem>
                     )}
                   />
+                  <FormField
+                    control={form.control}
+                    name={`entries.${index}.narration`}
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel className="text-xs">Narration</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            value={field.value ?? ""}
+                            placeholder="Optional note for this entry"
+                            data-testid={`input-narration-journal-mobile-${index}`}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
               ))}
               <div className="flex flex-col gap-2 pt-2">
@@ -204,7 +222,14 @@ export function JournalEditForm({
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    append({ type: "DR", accountType: "ledger", accountId: 0, accountName: "", amount: "" })
+                    append({
+                      type: "DR",
+                      accountType: "ledger",
+                      accountId: 0,
+                      accountName: "",
+                      amount: "",
+                      narration: "",
+                    })
                   }
                   data-testid="button-add-row-journal-mobile"
                 >
@@ -234,7 +259,8 @@ export function JournalEditForm({
                 <thead className="bg-muted/50 sticky top-0 z-30">
                   <tr>
                     <th className="text-left p-3 font-medium w-[10%]">Type</th>
-                    <th className="text-left p-3 font-medium w-[60%]">Account</th>
+                    <th className="text-left p-3 font-medium w-[35%]">Account</th>
+                    <th className="text-left p-3 font-medium w-[25%]">Narration</th>
                     <th className="text-left p-3 font-medium w-[25%]">Amount</th>
                     <th className="w-[5%]"></th>
                   </tr>
@@ -311,6 +337,25 @@ export function JournalEditForm({
                       <td className="p-2">
                         <FormField
                           control={form.control}
+                          name={`entries.${index}.narration`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  value={field.value ?? ""}
+                                  placeholder="Optional note…"
+                                  data-testid={`input-narration-journal-${index}`}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </td>
+                      <td className="p-2">
+                        <FormField
+                          control={form.control}
                           name={`entries.${index}.amount`}
                           render={({ field }) => (
                             <FormItem>
@@ -359,7 +404,7 @@ export function JournalEditForm({
                 </tbody>
                 <tfoot className="bg-muted/30 border-t-2">
                   <tr>
-                    <td colSpan={2} className="p-3">
+                    <td colSpan={3} className="p-3">
                       <div className="flex items-center gap-4">
                         <Button
                           type="button"
@@ -372,6 +417,7 @@ export function JournalEditForm({
                               accountId: 0,
                               accountName: "",
                               amount: "",
+                              narration: "",
                             })
                           }
                           data-testid="button-add-row"
