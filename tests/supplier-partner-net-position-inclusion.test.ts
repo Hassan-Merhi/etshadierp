@@ -6,13 +6,17 @@ const root = path.resolve(process.cwd());
 const read = (relativePath: string) => fs.readFileSync(path.join(root, relativePath), "utf8");
 
 describe("supplier partner net position inclusion", () => {
-  it("includes Golden Coast customer assets, Loan/Loans liabilities, and residual equity in the live Net Position", () => {
+  it("includes Golden Coast customer assets, Loan/Loans liabilities, and balance-sheet-native equity", () => {
     const source = read("server/routes/stats/goldenCoastResidualEquityProjection.ts");
     expect(source).toContain('"Customer"');
     expect(source).toContain('"Loan"');
     expect(source).toContain('"Loans"');
-    expect(source).toContain("const freshStartResidual = round2(netPosition - hassanClaim)");
-    expect(source).toContain('residualFormula: "net_assets_minus_hassan"');
+    expect(source).toContain("const netPosition = round2(forUsTotal - onUsTotal)");
+    expect(source).toContain(
+      'residualFormula: "ledger_partner_capital_plus_unclosed_earnings_plus_fx_translation"'
+    );
+    expect(source).toContain("const freshStartTotalEntitlement = round2(freshStartClaim + gcSalesCashPayable)");
+    expect(source).toContain("for (const accountId of currentTranslatedLedgerAccountIds(body)) existingIds.add(accountId)");
   });
 
   it("does not let current-cash translation erase supplier-partner equity", () => {
@@ -20,6 +24,8 @@ describe("supplier partner net position inclusion", () => {
     expect(source).toContain("payload.equity?.includedInNetPosition === true");
     expect(source).toContain("plus(equityContribution)");
     expect(source).toContain("payload.netWorth = netPosition");
+    expect(source).toContain("currentTranslatedLedgerAccountIds");
+    expect(source).toContain("currentCashBankTranslationDifference");
   });
 
   it("keeps historical/monthly and Excel calculations aligned", () => {
