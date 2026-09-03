@@ -17,6 +17,7 @@ import { GOLDEN_COAST_TABS, type GoldenCoastTab } from "./golden-coast/contracts
 import { FreshStartHadiPaymentPanel } from "./golden-coast/FreshStartHadiPaymentPanel";
 import { GcSalesCashPanel } from "./golden-coast/GcSalesCashPanel";
 import { GoldenCoastOverview } from "./golden-coast/GoldenCoastOverview";
+import { HadiProceedsRemittancePanel } from "./golden-coast/HadiProceedsRemittancePanel";
 import { HassanSavingsPanel } from "./golden-coast/HassanSavingsPanel";
 import { MonthlyClosePanel } from "./golden-coast/MonthlyClosePanel";
 import { useReadinessInvalidation } from "./golden-coast/shared";
@@ -81,6 +82,7 @@ export default function SpGoldenCoast() {
 
         <TabsContent value="hadi" className="mt-5 space-y-5">
           <FreshStartHadiPaymentPanel companyKey={companyKey} />
+          <HadiProceedsRemittancePanel companyKey={companyKey} />
         </TabsContent>
 
         <TabsContent value="savings" className="mt-5">
