@@ -16,6 +16,8 @@ type DisplayAccount = {
   value: number;
   category?: string;
   balanceSide?: "Dr" | "Cr";
+  currencyRevalued?: boolean;
+  translationDifference?: unknown;
 };
 
 type NetProfitSection = {
@@ -44,7 +46,8 @@ const INTERNAL_SP_SUBTYPES = new Set([
   "sp_pay_deduction_clearing",
   "sp_opnbal",
 ]);
-const UNCL_CLOSED_EARNINGS_CODE = "GC-UNCL-PNL";
+const UNCLOSED_EARNINGS_CODE = "GC-UNCL-PNL";
+const FX_TRANSLATION_CODE = "GC-FX-TRANS";
 
 function numberValue(value: unknown): number {
   const parsed = Number(value ?? 0);
@@ -103,6 +106,14 @@ function addBreakdown(accounts: DisplayAccount[]): Array<{ name: string; value: 
     .sort((a, b) => b.value - a.value);
 }
 
+function currentCashTranslationAdjustment(forUsAccounts: DisplayAccount[], onUsAccounts: DisplayAccount[]): number {
+  return round2(
+    [...forUsAccounts, ...onUsAccounts]
+      .filter((account) => account.currencyRevalued === true)
+      .reduce((total, account) => total + numberValue(account.translationDifference), 0)
+  );
+}
+
 function goldenCoastRoles(accounts: LedgerRow[]) {
   const active = accounts.filter((account) => account.active !== false && account.deletedAt == null);
   const fresh = active.find((account) => account.subType === "gc_partner_capital") ?? null;
@@ -131,8 +142,9 @@ function goldenCoastRoles(accounts: LedgerRow[]) {
  * therefore need no additional residual adjustment.
  *
  * Profit/loss that has not yet been closed by Phase 11 is shown separately as
- * Current Period Earnings (Unclosed). It is a presentation reconciliation only;
- * partner equity is not mutated until the protected monthly close posts it.
+ * Current Period Earnings (Unclosed). Current cash/bank translation is also
+ * isolated in its own equity adjustment so unrealised FX never masquerades as
+ * distributable earnings. Neither presentation line mutates partner ledgers.
  */
 export function projectGoldenCoastResidualEquity(input: {
   body: NetProfitResponse;
@@ -237,7 +249,8 @@ export function projectGoldenCoastResidualEquity(input: {
   const freshStartClaim = round2(freshLedgerClaim - legacyOpeningPayableReclassification);
   const hassanClaim = goldenCoastPartnerClaim(roles.hassan, accountBalances);
   const partnerCapitalTotal = round2(freshStartClaim + hassanClaim);
-  const unclosedEarnings = round2(netPosition - partnerCapitalTotal);
+  const currencyTranslationAdjustment = currentCashTranslationAdjustment(forUsAccounts, onUsAccounts);
+  const unclosedEarnings = round2(netPosition - partnerCapitalTotal - currencyTranslationAdjustment);
   const gcSalesCashPayable = currentCreditNormalPayable(roles.gcSalesCash, accountBalances);
   const freshStartTotalEntitlement = round2(freshStartClaim + gcSalesCashPayable);
 
@@ -263,10 +276,19 @@ export function projectGoldenCoastResidualEquity(input: {
   if (Math.abs(unclosedEarnings) >= 0.005) {
     equityAccounts.push({
       name: "Current Period Earnings (Unclosed)",
-      code: UNCL_CLOSED_EARNINGS_CODE,
+      code: UNCLOSED_EARNINGS_CODE,
       value: round2(Math.abs(unclosedEarnings)),
       category: "Current Period Earnings",
       balanceSide: unclosedEarnings >= 0 ? "Cr" : "Dr",
+    });
+  }
+  if (Math.abs(currencyTranslationAdjustment) >= 0.005) {
+    equityAccounts.push({
+      name: "Current FX Translation Adjustment",
+      code: FX_TRANSLATION_CODE,
+      value: round2(Math.abs(currencyTranslationAdjustment)),
+      category: "Currency Translation",
+      balanceSide: currencyTranslationAdjustment >= 0 ? "Cr" : "Dr",
     });
   }
 
@@ -276,7 +298,7 @@ export function projectGoldenCoastResidualEquity(input: {
     accounts: equityAccounts,
     includedInNetPosition: false,
     balanceSheetIdentity: "assets_minus_liabilities_equals_equity",
-    residualFormula: "ledger_partner_capital_plus_unclosed_earnings",
+    residualFormula: "ledger_partner_capital_plus_unclosed_earnings_plus_fx_translation",
     freshStartResidual: freshStartClaim,
     freshStartClaim,
     freshStartLedgerClaim: freshLedgerClaim,
@@ -284,6 +306,7 @@ export function projectGoldenCoastResidualEquity(input: {
     hassanClaim,
     partnerCapitalTotal,
     unclosedEarnings,
+    currencyTranslationAdjustment,
     gcSalesCashPayable,
     legacyOpeningPayableReclassification,
   };
