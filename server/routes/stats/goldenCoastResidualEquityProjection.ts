@@ -258,6 +258,7 @@ export function projectGoldenCoastResidualEquity(input: {
     ...(body.equity || {}),
     total: netPosition,
     accounts: equityAccounts,
+    includedInNetPosition: true,
     residualFormula: "net_assets_minus_hassan",
     freshStartResidual: freshStartResidual,
     hassanClaim,
