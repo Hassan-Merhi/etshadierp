@@ -11,17 +11,14 @@ describe("supplier partner customer Net Position", () => {
 
     expect(helper).toContain("voucherEntries.customerId");
     expect(helper).toContain("isNull(voucherEntries.ledgerAccountId)");
-    expect(helper).toContain("customer.openingBalanceSide === \"Cr\" ? -opening : opening");
+    expect(helper).toContain('customer.openingBalanceSide === "Cr" ? -opening : opening');
     expect(helper).toContain("ledgerMovement.debit -");
     expect(helper).toContain("directMovement.debit -");
     expect(helper).toContain("if (Math.abs(signedBalance) < 0.01) continue");
   });
 
   it("uses the authoritative customer balance in historical and Excel Net Position paths", () => {
-    const paths = [
-      "server/helpers/calculateNetPositionAsOf.ts",
-      "server/routes/stats/statsNetPositionRoutes.ts",
-    ];
+    const paths = ["server/helpers/calculateNetPositionAsOf.ts", "server/routes/stats/statsNetPositionRoutes.ts"];
 
     for (const relativePath of paths) {
       const source = read(relativePath);
