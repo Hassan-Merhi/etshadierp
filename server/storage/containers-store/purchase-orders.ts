@@ -3,10 +3,12 @@ import {
   infrastructurePostingIdentity,
   insertInfrastructureVoucher,
 } from "../../services/accounting/infrastructureVoucherIdentity";
+import { resolvePoImportCreditTarget } from "../../services/accounting/poImportAccounting";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { db } from "../../db";
 import * as schema from "@shared/schema";
 import type { PurchaseOrder, InsertPurchaseOrder } from "@shared/schema";
+import { getConfiguredIntercompanyCreditAccount } from "../accounting/intercompany";
 
 export async function createPurchaseOrder(
   po: InsertPurchaseOrder,
@@ -92,6 +94,10 @@ export async function createPurchaseOrder(
     // they must NOT go through the intercompany branch; the supplier credit
     // must live inside the SP company so its ledger/stats show the balance.
     const isSupplierPartner = currentCompany?.companyType === "supplier_partner";
+    const configuredIntercompanyCreditAccount = !isSupplierPartner
+      ? await getConfiguredIntercompanyCreditAccount(po.companyId)
+      : undefined;
+    const configuredIntercompanyCreditAccountId = configuredIntercompanyCreditAccount?.id ?? null;
     if (parentCompany && po.companyId !== parentCompany.id && !isSupplierPartner) {
       const isParentFreight = po.freightPaidBy === "parent" && poFreight > 0;
       const poIntercoTotal = isParentFreight ? poTotal - poFreight : poTotal;
@@ -100,17 +106,19 @@ export async function createPurchaseOrder(
       const parentCreditCode = parentCompany.name.toUpperCase().replace(/\s+/g, "_") + "_CREDIT";
       const parentCreditName = parentCompany.name + " Credit";
 
-      let parentCreditAccount = await db
-        .select()
-        .from(schema.ledgerAccounts)
-        .where(
-          and(
-            eq(schema.ledgerAccounts.companyId, po.companyId),
-            eq(schema.ledgerAccounts.code, parentCreditCode),
-            isNull(schema.ledgerAccounts.deletedAt)
-          )
-        )
-        .limit(1);
+      let parentCreditAccount = configuredIntercompanyCreditAccount
+        ? [configuredIntercompanyCreditAccount]
+        : await db
+            .select()
+            .from(schema.ledgerAccounts)
+            .where(
+              and(
+                eq(schema.ledgerAccounts.companyId, po.companyId),
+                eq(schema.ledgerAccounts.code, parentCreditCode),
+                isNull(schema.ledgerAccounts.deletedAt)
+              )
+            )
+            .limit(1);
 
       if (!parentCreditAccount.length) {
         const [newAccount] = await db
@@ -295,10 +303,23 @@ export async function createPurchaseOrder(
         narration: `PO ${created.poNumber} - Purchases`,
       });
 
-      if (po.supplierId) {
+      const creditTarget = resolvePoImportCreditTarget({
+        companyType: currentCompany?.companyType,
+        configuredIntercompanyCreditAccountId,
+        supplierId: po.supplierId,
+      });
+      if (creditTarget.kind === "intercompany") {
         await db.insert(schema.voucherEntries).values({
           voucherId: purchaseVoucher.id,
-          supplierId: po.supplierId,
+          ledgerAccountId: creditTarget.ledgerAccountId,
+          debitAmount: "0",
+          creditAmount: poTotal.toFixed(2),
+          narration: `PO ${created.poNumber} - Intercompany credit`,
+        });
+      } else if (creditTarget.supplierId) {
+        await db.insert(schema.voucherEntries).values({
+          voucherId: purchaseVoucher.id,
+          supplierId: creditTarget.supplierId,
           debitAmount: "0",
           creditAmount: poTotal.toFixed(2),
           narration: `PO ${created.poNumber} - Supplier`,

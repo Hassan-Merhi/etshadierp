@@ -9,7 +9,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth } from "../../auth";
-import { resolveParentCompanyId } from "../helpers/supplierBalanceHelpers";
+import { resolveParentCompanyId, isSupplierVisibleToCompany } from "../helpers/supplierBalanceHelpers";
 import { vouchers, voucherEntries, factorySuppliers, factoryContainers, factorySupplierPayments } from "@shared/schema";
 import { eq, and, sql, isNull } from "drizzle-orm";
 
@@ -47,7 +47,7 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
         banks,
         assets,
         employees,
-        suppliers,
+        allSuppliers,
         fSuppliers,
         fContainers,
         fPayments,
@@ -93,6 +93,12 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
       ]);
       // Strip internal system-only accounts (sp_stock, sp_opnbal are isHidden=true for a reason)
       const ledgers = ledgersRaw.filter((a) => !["sp_stock", "sp_opnbal"].includes(a.subType ?? ""));
+
+      // getAllSuppliers() is not company-scoped, so foreign tenants' rows have to
+      // be dropped here rather than left to the isChildCompany filter below, which
+      // a company resolving to itself never applies — and which would otherwise
+      // also apply those suppliers' opening balances.
+      const suppliers = allSuppliers.filter((supplier) => isSupplierVisibleToCompany(supplier, companyId));
 
       const _companyVoucherIds = companyVouchers.map((v) => v.id);
       // FACTORY-PAY-* voucher IDs — excluded when computing factory supplier voucher-paid amounts

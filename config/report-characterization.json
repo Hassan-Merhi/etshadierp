@@ -5,7 +5,7 @@
     "GET /api/stats/net-profit": {
       "status": 200,
       "shape": "{currency,currencyRevaluation,equity,expenses,expensesTotal,forUs,forUsTotal,income,incomeTotal,netPosition,netPositionBreakdown,netPositionLabel,netProfit,netWorth,onUs,onUsTotal,ownersCapital,spPosProfit,totalExpenses,totalIncome}",
-      "hash": "63e73db3d99f2441454164075921af5e4be4af55189fab981bfd7e0edc078aaa"
+      "hash": "6867c838de922bec96226cdf4d347099500fae94ba95f5afd01bf1be4703c134"
     },
     "GET /api/reports/net-profit-excel": {
       "status": 200,
