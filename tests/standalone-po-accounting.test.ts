@@ -6,12 +6,7 @@ import { storage } from "../server/storage";
 import { resolveParentCompanyId } from "../server/routes/helpers/supplierBalanceHelpers";
 import * as schema from "../shared/schema";
 import { companyScopedSuppliers } from "../shared/schema/supplierCompanyScope";
-import {
-  cleanupTestData,
-  closeTestServer,
-  seedTestData,
-  type TestContext,
-} from "./setup";
+import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 
 const TEST_PREFIX = "standpo";
 
@@ -81,33 +76,16 @@ afterAll(async () => {
       .select({ voucherId: schema.purchaseOrders.voucherId })
       .from(schema.purchaseOrders)
       .where(eq(schema.purchaseOrders.id, poId));
-    await db
-      .delete(schema.poLineItems)
-      .where(eq(schema.poLineItems.poId, poId));
-    await db
-      .delete(schema.purchaseOrders)
-      .where(eq(schema.purchaseOrders.id, poId));
+    await db.delete(schema.poLineItems).where(eq(schema.poLineItems.poId, poId));
+    await db.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.id, poId));
     if (po?.voucherId) {
-      await pool.query(
-        "DELETE FROM accounting_posting_requests WHERE voucher_id = $1",
-        [po.voucherId],
-      );
-      await db
-        .delete(schema.voucherEntries)
-        .where(eq(schema.voucherEntries.voucherId, po.voucherId));
-      await db
-        .delete(schema.vouchers)
-        .where(eq(schema.vouchers.id, po.voucherId));
+      await pool.query("DELETE FROM accounting_posting_requests WHERE voucher_id = $1", [po.voucherId]);
+      await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, po.voucherId));
+      await db.delete(schema.vouchers).where(eq(schema.vouchers.id, po.voucherId));
     }
   }
-  if (containerId)
-    await db
-      .delete(schema.containers)
-      .where(eq(schema.containers.id, containerId));
-  if (supplierId)
-    await db
-      .delete(companyScopedSuppliers)
-      .where(eq(companyScopedSuppliers.id, supplierId));
+  if (containerId) await db.delete(schema.containers).where(eq(schema.containers.id, containerId));
+  if (supplierId) await db.delete(companyScopedSuppliers).where(eq(companyScopedSuppliers.id, supplierId));
 
   await storage.setParentCompanyId(originalParentCompanyId);
   await cleanupTestData(TEST_PREFIX);
@@ -136,7 +114,7 @@ describe("standalone purchase-order accounting", () => {
         otherCharges: "0",
         status: "Open",
       },
-      "2026-09-02",
+      "2026-09-02"
     );
     poId = po.id;
 
@@ -146,8 +124,7 @@ describe("standalone purchase-order accounting", () => {
       .where(eq(schema.purchaseOrders.id, po.id));
     const voucherId = storedPo?.voucherId;
     expect(voucherId).toBeTruthy();
-    if (!voucherId)
-      throw new Error("Standalone PO did not create a purchase voucher");
+    if (!voucherId) throw new Error("Standalone PO did not create a purchase voucher");
 
     const [purchaseVoucher] = await db
       .select({ companyId: schema.vouchers.companyId })
@@ -176,7 +153,7 @@ describe("standalone purchase-order accounting", () => {
           debitAmount: "125.00",
           creditAmount: "0.00",
         }),
-      ]),
+      ])
     );
 
     const parentInterco = await db
@@ -185,11 +162,8 @@ describe("standalone purchase-order accounting", () => {
       .where(
         and(
           eq(schema.vouchers.companyId, legacyParentCompanyId),
-          like(
-            schema.vouchers.voucherNumber,
-            `INTERCO-PARENT-${TEST_PREFIX.toUpperCase()}-PO-1-%`,
-          ),
-        ),
+          like(schema.vouchers.voucherNumber, `INTERCO-PARENT-${TEST_PREFIX.toUpperCase()}-PO-1-%`)
+        )
       );
     expect(parentInterco).toHaveLength(0);
 
@@ -199,8 +173,8 @@ describe("standalone purchase-order accounting", () => {
       .where(
         and(
           eq(schema.ledgerAccounts.companyId, ctx.companyId),
-          like(schema.ledgerAccounts.name, `%Legacy Parent Credit%`),
-        ),
+          like(schema.ledgerAccounts.name, `%Legacy Parent Credit%`)
+        )
       );
     expect(parentCredit).toHaveLength(0);
   });
