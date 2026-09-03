@@ -75,20 +75,10 @@ export async function repairStandalonePurchaseOrderAccounting(companyId: number)
     };
   }
 
+  // Reading the canonical account is harmless, but creating it is deferred
+  // until a PO is actually confirmed to need repair. A no-op sync must never
+  // mutate the chart of accounts just because this compatibility boundary ran.
   let purchasesAccount = await storage.getLedgerAccountByCode("PURCHASES", companyId);
-  if (!purchasesAccount) {
-    purchasesAccount = await storage.createLedgerAccount({
-      companyId,
-      code: "PURCHASES",
-      name: "Purchases",
-      accountType: "Expense",
-      subType: "Direct Expense",
-      openingBalance: "0",
-      openingBalanceSide: "Dr",
-      active: true,
-    });
-  }
-
   const purchaseOrdersForCompany = await storage.getAllPurchaseOrders(companyId);
   let repairedStandaloneSupplierVouchers = 0;
   let normalizedStandaloneParentFreight = 0;
@@ -166,6 +156,19 @@ export async function repairStandalonePurchaseOrderAccounting(companyId: number)
         creditEntries.length !== 1;
 
       if (!needsRepair) continue;
+
+      if (!purchasesAccount) {
+        purchasesAccount = await storage.createLedgerAccount({
+          companyId,
+          code: "PURCHASES",
+          name: "Purchases",
+          accountType: "Expense",
+          subType: "Direct Expense",
+          openingBalance: "0",
+          openingBalanceSide: "Dr",
+          active: true,
+        });
+      }
 
       await db.transaction(async (tx) => {
         const debitEntry = debitEntries[0];
