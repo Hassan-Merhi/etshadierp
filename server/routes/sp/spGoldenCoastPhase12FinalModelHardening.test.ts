@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const phase6RouteSource = readFileSync(new URL("./spGoldenCoastPhase6PosSaleRoutes.ts", import.meta.url), "utf8");
 const phase6AutoHadiSource = readFileSync(new URL("./goldenCoastPhase6AutoHadi.ts", import.meta.url), "utf8");
+const phase6AutoHadiCoreSource = readFileSync(new URL("./goldenCoastPhase6AutoHadiCore.ts", import.meta.url), "utf8");
 const phase7RouteSource = readFileSync(new URL("./spGoldenCoastPhase7HadiTransferRoutes.ts", import.meta.url), "utf8");
 const phase7ServiceSource = readFileSync(
   new URL("../../services/accounting/goldenCoastPhase7HadiTransfer.ts", import.meta.url),
@@ -32,12 +33,17 @@ describe("Golden Coast Phase 12 final accounting-model hardening", () => {
     );
   });
 
-  it("atomically routes Phase 6 sale cash into the configured HADI company", () => {
+  it("atomically routes Phase 6 sale cash into HADI before Phase 15 creates the credit payable", () => {
     expect(phase6RouteSource).toContain("postGoldenCoastAutomaticHadiCollectionTx");
     expect(phase6RouteSource).toContain("hadi_collection_${item.role}");
-    expect(phase6AutoHadiSource).toContain('operation: "collect_via_hadi"');
-    expect(phase6AutoHadiSource).toContain("buildGoldenCoastPhase7TransferPostings");
-    expect(phase6AutoHadiSource).toContain("postBalancedVoucherTx");
+    expect(phase6AutoHadiCoreSource).toContain('operation: "collect_via_hadi"');
+    expect(phase6AutoHadiCoreSource).toContain("buildGoldenCoastPhase7TransferPostings");
+    expect(phase6AutoHadiCoreSource).toContain("postBalancedVoucherTx");
+    expect(phase6AutoHadiSource).toContain("core.postGoldenCoastAutomaticHadiCollectionTx(input)");
+    expect(phase6AutoHadiSource).toContain("buildGoldenCoastPhase15SalesPayablePosting");
+    expect(phase6AutoHadiSource.indexOf("core.postGoldenCoastAutomaticHadiCollectionTx(input)")).toBeLessThan(
+      phase6AutoHadiSource.indexOf("postPhase15SalesPayableBridge")
+    );
   });
 
   it("routes the live Supplier Partner POS to Phase 6 when Golden Coast setup is present", () => {
