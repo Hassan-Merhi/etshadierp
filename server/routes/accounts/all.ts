@@ -15,7 +15,7 @@ import {
   getSupplierBalanceForContext,
 } from "../helpers/supplierBalanceHelpers";
 import { vouchers, voucherEntries, customerBalances, customerOrders } from "@shared/schema";
-import { eq, and, inArray, sql, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, inArray, sql, isNull } from "drizzle-orm";
 import { getClientDate } from "../../lib/dateUtils";
 import { resultRows } from "../../lib/queryResult";
 
@@ -29,27 +29,20 @@ export function registerAccountListRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
 
       // Fire all independent lookups in parallel instead of serially.
-      // getAllSuppliers is always fetched; for factory companies the result is
-      // discarded — the wasted query is small compared to the serial latency saved.
       const [currentCompany, ledgersAll, banks, assets, employees, allSuppliers, companyCustomers] = await Promise.all([
         storage.getCompanyById(companyId),
-        storage.getAllLedgerAccounts(companyId, true), // include hidden so cash/loan/bank accounts appear in pickers
+        storage.getAllLedgerAccounts(companyId, true),
         storage.getAllBankAccounts(companyId),
         storage.getAllFixedAssets(companyId),
         storage.getAllEmployees(companyId),
         storage.getAllSuppliers(),
         storage.getAllCustomers(companyId),
       ]);
-      // Strip internal system-only accounts (isHidden=true for a reason — never show in pickers)
       const ledgers = ledgersAll.filter((a) => !["sp_stock", "sp_opnbal"].includes(a.subType ?? ""));
       const isFactoryCompany = currentCompany?.companyType === "factory";
       const isPropertiesCompany = currentCompany?.companyType === "properties";
       const suppliers = isFactoryCompany || isPropertiesCompany ? [] : allSuppliers;
 
-      // Build a map of ledgerAccountId → customer opening balance.
-      // For customer-linked ledger accounts, the customer record is the
-      // authoritative source of opening balance — the ledger account's own
-      // openingBalance may have drifted (e.g. edited directly in Accounts page).
       const customerObMap = new Map<number, { openingBalance: string; openingBalanceSide: string | null }>();
       for (const cust of companyCustomers) {
         if (cust.ledgerAccountId) {
@@ -60,9 +53,8 @@ export function registerAccountListRoutes(app: Express) {
         }
       }
 
-      // For factory companies, compute a combined balance for customer-linked ledger accounts
-      // using the same multi-source formula as /api/factory/customers so both pages agree.
-      // Formula: OB + finalized order totals + customerBalances non-INVOICE + voucherNet (excl CHARGE-*)
+      // For factory companies, compute the same combined customer balance used
+      // by the Factory Customers page.
       const customerLedgerOverrides = new Map<number, { balance: string; balanceSide: string }>();
       if (isFactoryCompany) {
         const linkedCustomers = companyCustomers.filter((c) => c.ledgerAccountId);
@@ -164,12 +156,6 @@ export function registerAccountListRoutes(app: Express) {
         }
       }
 
-      // The "Factory Worker Advances" ledger account's own debit/credit balance drifts
-      // from reality because advance repayments/deductions aren't always posted back to
-      // it (see the same guard in the Factory Net Position route). factory_worker_advances
-      // .remaining_balance is the authoritative source (also used by the Payroll & Benefits
-      // "Advances" KPI and Net Position), so override this account's displayed balance here
-      // too — otherwise the Accounts page shows a stale figure that doesn't match those pages.
       if (isFactoryCompany) {
         const workerAdvLedger = ledgers.find(
           (a) => (a.name || "").toLowerCase().replace(/\s+/g, " ").trim() === "factory worker advances"
@@ -177,9 +163,9 @@ export function registerAccountListRoutes(app: Express) {
         if (workerAdvLedger) {
           const workerAdvRes = await db.execute(sql`
             SELECT COALESCE(SUM(remaining_balance::numeric), 0) AS total
-            FROM   factory_worker_advances
-            WHERE  company_id = ${companyId}
-              AND  remaining_balance > 0
+            FROM factory_worker_advances
+            WHERE company_id = ${companyId}
+              AND remaining_balance > 0
           `);
           const workerAdvRow = resultRows(workerAdvRes)[0] ?? {};
           const workerAdvancesValue = parseFloat(String(workerAdvRow.total ?? "0")) || 0;
@@ -190,8 +176,6 @@ export function registerAccountListRoutes(app: Express) {
         }
       }
 
-      // Optional date range filter for account balances.
-      // effectiveEndDate defaults to today so future-dated vouchers are excluded.
       const asOfDate = getClientDate(req);
       const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
       const balStartDate =
@@ -200,8 +184,6 @@ export function registerAccountListRoutes(app: Express) {
         typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate) ? req.query.endDate : undefined;
       const effectiveEndDate = rawEndDate && rawEndDate < asOfDate ? rawEndDate : asOfDate;
 
-      // Get all voucher entries for this company's vouchers (excluding optional and deleted)
-      // Use COALESCE(effectiveDate, voucherDate) so period filtering respects effective date
       const voucherDateConditions = [
         eq(vouchers.companyId, companyId),
         eq(vouchers.optional, false),
@@ -210,113 +192,62 @@ export function registerAccountListRoutes(app: Express) {
         sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${effectiveEndDate}`,
       ];
 
-      // Ledger account IDs that belong to this company (already fetched above)
       const ledgerIds = ledgers.map((a) => a.id);
+      const ledgerIdSet = new Set(ledgerIds);
 
-      // For ledger accounts: query entries scoped strictly to THIS company's vouchers.
-      // Cross-company aggregation causes the account-list balance to differ from the
-      // opened statement and Factory Net Position (both company-scoped).
-      const companyLedgerConditions = [
-        eq(vouchers.companyId, companyId),
-        eq(vouchers.optional, false),
-        isNull(vouchers.deletedAt),
-        isNotNull(voucherEntries.ledgerAccountId),
-        ...(balStartDate ? [sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) >= ${balStartDate}`] : []),
-        sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${effectiveEndDate}`,
-        ...(ledgerIds.length > 0 ? [inArray(voucherEntries.ledgerAccountId, ledgerIds)] : [sql`1=0`]),
-      ];
+      // Phase 4: one aggregate scan replaces the previous three-step
+      // voucher-id -> raw-entry -> ledger-entry read path. The old endpoint
+      // materialized every matching voucher entry in Node just to sum four
+      // account dimensions. PostgreSQL now returns only grouped totals.
+      const movementRows = await db
+        .select({
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+          bankAccountId: voucherEntries.bankAccountId,
+          fixedAssetId: voucherEntries.fixedAssetId,
+          employeeId: voucherEntries.employeeId,
+          debits: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric)), 0)`,
+          credits: sql<string>`COALESCE(SUM(CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(and(...voucherDateConditions))
+        .groupBy(
+          voucherEntries.ledgerAccountId,
+          voucherEntries.bankAccountId,
+          voucherEntries.fixedAssetId,
+          voucherEntries.employeeId
+        );
 
-      // Run both fetches in parallel
-      const [companyVouchers, companyLedgerEntries] = await Promise.all([
-        db
-          .select({ id: vouchers.id })
-          .from(vouchers)
-          .where(and(...voucherDateConditions)),
-        ledgerIds.length > 0
-          ? db
-              .select({
-                ledgerAccountId: voucherEntries.ledgerAccountId,
-                debitAmount: voucherEntries.debitAmount,
-                creditAmount: voucherEntries.creditAmount,
-              })
-              .from(voucherEntries)
-              .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-              .where(and(...companyLedgerConditions))
-          : Promise.resolve([]),
-      ]);
-
-      const companyVoucherIds = companyVouchers.map((v) => v.id);
-
-      // Get all voucher entries for this company (needed for bank / asset / employee / supplier balances)
-      const allEntries =
-        companyVoucherIds.length > 0
-          ? await db.select().from(voucherEntries).where(inArray(voucherEntries.voucherId, companyVoucherIds)).execute()
-          : [];
-
-      // Group entries by account type and calculate balances
-      // Ledger balances use the company-scoped query above.
       const ledgerBalances = new Map<number, { debits: number; credits: number }>();
-      for (const entry of companyLedgerEntries) {
-        if (!entry.ledgerAccountId) continue;
-        const debit = parseFloat(entry.debitAmount || "0");
-        const credit = parseFloat(entry.creditAmount || "0");
-        const existing = ledgerBalances.get(entry.ledgerAccountId) || { debits: 0, credits: 0 };
-        ledgerBalances.set(entry.ledgerAccountId, {
-          debits: existing.debits + debit,
-          credits: existing.credits + credit,
-        });
-      }
-
       const bankBalances = new Map<number, { debits: number; credits: number }>();
       const assetBalances = new Map<number, { debits: number; credits: number }>();
       const employeeBalances = new Map<number, { debits: number; credits: number }>();
-      // Note: Supplier balances are calculated separately below using getSupplierBalanceForContext,
-      // which correctly scopes entries to the selected company and applies opening-balance rules
-      // (opening balance only applies in the parent company's context — zero for all others).
 
-      for (const entry of allEntries) {
-        const debit = parseFloat(entry.debitAmount || "0");
-        const credit = parseFloat(entry.creditAmount || "0");
+      const addMovement = (
+        target: Map<number, { debits: number; credits: number }>,
+        id: number | null | undefined,
+        debits: number,
+        credits: number
+      ) => {
+        if (!id) return;
+        const existing = target.get(id) || { debits: 0, credits: 0 };
+        target.set(id, {
+          debits: existing.debits + debits,
+          credits: existing.credits + credits,
+        });
+      };
 
-        // Ledger balances are already handled by the cross-company query above
-
-        if (entry.bankAccountId) {
-          const existing = bankBalances.get(entry.bankAccountId) || {
-            debits: 0,
-            credits: 0,
-          };
-          bankBalances.set(entry.bankAccountId, {
-            debits: existing.debits + debit,
-            credits: existing.credits + credit,
-          });
+      for (const row of movementRows) {
+        const debits = parseFloat(row.debits || "0");
+        const credits = parseFloat(row.credits || "0");
+        if (row.ledgerAccountId && ledgerIdSet.has(row.ledgerAccountId)) {
+          addMovement(ledgerBalances, row.ledgerAccountId, debits, credits);
         }
-
-        if (entry.fixedAssetId) {
-          const existing = assetBalances.get(entry.fixedAssetId) || {
-            debits: 0,
-            credits: 0,
-          };
-          assetBalances.set(entry.fixedAssetId, {
-            debits: existing.debits + debit,
-            credits: existing.credits + credit,
-          });
-        }
-
-        if (entry.employeeId) {
-          const existing = employeeBalances.get(entry.employeeId) || {
-            debits: 0,
-            credits: 0,
-          };
-          employeeBalances.set(entry.employeeId, {
-            debits: existing.debits + debit,
-            credits: existing.credits + credit,
-          });
-        }
-        // Note: Supplier balances are calculated separately below using global entries
-        // (not company-filtered) to match the supplier stats endpoint
+        addMovement(bankBalances, row.bankAccountId, debits, credits);
+        addMovement(assetBalances, row.fixedAssetId, debits, credits);
+        addMovement(employeeBalances, row.employeeId, debits, credits);
       }
 
-      // Helper function to calculate actual balance
       const calculateBalance = (
         openingBalance: string,
         openingBalanceSide: string | null,
@@ -324,37 +255,19 @@ export function registerAccountListRoutes(app: Express) {
         credits: number
       ) => {
         let balance = parseFloat(openingBalance || "0");
-
-        // If opening balance has a side, convert to signed number
-        if (openingBalanceSide === "Cr") {
-          balance = -balance;
-        }
-
-        // Add net change (debits increase, credits decrease)
+        if (openingBalanceSide === "Cr") balance = -balance;
         balance += debits - credits;
-
-        // Determine side based on final balance
         const balanceSide = balance >= 0 ? "Dr" : "Cr";
-        const absoluteBalance = Math.abs(balance);
-
-        return { balance: absoluteBalance, balanceSide };
+        return { balance: Math.abs(balance), balanceSide };
       };
 
       const accounts = [
         ...ledgers.map((account) => {
-          const movements = ledgerBalances.get(account.id) || {
-            debits: 0,
-            credits: 0,
-          };
-          // If this ledger account is linked to a customer, use the customer's
-          // opening balance as the authoritative source (may differ from the
-          // ledger account's own openingBalance if edited directly).
+          const movements = ledgerBalances.get(account.id) || { debits: 0, credits: 0 };
           const custOb = customerObMap.get(account.id);
           const effectiveOB = custOb?.openingBalance ?? account.openingBalance ?? "0";
           const effectiveOBSide = custOb?.openingBalanceSide ?? account.openingBalanceSide;
 
-          // For factory companies, use the pre-computed combined balance override
-          // (sales + customerBalances + voucherEntries via both ledgerId and customerId)
           const override = customerLedgerOverrides.get(account.id);
           if (override) {
             return {
@@ -380,7 +293,6 @@ export function registerAccountListRoutes(app: Express) {
             movements.debits,
             movements.credits
           );
-
           return {
             id: `ledger-${account.id}`,
             accountId: account.id,
@@ -398,17 +310,13 @@ export function registerAccountListRoutes(app: Express) {
           };
         }),
         ...banks.map((account) => {
-          const movements = bankBalances.get(account.id) || {
-            debits: 0,
-            credits: 0,
-          };
+          const movements = bankBalances.get(account.id) || { debits: 0, credits: 0 };
           const { balance, balanceSide } = calculateBalance(
             account.openingBalance || "0",
             account.openingBalanceSide,
             movements.debits,
             movements.credits
           );
-
           return {
             id: `bank-${account.id}`,
             accountId: account.id,
@@ -424,17 +332,13 @@ export function registerAccountListRoutes(app: Express) {
           };
         }),
         ...assets.map((asset) => {
-          const movements = assetBalances.get(asset.id) || {
-            debits: 0,
-            credits: 0,
-          };
+          const movements = assetBalances.get(asset.id) || { debits: 0, credits: 0 };
           const { balance, balanceSide } = calculateBalance(
             asset.openingBalance || "0",
-            "Dr", // Fixed assets are always debit balance
+            "Dr",
             movements.debits,
             movements.credits
           );
-
           return {
             id: `asset-${asset.id}`,
             accountId: asset.id,
@@ -444,23 +348,16 @@ export function registerAccountListRoutes(app: Express) {
             balance: balance.toFixed(2),
             balanceSide,
             openingBalance: parseFloat(asset.openingBalance || "0"),
-            openingBalanceSide: "Dr", // Fixed assets are always debit balance
+            openingBalanceSide: "Dr",
             active: asset.active,
             parentId: null,
           };
         }),
         ...employees.map((employee) => {
-          const movements = employeeBalances.get(employee.id) || {
-            debits: 0,
-            credits: 0,
-          };
+          const movements = employeeBalances.get(employee.id) || { debits: 0, credits: 0 };
           const openingBalance = parseFloat(employee.openingBalance || "0");
-          // Employee accounts are liability (Cr-normal): credits increase balance, debits decrease it.
-          // Positive netBalance = Cr (we owe them, the normal state).
-          // This matches the payroll page's currentBalance convention.
           const netBalance = openingBalance + movements.credits - movements.debits;
           const balanceSide = netBalance >= 0 ? "Cr" : "Dr";
-
           return {
             id: `employee-${employee.id}`,
             accountId: employee.id,
@@ -469,7 +366,7 @@ export function registerAccountListRoutes(app: Express) {
             name: `${employee.firstName} ${employee.lastName}`,
             balance: Math.abs(netBalance).toFixed(2),
             balanceSide,
-            openingBalance: openingBalance,
+            openingBalance,
             openingBalanceSide: "Cr",
             active: employee.active,
             parentId: null,
@@ -477,64 +374,54 @@ export function registerAccountListRoutes(app: Express) {
         }),
       ];
 
-      // Determine whether the current company is the parent company. The opening
-      // balance is a one-time historical entry that only belongs to the parent
-      // company's books — child/sub companies start from zero and only accrue a
-      // balance from their OWN vouchers. The parent is NEVER inferred from
-      // "lowest company ID" — only the explicit parentCompanyId setting decides.
-      let isChildCompany = false;
-      try {
-        const parentCompanyId = await resolveParentCompanyId(companyId);
-        isChildCompany = companyId !== parentCompanyId;
-      } catch (error) {
-        if (!(error instanceof ParentCompanyNotConfiguredError)) throw error;
-        // Without a configured legacy parent, never guess which ERP company
-        // owns an unscoped supplier opening balance. Account pickers can still
-        // safely expose current-company activity as a child-company view.
-        isChildCompany = true;
-      }
+      // Factory and Properties companies never expose supplier accounts here, so
+      // do not perform legacy parent-company resolution for an empty supplier set.
+      const supplierAccountsList =
+        suppliers.length === 0
+          ? []
+          : await (async () => {
+              let isChildCompany = false;
+              try {
+                const parentCompanyId = await resolveParentCompanyId(companyId);
+                isChildCompany = companyId !== parentCompanyId;
+              } catch (error) {
+                if (!(error instanceof ParentCompanyNotConfiguredError)) throw error;
+                isChildCompany = true;
+              }
 
-      // Calculate each supplier's balance scoped to THIS company only (opening
-      // balance applies solely in the parent company's context). Child companies
-      // additionally omit suppliers with no activity in that company at all.
-      const supplierAccountsList = (
-        await Promise.all(
-          suppliers.map(async (supplier) => {
-            const {
-              balance: calculatedBalance,
-              openingBalance,
-              hasActivity,
-            } = await getSupplierBalanceForContext(supplier, companyId, {
-              allowUnconfiguredLegacyScope: true,
-            });
+              return (
+                await Promise.all(
+                  suppliers.map(async (supplier) => {
+                    const {
+                      balance: calculatedBalance,
+                      openingBalance,
+                      hasActivity,
+                    } = await getSupplierBalanceForContext(supplier, companyId, {
+                      allowUnconfiguredLegacyScope: true,
+                    });
 
-            if (isChildCompany && !hasActivity) return null;
+                    if (isChildCompany && !hasActivity) return null;
+                    const balanceSide = calculatedBalance >= 0 ? "Cr" : "Dr";
 
-            // For suppliers, return the signed balance (same format as /api/suppliers/stats)
-            // Positive = we owe them (Cr), Negative = they owe us/prepaid (Dr)
-            const balanceSide = calculatedBalance >= 0 ? "Cr" : "Dr";
+                    return {
+                      id: `supplier-${supplier.id}`,
+                      accountId: supplier.id,
+                      type: "supplier",
+                      code: supplier.code,
+                      name: supplier.legalName,
+                      balance: calculatedBalance.toFixed(2),
+                      balanceSide,
+                      openingBalance,
+                      openingBalanceSide: "Cr",
+                      active: supplier.active,
+                      parentId: null,
+                    };
+                  })
+                )
+              ).filter((s): s is NonNullable<typeof s> => s !== null);
+            })();
 
-            return {
-              id: `supplier-${supplier.id}`,
-              accountId: supplier.id,
-              type: "supplier",
-              code: supplier.code,
-              name: supplier.legalName,
-              balance: calculatedBalance.toFixed(2), // Signed value, not absolute
-              balanceSide,
-              openingBalance: openingBalance,
-              openingBalanceSide: "Cr", // Suppliers are always credit balance (payable)
-              active: supplier.active,
-              parentId: null,
-            };
-          })
-        )
-      ).filter((s): s is NonNullable<typeof s> => s !== null);
-
-      // Combine all accounts — customers are excluded from the voucher account selector
-      const allAccounts = [...accounts, ...supplierAccountsList];
-
-      res.json({ accounts: allAccounts, asOfDate: effectiveEndDate });
+      res.json({ accounts: [...accounts, ...supplierAccountsList], asOfDate: effectiveEndDate });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
