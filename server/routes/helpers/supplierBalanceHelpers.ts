@@ -79,6 +79,29 @@ export async function isParentCompanyContext(companyId?: number | null): Promise
   return legacyParentCompanyId === companyId;
 }
 
+/**
+ * Whether a supplier row may be shown to the company currently being viewed.
+ *
+ * Supplier rows are company-owned through suppliers.company_id, but the account
+ * pickers load every supplier and historically relied on the child-company
+ * "no activity here" filter to hide other tenants' rows. That is not a tenant
+ * boundary: a company that resolves to itself (a standalone or root company)
+ * skips that filter and would otherwise see every other tenant's supplier names
+ * and codes, and in the voucher sidebar their opening balances too.
+ *
+ * Rows predating the company-scope migration have a null company_id and are not
+ * owned by any single tenant, so they stay visible; ownership of their opening
+ * balance is decided separately by isParentCompanyContext.
+ */
+export function isSupplierVisibleToCompany(
+  supplier: { companyId?: number | null },
+  companyId?: number | null
+): boolean {
+  if (!supplier.companyId) return true;
+  if (!companyId) return true;
+  return supplier.companyId === companyId;
+}
+
 export interface SupplierBalanceContextResult {
   balance: number;
   openingBalance: number;
