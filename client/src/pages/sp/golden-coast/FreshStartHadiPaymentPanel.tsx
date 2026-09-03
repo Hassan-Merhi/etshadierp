@@ -58,6 +58,9 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
   const [reference, setReference] = useState("");
   const [requestId, setRequestId] = useState(() => makeRequestId("gc-fs-hadi"));
 
+  // Keep the read-only legacy Phase 7 probe for backward-compatible HADI
+  // discovery. Phase 16 retires only its mutation; this authorized readiness
+  // and payment endpoint owns the actual credit-payable settlement.
   const phase7Probe = useQuery<Phase7Readiness>({
     queryKey: [PHASE7_READINESS, companyKey, "fresh-start-probe"],
     queryFn: () => readJson<Phase7Readiness>(PHASE7_READINESS),
@@ -139,11 +142,11 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
             </CardTitle>
             <CardDescription>
               {releaseDebtEnglish(
-                "Use this only when HADI actually pays Fresh Start. A normal GC↔HADI transfer only moves an asset and does not reduce Fresh Start."
+                "Settle the live GC Sales Cash credit payable from Golden Coast sale proceeds that HADI is still holding."
               )}
             </CardDescription>
           </div>
-          <Badge variant="secondary">{releaseDebtEnglish("Fresh Start settlement")}</Badge>
+          <Badge variant="secondary">{releaseDebtEnglish("Phase 16")}</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -182,7 +185,7 @@ export function FreshStartHadiPaymentPanel({ companyKey }: { companyKey: Company
           {releaseDebtEnglish("Dr Golden Coast Intercompany / Cr selected Cash or Bank")}
           <p className="mt-2 text-xs">
             {releaseDebtEnglish(
-              "Fresh Start Equity is not posted here. It decreases automatically in Net Position because Net Assets fell while Hassan's account stayed unchanged."
+              "Fresh Start Equity is not posted again here. Phase 15 already reclassified the sold amount from Fresh Start's capital claim into GC Sales Cash; this payment only settles that payable."
             )}
           </p>
         </div>
