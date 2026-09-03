@@ -220,16 +220,11 @@ export function registerOrderBaleScanRoutes(app: Express) {
         let priceUsed = bale.productSellingPrice || "0";
 
         if (order.proformaIdUsed) {
-          // Membership, pricing and current loaded quantity are returned in one
-          // query instead of reading the proforma line and then issuing a second
-          // COUNT(*) round trip.
-          const [proformaLine] = await tx
-            .select({
-              quantity: customerProformaLines.quantity,
-              pricingMode: customerProformaLines.pricingMode,
-              pricePerKg: customerProformaLines.pricePerKg,
-              pricePerBale: customerProformaLines.pricePerBale,
-              currentCount: sql<number>`(
+          // Membership and pricing always come from the proforma line. The
+          // potentially expensive active-bale COUNT is only needed while the
+          // overload guard is actually enforced; confirmed/bypass scans use 0.
+          const currentCountExpression = enforceOverload
+            ? sql<number>`(
                 SELECT COUNT(*)::int
                 FROM customer_order_bales cob
                 JOIN customer_orders ON customer_orders.id = cob.order_id
@@ -238,7 +233,16 @@ export function registerOrderBaleScanRoutes(app: Express) {
                   AND customer_orders.status != 'CANCELLED'
                   AND ${isNull(customerOrders.deletedAt)}
                   AND LOWER(TRIM(COALESCE(cob.article_code, ''))) = ${normalizedEffectiveArticleCode}
-              )`,
+              )`
+            : sql<number>`0`;
+
+          const [proformaLine] = await tx
+            .select({
+              quantity: customerProformaLines.quantity,
+              pricingMode: customerProformaLines.pricingMode,
+              pricePerKg: customerProformaLines.pricePerKg,
+              pricePerBale: customerProformaLines.pricePerBale,
+              currentCount: currentCountExpression,
             })
             .from(customerProformaLines)
             .where(
