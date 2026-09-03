@@ -48,8 +48,7 @@ export function resolveAuthenticatedAppRoute({
   const factoryDefaultPage = computeFactoryDefaultPage(myAccess);
   const isFactoryBootstrapExemptRoute =
     currentLocation === "/my-settings" || currentLocation === "/intercompany-requests";
-  const isFactoryBootstrapRoute =
-    isFactoryCompany && (isFactoryRoute || !isFactoryBootstrapExemptRoute);
+  const isFactoryBootstrapRoute = isFactoryCompany && (isFactoryRoute || !isFactoryBootstrapExemptRoute);
 
   let decision: AuthenticatedAppRouteDecision = { kind: "continue" };
 
@@ -68,7 +67,11 @@ export function resolveAuthenticatedAppRoute({
     (currentLocation === "/sp/migration" || currentLocation === "/sp/gc-migration")
   ) {
     decision = { kind: "redirect", to: "/sp/setup" };
-  } else if (isSupplierPartnerCompany && isSupplierPartnerRoute && !SUPPLIER_PARTNER_PATHS.has(currentLocation)) {
+  } else if (
+    isSupplierPartnerCompany &&
+    isSupplierPartnerRoute &&
+    !SUPPLIER_PARTNER_PATHS.has(currentLocation)
+  ) {
     decision = { kind: "redirect", to: "/sp" };
   } else if (isFactoryRoute && !isFactoryCompany) {
     // Factory-only bootstrap data must never gate an ERP/non-Factory company.
