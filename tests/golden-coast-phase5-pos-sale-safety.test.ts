@@ -119,6 +119,9 @@ describe("Golden Coast Phase 5 — replay safety", () => {
       "cogs",
       "hadi_collection_golden_coast",
       "hadi_collection_hadi",
+      // Phase 15 posts the Fresh Start capital-to-payable bridge alongside the
+      // collection, so every automatically routed sale carries a third leg.
+      "hadi_collection_sales_payable",
     ]);
     expect(await lotRemaining(lotId)).toBeCloseTo(remainingAfterFirst, 4);
     expect(await goldenCoastInventory()).toBeCloseTo(inventoryAfterFirst, 4);
@@ -236,7 +239,7 @@ describe("Golden Coast Phase 5 — atomicity and isolation", () => {
     expect(foreignLocation.body.code).toBe("GC_PHASE6_LOCATION_INVALID");
   });
 
-  it("keeps the Golden Coast company's partner capital untouched by Phase 5 sales", async () => {
+  it("touches Fresh Start capital only through the Phase 15 bridge, and Hassan's never", async () => {
     const capitalRows = await db
       .select({ id: schema.ledgerAccounts.id })
       .from(schema.ledgerAccounts)
@@ -248,17 +251,39 @@ describe("Golden Coast Phase 5 — atomicity and isolation", () => {
       );
     expect(capitalRows).toHaveLength(1);
 
-    const { rows } = await pool.query(
+    // Hassan's capital is still never touched by a sale: the Phase 15 bridge
+    // reclassifies Fresh Start's claim on the goods it contributed, nothing else.
+    const owner = await pool.query(
       `SELECT COUNT(*)::int AS c
        FROM voucher_entries ve
        JOIN vouchers v ON v.id = ve.voucher_id
        WHERE v.company_id = $1
          AND ve.ledger_account_id IN (
            SELECT id FROM ledger_accounts
-           WHERE company_id = $1 AND sub_type IN ('gc_partner_capital', 'gc_owner_capital'))`,
+           WHERE company_id = $1 AND sub_type = 'gc_owner_capital')`,
       [fixture.ctx.companyId]
     );
-    expect(rows[0].c).toBe(0);
+    expect(owner.rows[0].c).toBe(0);
+
+    // Fresh Start's capital moves only on Phase 15 bridge vouchers, and only
+    // ever as a debit — a sale converts contributed capital into a payable, it
+    // never credits capital back.
+    const partner = await pool.query(
+      `SELECT v.voucher_number, ve.debit_amount::numeric AS dr, ve.credit_amount::numeric AS cr
+       FROM voucher_entries ve
+       JOIN vouchers v ON v.id = ve.voucher_id
+       WHERE v.company_id = $1
+         AND ve.ledger_account_id IN (
+           SELECT id FROM ledger_accounts
+           WHERE company_id = $1 AND sub_type = 'gc_partner_capital')`,
+      [fixture.ctx.companyId]
+    );
+    expect(partner.rows.length).toBeGreaterThan(0);
+    for (const row of partner.rows) {
+      expect(String(row.voucher_number)).toMatch(/^GC-P15-C\d+-/);
+      expect(Number(row.dr)).toBeGreaterThan(0);
+      expect(Number(row.cr)).toBe(0);
+    }
   });
 });
 

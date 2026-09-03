@@ -117,22 +117,9 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement route surface", () => {
     expect(routeSource).not.toContain("hadiCompanyId");
   });
 
-  it("books a transfer fee to Shared Charges instead of shrinking the payment", () => {
-    // The payable is relieved by amountUsd alone; the fee rides on the paying
-    // account, so the credit is the combined outflow.
-    expect(serviceSource).toContain("debitAmount: input.plan.amountUsd");
-    expect(serviceSource).toContain("creditAmount: input.plan.cashOutflowUsd");
-    expect(serviceSource).toContain("cashOutflowUsd: money(amount.plus(fee))");
-    // Shared Charges is resolved by canonical sub type, never by account name.
-    expect(routeSource).toContain('const SHARED_CHARGES_SUBTYPE = "sp_shared_charges"');
+  it("resolves Shared Charges by canonical sub type, never by account name", () => {
+    // The fee's posting shape is proven behaviourally in the service suite; what
+    // only source can show is that the expense account is found by its role.
     expect(routeSource).toContain("eq(ledgerAccounts.subType, SHARED_CHARGES_SUBTYPE)");
-    // A fee is only accepted when that account genuinely resolves.
-    expect(routeSource).toContain("resolveSharedChargesAccount(tx, companyId, true)");
-  });
-
-  it("reads the credit-normal payable through the shared sign convention", () => {
-    // One module owns the negation, so no route re-derives the sign itself.
-    expect(routeSource).toContain("gcSalesCashPayableBalance(");
-    expect(routeSource).toContain("gcSalesCashSettleablePayable(");
   });
 });

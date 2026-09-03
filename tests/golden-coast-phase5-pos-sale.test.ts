@@ -191,6 +191,9 @@ describe("Golden Coast Phase 5 — FIFO sale accounting", () => {
       "cogs",
       "hadi_collection_golden_coast",
       "hadi_collection_hadi",
+      // Phase 15 posts the Fresh Start capital-to-payable bridge alongside the
+      // collection, so every automatically routed sale carries a third leg.
+      "hadi_collection_sales_payable",
     ]);
   });
 
@@ -273,6 +276,9 @@ describe("Golden Coast Phase 5 — FIFO sale accounting", () => {
       "cogs",
       "hadi_collection_golden_coast",
       "hadi_collection_hadi",
+      // Phase 15 posts the Fresh Start capital-to-payable bridge alongside the
+      // collection, so every automatically routed sale carries a third leg.
+      "hadi_collection_sales_payable",
     ]);
   });
 

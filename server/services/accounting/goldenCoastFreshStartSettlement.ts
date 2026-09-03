@@ -1,6 +1,7 @@
 import Decimal from "decimal.js";
 import { and, eq, isNull } from "drizzle-orm";
 import { ledgerAccounts } from "@shared/schema";
+import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import type { DbTransaction } from "../../db";
 import { getGoldenCoastAccountDefinition } from "./goldenCoastPhase2Accounts";
 import { postBalancedVoucherTx } from "./centralPostingEngine";
@@ -27,7 +28,7 @@ async function resolveAccount(tx: DbTransaction, companyId: number, subType: str
       )
     )
     .limit(1);
-  if (!account) throw new Error(`Missing Golden Coast account ${subType}`);
+  if (!account) throw new Error(releaseDebtEnglish(`Missing Golden Coast account ${subType}`));
   return Number(account.id);
 }
 
@@ -43,7 +44,7 @@ export async function settleGoldenCoastFreshStartPayableTx(input: {
   voucherNumber: string;
 }) {
   const amount = money(input.amountUsd);
-  if (new Decimal(amount).lte(0)) throw new Error("Settlement amount must be positive");
+  if (new Decimal(amount).lte(0)) throw new Error(releaseDebtEnglish("Settlement amount must be positive"));
 
   const payable = await resolveAccount(
     input.tx,
@@ -55,7 +56,7 @@ export async function settleGoldenCoastFreshStartPayableTx(input: {
       ? input.cashAccountId
       : (input.gcIntercompanyAccountId ?? (await resolveAccount(input.tx, input.companyId, "sp_hadi_intercompany")));
 
-  if (!creditAccount) throw new Error("Missing settlement credit account");
+  if (!creditAccount) throw new Error(releaseDebtEnglish("Missing settlement credit account"));
 
   const request = buildGenericVoucherPostingRequest({
     companyId: input.companyId,
@@ -64,7 +65,7 @@ export async function settleGoldenCoastFreshStartPayableTx(input: {
       voucherType: "Journal",
       voucherDate: input.voucherDate,
       voucherNumber: input.voucherNumber,
-      description: `Fresh Start settlement ${input.source}`,
+      description: releaseDebtEnglish(`Fresh Start settlement ${input.source}`),
       currency: "USD",
       locationId: null,
     },
