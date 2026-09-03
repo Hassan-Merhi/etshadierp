@@ -17,6 +17,7 @@ import { extractPOFromText, clearERPContextCache } from "../chatService";
 import { readExcel, sheetToJson } from "../excelHelper";
 import { requireAIActionPermission, logAIAction } from "../lib/aiActionPermission";
 import { poLineItems, purchaseOrders, supplierProformas } from "@shared/schema";
+import { supplierService } from "./suppliers/supplierService";
 
 export function registerChatbotPoImportRoutes(app: Express) {
   // ── PO File Parse (AI-powered) ────────────────────────────────────
@@ -30,7 +31,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
       if (denied) return res.status(denied.code).json({ message: denied.message });
 
       const fileExt = (req.file.originalname || "").toLowerCase().split(".").pop();
-      const allSuppliers = await storage.getAllSuppliers();
+      const allSuppliers = await supplierService.list(companyId, "", true);
       const allStockItems = await storage.getAllStockItems(companyId);
 
       // ── Helper: match supplier from raw string ──────────────────────
@@ -365,6 +366,11 @@ export function registerChatbotPoImportRoutes(app: Express) {
       if (!containerNumber) return res.status(400).json({ message: "Container number is required" });
       if (!supplierId) return res.status(400).json({ message: "Supplier is required" });
       if (!lines?.length) return res.status(400).json({ message: "At least one line item is required" });
+
+      const visibleSuppliers = await supplierService.list(companyId, "", true);
+      if (!visibleSuppliers.some((supplier) => supplier.id === Number(supplierId))) {
+        return res.status(400).json({ message: "Selected supplier not found" });
+      }
 
       const unresolved = lines.filter((l: any) => !l.stockItemId);
       if (unresolved.length > 0) {
