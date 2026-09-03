@@ -35,7 +35,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
 
       const parsedLocationId = Number.parseInt(String(locationId), 10);
       if (!Number.isInteger(parsedLocationId) || parsedLocationId <= 0) {
-        return res.status(400).json({ message: "Invalid locationId" });
+        return res.status(400).json({ message: "scanCode and locationId are required" });
       }
 
       const scannerName: string | null = req.session?.username || req.session?.name || req.session?.email || null;
@@ -165,17 +165,18 @@ export function registerOrderBaleScanRoutes(app: Express) {
         }
 
         if (bale.status === "RESERVED_FOR_ORDER") {
-          if (bale.reservedInThisOrder) {
+          const reservedBale = bale;
+          if (reservedBale.reservedInThisOrder) {
             return {
               ok: false,
               httpStatus: 400,
-              body: { message: `${bale.referenceNumber || scanCode} is already loaded in this order` },
+              body: { message: `${reservedBale.referenceNumber || scanCode} is already loaded in this order` },
             };
           }
           return {
             ok: false,
             httpStatus: 400,
-            body: { message: `Bale ${bale.referenceNumber || scanCode} is reserved for another loading order` },
+            body: { message: `Bale ${reservedBale.referenceNumber || scanCode} is reserved for another loading order` },
           };
         }
 
@@ -191,19 +192,19 @@ export function registerOrderBaleScanRoutes(app: Express) {
               ORDER BY CASE WHEN cob.order_id = ${orderId} THEN 0 ELSE 1 END, cob.order_id
               LIMIT 1`
         );
-        const activeOrderRow = firstRow(activeOrderCheck);
-        if (activeOrderRow) {
-          if (Number(activeOrderRow.order_id) === orderId) {
+        const crossOrderDupRow = firstRow(activeOrderCheck);
+        if (crossOrderDupRow) {
+          if (Number(crossOrderDupRow.order_id) === orderId) {
             return { ok: false, httpStatus: 400, body: { message: "Bale already added to this order" } };
           }
-          const orderRef = activeOrderRow.invoice_number
-            ? `invoice ${activeOrderRow.invoice_number}`
-            : `loading #${activeOrderRow.order_id}`;
+          const orderRef = crossOrderDupRow.invoice_number
+            ? `invoice ${crossOrderDupRow.invoice_number}`
+            : `loading #${crossOrderDupRow.order_id}`;
           return {
             ok: false,
             httpStatus: 400,
             body: {
-              message: `Bale ${bale.referenceNumber || scanCode} is already in ${orderRef} (${activeOrderRow.status}). Remove it from that order first.`,
+              message: `Bale ${bale.referenceNumber || scanCode} is already in ${orderRef} (${crossOrderDupRow.status}). Remove it from that order first.`,
             },
           };
         }
