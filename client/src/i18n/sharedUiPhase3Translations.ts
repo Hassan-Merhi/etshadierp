@@ -31,6 +31,7 @@ import { phase3RemainingTranslationsPart21 } from "./phase3RemainingTranslations
 import { phase3RemainingTranslationsPart22 } from "./phase3RemainingTranslations.part22";
 import { phase3RemainingTranslationsPart23 } from "./phase3RemainingTranslations.part23";
 import { phase3RemainingTranslationsPart24 } from "./phase3RemainingTranslations.part24";
+import { phase3RemainingTranslationsPart25 } from "./phase3RemainingTranslations.part25";
 import { createPhase3TemplateTranslator } from "./phase3TemplateTranslationRuntime";
 
 export const phase3SharedUiTranslations: readonly Phase3SharedUiEntry[] = [
@@ -65,6 +66,7 @@ export const phase3SharedUiTranslations: readonly Phase3SharedUiEntry[] = [
   ...phase3RemainingTranslationsPart22,
   ...phase3RemainingTranslationsPart23,
   ...phase3RemainingTranslationsPart24,
+  ...phase3RemainingTranslationsPart25,
 ];
 
 const canonicalEnglishText = new Set(phase3SharedUiTranslations.map((entry) => entry.en));

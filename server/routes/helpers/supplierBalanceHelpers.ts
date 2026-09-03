@@ -88,6 +88,16 @@ export interface SupplierBalanceContextResult {
   historicalBaseBalance: number;
 }
 
+export interface SupplierBalanceContextOptions {
+  /**
+   * Account pickers can still provide company-scoped activity when the legacy
+   * supplier opening-balance owner is ambiguous. In that narrow read-only
+   * context, treat the unowned legacy opening balance as zero instead of
+   * making unrelated ledger accounts fail to load.
+   */
+  allowUnconfiguredLegacyScope?: boolean;
+}
+
 function emptySupplierBalance(): SupplierBalanceContextResult {
   return {
     balance: 0,
@@ -108,15 +118,26 @@ function emptySupplierBalance(): SupplierBalanceContextResult {
  */
 export async function getSupplierBalanceForContext(
   supplier: { id: number; companyId?: number | null; openingBalance?: string | null },
-  companyId?: number | null
+  companyId?: number | null,
+  options: SupplierBalanceContextOptions = {}
 ): Promise<SupplierBalanceContextResult> {
   if (companyId && supplier.companyId && supplier.companyId !== companyId) {
     return emptySupplierBalance();
   }
 
-  const ownsOpeningBalance = supplier.companyId
-    ? !companyId || supplier.companyId === companyId
-    : await isParentCompanyContext(companyId);
+  let ownsOpeningBalance: boolean;
+  if (supplier.companyId) {
+    ownsOpeningBalance = !companyId || supplier.companyId === companyId;
+  } else {
+    try {
+      ownsOpeningBalance = await isParentCompanyContext(companyId);
+    } catch (error) {
+      if (!(options.allowUnconfiguredLegacyScope && error instanceof ParentCompanyNotConfiguredError)) {
+        throw error;
+      }
+      ownsOpeningBalance = false;
+    }
+  }
   const openingBalanceD = ownsOpeningBalance ? new Decimal(supplier.openingBalance || "0") : new Decimal(0);
   const openingBalance = openingBalanceD.toNumber();
   const entries = await getVoucherEntriesBySupplierBatched(supplier.id, companyId || undefined);

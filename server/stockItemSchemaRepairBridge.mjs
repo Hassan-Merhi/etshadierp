@@ -5,7 +5,19 @@ import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 const { Client } = pg;
 const INSTALL_KEY = Symbol.for("erp.stock-item-schema-repair.applied");
 const STARTUP_LOCK_KEY = 741_220_263;
-const REQUIRED_COLUMNS = ["reorder_level", "selling_price", "active", "deleted_at", "created_at"];
+const REQUIRED_COLUMNS = [
+  "stock_group_id",
+  "grade_id",
+  "category_id",
+  "opening_qty",
+  "opening_rate",
+  "opening_value",
+  "reorder_level",
+  "selling_price",
+  "active",
+  "deleted_at",
+  "created_at",
+];
 
 function resolveConnectionString() {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
@@ -79,6 +91,30 @@ export async function ensureStockItemSchemaReadiness() {
 
     const before = await readPresentColumns(client);
 
+    if (!before.has("stock_group_id")) {
+      await client.query("ALTER TABLE stock_items ADD COLUMN stock_group_id integer");
+      log("INFO", "Added missing stock_items column", { columnName: "stock_group_id" });
+    }
+    if (!before.has("grade_id")) {
+      await client.query("ALTER TABLE stock_items ADD COLUMN grade_id integer");
+      log("INFO", "Added missing stock_items column", { columnName: "grade_id" });
+    }
+    if (!before.has("category_id")) {
+      await client.query("ALTER TABLE stock_items ADD COLUMN category_id integer");
+      log("INFO", "Added missing stock_items column", { columnName: "category_id" });
+    }
+    if (!before.has("opening_qty")) {
+      await client.query("ALTER TABLE stock_items ADD COLUMN opening_qty numeric(15,3) DEFAULT 0");
+      log("INFO", "Added missing stock_items column", { columnName: "opening_qty" });
+    }
+    if (!before.has("opening_rate")) {
+      await client.query("ALTER TABLE stock_items ADD COLUMN opening_rate numeric(15,2) DEFAULT 0");
+      log("INFO", "Added missing stock_items column", { columnName: "opening_rate" });
+    }
+    if (!before.has("opening_value")) {
+      await client.query("ALTER TABLE stock_items ADD COLUMN opening_value numeric(15,2) DEFAULT 0");
+      log("INFO", "Added missing stock_items column", { columnName: "opening_value" });
+    }
     if (!before.has("reorder_level")) {
       await client.query("ALTER TABLE stock_items ADD COLUMN reorder_level numeric(15,3) DEFAULT 0");
       log("INFO", "Added missing stock_items column", { columnName: "reorder_level" });
@@ -105,6 +141,28 @@ export async function ensureStockItemSchemaReadiness() {
     if (missing.length > 0) {
       throw new Error(`stock_items schema is still missing required columns: ${missing.join(", ")}`);
     }
+
+    // Validate the exact full-row shape used by Drizzle-backed stock-item reads.
+    // LIMIT 0 asks PostgreSQL to resolve every column without reading tenant data.
+    await client.query(`SELECT
+      id,
+      company_id,
+      code,
+      name,
+      stock_group_id,
+      grade_id,
+      category_id,
+      uom,
+      opening_qty,
+      opening_rate,
+      opening_value,
+      reorder_level,
+      selling_price,
+      active,
+      deleted_at,
+      created_at
+    FROM stock_items
+    LIMIT 0`);
 
     await client.query("COMMIT");
     log("INFO", "Stock-item schema readiness verified", {

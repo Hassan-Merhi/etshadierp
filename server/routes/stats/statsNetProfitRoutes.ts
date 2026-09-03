@@ -5,14 +5,15 @@ import { db } from "../../db";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { containers, suppliers, employees, salaryAdvances, exchangeRates } from "@shared/schema";
 import { eq, and, or, desc, inArray, sql, isNull, lte } from "drizzle-orm";
-import { classifyNetPositionAccounts, getAccountNetBalance } from "../../netPositionHelper";
+import { classifyEquityAccounts, classifyNetPositionAccounts, getAccountNetBalance } from "../../netPositionHelper";
 
 import { _getCached, _setCached } from "../../services/shared/ttlCache";
 import { computeRentalOutstanding } from "./netProfitRentalSection";
 import { computeStockInHand } from "./netProfitStockSection";
 import { loadNetProfitData } from "./netProfitDataLoad";
-import { firstRow } from "../../lib/queryResult";
 import { getNetPositionCurrencySummary } from "../../services/accounting/netPositionCurrency";
+import { storage } from "../../storage";
+import { getSupplierPartnerPosProfit } from "./realizedProfit";
 
 export function registerStatsNetProfitRoutes(app: Express) {
   app.get("/api/stats/net-profit", requireAuth, requireNonPOS, async (req, res) => {
@@ -38,9 +39,10 @@ export function registerStatsNetProfitRoutes(app: Express) {
 
       // All the report's raw inputs - company row, ledger accounts and the three
       // grouped balance maps - are loaded in ./netProfitDataLoad.
-      const [netPositionCurrency, reportData] = await Promise.all([
+      const [netPositionCurrency, reportData, companySettings] = await Promise.all([
         getNetPositionCurrencySummary(companyId, toDate),
         loadNetProfitData(companyId, toDate),
+        storage.getCompanySettings(companyId),
       ]);
       const {
         companyRecord,
@@ -96,6 +98,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
         includeSupplierTypeAccounts: shouldIncludeSuppliers,
       });
+      const equity = classifyEquityAccounts(companyAccounts, accountBalances);
       let forUsTotal = classified.forUsTotal;
       let onUsTotal = classified.onUsTotal;
       const forUsAccounts = classified.forUsAccounts;
@@ -572,18 +575,10 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // Cr Payable) already mathematically reflect the profit in the net position.
       // Adding it again would double-count.
       let spPosProfit = 0;
+      const spPosProfitBaselineDate =
+        isSpCompany && companySettings?.spPosProfitBaselineDate ? companySettings.spPosProfitBaselineDate : null;
       if (isSpCompany) {
-        const spProfitResult = await db.execute(sql`
-          SELECT COALESCE(SUM(CAST(si.profit AS DECIMAL)), 0) AS total
-          FROM sales_items si
-          JOIN vouchers v ON si.voucher_id = v.id
-          WHERE v.company_id  = ${companyId}
-            AND v.voucher_type = 'Sales'
-            AND v.deleted_at  IS NULL
-            ${toDate ? sql`AND v.voucher_date <= ${toDate}` : sql``}
-        `);
-        const spRow = firstRow<{ total: string | null }>(spProfitResult);
-        spPosProfit = round2(parseFloat(spRow?.total || "0"));
+        spPosProfit = round2(await getSupplierPartnerPosProfit(companyId, spPosProfitBaselineDate, toDate));
       }
 
       // Owner's Capital for backward compatibility
@@ -617,6 +612,10 @@ export function registerStatsNetProfitRoutes(app: Express) {
           total: expensesTotal,
           breakdown: expensesBreakdown,
         },
+        equity: {
+          total: equity.total,
+          accounts: equity.accounts,
+        },
         netPosition,
       };
 
@@ -625,6 +624,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
         totalExpenses: expensesTotal,
         netProfit,
         spPosProfit,
+        ...(spPosProfitBaselineDate ? { spPosProfitBaselineDate } : {}),
         forUs: {
           total: forUsTotal,
           breakdown: forUsBreakdown,
@@ -645,6 +645,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
           breakdown: expensesBreakdown,
           accounts: expensesAccounts,
         },
+        equity,
         ownersCapital,
         netWorth,
         netPosition,
@@ -654,14 +655,14 @@ export function registerStatsNetProfitRoutes(app: Express) {
         onUsTotal,
         incomeTotal,
         expensesTotal,
-         currency: {
-           ...netPositionCurrency,
-           currentCashBankTranslationApplied: false,
-           historicalValuesLocked: true,
-         },
-         currencyRevaluation: {
-           reportTotalsProvisional: netPositionCurrency.totalsProvisional,
-         },
+        currency: {
+          ...netPositionCurrency,
+          currentCashBankTranslationApplied: false,
+          historicalValuesLocked: true,
+        },
+        currencyRevaluation: {
+          reportTotalsProvisional: netPositionCurrency.totalsProvisional,
+        },
       };
       _setCached(_cacheKey, _result);
       res.json(_result);

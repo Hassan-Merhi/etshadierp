@@ -9,7 +9,11 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth } from "../../auth";
-import { resolveParentCompanyId, getSupplierBalanceForContext } from "../helpers/supplierBalanceHelpers";
+import {
+  ParentCompanyNotConfiguredError,
+  resolveParentCompanyId,
+  getSupplierBalanceForContext,
+} from "../helpers/supplierBalanceHelpers";
 import { vouchers, voucherEntries, customerBalances, customerOrders } from "@shared/schema";
 import { eq, and, inArray, sql, isNull, isNotNull } from "drizzle-orm";
 import { getClientDate } from "../../lib/dateUtils";
@@ -478,8 +482,17 @@ export function registerAccountListRoutes(app: Express) {
       // company's books — child/sub companies start from zero and only accrue a
       // balance from their OWN vouchers. The parent is NEVER inferred from
       // "lowest company ID" — only the explicit parentCompanyId setting decides.
-      const parentCompanyId = await resolveParentCompanyId(companyId);
-      const isChildCompany = companyId !== parentCompanyId;
+      let isChildCompany = false;
+      try {
+        const parentCompanyId = await resolveParentCompanyId(companyId);
+        isChildCompany = companyId !== parentCompanyId;
+      } catch (error) {
+        if (!(error instanceof ParentCompanyNotConfiguredError)) throw error;
+        // Without a configured legacy parent, never guess which ERP company
+        // owns an unscoped supplier opening balance. Account pickers can still
+        // safely expose current-company activity as a child-company view.
+        isChildCompany = true;
+      }
 
       // Calculate each supplier's balance scoped to THIS company only (opening
       // balance applies solely in the parent company's context). Child companies
@@ -491,7 +504,9 @@ export function registerAccountListRoutes(app: Express) {
               balance: calculatedBalance,
               openingBalance,
               hasActivity,
-            } = await getSupplierBalanceForContext(supplier, companyId);
+            } = await getSupplierBalanceForContext(supplier, companyId, {
+              allowUnconfiguredLegacyScope: true,
+            });
 
             if (isChildCompany && !hasActivity) return null;
 

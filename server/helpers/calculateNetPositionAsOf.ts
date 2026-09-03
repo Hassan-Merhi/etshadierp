@@ -10,8 +10,9 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { locations, employees, suppliers, containers } from "@shared/schema";
 import { eq, and, or, isNull, lte, sql } from "drizzle-orm";
-import { classifyNetPositionAccounts, round2 } from "../netPositionHelper";
+import { classifyEquityAccounts, classifyNetPositionAccounts, round2 } from "../netPositionHelper";
 import { calculateHistoricalLocationInventory } from "../routes/_helpers";
+import { getSupplierPartnerCustomerNetPosition } from "./supplierPartnerCustomerNetPosition";
 
 export interface NetPositionLineItem {
   label: string;
@@ -107,21 +108,35 @@ export async function calculateNetPositionAsOf(
 
   const parentCompanyId = await storage.getParentCompanyId();
   const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
+  const supplierPartnerCustomerPosition = isSupplierPartner
+    ? await getSupplierPartnerCustomerNetPosition(companyId, toDate)
+    : null;
 
-  // SP formula: What We Have = Cash + SP-HADI-IC receivable (Hadi holds the cash on SP's behalf);
-  // What We Owe = Supplier Cash Payable only.
+  // SP formula: What We Have = Cash + Customer A/R + SP-HADI-IC receivable (Hadi holds the cash on SP's behalf);
+  // What We Owe = Supplier Cash Payable plus Loan/Loans balances.
   // sp_hadi_intercompany is included so that when cash is transferred to Hadi via interco POS
   // transfer, the receivable offsets the supplier payable and Net Position stays at 0.
   // All other SP ledger accounts (OTW, prepaid, clearing, etc.) are excluded.
   // For non-SP companies, the generic exclusion of internal sp_stock / sp_cost_clearing applies.
   const accountsForClassify = isSupplierPartner
     ? companyAccounts.filter(
-        (a) => a.accountType === "Cash" || a.subType === "sp_payable" || a.subType === "sp_hadi_intercompany"
+        (a) =>
+          a.accountType === "Cash" ||
+          a.accountType === "Loan" ||
+          a.accountType === "Loans" ||
+          ((a.accountType === "Customer" ||
+            a.subType === "Accounts Receivable" ||
+            (a.code || "").toUpperCase().startsWith("CUST-") ||
+            (a.name || "").toLowerCase().includes("customer account")) &&
+            !supplierPartnerCustomerPosition?.ledgerAccountIds.has(a.id)) ||
+          a.subType === "sp_payable" ||
+          a.subType === "sp_hadi_intercompany"
       )
     : companyAccounts.filter((a) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing");
   const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
     includeSupplierTypeAccounts: shouldIncludeSuppliers,
   });
+  const equity = classifyEquityAccounts(companyAccounts, accountBalances);
 
   let forUsTotal = classified.forUsTotal;
   let onUsTotal = classified.onUsTotal;
@@ -138,6 +153,19 @@ export async function calculateNetPositionAsOf(
     category: a.category,
     side: "onUs",
   }));
+
+  if (supplierPartnerCustomerPosition) {
+    for (const customer of supplierPartnerCustomerPosition.items) {
+      const value = round2(Math.abs(customer.signedBalance));
+      if (customer.signedBalance > 0) {
+        forUsTotal = round2(forUsTotal + value);
+        forUsLines.push({ label: customer.name, value, category: "Asset", side: "forUs" });
+      } else {
+        onUsTotal = round2(onUsTotal + value);
+        onUsLines.push({ label: customer.name, value, category: "Liability", side: "onUs" });
+      }
+    }
+  }
 
   // ── Stock on floor ────────────────────────────────────────────────────
   const activeLocationsData = await db
@@ -296,7 +324,8 @@ export async function calculateNetPositionAsOf(
 
   forUsTotal = round2(forUsTotal);
   onUsTotal = round2(onUsTotal);
-  const netPosition = round2(forUsTotal - onUsTotal);
+  const equityContribution = isSupplierPartner ? equity.total : 0;
+  const netPosition = round2(forUsTotal - onUsTotal + equityContribution);
 
   return {
     forUsTotal,

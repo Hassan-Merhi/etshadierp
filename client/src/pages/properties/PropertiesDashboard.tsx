@@ -26,6 +26,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { selectAccountsArray, type AccountsAllPayload } from "@/lib/accountsAllPayload";
 
 import type {
   Account,
@@ -80,21 +81,17 @@ export default function PropertiesDashboard() {
     staleTime: 30 * 1000,
   });
 
-  // Fetch all accounts for selection
-  const { data: allAccounts = [] } = useQuery<Account[]>({
+  // Fetch all accounts for selection without assuming the shared cache is a bare array.
+  const { data: allAccounts = [] } = useQuery<AccountsAllPayload<Account>, Error, Account[]>({
     queryKey: ["/api/accounts/all", selectedCompany?.id],
+    select: selectAccountsArray,
     enabled: !!selectedCompany,
   });
 
-  // Fetch all payable accounts (ledger accounts)
+  // The ledger-only endpoint already returns a plain array. Do not fetch the
+  // enveloped /api/accounts/all response under this different query key.
   const { data: allPayableAccounts = [] } = useQuery<PayableAccount[]>({
     queryKey: ["/api/accounts/all-ledger", selectedCompany?.id],
-    queryFn: async () => {
-      const response = await apiRequest("GET", "/api/accounts/all");
-      if (!response.ok) throw new Error("Failed to fetch accounts");
-      const accounts = await response.json();
-      return accounts.filter((acc: { type: string }) => acc.type && acc.type.toLowerCase() === "ledger");
-    },
     enabled: !!selectedCompany,
   });
 

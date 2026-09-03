@@ -24,7 +24,7 @@ import { describe, expect, it } from "vitest";
 import { startupMigrations } from "../server/startup-schema";
 
 /** Statement count of the reviewed composed array. */
-const EXPECTED_STATEMENT_COUNT = 1346;
+const EXPECTED_STATEMENT_COUNT = 1353;
 
 /**
  * sha256 of JSON.stringify(startupMigrations) for the reviewed composed array.
@@ -73,6 +73,15 @@ const EXPECTED_STATEMENT_COUNT = 1346;
  * table and its two indexes for multi-sheet workbook imports, taking the count
  * from 1343 to 1346.
  *
+ * Re-pinned again when stage 024 was expanded with six legacy stock_items
+ * catch-up statements for stock_group_id, grade_id, category_id, opening_qty,
+ * opening_rate and opening_value. They are ordered before the existing five
+ * stage-024 statements, taking the composed array from 1346 to 1352 while
+ * preserving the reviewed stage ordering before stage 025.
+ *
+ * Re-pinned again when the nullable Supplier Partner POS realized-profit
+ * baseline date was added, taking the count from 1352 to 1353.
+ *
  * Re-pinned again when three VALIDATE statements were removed from
  * 007-schema-catchup-may-2026.ts, taking the count from 1288 to 1285. They
  * validated factory_raw_stock, factory_fx_allocations and
@@ -82,7 +91,66 @@ const EXPECTED_STATEMENT_COUNT = 1346;
  * parent table and raised foreign_key_violation on every boot of a database
  * holding factory rows. Only those three were deleted and no statement moved.
  */
-const EXPECTED_CONTENT_HASH = "27e03f62db703dd9d1ab4dfc57248237e67d31bfd0ed17eb25e534af2c753660";
+const EXPECTED_CONTENT_HASH = "d17bf4eb726113164fcbd8b291fb097b5928f9f0e30e9ba05650c1f7cdbc18e2";
+/**
+ * sha256 of JSON.stringify(startupMigrations) for the reviewed composed array.
+ *
+ * Re-pinned when the three factory_container_receipts constraints in
+ * 010-security-notifications-and-precision.ts gained the DO/duplicate_object
+ * guard the rest of that file uses. Unguarded they raised "constraint already
+ * exists" on every startup after the first, which the startup-migration ratchet
+ * added in the same change would have reported as three failures on every
+ * re-run. The statement COUNT is unchanged at 1280 and no statement moved: the
+ * three were wrapped in place, so only their text differs.
+ *
+ * Re-pinned again when the eleven baselined startup-migration failures were
+ * fixed: nine seed INSERTs became guarded SELECTs that check their company and
+ * ledger account exist, and two foreign keys targeting schema that no longer
+ * exists (supplier_containers, bales.erp_location_id) were guarded on the object
+ * being present. The count is still 1280 and nothing moved — every statement was
+ * guarded in place — and the migration ceiling fell from 11 to 0.
+ *
+ * Re-pinned again for the canonical stock movement journal
+ * (021-canonical-stock-movement-journal.ts): eight appended statements creating
+ * the three journal tables and their indexes, taking the count from 1280 to
+ * 1288. They are appended last because they reference companies, stock_items
+ * and locations, so nothing before them moved.
+ *
+ * Re-pinned again when the legacy orphan repair stage was added before the
+ * foreign-key batch. It archives invalid child rows, preserves nullable
+ * references by clearing only the missing parent id, and raises the count
+ * from 1285 to 1332.
+ *
+ * Re-pinned again when the idempotent tenant-control integrity repair stage
+ * was appended, taking the count from 1332 to 1335. It deterministically
+ * collapses duplicate company roles and removes user-location rows without
+ * a matching company role.
+ *
+ * Re-pinned again when the generic transaction-owned financial operation
+ * request table and its two indexes were appended as startup stage 023,
+ * taking the count from 1335 to 1338.
+ *
+ * Re-pinned again when startup stage 024 added five idempotent stock_items
+ * catch-up statements for reorder_level, selling_price, active, deleted_at and
+ * created_at, taking the count from 1338 to 1343. The five statements were
+ * appended after stage 023, so no earlier startup statement moved.
+ *
+ * Re-pinned again when startup stage 025 added the Insurance monthly-amount
+ * table and its two indexes for multi-sheet workbook imports, taking the count
+ * from 1343 to 1346.
+ *
+ * Re-pinned again when the nullable Supplier Partner POS realized-profit
+ * baseline date was added, taking the count from 1346 to 1347.
+ *
+ * Re-pinned again when three VALIDATE statements were removed from
+ * 007-schema-catchup-may-2026.ts, taking the count from 1288 to 1285. They
+ * validated factory_raw_stock, factory_fx_allocations and
+ * factory_container_commissions *_container_id_fkey while those constraints
+ * still pointed at `containers`; part 009 drops each one and recreates it
+ * against factory_containers, so the validation compared rows against the wrong
+ * parent table and raised foreign_key_violation on every boot of a database
+ * holding factory rows. Only those three were deleted and no statement moved.
+ */
 
 function contentHash(statements: string[]): string {
   return crypto.createHash("sha256").update(JSON.stringify(statements)).digest("hex");

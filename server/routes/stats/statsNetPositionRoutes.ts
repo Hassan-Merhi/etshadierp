@@ -9,7 +9,8 @@ import { logAudit, calculateHistoricalLocationInventory } from "../_helpers";
 import { getClientDate } from "../../lib/dateUtils";
 import { inventory, containers, vouchers, suppliers, locations, factoryWorkerAdvances } from "@shared/schema";
 import { eq, and, or, inArray, sql, isNull, lte } from "drizzle-orm";
-import { classifyNetPositionAccounts, round2 } from "../../netPositionHelper";
+import { classifyEquityAccounts, classifyNetPositionAccounts, round2 } from "../../netPositionHelper";
+import { getSupplierPartnerCustomerNetPosition } from "../../helpers/supplierPartnerCustomerNetPosition";
 
 export function registerStatsNetPositionRoutes(app: Express) {
   app.get("/api/stats/net-position-excel", requireAuth, requireNonPOS, async (req, res) => {
@@ -111,10 +112,24 @@ export function registerStatsNetPositionRoutes(app: Express) {
       // ── 2. Classify accounts ──────────────────────────────────────────────
       const parentCompanyId = await storage.getParentCompanyId();
       const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
-      // SP formula: Cash + Stock (inventory) → What We Have; sp_payable only → What We Owe.
+      // SP formula: Cash + Customer A/R + Stock (inventory) → What We Have; sp_payable and Loan/Loans → What We Owe.
       const isSupplierPartner = company?.companyType === "supplier_partner";
+      const supplierPartnerCustomerPosition = isSupplierPartner
+        ? await getSupplierPartnerCustomerNetPosition(companyId, toDate)
+        : null;
       const accountsForClassify = isSupplierPartner
-        ? companyAccounts.filter((a) => a.accountType === "Cash" || a.subType === "sp_payable")
+        ? companyAccounts.filter(
+            (a) =>
+              a.accountType === "Cash" ||
+              a.accountType === "Loan" ||
+              a.accountType === "Loans" ||
+              ((a.accountType === "Customer" ||
+                a.subType === "Accounts Receivable" ||
+                (a.code || "").toUpperCase().startsWith("CUST-") ||
+                (a.name || "").toLowerCase().includes("customer account")) &&
+                !supplierPartnerCustomerPosition?.ledgerAccountIds.has(a.id)) ||
+              a.subType === "sp_payable"
+          )
         : companyAccounts.filter(
             (a) =>
               a.subType !== "sp_stock" &&
@@ -124,10 +139,38 @@ export function registerStatsNetPositionRoutes(app: Express) {
       const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
         includeSupplierTypeAccounts: shouldIncludeSuppliers,
       });
+      const equity = classifyEquityAccounts(companyAccounts, accountBalances);
       let forUsTotal = classified.forUsTotal;
       let onUsTotal = classified.onUsTotal;
       const forUsAccounts = [...classified.forUsAccounts];
       const onUsAccounts = [...classified.onUsAccounts];
+
+      if (supplierPartnerCustomerPosition) {
+        for (const customer of supplierPartnerCustomerPosition.items) {
+          const value = round2(Math.abs(customer.signedBalance));
+          if (customer.signedBalance > 0) {
+            forUsTotal = round2(forUsTotal + value);
+            forUsAccounts.push({
+              id: customer.ledgerAccountId ?? undefined,
+              name: customer.name,
+              code: customer.code,
+              value,
+              category: "Asset",
+            });
+          } else {
+            onUsTotal = round2(onUsTotal + value);
+            onUsAccounts.push({
+              id: customer.ledgerAccountId ?? undefined,
+              name: customer.name,
+              code: customer.code,
+              value,
+              category: "Liability",
+            });
+          }
+        }
+        forUsAccounts.sort((a, b) => b.value - a.value);
+        onUsAccounts.sort((a, b) => b.value - a.value);
+      }
 
       // ── 3. Stock In Hand — historical as of toDate ────────────────────────
       const activeLocsData = await db
@@ -263,7 +306,8 @@ export function registerStatsNetPositionRoutes(app: Express) {
         });
       }
 
-      const netPosition = round2(forUsTotal - onUsTotal);
+      const equityContribution = isSupplierPartner ? equity.total : 0;
+      const netPosition = round2(forUsTotal - onUsTotal + equityContribution);
       forUsTotal = round2(forUsTotal);
       onUsTotal = round2(onUsTotal);
 

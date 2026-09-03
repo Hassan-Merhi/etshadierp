@@ -7,6 +7,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { queryClient } from "@/lib/queryClient";
+import { selectAccountsArray, type AccountsAllPayload } from "@/lib/accountsAllPayload";
 import { useToast } from "@/hooks/use-toast";
 
 import type {
@@ -103,15 +104,17 @@ export function useDashboard() {
     refetchInterval: 5 * 60 * 1000,
   });
 
-  // /api/accounts/all returns { accounts: [...], asOfDate: "..." } — extract the array.
-  const { data: allAccounts = [] } = useQuery<Account[]>({
+  // Keep the shared /api/accounts/all cache in its server envelope shape and
+  // normalize only for this observer. Other screens use the exact same query
+  // key and may already have cached either the envelope or a legacy bare array.
+  const { data: allAccounts = [] } = useQuery<AccountsAllPayload<Account>, Error, Account[]>({
     queryKey: ["/api/accounts/all", selectedCompany?.id],
     queryFn: async () => {
       const response = await modeApiRequest("GET", "/api/accounts/all");
       if (!response.ok) throw new Error("Failed to fetch accounts");
-      const data = await response.json();
-      return Array.isArray(data) ? data : (data.accounts ?? []);
+      return (await response.json()) as AccountsAllPayload<Account>;
     },
+    select: selectAccountsArray,
     enabled: !!selectedCompany,
   });
 
@@ -208,7 +211,7 @@ export function useDashboard() {
       });
       toast({
         title: "Success",
-        description: "Payable account removed from dashboard",
+        description: "Account removed from dashboard",
       });
     },
     onError: (error: unknown) => {

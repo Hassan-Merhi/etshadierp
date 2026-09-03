@@ -91,6 +91,8 @@
 - [Ignored tracked migration files](ignored-tracked-migrations.md) — after merging branches, compare tracked migration trees when startup references a missing SQL file; ignored patterns can hide schema drift.
 - [Stale Vite source rewrites](stale-vite-source-rewrites.md) — when a component has moved to source-owned behavior, bypass its legacy build-time rewrite rather than letting strict markers kill preview startup.
 - [Supplier Partner ledger subtypes](supplier-partner-ledger-subtypes.md) — generic ledger edit validation must preserve SP role subtypes such as sp_payable, including legacy Accounts Payable records.
+- [Ledger subtype validation](ledger-subtype-validation.md) — generic ledger writes must accept canonical subtypes owned by specialized accounting flows.
+- [Net Position equity display](net-position-equity-display.md) — partner equity stays outside asset/liability totals but appears in a separate details section.
 - [Golden Coast POS request identity](golden-coast-pos-request-identity.md) — keep Phase 6 under the operational guard; handler-level replay needs fresh transport keys, while changed payloads require a rotated client identity.
 - [Golden Coast cutover removal](golden-coast-existing-position-carry-forward.md) — active POS/container flows do not require the opening cutover; POS lazily costs current inventory while historical bridge support remains.
 - [Golden Coast normal POS settlement](golden-coast-normal-pos-settlement.md) — shared itemized POS journal plus atomic paired GC/HADI cash settlement; reclassify only when payable and canonical GC cash differ.

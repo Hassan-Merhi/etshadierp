@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { stockItemKeys } from "@/lib/queryKeys";
+import { unwrapAccountsResponse } from "@/lib/apiResponseAdapters";
 import { VoucherData, BankAccount, LedgerAccount, Supplier, StockItem, Location } from "./VoucherEditHelpers";
 import { AccountWithBalance } from "./VoucherAccountHelpers";
 
@@ -47,9 +48,14 @@ export function useVoucherEditQueries({ id, selectedCompanyId }: UseVoucherEditQ
     queryKey: ["/api/locations"],
   });
 
-  const { data: allAccountsData = [] } = useQuery<AccountWithBalance[]>({
+  const { data: allAccountsData = [] } = useQuery<
+    AccountWithBalance[] | { accounts?: AccountWithBalance[] },
+    Error,
+    AccountWithBalance[]
+  >({
     queryKey: ["/api/accounts/all", selectedCompanyId],
     enabled: !!selectedCompanyId,
+    select: unwrapAccountsResponse<AccountWithBalance>,
   });
 
   return {

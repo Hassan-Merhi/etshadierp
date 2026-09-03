@@ -126,7 +126,9 @@ describe("Supplier Profit Check integrity", () => {
 
     const sourceSql = String(harness.query.mock.calls[1]?.[0]);
     expect(sourceSql).toContain("JOIN LATERAL");
-    expect(sourceSql).toContain("SUM(resolved.qty)");
+    // The resolution CTE is `source_rows` since unresolved proforma lines started being retained
+    // instead of dropped by the join; the aggregation it feeds is what this test pins.
+    expect(sourceSql).toContain("SUM(source_rows.qty)");
     expect(sourceSql).toContain("GROUP BY");
     expect(res.body).toEqual([]);
   });

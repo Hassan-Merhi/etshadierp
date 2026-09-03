@@ -1,6 +1,6 @@
 import type { ClientErrorLike } from "@/lib/clientError";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient, invalidateCustomerBalances } from "@/lib/queryClient";
+import { apiRequest, queryClient, invalidateCustomerBalances, keyStartsWith } from "@/lib/queryClient";
 import { invalidateLocationInventoryQueries } from "@/api/inventoryApi";
 import { removePosDraftSummary, upsertPosDraftSummary } from "@/api/posApi";
 import type { SaleRow, Location } from "../pos-components/posTypes";
@@ -272,6 +272,9 @@ export function usePosMutations({
       } else invalidateLocationInventoryQueries(locationId);
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       if (editVoucherId) queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${editVoucherId}`] });
+      if (isSpCompany) {
+        queryClient.invalidateQueries({ predicate: keyStartsWith("/api/sp/report/profit") });
+      }
       invalidateCustomerBalances(data?.voucher?.customerId ?? undefined);
 
       toast({
