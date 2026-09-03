@@ -2,7 +2,9 @@
  * stockTransferAdjRoutes: PosPriceList endpoints.
  *
  * Registered by ./index.ts in the original order; Express resolves
- * first-match, so that order is behaviour.
+ * first-match, so that order is behaviour. GET /api/pos/price-list therefore
+ * has to carry the price-group (follower -> master) inheritance itself: a
+ * second, later registration elsewhere would simply never be reached.
  */
 import type { Express } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
@@ -84,6 +86,22 @@ export function registerPosPriceListRoutes(app: Express) {
           .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)))
           .orderBy(stockItems.name);
       } else {
+        // Followers inherit the master's price. Masters and ungrouped locations
+        // continue to use their own location-specific price. Inventory quantity
+        // always comes from the requested location itself.
+        const [priceGroup] = await db
+          .select({ masterLocationId: locationPriceGroups.masterLocationId })
+          .from(locationPriceGroups)
+          .where(
+            and(
+              eq(locationPriceGroups.companyId, companyId),
+              eq(locationPriceGroups.followerLocationId, locationId as number)
+            )
+          )
+          .limit(1);
+
+        const effectivePriceLocationId = priceGroup?.masterLocationId ?? (locationId as number);
+
         rows = await db
           .select({
             stockItemId: stockItems.id,
@@ -101,7 +119,7 @@ export function registerPosPriceListRoutes(app: Express) {
             stockItemLocationPrices,
             and(
               eq(stockItemLocationPrices.stockItemId, stockItems.id),
-              eq(stockItemLocationPrices.locationId, locationId as number)
+              eq(stockItemLocationPrices.locationId, effectivePriceLocationId)
             )
           )
           .leftJoin(
@@ -139,11 +157,11 @@ export function registerPosPriceListRoutes(app: Express) {
         ]);
 
         const dubaiMap = new Map<number, string>();
-        for (const r of (dubaiCostRes.rows)) {
+        for (const r of dubaiCostRes.rows) {
           dubaiMap.set(Number(r.stockItemId), String(r.costDubai ?? "0"));
         }
         const offloadMap = new Map<number, string>();
-        for (const r of (offloadCostRes.rows)) {
+        for (const r of offloadCostRes.rows) {
           offloadMap.set(Number(r.stockItemId), String(r.offloadingCost ?? "0"));
         }
 
@@ -254,9 +272,8 @@ export function registerPosPriceListRoutes(app: Express) {
             ORDER BY pli.stock_item_id, co.offloaded_at DESC
           `),
         ]);
-        for (const r of (dubaiCostRes.rows)) dubaiMap.set(Number(r.stockItemId), String(r.costDubai ?? "0"));
-        for (const r of (offloadCostRes.rows))
-          offloadMap.set(Number(r.stockItemId), String(r.offloadingCost ?? "0"));
+        for (const r of dubaiCostRes.rows) dubaiMap.set(Number(r.stockItemId), String(r.costDubai ?? "0"));
+        for (const r of offloadCostRes.rows) offloadMap.set(Number(r.stockItemId), String(r.offloadingCost ?? "0"));
       }
 
       const result = items.map((item) => {
