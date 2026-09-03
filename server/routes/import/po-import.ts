@@ -419,11 +419,7 @@ export function registerPoImportRoutes(app: Express) {
         // Otherwise: entries created at container offload time per Tally conventions
         const voucher = await storage.createVoucher({
           companyId: currentCompanyId,
-          postingSource: infrastructurePostingIdentity(
-            "po-import",
-            `${currentCompanyId}:${poNumber}`,
-            "purchase"
-          ),
+          postingSource: infrastructurePostingIdentity("po-import", `${currentCompanyId}:${poNumber}`, "purchase"),
           currency: "USD",
           voucherNumber: `PO-${poNumber}-${Date.now()}`,
           voucherType: "Purchase",

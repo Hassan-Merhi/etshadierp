@@ -1,6 +1,5 @@
 export type PoImportCreditTarget =
-  | { kind: "intercompany"; ledgerAccountId: number }
-  | { kind: "supplier"; supplierId: number | null };
+  { kind: "intercompany"; ledgerAccountId: number } | { kind: "supplier"; supplierId: number | null };
 
 export function resolvePoImportCreditTarget(input: {
   companyType?: string | null;
