@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const routeSource = readFileSync(new URL("./spGoldenCoastPhase6PosSaleRoutes.ts", import.meta.url), "utf8");
+const autoHadiSource = readFileSync(new URL("./goldenCoastPhase6AutoHadi.ts", import.meta.url), "utf8");
 const spIndexSource = readFileSync(new URL("./index.ts", import.meta.url), "utf8");
 const phase5RouteSource = readFileSync(new URL("./spGoldenCoastPhase5PosSaleRoutes.ts", import.meta.url), "utf8");
 const phase6ServiceSource = readFileSync(
@@ -46,6 +47,7 @@ describe("Golden Coast Phase 6 POS sale route", () => {
     expect(routeSource).not.toContain('sourceType: "location_sale"');
     expect(phase6ServiceSource).not.toContain('sourceType: "location_sale"');
   });
+
   it("credits the deduction to canonical Hassan Savings and debits GC Sales Cash", () => {
     for (const role of ["gc_sales_cash", "stock_in_hand", "hassan_savings"]) {
       expect(routeSource).toContain(`"${role}"`);
@@ -77,11 +79,9 @@ describe("Golden Coast Phase 6 POS sale route", () => {
     expect(routeSource).toContain("GC_PHASE6_IDEMPOTENCY_INCONSISTENT");
   });
 
-  it("does not mutate partner equity", () => {
-    expect(routeSource).not.toContain("fresh_start_equity");
-    expect(routeSource).not.toContain("hassan_equity");
-    expect(phase6ServiceSource).not.toContain("gc_partner_capital");
-    expect(phase6ServiceSource).not.toContain("gc_owner_capital");
+  it("delegates the Fresh Start claim reclassification without touching Hassan equity", () => {
+    expect(autoHadiSource).toContain("buildGoldenCoastPhase15SalesPayablePosting");
+    expect(autoHadiSource).not.toContain('eq(ledgerAccounts.subType, "gc_owner_capital")');
   });
 
   it("keeps old Phase 5 code present for history while making it unreachable", () => {
