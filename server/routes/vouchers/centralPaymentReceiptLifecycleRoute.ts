@@ -5,7 +5,7 @@ import { requireAuth, requireNonPOS } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
+import { voucherMutationBlockReason } from "../../lib/migratedVoucherGuard";
 import { storage } from "../../storage";
 import type { VoucherEntryInsertFields } from "../../services/accounting/accountingTypes";
 import { PostingValidationError } from "../../services/accounting/centralPostingEngine";
@@ -84,8 +84,9 @@ async function updateActivePaymentReceipt(req: Request, res: Response, next: Nex
       res.status(403).json({ message: "Access denied: Voucher belongs to a different company" });
       return;
     }
-    if (isReadonlyMigratedVoucher(existing)) {
-      res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+    const blockedVoucherReason = voucherMutationBlockReason(existing);
+    if (blockedVoucherReason) {
+      res.status(403).json({ message: blockedVoucherReason });
       return;
     }
 

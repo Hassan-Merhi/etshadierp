@@ -7,7 +7,7 @@
 import type { Express } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
-import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../../lib/migratedVoucherGuard";
+import { voucherMutationBlockReason } from "../../../lib/migratedVoucherGuard";
 import { db } from "../../../db";
 import { requireAuth, requireRole, requireNonPOS } from "../../../auth";
 import { stockTransferVouchers, stockTransferItems, vouchers } from "@shared/schema";
@@ -33,8 +33,9 @@ export function registerAdminRepairMiscRoutes(app: Express) {
         .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, companyId)));
 
       if (!voucher) return res.status(404).json({ message: "Voucher not found" });
-      if (isReadonlyMigratedVoucher(voucher)) {
-        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+      const blockedVoucherReason = voucherMutationBlockReason(voucher);
+      if (blockedVoucherReason) {
+        return res.status(403).json({ message: blockedVoucherReason });
       }
       if (!voucher.optional) return res.status(400).json({ message: "Voucher is already finalized" });
 

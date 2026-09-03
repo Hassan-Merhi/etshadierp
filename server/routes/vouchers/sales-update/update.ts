@@ -9,7 +9,7 @@ import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { storage } from "../../../storage";
 import { requireAuth } from "../../../auth";
-import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../../lib/migratedVoucherGuard";
+import { voucherMutationBlockReason } from "../../../lib/migratedVoucherGuard";
 import { logAudit, syncEmployeeBalancesFromEntries, buildVoucherChangesForUpdate } from "../../_helpers";
 import { vouchers, voucherEntries } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -23,8 +23,9 @@ export function registerVoucherUpdateRoutes(app: Express) {
 
       const existingVoucher = await storage.getVoucherById(id);
       if (!existingVoucher) return res.status(404).json({ message: "Voucher not found" });
-      if (isReadonlyMigratedVoucher(existingVoucher)) {
-        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+      const blockedVoucherReason = voucherMutationBlockReason(existingVoucher);
+      if (blockedVoucherReason) {
+        return res.status(403).json({ message: blockedVoucherReason });
       }
 
       const effectiveCompanyId = req.session.currentCompanyId || req.session.factoryCompanyId;

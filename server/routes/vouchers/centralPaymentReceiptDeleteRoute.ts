@@ -12,7 +12,7 @@ import { requireAuth, requireRole } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
+import { voucherMutationBlockReason } from "../../lib/migratedVoucherGuard";
 import { storage } from "../../storage";
 import { applyEmployeeBalanceDeltasTx } from "../../services/accounting/employeeBalancePosting";
 import { removeFactoryDaybookMirrorTx } from "../../services/accounting/factoryDaybookMirrorRemoval";
@@ -58,8 +58,9 @@ async function deleteActivePaymentReceipt(req: Request, res: Response, next: Nex
       res.status(403).json({ message: "Access denied: Voucher belongs to a different company" });
       return;
     }
-    if (isReadonlyMigratedVoucher(voucher)) {
-      res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+    const blockedVoucherReason = voucherMutationBlockReason(voucher);
+    if (blockedVoucherReason) {
+      res.status(403).json({ message: blockedVoucherReason });
       return;
     }
 
@@ -94,7 +95,7 @@ async function deleteActivePaymentReceipt(req: Request, res: Response, next: Nex
         return {
           replayed: true,
           voucher: lockedVoucher,
-          entries: ([]),
+          entries: [],
         };
       }
 

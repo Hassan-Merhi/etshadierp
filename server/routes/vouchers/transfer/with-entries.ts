@@ -10,7 +10,7 @@ import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
 import { storage } from "../../../storage";
 import { requireAuth } from "../../../auth";
-import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../../lib/migratedVoucherGuard";
+import { voucherMutationBlockReason } from "../../../lib/migratedVoucherGuard";
 import { logAudit, snapshotVoucherEntries, buildVoucherChangesForUpdate } from "../../_helpers";
 import { normalizeVoucherEntryAmounts } from "../../../services/accounting/currencyAmounts";
 import { vouchers, voucherEntries, customerBalances, interCompanyTransfers } from "@shared/schema";
@@ -36,8 +36,9 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
 
       const existingVoucher = await storage.getVoucherById(id);
       if (!existingVoucher) return res.status(404).json({ message: "Voucher not found" });
-      if (isReadonlyMigratedVoucher(existingVoucher)) {
-        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+      const blockedVoucherReason = voucherMutationBlockReason(existingVoucher);
+      if (blockedVoucherReason) {
+        return res.status(403).json({ message: blockedVoucherReason });
       }
       if (existingVoucher.companyId !== req.session.currentCompanyId) {
         return res.status(403).json({ message: "Access denied: Voucher belongs to a different company" });

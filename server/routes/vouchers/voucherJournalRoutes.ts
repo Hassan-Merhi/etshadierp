@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
-import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
+import { voucherMutationBlockReason } from "../../lib/migratedVoucherGuard";
 import { requireAuth, requireNonPOS } from "../../auth";
 import {
   logAudit,
@@ -491,8 +491,9 @@ export function registerVoucherJournalRoutes(app: Express) {
           throw new Error("Access denied: Voucher belongs to a different company");
         }
 
-        if (isReadonlyMigratedVoucher(existingVoucher)) {
-          throw new Error(READONLY_MIGRATED_VOUCHER_MESSAGE);
+        const blockedVoucherReason = voucherMutationBlockReason(existingVoucher);
+        if (blockedVoucherReason) {
+          throw new Error(blockedVoucherReason);
         }
 
         // Get existing entries before deleting (for balance sync)

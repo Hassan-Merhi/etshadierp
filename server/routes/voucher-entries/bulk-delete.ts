@@ -10,7 +10,7 @@ import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole } from "../../auth";
-import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
+import { voucherMutationBlockReason } from "../../lib/migratedVoucherGuard";
 import {
   logAudit,
   syncEmployeeBalancesFromEntries,
@@ -87,8 +87,9 @@ export function registerVoucherBulkDeleteRoutes(app: Express) {
             continue;
           }
 
-          if (isReadonlyMigratedVoucher(voucher)) {
-            errors.push(`Voucher ${id}: ${READONLY_MIGRATED_VOUCHER_MESSAGE}`);
+          const blockedVoucherReason = voucherMutationBlockReason(voucher);
+          if (blockedVoucherReason) {
+            errors.push(`Voucher ${id}: ${blockedVoucherReason}`);
             continue;
           }
 

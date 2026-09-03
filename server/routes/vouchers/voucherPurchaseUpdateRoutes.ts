@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
-import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
+import { voucherMutationBlockReason } from "../../lib/migratedVoucherGuard";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { logAudit, buildItemLevelChanges } from "../_helpers";
 import {
@@ -44,8 +44,9 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
       if (existingVoucher.companyId !== req.session.currentCompanyId) {
         return res.status(403).json({ message: "Access denied: Voucher belongs to a different company" });
       }
-      if (isReadonlyMigratedVoucher(existingVoucher)) {
-        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+      const blockedVoucherReason = voucherMutationBlockReason(existingVoucher);
+      if (blockedVoucherReason) {
+        return res.status(403).json({ message: blockedVoucherReason });
       }
       const userRole = req.session.currentRole;
       if (!userRole) return res.status(403).json({ message: "User role not found" });
@@ -171,8 +172,9 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
       if (existingVoucher.companyId !== req.session.currentCompanyId) {
         return res.status(403).json({ message: "Access denied: Voucher belongs to a different company" });
       }
-      if (isReadonlyMigratedVoucher(existingVoucher)) {
-        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+      const blockedVoucherReason = voucherMutationBlockReason(existingVoucher);
+      if (blockedVoucherReason) {
+        return res.status(403).json({ message: blockedVoucherReason });
       }
       const userRole = req.session.currentRole;
       if (!userRole) return res.status(403).json({ message: "User role not found" });

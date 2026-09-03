@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { getVoucherTypeBadge } from "@/lib/voucherTypeBadge";
 import { cn } from "@/lib/utils";
-import { isReadonlyMigratedVoucher } from "@/lib/migratedVoucherGuard";
+import { isVoucherMutationBlocked, voucherLockLabel } from "@/lib/migratedVoucherGuard";
 import { DaybookRow, Voucher, ViewVoucherEntry } from "./types";
 
 interface DaybookTableProps {
@@ -407,7 +407,8 @@ export function DaybookTable({
       const isDvHidden = hiddenRowIds.has(dvid);
       const isExpanded = expandedVoucherId === voucher.id;
       const isLockedType = voucher.voucherType === "Sales" || voucher.voucherType === "Purchase";
-      const isReadonlyMigrated = isReadonlyMigratedVoucher(voucher);
+      const voucherLocked = isVoucherMutationBlocked(voucher);
+      const lockLabel = voucherLockLabel(voucher);
       tableRows.push(
         <TableRow
           key={dvid}
@@ -491,8 +492,8 @@ export function DaybookTable({
                 >
                   <Eye className="w-4 h-4" />
                 </Button>
-                {isReadonlyMigrated ? (
-                  <Button variant="ghost" size="icon" disabled title="Read-only migration record — cannot be edited">
+                {voucherLocked ? (
+                  <Button variant="ghost" size="icon" disabled title={`${lockLabel} — cannot be edited`}>
                     <Lock className="w-4 h-4 text-muted-foreground" />
                   </Button>
                 ) : isLockedType ? (
@@ -550,7 +551,7 @@ export function DaybookTable({
                     <EyeOff className="w-4 h-4 text-muted-foreground" />
                   )}
                 </Button>
-                {canDelete() && !isReadonlyMigrated && (
+                {canDelete() && !voucherLocked && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -601,7 +602,10 @@ export function DaybookTable({
                               <span className="font-mono text-xs text-red-600 dark:text-red-400">
                                 Dr{" "}
                                 {formatTransactionAmount && e.transactionCurrency
-                                  ? formatTransactionAmount(e.transactionDebitAmount || e.debitAmount, e.transactionCurrency)
+                                  ? formatTransactionAmount(
+                                      e.transactionDebitAmount || e.debitAmount,
+                                      e.transactionCurrency
+                                    )
                                   : formatAmount(parseFloat(e.debitAmount))}
                               </span>
                             )}
@@ -609,7 +613,10 @@ export function DaybookTable({
                               <span className="font-mono text-xs text-green-600 dark:text-green-400">
                                 Cr{" "}
                                 {formatTransactionAmount && e.transactionCurrency
-                                  ? formatTransactionAmount(e.transactionCreditAmount || e.creditAmount, e.transactionCurrency)
+                                  ? formatTransactionAmount(
+                                      e.transactionCreditAmount || e.creditAmount,
+                                      e.transactionCurrency
+                                    )
                                   : formatAmount(parseFloat(e.creditAmount))}
                               </span>
                             )}
@@ -715,7 +722,8 @@ export function DaybookTable({
       const dvid = `voucher-${voucher.id}`;
       const isDvHidden = hiddenRowIds.has(dvid);
       const isLockedType = voucher.voucherType === "Sales" || voucher.voucherType === "Purchase";
-      const isReadonlyMigrated = isReadonlyMigratedVoucher(voucher);
+      const voucherLocked = isVoucherMutationBlocked(voucher);
+      const lockLabel = voucherLockLabel(voucher);
       const vDesc =
         voucher.description ||
         (["Payment", "Receipt", "Journal"].includes(voucher.voucherType) && accountNameCache[voucher.id]
@@ -756,9 +764,9 @@ export function DaybookTable({
                   Hidden
                 </Badge>
               )}
-              {isReadonlyMigrated && (
+              {voucherLocked && (
                 <Badge variant="outline" className="text-xs gap-1">
-                  <Lock className="w-3 h-3" /> Read-only migration
+                  <Lock className="w-3 h-3" /> {lockLabel}
                 </Badge>
               )}
             </div>
@@ -779,8 +787,8 @@ export function DaybookTable({
                 >
                   <Eye className="w-3.5 h-3.5" />
                 </Button>
-                {isReadonlyMigrated ? (
-                  <Button variant="ghost" size="icon" className="h-7 w-7" disabled title="Read-only migration record">
+                {voucherLocked ? (
+                  <Button variant="ghost" size="icon" className="h-7 w-7" disabled title={lockLabel ?? undefined}>
                     <Lock className="w-3.5 h-3.5 text-muted-foreground" />
                   </Button>
                 ) : isLockedType ? (
@@ -804,7 +812,7 @@ export function DaybookTable({
                     <Edit className="w-3.5 h-3.5" />
                   </Button>
                 ) : null}
-                {canDelete() && !isReadonlyMigrated && (
+                {canDelete() && !voucherLocked && (
                   <Button
                     variant="ghost"
                     size="icon"

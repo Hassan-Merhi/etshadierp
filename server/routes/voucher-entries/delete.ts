@@ -10,7 +10,7 @@ import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole } from "../../auth";
-import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
+import { voucherMutationBlockReason } from "../../lib/migratedVoucherGuard";
 import {
   logAudit,
   syncEmployeeBalancesFromEntries,
@@ -56,8 +56,9 @@ export function registerVoucherDeleteRoutes(app: Express) {
         return res.status(404).json({ message: "Voucher not found" });
       }
 
-      if (isReadonlyMigratedVoucher(voucher)) {
-        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+      const blockedVoucherReason = voucherMutationBlockReason(voucher);
+      if (blockedVoucherReason) {
+        return res.status(403).json({ message: blockedVoucherReason });
       }
 
       const companyId = req.session.currentCompanyId;
