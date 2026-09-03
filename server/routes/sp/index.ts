@@ -9,6 +9,7 @@ import { registerSpGoldenCoastPhase3CutoverRoutes } from "./spGoldenCoastPhase3C
 import { registerSpGoldenCoastPhase4CutoverFifoRoutes } from "./spGoldenCoastPhase4CutoverFifoRoutes";
 import { registerSpGoldenCoastPhase6PosSaleRoutes } from "./spGoldenCoastPhase6PosSaleRegistration";
 import { registerSpGoldenCoastPhase7HadiTransferRoutes } from "./spGoldenCoastPhase7HadiTransferRoutes";
+import { registerSpGoldenCoastFreshStartHadiPaymentRoutes } from "./spGoldenCoastFreshStartHadiPaymentRoutes";
 import { registerSpGoldenCoastPhase8ContainerOffloadRoutes } from "./spGoldenCoastPhase8ContainerOffloadRoutes";
 import { registerSpGoldenCoastPhase9HassanSavingsWithdrawalRoutes } from "./spGoldenCoastPhase9HassanSavingsWithdrawalRoutes";
 import { registerSpGoldenCoastPhase10SalesCashSettlementRoutes } from "./spGoldenCoastPhase10SalesCashSettlementRoutes";
@@ -80,6 +81,9 @@ export function registerSpRoutes(app: Express) {
   // history/tests, but its production route is intentionally no longer mounted.
   registerSpGoldenCoastPhase6PosSaleRoutes(app);
   registerSpGoldenCoastPhase7HadiTransferRoutes(app);
+  // Paying Fresh Start is distinct from merely moving cash between GC and HADI:
+  // it reduces Fresh Start equity and the GC-side HADI intercompany asset.
+  registerSpGoldenCoastFreshStartHadiPaymentRoutes(app);
   registerSpGoldenCoastPhase8ContainerOffloadRoutes(app);
   registerSpGoldenCoastPhase9HassanSavingsWithdrawalRoutes(app);
   registerSpGoldenCoastPhase10SalesCashSettlementRoutes(app);
