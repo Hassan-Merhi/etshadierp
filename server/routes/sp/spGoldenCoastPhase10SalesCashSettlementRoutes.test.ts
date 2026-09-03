@@ -50,14 +50,15 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement route surface", () => {
     expect(routeSource).toContain("definition.acceptedAccountTypes.includes(account.accountType)");
   });
 
-  it("validates every direct receipt target as same-company active Cash/Bank", () => {
+  it("validates every direct payment target as same-company active Cash/Bank", () => {
+    expect(routeSource).toContain("validatePaymentAccount");
     expect(routeSource).toContain("eq(bankAccounts.companyId, companyId)");
     expect(routeSource).toContain("eq(bankAccounts.active, true)");
     expect(routeSource).toContain("isNull(bankAccounts.deletedAt)");
     expect(routeSource).toContain('inArray(ledgerAccounts.accountType, ["Cash", "Bank"])');
   });
 
-  it("computes the collectible balance from opening semantics plus posted vouchers at the settlement date", () => {
+  it("computes the payable balance from opening semantics plus posted vouchers at the settlement date", () => {
     expect(routeSource).toContain("gcSalesCashDebitBalance");
     expect(routeSource).toContain("SUM(CAST(ve.debit_amount AS numeric) - CAST(ve.credit_amount AS numeric))");
     expect(routeSource).toContain("WHEN la.opening_balance_side = 'Cr'");
@@ -99,16 +100,16 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement route surface", () => {
     expect(routeSource).not.toContain("tx.insert(voucherEntries)");
   });
 
-  it("binds replay identity to amount, date, reference, receipt routing and canonical GC Sales Cash", () => {
+  it("binds replay identity to amount, date, reference, payment routing and canonical GC Sales Cash", () => {
     expect(serviceSource).toContain("goldenCoastPhase10SettlementDigest");
-    expect(serviceSource).toContain("receiptAccount: input.settlement.receiptAccount");
+    expect(serviceSource).toContain("paymentAccount: input.settlement.paymentAccount");
     expect(serviceSource).toContain("reference: input.settlement.reference");
     expect(serviceSource).toContain("gcSalesCashAccountId:");
     expect(serviceSource).toContain("GOLDEN_COAST_PHASE10_SOURCE_TYPE");
   });
 
-  it("posts only Dr Cash/Bank / Cr GC Sales Cash and does not duplicate other phase accounting", () => {
-    expect(serviceSource).toContain("Dr selected Golden Coast Cash/Bank / Cr canonical GC Sales Cash");
+  it("posts only Dr GC Sales Cash / Cr Cash/Bank and does not duplicate other phase accounting", () => {
+    expect(serviceSource).toContain("Dr canonical GC Sales Cash / Cr selected Golden Coast Cash/Bank");
     expect(serviceSource).not.toContain("Hassan Savings withdrawal");
     expect(routeSource).not.toContain("spStockMovements");
     expect(routeSource).not.toContain("adjustSpInventoryAtomic");

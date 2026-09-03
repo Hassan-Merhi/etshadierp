@@ -71,6 +71,7 @@ export const voucherEntrySchema = z.object({
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Amount must be a positive number",
     }),
+  narration: z.string().optional(),
 });
 
 export const voucherFormSchema = z.object({
@@ -79,6 +80,7 @@ export const voucherFormSchema = z.object({
   paymentAccountName: z.string(),
   voucherDate: z.date(),
   entries: z.array(voucherEntrySchema).min(1, "Add at least one entry"),
+  paymentAccountNarration: z.string().optional(),
   notes: z.string().optional(),
   optional: z.boolean().default(false),
 });

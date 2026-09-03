@@ -1,12 +1,12 @@
 ---
 name: Test cleanup FK order
-description: Correct deletion order for cleanupTestData to avoid FK constraint violations on audit_log and login_history.
+description: Correct deletion order for cleanupTestData to avoid FK constraint violations across audit, vouchers, PO, and container fixtures.
 ---
 
 ## Rule
-`cleanupTestData` must clear `audit_log` and `login_history` (by `company_id`) before deleting the company row. `login_history` has **two** FK columns — `user_id` and `company_id` — so deleting by user alone is insufficient; must also delete by company.
+`cleanupTestData` must clear `audit_log` and `login_history` (by `company_id`) before deleting the company row. It must also remove voucher-linked purchase orders and normal-container child rows before deleting their vouchers, containers, suppliers, or company. `login_history` has **two** FK columns — `user_id` and `company_id` — so deleting by user alone is insufficient; must also delete by company.
 
-**Why:** `audit_log.company_id` and `login_history.company_id` both have FK constraints referencing `companies.id`. Any login or audit event for the test company blocks deletion until these rows are removed first.
+**Why:** `audit_log.company_id` and `login_history.company_id` both have FK constraints referencing `companies.id`; PO voucher links, container links, and migrated supplier company links do the same. End-to-end PO tests expose these restrictions even when a fresh database does not.
 
 **How to apply:** In `tests/setup.ts` `cleanupTestData`, add these two raw pool queries at the top of the per-company cleanup loop, before any Drizzle deletes:
 

@@ -824,6 +824,7 @@ export const phase3RemainingTranslationsPart12: readonly Phase3SharedUiEntry[] =
   },
   { en: "Narration (optional)", ar: "الإهدار (اختياري)", fr: "Narration (facultative)" },
   { en: "Narration (Optional)", ar: "الإغراء (الاختياري)", fr: "Narration (facultative)" },
+  { en: "Narration for this account", ar: "بيان هذا الحساب", fr: "Narration pour ce compte" },
   { en: "Narration / Notes", ar: "الملاحة/المذكرات", fr: "Narration / Notes" },
   { en: "Narration:", ar: "الزر:", fr: "Narration :" },
   { en: "National ID", ar: "الهوية الوطنية", fr: "Identification nationale" },

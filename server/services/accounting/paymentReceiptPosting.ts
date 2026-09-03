@@ -1,11 +1,7 @@
 import { createHash } from "node:crypto";
 import Decimal from "decimal.js";
 import type { VoucherEntryInsertFields } from "./accountingTypes";
-import {
-  PostingValidationError,
-  type CentralPostingRequest,
-  type PostingActor,
-} from "./centralPostingEngine";
+import { PostingValidationError, type CentralPostingRequest, type PostingActor } from "./centralPostingEngine";
 import { normalizeVoucherEntryAmounts } from "./currencyAmounts";
 import { resolveManualJournalClientRequestId } from "./manualJournalPosting";
 
@@ -15,6 +11,7 @@ export interface PaymentReceiptLineInput {
   accountType: string;
   accountId: number | string;
   amount: string | number;
+  narration?: string | null;
 }
 
 export interface BuildPaymentReceiptPostingInput {
@@ -24,6 +21,7 @@ export interface BuildPaymentReceiptPostingInput {
   voucherDate: string;
   paymentAccountType: string;
   paymentAccountId: number | string;
+  paymentAccountNarration?: string | null;
   entries: PaymentReceiptLineInput[];
   notes?: string | null;
   currency?: string | null;
@@ -31,10 +29,7 @@ export interface BuildPaymentReceiptPostingInput {
   effectiveDate?: string | null;
   clientRequestId?: unknown;
   actor?: PostingActor;
-  resolveTarget: (
-    accountType: string,
-    accountId: number
-  ) => Promise<VoucherEntryInsertFields>;
+  resolveTarget: (accountType: string, accountId: number) => Promise<VoucherEntryInsertFields>;
 }
 
 export interface BuiltPaymentReceiptPosting {
@@ -48,10 +43,7 @@ const MAX_ROUNDING_ADJUSTMENT = new Decimal("0.001000");
 function positiveId(value: unknown, field: string): number {
   const id = Number(value);
   if (!Number.isInteger(id) || id <= 0) {
-    throw new PostingValidationError(
-      "POSTING_TARGET_ID_INVALID",
-      `${field} must be a positive integer`
-    );
+    throw new PostingValidationError("POSTING_TARGET_ID_INVALID", `${field} must be a positive integer`);
   }
   return id;
 }
@@ -114,17 +106,10 @@ function normalizeLeg(input: {
   };
 }
 
-function adjustBaseSideToTarget(
-  entries: VoucherEntryInsertFields[],
-  side: "debit" | "credit",
-  target: Decimal
-): void {
+function adjustBaseSideToTarget(entries: VoucherEntryInsertFields[], side: "debit" | "credit", target: Decimal): void {
   const amountField = side === "debit" ? "debitAmount" : "creditAmount";
   const baseField = side === "debit" ? "baseDebitAmount" : "baseCreditAmount";
-  const current = entries.reduce(
-    (sum, entry) => sum.plus(new Decimal(entry[amountField] ?? "0")),
-    new Decimal(0)
-  );
+  const current = entries.reduce((sum, entry) => sum.plus(new Decimal(entry[amountField] ?? "0")), new Decimal(0));
   const adjustment = target.minus(current);
   if (adjustment.isZero()) return;
   if (adjustment.abs().gt(MAX_ROUNDING_ADJUSTMENT)) {
@@ -168,29 +153,31 @@ function fingerprint(input: {
   entries: VoucherEntryInsertFields[];
 }): string {
   return createHash("sha256")
-    .update(JSON.stringify({
-      companyId: input.companyId,
-      voucherType: input.voucherType,
-      voucherDate: input.voucherDate,
-      notes: input.notes,
-      currency: input.currency,
-      exchangeRate: input.exchangeRate,
-      effectiveDate: input.effectiveDate,
-      entries: input.entries.map((entry) => ({
-        ledgerAccountId: entry.ledgerAccountId ?? null,
-        bankAccountId: entry.bankAccountId ?? null,
-        fixedAssetId: entry.fixedAssetId ?? null,
-        supplierId: entry.supplierId ?? null,
-        employeeId: entry.employeeId ?? null,
-        customerId: entry.customerId ?? null,
-        factorySupplierId: entry.factorySupplierId ?? null,
-        transactionDebitAmount: entry.transactionDebitAmount ?? null,
-        transactionCreditAmount: entry.transactionCreditAmount ?? null,
-        baseDebitAmount: entry.baseDebitAmount ?? null,
-        baseCreditAmount: entry.baseCreditAmount ?? null,
-        narration: entry.narration ?? null,
-      })),
-    }))
+    .update(
+      JSON.stringify({
+        companyId: input.companyId,
+        voucherType: input.voucherType,
+        voucherDate: input.voucherDate,
+        notes: input.notes,
+        currency: input.currency,
+        exchangeRate: input.exchangeRate,
+        effectiveDate: input.effectiveDate,
+        entries: input.entries.map((entry) => ({
+          ledgerAccountId: entry.ledgerAccountId ?? null,
+          bankAccountId: entry.bankAccountId ?? null,
+          fixedAssetId: entry.fixedAssetId ?? null,
+          supplierId: entry.supplierId ?? null,
+          employeeId: entry.employeeId ?? null,
+          customerId: entry.customerId ?? null,
+          factorySupplierId: entry.factorySupplierId ?? null,
+          transactionDebitAmount: entry.transactionDebitAmount ?? null,
+          transactionCreditAmount: entry.transactionCreditAmount ?? null,
+          baseDebitAmount: entry.baseDebitAmount ?? null,
+          baseCreditAmount: entry.baseCreditAmount ?? null,
+          narration: entry.narration ?? null,
+        })),
+      })
+    )
     .digest("hex");
 }
 
@@ -201,10 +188,7 @@ export async function buildPaymentReceiptPostingRequest(
     throw new PostingValidationError("POSTING_COMPANY_INVALID", "A valid companyId is required");
   }
   if (input.voucherType !== "Payment" && input.voucherType !== "Receipt") {
-    throw new PostingValidationError(
-      "POSTING_VOUCHER_TYPE_INVALID",
-      "voucherType must be Payment or Receipt"
-    );
+    throw new PostingValidationError("POSTING_VOUCHER_TYPE_INVALID", "voucherType must be Payment or Receipt");
   }
   if (!input.voucherDate || !Array.isArray(input.entries) || input.entries.length === 0) {
     throw new PostingValidationError(
@@ -216,7 +200,9 @@ export async function buildPaymentReceiptPostingRequest(
   const voucherType = input.voucherType;
   const paymentAccountId = positiveId(input.paymentAccountId, "paymentAccountId");
   const paymentTarget = await input.resolveTarget(input.paymentAccountType, paymentAccountId);
-  const currency = String(input.currency || "USD").trim().toUpperCase();
+  const currency = String(input.currency || "USD")
+    .trim()
+    .toUpperCase();
   const notes = input.notes?.trim() || null;
   const effectiveDate = input.effectiveDate || null;
   const normalizedEntries: VoucherEntryInsertFields[] = [];
@@ -226,22 +212,36 @@ export async function buildPaymentReceiptPostingRequest(
     input.paymentAccountType === "supplier" ||
     input.paymentAccountType === "factorySupplier" ||
     input.paymentAccountType === "employee";
+  const paymentNarration = input.paymentAccountNarration?.trim() || notes;
 
   for (let index = 0; index < input.entries.length; index += 1) {
     const line = input.entries[index];
     const amount = positiveAmount(line.amount, index);
     transactionTotal = transactionTotal.plus(amount);
+    const contraNarration = line.narration?.trim() || notes;
     const contraTarget = await input.resolveTarget(
       line.accountType,
       positiveId(line.accountId, `entries[${index}].accountId`)
     );
 
-    const drTarget = voucherType === "Payment"
-      ? liabilityPaymentAccount ? paymentTarget : contraTarget
-      : liabilityPaymentAccount ? contraTarget : paymentTarget;
-    const crTarget = voucherType === "Payment"
-      ? liabilityPaymentAccount ? contraTarget : paymentTarget
-      : liabilityPaymentAccount ? paymentTarget : contraTarget;
+    const drTarget =
+      voucherType === "Payment"
+        ? liabilityPaymentAccount
+          ? paymentTarget
+          : contraTarget
+        : liabilityPaymentAccount
+          ? contraTarget
+          : paymentTarget;
+    const crTarget =
+      voucherType === "Payment"
+        ? liabilityPaymentAccount
+          ? contraTarget
+          : paymentTarget
+        : liabilityPaymentAccount
+          ? paymentTarget
+          : contraTarget;
+    const paymentIsDebit =
+      (voucherType === "Payment" && liabilityPaymentAccount) || (voucherType === "Receipt" && !liabilityPaymentAccount);
 
     normalizedEntries.push(
       normalizeLeg({
@@ -250,7 +250,7 @@ export async function buildPaymentReceiptPostingRequest(
         amount,
         side: "DR",
         target: drTarget,
-        narration: notes,
+        narration: paymentIsDebit ? paymentNarration : contraNarration,
       }),
       normalizeLeg({
         currency,
@@ -258,7 +258,7 @@ export async function buildPaymentReceiptPostingRequest(
         amount,
         side: "CR",
         target: crTarget,
-        narration: notes,
+        narration: paymentIsDebit ? contraNarration : paymentNarration,
       })
     );
   }

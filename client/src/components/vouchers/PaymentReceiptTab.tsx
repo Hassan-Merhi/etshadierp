@@ -558,6 +558,20 @@ export function PaymentReceiptTab({
                   </div>
                 </div>
 
+                <FormField
+                  control={form.control}
+                  name="paymentAccountNarration"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{accountLabel} narration</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value ?? ""} placeholder="Optional narration for this account" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 {/* ── Entries table ── */}
                 <VoucherEntriesTable
                   form={form}

@@ -72,6 +72,7 @@ export const useFormInitialization = (
         paymentAccountName: accountName,
         voucherDate: parseISO(voucher.voucherDate),
         currency: (voucher.currency as "USD" | "CFA") || selectedCurrency,
+        paymentAccountNarration: mainEntry?.narration || "",
         notes: voucher.description || "",
         entries: contraEntries.map((e) => {
           const eAccountType = e.ledgerAccountId
@@ -107,6 +108,7 @@ export const useFormInitialization = (
             accountId: eAccountId,
             accountName: eAccountName,
             amount: parseFloat(e.debitAmount) > 0 ? e.debitAmount : e.creditAmount,
+            narration: e.narration || "",
           };
         }),
       });
@@ -139,6 +141,7 @@ export const useFormInitialization = (
             accountId,
             accountName,
             amount: type === "DR" ? e.debitAmount : e.creditAmount,
+            narration: e.narration || "",
           };
         }),
       });

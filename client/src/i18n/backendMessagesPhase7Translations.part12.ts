@@ -1,6 +1,6 @@
 import type { Phase7BackendMessagesEntry } from "./backendMessagesPhase7TranslationTypes";
 
-/** Tenant-scope, parent-accounting, and Phase 2 CodeQL parameter-tampering messages. */
+/** Tenant-scope, parent-accounting, Phase 2 CodeQL parameter-tampering, and intercompany messages. */
 export const backendMessagesPhase7TranslationsPart12: readonly Phase7BackendMessagesEntry[] = [
   {
     en: "PO Import company scope does not match the active company.",
@@ -76,5 +76,10 @@ export const backendMessagesPhase7TranslationsPart12: readonly Phase7BackendMess
     en: "cashAccountId must be a single positive integer",
     ar: "يجب أن تكون cashAccountId عددًا صحيحًا موجبًا واحدًا",
     fr: "cashAccountId doit être un entier positif unique",
+  },
+  {
+    en: "Configured intercompany credit account ${configuredAccountId} is missing, inactive, or belongs to another company",
+    ar: "حساب الائتمان بين الشركات المُكوّن ${configuredAccountId} مفقود أو غير نشط أو ينتمي إلى شركة أخرى",
+    fr: "Le compte de crédit intersociétés configuré ${configuredAccountId} est introuvable, inactif ou appartient à une autre société",
   },
 ];

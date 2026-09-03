@@ -27,6 +27,8 @@
     "POST /api/sp/golden-coast/phase6/pos-sale [<anonymous> > <anonymous> > requireAuth > <anonymous>]",
     "GET /api/sp/golden-coast/phase7/sales-cash-transfer/readiness [<anonymous> > requireAuth > requireNonPOS > <anonymous>]",
     "POST /api/sp/golden-coast/phase7/sales-cash-transfer [<anonymous> > <anonymous> > requireAuth > requireNonPOS > <anonymous>]",
+    "GET /api/sp/golden-coast/phase7/sales-cash-pay-fresh-start/readiness [<anonymous> > requireAuth > requireNonPOS > <anonymous>]",
+    "POST /api/sp/golden-coast/phase7/sales-cash-pay-fresh-start [<anonymous> > <anonymous> > requireAuth > requireNonPOS > <anonymous>]",
     "GET /api/sp/golden-coast/phase8/container-offload/readiness [<anonymous> > requireAuth > <anonymous>]",
     "POST /api/sp/golden-coast/phase8/containers [<anonymous> > <anonymous> > requireAuth > <anonymous>]",
     "POST /api/sp/golden-coast/phase8/offload [<anonymous> > <anonymous> > requireAuth > <anonymous>]",
@@ -40,6 +42,7 @@
     "POST /api/insurance/import/preview [<anonymous> > requireAuth > multerMiddleware > <anonymous>]",
     "POST /api/insurance/import/apply [<anonymous> > requireAuth > <anonymous>]",
     "POST /api/insurance/admin/clear-all [<anonymous> > requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/pos/price-list [requireAuth > <anonymous>]",
     "PUT /api/supplier-profit-check/po-overrides/bulk [requireAuth > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
@@ -64,7 +67,8 @@
     "USE /api/sp/sales [<anonymous>]",
     "USE /api/po-import/parse [poImportDatabaseScopeContinuityBoundary]",
     "USE /api/containers/sync-all-vouchers [requireAuth]",
-    "USE /api/containers/sync-all-vouchers [standalonePoRepairBoundary]"
+    "USE /api/containers/sync-all-vouchers [standalonePoRepairBoundary]",
+    "USE /api/stats/net-profit [<anonymous>]"
   ],
   "routeManifestReplacements": [
     {
@@ -146,6 +150,6 @@
       "tests/phase4-hotpath-performance-regression.test.ts",
       "tests/ui/factory-bootstrap-phase3.test.ts"
     ],
-    "maxAdditionalTextAssertions": 714
+    "maxAdditionalTextAssertions": 717
   }
 }
