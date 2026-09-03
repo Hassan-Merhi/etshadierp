@@ -82,7 +82,7 @@ export function registerOrderCancelRoutes(app: Express) {
             .select({ legalName: customers.legalName })
             .from(customers)
             .where(eq(customers.id, order.customerId));
-          const cancelToday = req.body.txDate || getClientDate(req);
+          const cancelToday = req.body?.txDate || getClientDate(req);
           await db
             .delete(factoryDaybookEntries)
             .where(
@@ -174,7 +174,7 @@ export function registerOrderCancelRoutes(app: Express) {
         .select({ legalName: customers.legalName })
         .from(customers)
         .where(eq(customers.id, order.customerId));
-      const cancelToday = req.body.txDate || getClientDate(req);
+      const cancelToday = req.body?.txDate || getClientDate(req);
       await db
         .delete(factoryDaybookEntries)
         .where(
