@@ -17,9 +17,8 @@ describe("supplier partner customer Net Position", () => {
     expect(helper).toContain("if (Math.abs(signedBalance) < 0.01) continue");
   });
 
-  it("uses the authoritative customer balance in live, historical, and Excel Net Position paths", () => {
+  it("uses the authoritative customer balance in historical and Excel Net Position paths", () => {
     const paths = [
-      "server/routes/stats/statsNetProfitRoutes.ts",
       "server/helpers/calculateNetPositionAsOf.ts",
       "server/routes/stats/statsNetPositionRoutes.ts",
     ];
@@ -32,6 +31,13 @@ describe("supplier partner customer Net Position", () => {
       expect(source).toContain('startsWith("CUST-")');
       expect(source).toContain('includes("customer account")');
     }
+  });
+
+  it("keeps Golden Coast customer assets in the live residual-equity projection", () => {
+    const source = read("server/routes/stats/goldenCoastResidualEquityProjection.ts");
+    expect(source).toContain('"Customer"');
+    expect(source).toContain("getAccountNetBalance(account, accountBalances)");
+    expect(source).toContain("forUsAccounts.push");
   });
 
   it("does not render zero-value cash or bank rows after current translation", () => {
