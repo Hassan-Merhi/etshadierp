@@ -45,7 +45,8 @@ const reviewedSpMounts: string[] = [];
 // implementation is authoritative changes stock-transfer approval behavior, so it is deliberately
 // left for the audit phase that targets duplicate route registrations rather than folded into a
 // CI-unblocking change. Tracked as a confirmed finding, not an accepted one.
-const MAX_SHADOWED_REGISTRATIONS = 159;
+// Golden Coast's Fresh Start payment boundary adds one reviewed layered registration.
+const MAX_SHADOWED_REGISTRATIONS = 160;
 let actual: SerializedRouteManifest;
 
 async function buildManifest(): Promise<SerializedRouteManifest> {
