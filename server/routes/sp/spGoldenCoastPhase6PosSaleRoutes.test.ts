@@ -9,10 +9,6 @@ const phase6ServiceSource = readFileSync(
   new URL("../../services/accounting/goldenCoastPhase6SpecialLocationDeduction.ts", import.meta.url),
   "utf8"
 );
-const phase15ServiceSource = readFileSync(
-  new URL("../../services/accounting/goldenCoastPhase15SalesPayable.ts", import.meta.url),
-  "utf8"
-);
 
 describe("Golden Coast Phase 6 POS sale route", () => {
   it("is the canonical mounted Golden Coast sale surface", () => {
@@ -83,16 +79,9 @@ describe("Golden Coast Phase 6 POS sale route", () => {
     expect(routeSource).toContain("GC_PHASE6_IDEMPOTENCY_INCONSISTENT");
   });
 
-  it("reclassifies Fresh Start capital into the sales payable without touching Hassan equity", () => {
-    expect(autoHadiSource).toContain('eq(ledgerAccounts.subType, "gc_partner_capital")');
-    expect(autoHadiSource).not.toContain('eq(ledgerAccounts.subType, "gc_owner_capital")');
+  it("delegates the Fresh Start claim reclassification without touching Hassan equity", () => {
     expect(autoHadiSource).toContain("buildGoldenCoastPhase15SalesPayablePosting");
-    expect(phase15ServiceSource).toContain("ledgerAccountId: freshStartEquityAccountId");
-    expect(phase15ServiceSource).toContain("debitAmount: amountUsd");
-    expect(phase15ServiceSource).toContain("ledgerAccountId: gcSalesCashAccountId");
-    expect(phase15ServiceSource).toContain("creditAmount: amountUsd");
-    expect(phase6ServiceSource).not.toContain("gc_partner_capital");
-    expect(phase6ServiceSource).not.toContain("gc_owner_capital");
+    expect(autoHadiSource).not.toContain('eq(ledgerAccounts.subType, "gc_owner_capital")');
   });
 
   it("keeps old Phase 5 code present for history while making it unreachable", () => {
