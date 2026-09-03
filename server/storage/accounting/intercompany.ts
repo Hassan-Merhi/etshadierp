@@ -69,9 +69,7 @@ export async function getConfiguredIntercompanyCreditAccount(
     .limit(1);
 
   if (!account) {
-    throw new Error(
-      `Configured intercompany credit account ${configuredAccountId} is missing, inactive, or belongs to another company`
-    );
+    throw new Error("INTERCOMPANY_CREDIT_ACCOUNT_INVALID");
   }
 
   return account;
