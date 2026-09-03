@@ -8,6 +8,7 @@ import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
+import { deleteInfrastructurePostingIdentityForVoucherTx } from "../../../services/accounting/infrastructureVoucherIdentity";
 import { eq, and, sql, gte, lte, inArray } from "drizzle-orm";
 import {
   factoryWorkers,
@@ -267,6 +268,12 @@ export function registerPayrollGenerateRoutes(app: Express) {
             );
           if (staleGenVouchers.length > 0) {
             const vIds = staleGenVouchers.map((v) => v.id);
+            // Rebuilt PAYROLL-GEN vouchers can have a durable accounting posting
+            // identity that references the voucher with ON DELETE RESTRICT. Remove
+            // that marker first so regeneration can safely replace old vouchers.
+            for (const voucherId of vIds) {
+              await deleteInfrastructurePostingIdentityForVoucherTx(tx, voucherId);
+            }
             await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
             await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
           }
