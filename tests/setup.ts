@@ -200,6 +200,18 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // explicit request identities alive until teardown, so clear this test
     // ledger before deleting the fixture company's vouchers.
     await pool.query("DELETE FROM accounting_posting_requests WHERE company_id = $1", [company.id]);
+    // purchase_orders.voucher_id restricts the voucher delete below, so a test
+    // that posted a PO (the PO import flows in particular) leaves its voucher
+    // undeletable. po_line_items cascades from purchase_orders, so clearing the
+    // orders is enough. Both the company's own orders and any order pointing at
+    // one of its vouchers are removed, because a PO can be raised in a parent
+    // company against a child company's voucher.
+    await pool.query(
+      `DELETE FROM purchase_orders
+        WHERE company_id = $1
+           OR voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`,
+      [company.id]
+    );
     await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, company.id));
     // stock_adjustment_items.stock_item_id is a foreign key against stock_items,
     // so any adjustment line left by a test blocks the stock_items delete below
@@ -288,6 +300,10 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // Durable financial request reservations are company-scoped and must be
     // removed before deleting the fixture company.
     await pool.query("DELETE FROM financial_operation_requests WHERE company_id = $1", [company.id]);
+    // company_settings is written lazily the first time a company's settings are
+    // read, so a test never has to create one explicitly to be blocked by it. It
+    // is a leaf table — nothing references it — so it can go straight out.
+    await pool.query("DELETE FROM company_settings WHERE company_id = $1", [company.id]);
     await clearAsyncReferences();
 
     try {
