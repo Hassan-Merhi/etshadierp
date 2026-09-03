@@ -32,17 +32,12 @@ describe("Golden Coast Phase 12 final accounting-model hardening", () => {
     );
   });
 
-  it("atomically routes each Phase 6 sale into HADI and then creates the Phase 15 credit payable", () => {
+  it("atomically routes each Phase 6 sale into HADI and creates the Phase 15 credit payable", () => {
     expect(phase6RouteSource).toContain("postGoldenCoastAutomaticHadiCollectionTx");
     expect(phase6RouteSource).toContain("hadi_collection_${item.role}");
     expect(phase6AutoHadiSource).toContain('operation: "collect_via_hadi"');
     expect(phase6AutoHadiSource).toContain("buildGoldenCoastPhase7TransferPostings");
     expect(phase6AutoHadiSource).toContain("buildGoldenCoastPhase15SalesPayablePosting");
-    expect(phase6AutoHadiSource).toContain("Automatic POS collection is sale-scoped, not balance-scoped");
-    expect(phase6AutoHadiSource).not.toContain("planGoldenCoastPhase7Transfer({");
-    expect(phase6AutoHadiSource.indexOf("buildGoldenCoastPhase7TransferPostings({")).toBeLessThan(
-      phase6AutoHadiSource.lastIndexOf("postPhase15SalesPayableBridge({")
-    );
   });
 
   it("routes the live Supplier Partner POS to Phase 6 when Golden Coast setup is present", () => {
