@@ -1,6 +1,6 @@
 import type { Phase7BackendMessagesEntry } from "./backendMessagesPhase7TranslationTypes";
 
-/** Tenant-scope, parent-accounting, CodeQL parameter-tampering, and intercompany messages. */
+/** Tenant-scope, parent-accounting, Phase 2 CodeQL parameter-tampering, and intercompany messages. */
 export const backendMessagesPhase7TranslationsPart12: readonly Phase7BackendMessagesEntry[] = [
   {
     en: "PO Import company scope does not match the active company.",
