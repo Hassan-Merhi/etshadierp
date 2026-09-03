@@ -73,6 +73,18 @@ describe("Phase 3 factory bootstrap isolation", () => {
     expect(result.decision).toEqual({ kind: "bootstrap-error" });
   });
 
+  it("keeps cached Factory access usable when a background refetch fails", () => {
+    const result = resolveAuthenticatedAppRoute({
+      ...baseGuardInput,
+      currentLocation: "/factory/production-report",
+      companyType: "factory",
+      myAccess: fullFactoryAccess,
+      myAccessError: true,
+    });
+
+    expect(result.decision).toEqual({ kind: "continue" });
+  });
+
   it("continues into Factory after valid access is loaded", () => {
     const result = resolveAuthenticatedAppRoute({
       ...baseGuardInput,
