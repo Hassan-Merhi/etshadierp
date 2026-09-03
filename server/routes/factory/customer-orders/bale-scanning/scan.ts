@@ -18,7 +18,7 @@ import {
   shouldRequireProformaMembership,
 } from "./proformaScanPolicy";
 import { factoryBales, customerProformaLines, customerOrders, customerOrderBales } from "@shared/schema";
-import { eq, and, or, sql } from "drizzle-orm";
+import { eq, and, or, sql, isNull } from "drizzle-orm";
 import { firstRow } from "../../../../lib/queryResult";
 
 export function registerOrderBaleScanRoutes(app: Express) {
@@ -231,11 +231,11 @@ export function registerOrderBaleScanRoutes(app: Express) {
               currentCount: sql<number>`(
                 SELECT COUNT(*)::int
                 FROM customer_order_bales cob
-                JOIN customer_orders co ON co.id = cob.order_id
-                WHERE co.company_id = ${companyId}
-                  AND co.proforma_id_used = ${order.proformaIdUsed}
-                  AND co.status != 'CANCELLED'
-                  AND co.deleted_at IS NULL
+                JOIN customer_orders ON customer_orders.id = cob.order_id
+                WHERE customer_orders.company_id = ${companyId}
+                  AND customer_orders.proforma_id_used = ${order.proformaIdUsed}
+                  AND customer_orders.status != 'CANCELLED'
+                  AND ${isNull(customerOrders.deletedAt)}
                   AND LOWER(TRIM(COALESCE(cob.article_code, ''))) = ${normalizedEffectiveArticleCode}
               )`,
             })
