@@ -43,7 +43,6 @@ export {
 export type {
   GoldenCoastAutomaticHadiAccount,
   GoldenCoastAutomaticHadiPair,
-  GoldenCoastAutomaticHadiResult,
 } from "./goldenCoastPhase6AutoHadiCore";
 
 const postingDependencies = createDatabasePostingDependencies();
@@ -52,6 +51,15 @@ type PersistedPostingResult = CentralPostingResult<typeof vouchers.$inferSelect,
 type AutomaticCashCandidate = core.GoldenCoastAutomaticHadiAccount & {
   source: "cash-ledger" | "bank-ledger" | "bank-account";
 };
+
+export type GoldenCoastAutomaticHadiPostingRole = GoldenCoastPhase7PostingRole | "sales_payable";
+export interface GoldenCoastAutomaticHadiResult extends Omit<core.GoldenCoastAutomaticHadiResult, "postings"> {
+  postings: Array<{
+    role: GoldenCoastAutomaticHadiPostingRole;
+    voucher: PersistedPostingResult["voucher"];
+    entries: PersistedPostingResult["entries"];
+  }>;
+}
 
 function assertHadiAuthorized(pair: core.GoldenCoastAutomaticHadiPair): void {
   const requestContext = getCompanyRequestRuntimeContext();
@@ -310,7 +318,11 @@ async function findReplayedAutomaticTransfer(
   return Promise.all(
     found.map(async (item) => {
       const voucher = item.marker!.voucher;
-      return { role: item.role, voucher, entries: await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id)) };
+      return {
+        role: item.role,
+        voucher,
+        entries: await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id)),
+      };
     })
   );
 }
@@ -349,6 +361,51 @@ async function resolveFreshStartEquityAccount(
   return { id: Number(rows[0].id), name: String(rows[0].name) };
 }
 
+function entryNetDebit(entries: PersistedPostingResult["entries"], ledgerAccountId: number): Decimal {
+  return entries
+    .filter((entry) => Number(entry.ledgerAccountId ?? 0) === ledgerAccountId)
+    .reduce(
+      (sum, entry) => sum.plus(String(entry.debitAmount ?? "0")).minus(String(entry.creditAmount ?? "0")),
+      new Decimal(0)
+    );
+}
+
+function verifyPhase15SalesPayablePosting(input: {
+  posted: PersistedPostingResult;
+  companyId: number;
+  freshStartEquityAccountId: number;
+  gcSalesCashAccountId: number;
+  amountUsd: string;
+}): void {
+  const expected = new Decimal(input.amountUsd);
+  const voucher = input.posted.voucher;
+  const entries = input.posted.entries;
+  const allowed = new Set([input.freshStartEquityAccountId, input.gcSalesCashAccountId]);
+  const invalidEntry = entries.find(
+    (entry) =>
+      entry.bankAccountId != null ||
+      entry.ledgerAccountId == null ||
+      !allowed.has(Number(entry.ledgerAccountId))
+  );
+  const freshNetDebit = entryNetDebit(entries, input.freshStartEquityAccountId);
+  const payableNetDebit = entryNetDebit(entries, input.gcSalesCashAccountId);
+
+  if (
+    Number(voucher.companyId) !== input.companyId ||
+    voucher.deletedAt != null ||
+    entries.length !== 2 ||
+    invalidEntry ||
+    !freshNetDebit.equals(expected) ||
+    !payableNetDebit.equals(expected.negated())
+  ) {
+    throw new core.GoldenCoastPhase6AutoHadiError(
+      "Phase 15 sales-payable replay state is missing, deleted, or no longer matches the canonical Fresh Start Equity / GC Sales Cash journal.",
+      "GC_PHASE15_SALES_PAYABLE_IDEMPOTENCY_INCONSISTENT",
+      409
+    );
+  }
+}
+
 async function postPhase15SalesPayableBridge(input: {
   tx: DatabaseTransaction;
   companyId: number;
@@ -358,7 +415,7 @@ async function postPhase15SalesPayableBridge(input: {
   clientRequestId: string;
   transfer: core.GoldenCoastAutomaticHadiResult["transfer"];
   actor?: PostingActor;
-}): Promise<void> {
+}): Promise<GoldenCoastAutomaticHadiResult["postings"][number]> {
   const freshStartEquity = await resolveFreshStartEquityAccount(input.tx, input.companyId);
   const saleDigest = createHash("sha256").update(JSON.stringify(input.transfer)).digest("hex").slice(0, 32);
   const sale = {
@@ -372,8 +429,16 @@ async function postPhase15SalesPayableBridge(input: {
   };
   const digest = goldenCoastPhase15SalesPayableDigest(sale);
   const request = buildGoldenCoastPhase15SalesPayablePosting({ sale, digest, exchangeRate: null, actor: input.actor });
-  await postBalancedVoucherTx(input.tx, request, postingDependencies);
+  const posted = (await postBalancedVoucherTx(input.tx, request, postingDependencies)) as PersistedPostingResult;
+  verifyPhase15SalesPayablePosting({
+    posted,
+    companyId: input.companyId,
+    freshStartEquityAccountId: freshStartEquity.id,
+    gcSalesCashAccountId: input.gcSalesCashAccountId,
+    amountUsd: input.amountUsd,
+  });
   await assertTransactionCompanyScope(input.tx, input.companyId);
+  return { role: "sales_payable", voucher: posted.voucher, entries: posted.entries };
 }
 
 /**
@@ -391,7 +456,7 @@ export async function postGoldenCoastAutomaticHadiCollectionTx(input: {
   amountUsd: string;
   clientRequestId: string;
   actor?: PostingActor;
-}): Promise<core.GoldenCoastAutomaticHadiResult> {
+}): Promise<GoldenCoastAutomaticHadiResult> {
   const amount = new Decimal(input.amountUsd);
   if (!amount.isFinite() || !amount.greaterThan(0)) {
     throw new core.GoldenCoastPhase6AutoHadiError(
@@ -424,14 +489,9 @@ export async function postGoldenCoastAutomaticHadiCollectionTx(input: {
     },
   });
   const transferDigest = goldenCoastPhase7TransferDigest({ transfer, accounts });
-  const replayed = await findReplayedAutomaticTransfer(
-    input.tx,
-    pair,
-    input.clientRequestId,
-    transferDigest
-  );
+  const replayed = await findReplayedAutomaticTransfer(input.tx, pair, input.clientRequestId, transferDigest);
   if (replayed) {
-    await postPhase15SalesPayableBridge({
+    const salesPayable = await postPhase15SalesPayableBridge({
       tx: input.tx,
       companyId: input.companyId,
       gcSalesCashAccountId: input.gcSalesCashAccountId,
@@ -441,7 +501,14 @@ export async function postGoldenCoastAutomaticHadiCollectionTx(input: {
       transfer,
       actor: input.actor,
     });
-    return { replayed: true, pair, transfer, hadiCashAccount, plan: null, postings: replayed };
+    return {
+      replayed: true,
+      pair,
+      transfer,
+      hadiCashAccount,
+      plan: null,
+      postings: [...replayed, salesPayable],
+    };
   }
 
   const outstanding = await outstandingAutomaticHadiCollections(input.tx, pair.goldenCoastCompanyId);
@@ -468,7 +535,7 @@ export async function postGoldenCoastAutomaticHadiCollectionTx(input: {
     actor: input.actor,
   });
 
-  const postings: core.GoldenCoastAutomaticHadiResult["postings"] = [];
+  const postings: GoldenCoastAutomaticHadiResult["postings"] = [];
   for (const item of batch.postings) {
     const posted = (await postBalancedVoucherTx(input.tx, item.request, postingDependencies)) as PersistedPostingResult;
     if (posted.replayed) {
@@ -481,16 +548,18 @@ export async function postGoldenCoastAutomaticHadiCollectionTx(input: {
     postings.push({ role: item.role, voucher: posted.voucher, entries: posted.entries });
   }
   await assertTransactionCompanyScope(input.tx, pair.goldenCoastCompanyId);
-  await postPhase15SalesPayableBridge({
-    tx: input.tx,
-    companyId: input.companyId,
-    gcSalesCashAccountId: input.gcSalesCashAccountId,
-    saleDate: input.saleDate,
-    amountUsd,
-    clientRequestId: input.clientRequestId,
-    transfer,
-    actor: input.actor,
-  });
+  postings.push(
+    await postPhase15SalesPayableBridge({
+      tx: input.tx,
+      companyId: input.companyId,
+      gcSalesCashAccountId: input.gcSalesCashAccountId,
+      saleDate: input.saleDate,
+      amountUsd,
+      clientRequestId: input.clientRequestId,
+      transfer,
+      actor: input.actor,
+    })
+  );
 
   return { replayed: false, pair, transfer, hadiCashAccount, plan, postings };
 }
