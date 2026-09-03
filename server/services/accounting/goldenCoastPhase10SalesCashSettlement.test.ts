@@ -41,46 +41,46 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement", () => {
     expect(() => settlement({ amountUsd: "1.001" })).toThrow(/at most 2 decimal places/);
   });
 
-  it("allows partial settlement and reports the remaining GC Sales Cash debit balance", () => {
+  it("allows a partial payment and reports the remaining GC Sales Cash payable", () => {
     const parsed = settlement({ amountUsd: "600.00" });
     expect(
-      planGoldenCoastPhase10Settlement({ settlement: parsed, gcSalesCashDebitBalanceUsd: "1800.00" })
+      planGoldenCoastPhase10Settlement({ settlement: parsed, gcSalesCashPayableBalanceUsd: "1800.00" })
     ).toMatchObject({
-      gcSalesCashDebitBalanceBeforeUsd: "1800.00",
-      gcSalesCashDebitBalanceAfterUsd: "1200.00",
+      gcSalesCashPayableBalanceBeforeUsd: "1800.00",
+      gcSalesCashPayableBalanceAfterUsd: "1200.00",
     });
   });
 
   it("allows an exact full settlement but never over-collects", () => {
     const parsed = settlement({ amountUsd: "1800.00" });
     expect(
-      planGoldenCoastPhase10Settlement({ settlement: parsed, gcSalesCashDebitBalanceUsd: "1800.00" })
-    ).toMatchObject({ gcSalesCashDebitBalanceAfterUsd: "0.00" });
+      planGoldenCoastPhase10Settlement({ settlement: parsed, gcSalesCashPayableBalanceUsd: "1800.00" })
+    ).toMatchObject({ gcSalesCashPayableBalanceAfterUsd: "0.00" });
     expect(() =>
-      planGoldenCoastPhase10Settlement({ settlement: parsed, gcSalesCashDebitBalanceUsd: "1799.99" })
-    ).toThrow(/exceeds the current collectible GC Sales Cash balance/);
+      planGoldenCoastPhase10Settlement({ settlement: parsed, gcSalesCashPayableBalanceUsd: "1799.99" })
+    ).toThrow(/exceeds the outstanding GC Sales Cash payable/);
   });
 
-  it("treats a zero or credit GC Sales Cash balance as having nothing collectible", () => {
+  it("treats a zero or overpaid (debit) GC Sales Cash balance as having nothing to settle", () => {
     expect(() =>
       planGoldenCoastPhase10Settlement({
         settlement: settlement({ amountUsd: "1.00" }),
-        gcSalesCashDebitBalanceUsd: "0",
+        gcSalesCashPayableBalanceUsd: "0",
       })
-    ).toThrow(/balance 0.00/);
+    ).toThrow(/payable 0.00/);
     expect(() =>
       planGoldenCoastPhase10Settlement({
         settlement: settlement({ amountUsd: "1.00" }),
-        gcSalesCashDebitBalanceUsd: "-50",
+        gcSalesCashPayableBalanceUsd: "-50",
       })
-    ).toThrow(/balance 0.00/);
+    ).toThrow(/payable 0.00/);
   });
 
-  it("posts Dr selected bank / Cr GC Sales Cash through the central posting request", () => {
+  it("posts Dr GC Sales Cash / Cr selected bank through the central posting request", () => {
     const parsed = settlement({ amountUsd: "250.00" });
     const plan = planGoldenCoastPhase10Settlement({
       settlement: parsed,
-      gcSalesCashDebitBalanceUsd: "1000.00",
+      gcSalesCashPayableBalanceUsd: "1000.00",
     });
     const digest = goldenCoastPhase10SettlementDigest({
       settlement: parsed,
@@ -97,24 +97,25 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement", () => {
       sourceId: `settlement:${digest}`,
       idempotencyKey: goldenCoastPhase10IdempotencyKey(7, "phase10-test-1"),
     });
+    expect(posting.voucher).toMatchObject({ voucherType: "Payment" });
     expect(posting.entries).toHaveLength(2);
     expect(posting.entries[0]).toMatchObject({
-      bankAccountId: 91,
+      ledgerAccountId: 44,
       debitAmount: "250",
       creditAmount: "0",
     });
     expect(posting.entries[1]).toMatchObject({
-      ledgerAccountId: 44,
+      bankAccountId: 91,
       debitAmount: "0",
       creditAmount: "250",
     });
   });
 
-  it("debits a selected Cash/Bank ledger account when the receipt target is a ledger", () => {
+  it("credits a selected Cash/Bank ledger account when the payment target is a ledger", () => {
     const parsed = settlement({ amountUsd: "125.00", receiptAccount: { kind: "ledger", id: 55 } });
     const plan = planGoldenCoastPhase10Settlement({
       settlement: parsed,
-      gcSalesCashDebitBalanceUsd: "1000.00",
+      gcSalesCashPayableBalanceUsd: "1000.00",
     });
     const digest = goldenCoastPhase10SettlementDigest({
       settlement: parsed,
@@ -126,12 +127,12 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement", () => {
       settlementDigest: digest,
     });
 
-    expect(posting.entries[0]).toMatchObject({
+    expect(posting.entries[1]).toMatchObject({
       ledgerAccountId: 55,
-      debitAmount: "125",
-      creditAmount: "0",
+      debitAmount: "0",
+      creditAmount: "125",
     });
-    expect(posting.entries[0].bankAccountId).toBeUndefined();
+    expect(posting.entries[1].bankAccountId).toBeUndefined();
   });
 
   it("binds idempotency to the material payload, receipt routing and canonical account", () => {

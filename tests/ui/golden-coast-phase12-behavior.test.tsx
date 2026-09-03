@@ -233,8 +233,8 @@ describe("Phase 10 GC Sales Cash settlement", () => {
       ready: true,
       companyId: 42,
       gcSalesCashAccount: { id: 8, name: "GC Sales Cash" },
-      collectibleSalesCashUsd: "400.00",
-      rawSalesCashDebitBalanceUsd: "650.00",
+      settleableSalesCashUsd: "400.00",
+      rawSalesCashPayableBalanceUsd: "650.00",
       receiptAccounts: [{ kind: "bank", id: 44, name: "GC Bank", type: "bank" }],
       sourceType: "ledger",
     });

@@ -71,8 +71,10 @@ export interface Phase10Readiness {
   ready: boolean;
   companyId: number;
   gcSalesCashAccount: { id: number; name?: string };
-  collectibleSalesCashUsd: string;
-  rawSalesCashDebitBalanceUsd: string;
+  /** GC Sales Cash is credit-normal: this is what may still be paid down. */
+  settleableSalesCashUsd: string;
+  /** Outstanding payable, negative when GC Sales Cash has been overpaid. */
+  rawSalesCashPayableBalanceUsd: string;
   receiptAccounts: CashAccountOption[];
   sourceType: string;
 }

@@ -372,11 +372,14 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
         reference: "Clear remaining GC Sales Cash",
       },
     });
+    // Phase 10 is a payment against the credit-normal GC Sales Cash payable, so
+    // it is planned from the outstanding payable rather than from Phase 7's
+    // debit-side view of the same account.
     const settlementPlan = planGoldenCoastPhase10Settlement({
       settlement,
-      gcSalesCashDebitBalanceUsd: collectionPlan.gcSalesCashDebitBalanceAfterUsd,
+      gcSalesCashPayableBalanceUsd: "1275.00",
     });
-    expect(settlementPlan.gcSalesCashDebitBalanceAfterUsd).toBe("0.00");
+    expect(settlementPlan.gcSalesCashPayableBalanceAfterUsd).toBe("0.00");
     const settlementDigest = goldenCoastPhase10SettlementDigest({
       settlement,
       gcSalesCashAccountId: account.gcSalesCash,
@@ -386,8 +389,9 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
       gcSalesCashAccountId: account.gcSalesCash,
       settlementDigest,
     });
-    expect(bankNetDebit(settlementPosting.entries, bank.directCollection)).toBe(1275);
-    expect(ledgerNetDebit(settlementPosting.entries, account.gcSalesCash)).toBe(-1275);
+    // Paying the liability debits GC Sales Cash and credits the paying bank.
+    expect(ledgerNetDebit(settlementPosting.entries, account.gcSalesCash)).toBe(1275);
+    expect(bankNetDebit(settlementPosting.entries, bank.directCollection)).toBe(-1275);
     expectBalanced(settlementPosting.entries);
 
     const remittance = parseGoldenCoastPhase7TransferInput({
@@ -406,7 +410,7 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
     const remittancePlan = planGoldenCoastPhase7Transfer({
       transfer: remittance,
       balances: {
-        gcSalesCashDebitBalanceUsd: settlementPlan.gcSalesCashDebitBalanceAfterUsd,
+        gcSalesCashDebitBalanceUsd: "0.00",
         outstandingHadiCollectionsUsd: collectionPlan.outstandingHadiCollectionsAfterUsd,
       },
     });
