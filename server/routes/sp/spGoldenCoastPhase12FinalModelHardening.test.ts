@@ -63,7 +63,7 @@ describe("Golden Coast Phase 12 final accounting-model hardening", () => {
 
   it("keeps direct bank/cash settlement separate from POS sale recognition", () => {
     expect(phase10RouteSource).toContain("gcSalesCashDebitBalanceUsd");
-    expect(phase10RouteSource).toContain("validateReceiptAccount");
+    expect(phase10RouteSource).toContain("validatePaymentAccount");
     expect(phase10RouteSource).toContain("postBalancedVoucherTx");
   });
 
