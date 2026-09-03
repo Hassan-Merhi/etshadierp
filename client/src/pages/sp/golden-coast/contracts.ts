@@ -76,6 +76,8 @@ export interface Phase10Readiness {
   settleableSalesCashUsd: string;
   /** Outstanding payable, negative when GC Sales Cash has been overpaid. */
   rawSalesCashPayableBalanceUsd: string;
+  /** Expense account a transfer fee is booked to; null when not configured. */
+  sharedChargesAccount: { id: number; name: string } | null;
   receiptAccounts: CashAccountOption[];
   sourceType: string;
 }

@@ -131,6 +131,55 @@ async function resolveGcSalesCashAccount(
   return account;
 }
 
+const SHARED_CHARGES_SUBTYPE = "sp_shared_charges";
+
+/**
+ * Resolves the Shared Charges expense account a transfer fee is booked to. It
+ * is only required when a settlement actually carries a fee, so callers pass
+ * `required: false` for readiness reporting.
+ */
+async function resolveSharedChargesAccount(
+  conn: DbLike,
+  companyId: number,
+  required: boolean
+): Promise<{ id: number; name: string } | null> {
+  const rows = await conn
+    .select({ id: ledgerAccounts.id, name: ledgerAccounts.name, accountType: ledgerAccounts.accountType })
+    .from(ledgerAccounts)
+    .where(
+      and(
+        eq(ledgerAccounts.companyId, companyId),
+        eq(ledgerAccounts.subType, SHARED_CHARGES_SUBTYPE),
+        eq(ledgerAccounts.active, true),
+        isNull(ledgerAccounts.deletedAt)
+      )
+    )
+    .orderBy(asc(ledgerAccounts.id))
+    .limit(2);
+
+  if (rows.length !== 1) {
+    if (!required) return null;
+    throw new GoldenCoastPhase10RouteError(
+      rows.length === 0
+        ? "Shared Charges is not configured; a transfer fee cannot be booked"
+        : "Shared Charges is ambiguous; repair duplicate accounts before charging a transfer fee",
+      "GC_PHASE10_ACCOUNT_INVALID",
+      409
+    );
+  }
+  const account = { id: Number(rows[0].id), name: String(rows[0].name) };
+  const accountType = String(rows[0].accountType);
+  if (!["Direct Expense", "Expense"].includes(accountType)) {
+    if (!required) return null;
+    throw new GoldenCoastPhase10RouteError(
+      `Shared Charges must be an expense account, not ${accountType}`,
+      "GC_PHASE10_ACCOUNT_INVALID",
+      409
+    );
+  }
+  return account;
+}
+
 async function validateReceiptAccount(
   conn: DbLike,
   companyId: number,
@@ -317,7 +366,9 @@ async function findReplayedSettlement(
     );
   }
   const entries = await loadVoucherEntries(tx, Number(voucher.id));
-  if (entries.length !== 2 || !amountEquals(voucher.totalAmount, settlement.amountUsd)) {
+  const chargesFee = new Decimal(settlement.transferFeeUsd).greaterThan(0);
+  const cashOutflowUsd = new Decimal(settlement.amountUsd).plus(settlement.transferFeeUsd).toFixed(2);
+  if (entries.length !== (chargesFee ? 3 : 2) || !amountEquals(voucher.totalAmount, cashOutflowUsd)) {
     throw new GoldenCoastPhase10RouteError(
       "The persisted Phase 10 voucher no longer matches its idempotency marker",
       "GC_PHASE10_IDEMPOTENCY_INCONSISTENT",
@@ -337,11 +388,17 @@ async function findReplayedSettlement(
       settlement.receiptAccount.kind === "bank"
         ? Number(entry.bankAccountId ?? 0) === settlement.receiptAccount.id
         : Number(entry.ledgerAccountId ?? 0) === settlement.receiptAccount.id;
-    return (
-      targetMatches && amountEquals(entry.creditAmount, settlement.amountUsd) && amountEquals(entry.debitAmount, "0")
-    );
+    return targetMatches && amountEquals(entry.creditAmount, cashOutflowUsd) && amountEquals(entry.debitAmount, "0");
   });
-  if (!salesCashDebit || !receiptCredit) {
+  const feeDebit = !chargesFee
+    ? true
+    : entries.some(
+        (entry) =>
+          Number(entry.ledgerAccountId ?? 0) !== gcSalesCashAccountId &&
+          amountEquals(entry.debitAmount, settlement.transferFeeUsd) &&
+          amountEquals(entry.creditAmount, "0")
+      );
+  if (!salesCashDebit || !receiptCredit || !feeDebit) {
     throw new GoldenCoastPhase10RouteError(
       "The persisted Phase 10 voucher entries no longer match the requested settlement routing",
       "GC_PHASE10_IDEMPOTENCY_INCONSISTENT",
@@ -382,9 +439,10 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
     }
     await assertPhase10CutoverPosted(db, companyId);
     const gcSalesCashAccount = await resolveGcSalesCashAccount(db, companyId);
-    const [signedBalanceUsd, receiptAccounts] = await Promise.all([
+    const [signedBalanceUsd, receiptAccounts, sharedChargesAccount] = await Promise.all([
       gcSalesCashSignedBalance(db, companyId, gcSalesCashAccount.id),
       listReceiptAccounts(db, companyId),
+      resolveSharedChargesAccount(db, companyId, false),
     ]);
     const payableBalance = new Decimal(gcSalesCashPayableBalance(signedBalanceUsd));
     res.json({
@@ -394,6 +452,8 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
       gcSalesCashAccount,
       settleableSalesCashUsd: gcSalesCashSettleablePayable(payableBalance.toFixed()),
       rawSalesCashPayableBalanceUsd: payableBalance.toFixed(2),
+      // A transfer fee can only be charged when Shared Charges is configured.
+      sharedChargesAccount,
       receiptAccounts,
       sourceType: GOLDEN_COAST_PHASE10_SOURCE_TYPE,
     });
@@ -438,9 +498,15 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
       const gcSalesCashAccount = await resolveGcSalesCashAccount(tx, companyId);
       await validateReceiptAccount(tx, companyId, settlement.receiptAccount);
 
+      // Shared Charges is only resolved — and only required — when the payment
+      // actually carries a transfer fee.
+      const sharedChargesAccount = new Decimal(settlement.transferFeeUsd).greaterThan(0)
+        ? await resolveSharedChargesAccount(tx, companyId, true)
+        : null;
       const settlementDigest = goldenCoastPhase10SettlementDigest({
         settlement,
         gcSalesCashAccountId: gcSalesCashAccount.id,
+        sharedChargesAccountId: sharedChargesAccount?.id ?? null,
       });
       const replayed = await findReplayedSettlement(tx, companyId, settlement, gcSalesCashAccount.id, settlementDigest);
       if (replayed) {
@@ -450,6 +516,7 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
           settlement,
           gcSalesCashAccount,
           gcSalesCashPayableBalanceAfterUsd: gcSalesCashPayableBalance(currentBalance),
+          cashOutflowUsd: new Decimal(settlement.amountUsd).plus(settlement.transferFeeUsd).toFixed(2),
           voucher: replayed.voucher,
           entries: replayed.entries,
         };
@@ -477,6 +544,7 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
       const request = buildGoldenCoastPhase10SettlementPosting({
         plan,
         gcSalesCashAccountId: gcSalesCashAccount.id,
+        sharedChargesAccountId: sharedChargesAccount?.id ?? null,
         settlementDigest,
         actor,
       });
@@ -487,6 +555,7 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
         plan,
         gcSalesCashAccount,
         gcSalesCashPayableBalanceAfterUsd: plan.gcSalesCashPayableBalanceAfterUsd,
+        cashOutflowUsd: plan.cashOutflowUsd,
         voucher: posted.voucher,
         entries: posted.entries,
       };
@@ -498,6 +567,8 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
       companyId,
       clientRequestId: outcome.settlement.clientRequestId,
       amountUsd: outcome.settlement.amountUsd,
+      transferFeeUsd: outcome.settlement.transferFeeUsd,
+      cashOutflowUsd: outcome.cashOutflowUsd,
       gcSalesCashPayableBalanceAfterUsd: outcome.gcSalesCashPayableBalanceAfterUsd,
       gcSalesCashAccountId: outcome.gcSalesCashAccount.id,
       voucher: outcome.voucher,

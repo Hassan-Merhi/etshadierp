@@ -116,6 +116,19 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement route surface", () => {
     expect(serviceSource).toContain("Dr canonical GC Sales Cash / Cr selected Golden Coast Cash/Bank");
     expect(serviceSource).toContain('voucherType: "Payment"');
     expect(serviceSource).not.toContain('voucherType: "Receipt"');
+  });
+
+  it("books a transfer fee to Shared Charges instead of shrinking the settlement", () => {
+    // The payable is relieved by amountUsd alone; the fee rides on the paying
+    // account, so the credit is the combined outflow.
+    expect(serviceSource).toContain("debitAmount: input.plan.amountUsd");
+    expect(serviceSource).toContain("creditAmount: input.plan.cashOutflowUsd");
+    expect(serviceSource).toContain("cashOutflowUsd: money(amount.plus(fee))");
+    // Shared Charges is resolved by canonical sub type, never by account name.
+    expect(routeSource).toContain('const SHARED_CHARGES_SUBTYPE = "sp_shared_charges"');
+    expect(routeSource).toContain("eq(ledgerAccounts.subType, SHARED_CHARGES_SUBTYPE)");
+    // A fee is only accepted when that account genuinely resolves.
+    expect(routeSource).toContain("resolveSharedChargesAccount(tx, companyId, true)");
     expect(serviceSource).not.toContain("Hassan Savings withdrawal");
     expect(routeSource).not.toContain("spStockMovements");
     expect(routeSource).not.toContain("adjustSpInventoryAtomic");

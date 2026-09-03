@@ -29,6 +29,7 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement", () => {
       companyId: 7,
       settlementDate: "2026-09-01",
       amountUsd: "600.00",
+      transferFeeUsd: "0.00",
       clientRequestId: "phase10-test-1",
       receiptAccount: { kind: "bank", id: 91 },
       reference: "Direct collection",
@@ -39,6 +40,71 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement", () => {
     expect(() => settlement({ settlementDate: "2026-08-31" })).toThrow(/cutover date/);
     expect(() => settlement({ clientRequestId: "bad request" })).toThrow(GoldenCoastPhase10SettlementError);
     expect(() => settlement({ amountUsd: "1.001" })).toThrow(/at most 2 decimal places/);
+    expect(() => settlement({ transferFeeUsd: "-0.01" })).toThrow(/transferFeeUsd cannot be negative/);
+    expect(() => settlement({ transferFeeUsd: "1.001" })).toThrow(/at most 2 decimal places/);
+  });
+
+  it("relieves the payable by the full settlement and adds the fee to the cash outflow", () => {
+    const parsed = settlement({ amountUsd: "600.00", transferFeeUsd: "12.50" });
+    expect(
+      planGoldenCoastPhase10Settlement({ settlement: parsed, gcSalesCashPayableBalanceUsd: "1800.00" })
+    ).toMatchObject({
+      // The fee is an expense, so it never shrinks what Fresh Start is owed.
+      gcSalesCashPayableBalanceAfterUsd: "1200.00",
+      cashOutflowUsd: "612.50",
+    });
+  });
+
+  it("caps the settlement against the payable without counting the fee", () => {
+    const parsed = settlement({ amountUsd: "1800.00", transferFeeUsd: "25.00" });
+    expect(
+      planGoldenCoastPhase10Settlement({ settlement: parsed, gcSalesCashPayableBalanceUsd: "1800.00" })
+    ).toMatchObject({ gcSalesCashPayableBalanceAfterUsd: "0.00", cashOutflowUsd: "1825.00" });
+  });
+
+  it("posts the fee to Shared Charges and the total to the paying account", () => {
+    const parsed = settlement({ amountUsd: "600.00", transferFeeUsd: "12.50" });
+    const plan = planGoldenCoastPhase10Settlement({ settlement: parsed, gcSalesCashPayableBalanceUsd: "1800.00" });
+    const posting = buildGoldenCoastPhase10SettlementPosting({
+      plan,
+      gcSalesCashAccountId: 44,
+      sharedChargesAccountId: 66,
+      settlementDigest: goldenCoastPhase10SettlementDigest({
+        settlement: parsed,
+        gcSalesCashAccountId: 44,
+        sharedChargesAccountId: 66,
+      }),
+    });
+
+    expect(posting.entries).toHaveLength(3);
+    expect(posting.entries[0]).toMatchObject({ ledgerAccountId: 44, debitAmount: "600", creditAmount: "0" });
+    expect(posting.entries[1]).toMatchObject({ ledgerAccountId: 66, debitAmount: "12.5", creditAmount: "0" });
+    expect(posting.entries[2]).toMatchObject({ bankAccountId: 91, debitAmount: "0", creditAmount: "612.5" });
+  });
+
+  it("requires a distinct Shared Charges account whenever a fee is charged", () => {
+    const parsed = settlement({ amountUsd: "600.00", transferFeeUsd: "12.50" });
+    const plan = planGoldenCoastPhase10Settlement({ settlement: parsed, gcSalesCashPayableBalanceUsd: "1800.00" });
+    const digest = goldenCoastPhase10SettlementDigest({ settlement: parsed, gcSalesCashAccountId: 44 });
+    expect(() =>
+      buildGoldenCoastPhase10SettlementPosting({ plan, gcSalesCashAccountId: 44, settlementDigest: digest })
+    ).toThrow(/sharedChargesAccountId/);
+    expect(() =>
+      buildGoldenCoastPhase10SettlementPosting({
+        plan,
+        gcSalesCashAccountId: 44,
+        sharedChargesAccountId: 44,
+        settlementDigest: digest,
+      })
+    ).toThrow(/distinct accounts/);
+  });
+
+  it("binds replay identity to the transfer fee as well as the amount", () => {
+    const base = settlement({ transferFeeUsd: "0" });
+    const withFee = settlement({ transferFeeUsd: "12.50" });
+    expect(goldenCoastPhase10SettlementDigest({ settlement: base, gcSalesCashAccountId: 44 })).not.toBe(
+      goldenCoastPhase10SettlementDigest({ settlement: withFee, gcSalesCashAccountId: 44 })
+    );
   });
 
   it("allows a partial payment and reports the remaining GC Sales Cash payable", () => {

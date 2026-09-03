@@ -41,6 +41,7 @@ export function GcSalesCashPanel({ companyKey }: { companyKey: CompanyKey }) {
 
   const [phase10Date, setPhase10Date] = useState(todayIso);
   const [phase10Amount, setPhase10Amount] = useState("");
+  const [phase10TransferFee, setPhase10TransferFee] = useState("");
   const [phase10ReceiptAccount, setPhase10ReceiptAccount] = useState("");
   const [phase10Reference, setPhase10Reference] = useState("");
   const [phase10RequestId, setPhase10RequestId] = useState(() => makeRequestId("gc-p10"));
@@ -55,8 +56,16 @@ export function GcSalesCashPanel({ companyKey }: { companyKey: CompanyKey }) {
 
   const phase10 = phase10Query.data;
   const phase10Choice = selectedAccount(phase10ReceiptAccount, phase10?.receiptAccounts ?? []);
+  // The fee is charged on top of the settlement, so it is never capped by the
+  // payable — but it can only be booked when Shared Charges is configured.
+  const phase10Fee = phase10TransferFee.trim() === "" ? 0 : Number(phase10TransferFee);
+  const phase10FeeValid =
+    Number.isFinite(phase10Fee) && phase10Fee >= 0 && (phase10Fee === 0 || phase10?.sharedChargesAccount != null);
   const phase10CanSubmit =
-    phase10?.ready === true && phase10Choice != null && allowedAmount(phase10Amount, phase10.settleableSalesCashUsd);
+    phase10?.ready === true &&
+    phase10Choice != null &&
+    phase10FeeValid &&
+    allowedAmount(phase10Amount, phase10.settleableSalesCashUsd);
 
   const phase10Mutation = useMutation({
     mutationFn: async () => {
@@ -64,6 +73,7 @@ export function GcSalesCashPanel({ companyKey }: { companyKey: CompanyKey }) {
       const response = await apiRequest("POST", PHASE10_SETTLEMENT, {
         settlementDate: phase10Date,
         amountUsd: phase10Amount,
+        transferFeeUsd: phase10TransferFee.trim() || "0",
         clientRequestId: phase10RequestId,
         receiptAccount: phase10Choice,
         reference: phase10Reference.trim() || null,
@@ -73,6 +83,7 @@ export function GcSalesCashPanel({ companyKey }: { companyKey: CompanyKey }) {
     onSuccess: (result) => {
       invalidateReadiness();
       setPhase10Amount("");
+      setPhase10TransferFee("");
       setPhase10Reference("");
       setPhase10RequestId(makeRequestId("gc-p10"));
       toast({
@@ -154,6 +165,30 @@ export function GcSalesCashPanel({ companyKey }: { companyKey: CompanyKey }) {
               }}
               data-testid="input-gc-phase10-amount"
             />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-sm font-medium" htmlFor="gc-phase10-transfer-fee">
+              {releaseDebtEnglish("Transfer fee (USD)")}
+            </label>
+            <Input
+              id="gc-phase10-transfer-fee"
+              type="number"
+              min="0"
+              step="0.01"
+              value={phase10TransferFee}
+              onChange={(event) => {
+                setPhase10TransferFee(event.target.value);
+                rotatePhase10();
+              }}
+              data-testid="input-gc-phase10-transfer-fee"
+            />
+            <p className="text-xs text-muted-foreground">
+              {phase10?.sharedChargesAccount == null
+                ? releaseDebtEnglish("Shared Charges is not configured, so no transfer fee can be charged.")
+                : releaseDebtEnglish(
+                    "Paid on top of the settlement and booked to Shared Charges; the payable still falls by the full amount."
+                  )}
+            </p>
           </div>
           <div className="space-y-2 md:col-span-2">
             <label className="text-sm font-medium" htmlFor="select-gc-phase10-receipt-account">
