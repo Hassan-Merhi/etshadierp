@@ -22,6 +22,7 @@ import {
   runWithVerifiedParentCompanyScope,
 } from "../../services/security/parentCompanyPostingScope";
 import { resolvePoImportCreditTarget } from "../../services/accounting/poImportAccounting";
+import { supplierService } from "../suppliers/supplierService";
 
 export function registerPoImportRoutes(app: Express) {
   app.post("/api/po-import/validate", requireAuth, async (req, res) => {
@@ -38,9 +39,10 @@ export function registerPoImportRoutes(app: Express) {
 
       const errors: string[] = [];
 
-      // Validate supplier exists
-      const allSuppliers = await storage.getAllSuppliers();
-      const supplier = allSuppliers.find((s) => s.id === supplierId);
+      // Supplier master data may be inherited from the explicitly linked parent
+      // company, but the import records remain owned by the active company.
+      const visibleSuppliers = await supplierService.list(req.session.currentCompanyId, "", true);
+      const supplier = visibleSuppliers.find((s) => s.id === supplierId);
       if (!supplier) {
         errors.push("Selected supplier not found");
       }
@@ -170,9 +172,10 @@ export function registerPoImportRoutes(app: Express) {
       // SERVER-SIDE VALIDATION - Mandatory before import
       const validationErrors: string[] = [];
 
-      // Validate supplier exists
-      const allSuppliers = await storage.getAllSuppliers();
-      const supplier = allSuppliers.find((s) => s.id === supplierId);
+      // Supplier master data may be inherited from the explicitly linked parent
+      // company, but the import records remain owned by the active company.
+      const visibleSuppliers = await supplierService.list(currentCompanyId, "", true);
+      const supplier = visibleSuppliers.find((s) => s.id === supplierId);
       if (!supplier) {
         validationErrors.push("Selected supplier not found");
       }
