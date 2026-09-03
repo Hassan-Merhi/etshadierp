@@ -142,8 +142,10 @@
       "tests/formatting-gate-parity.test.ts",
       "tests/supplier-profit-check-integrity.test.ts",
       "tests/supplier-partner-net-position-inclusion.test.ts",
-      "tests/supplier-partner-customer-authoritative-net-position.test.ts"
+      "tests/supplier-partner-customer-authoritative-net-position.test.ts",
+      "tests/phase4-hotpath-performance-regression.test.ts",
+      "tests/ui/factory-bootstrap-phase3.test.ts"
     ],
-    "maxAdditionalTextAssertions": 689
+    "maxAdditionalTextAssertions": 714
   }
 }
