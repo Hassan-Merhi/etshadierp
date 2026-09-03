@@ -16,12 +16,12 @@ import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth } from "../../auth";
 import { ledgerAccounts, purchaseOrders, voucherEntries, type Container } from "@shared/schema";
-import { eq, and, sql, isNull, like } from "drizzle-orm";
-import { firstRow } from "../../lib/queryResult";
+import { eq, and, isNull, like } from "drizzle-orm";
 import {
   ParentCompanyPostingScopeError,
   runWithVerifiedParentCompanyScope,
 } from "../../services/security/parentCompanyPostingScope";
+import { resolvePoImportCreditTarget } from "../../services/accounting/poImportAccounting";
 
 export function registerPoImportRoutes(app: Express) {
   app.post("/api/po-import/validate", requireAuth, async (req, res) => {
@@ -148,6 +148,17 @@ export function registerPoImportRoutes(app: Express) {
       if (!fileHash || !containerNumber || !supplierId || !importDate || !preview) {
         return res.status(400).json({ message: "Missing required fields" });
       }
+
+      const currentCompanyId = req.session.currentCompanyId;
+      const currentCompanyLink = await storage.getCompanyById(currentCompanyId);
+      const parentCompanyId = currentCompanyLink?.parentCompanyId ?? null;
+      const isSubsidiary = parentCompanyId !== null;
+      const companyType = currentCompanyLink?.companyType ?? null;
+      const isSpCompany = companyType === "supplier_partner";
+      const configuredIntercompanyCreditAccount = !isSpCompany
+        ? await storage.getConfiguredIntercompanyCreditAccount(currentCompanyId)
+        : undefined;
+      const configuredIntercompanyCreditAccountId = configuredIntercompanyCreditAccount?.id ?? null;
 
       // Validate parent freight account when freightPaidBy=parent
       if (resolvedFreightPaidBy === "parent" && !resolvedFreightParentAccountId) {
@@ -407,10 +418,10 @@ export function registerPoImportRoutes(app: Express) {
         // If subsidiary with parent credit account: entries created here at import time
         // Otherwise: entries created at container offload time per Tally conventions
         const voucher = await storage.createVoucher({
-          companyId: req.session.currentCompanyId!,
+          companyId: currentCompanyId,
           postingSource: infrastructurePostingIdentity(
             "po-import",
-            `${req.session.currentCompanyId!}:${poNumber}`,
+            `${currentCompanyId}:${poNumber}`,
             "purchase"
           ),
           currency: "USD",
@@ -423,24 +434,6 @@ export function registerPoImportRoutes(app: Express) {
           sourceModule: "ERP",
         });
 
-        // === INTER-COMPANY CREDIT SYSTEM ===
-        // Intercompany posting is only valid when this exact company is explicitly linked
-        // to a parent through companies.parent_company_id. The global parentCompanyId setting
-        // identifies the historical parent company; it does not make every other company a child.
-        const currentCompanyId = req.session.currentCompanyId!;
-        const currentCompanyLink = await storage.getCompanyById(currentCompanyId);
-        const parentCompanyId = currentCompanyLink?.parentCompanyId ?? null;
-        const isSubsidiary = parentCompanyId !== null;
-
-        // ── SP Company: DR Goods OTW / CR OTW Clearing ───────────────────────
-        const companyRow = await db.execute(
-          sql`SELECT company_type FROM companies WHERE id = ${currentCompanyId} LIMIT 1`
-        );
-        const companyType =
-          firstRow(companyRow)?.company_type ??
-          (companyRow as unknown as { [key: string]: { company_type: unknown } })[0]?.company_type;
-        const isSpCompany = companyType === "supplier_partner";
-
         // Parent-side accounting is deliberately separate from the local
         // posting. A Supplier Partner keeps its OTW/Clearing voucher in the
         // child company, then also posts the intercompany receivable and
@@ -449,8 +442,7 @@ export function registerPoImportRoutes(app: Express) {
           if (!parentCompanyId) return;
 
           const linkedParentCompanyId = parentCompanyId;
-          const currentCompany = await storage.getCompanyById(currentCompanyId);
-          const subsidiaryName = currentCompany?.name || `Company ${currentCompanyId}`;
+          const subsidiaryName = currentCompanyLink?.name || `Company ${currentCompanyId}`;
 
           // Find or create "[Subsidiary Name] Credit" account in parent
           // (Asset - receivable). The companyId argument is mandatory on every
@@ -612,8 +604,7 @@ export function registerPoImportRoutes(app: Express) {
           });
         } else if (isSubsidiary) {
           // Get the subsidiary's company settings for parent credit account
-          const companySettings = await storage.getCompanySettings(currentCompanyId);
-          let parentCreditAccountId = companySettings?.parentCreditAccountId;
+          let parentCreditAccountId = configuredIntercompanyCreditAccountId;
 
           // Get the current company name for the parent company's receivable account
           const currentCompany = await storage.getCompanyById(currentCompanyId);
@@ -705,9 +696,9 @@ export function registerPoImportRoutes(app: Express) {
             });
           }
         } else {
-          // === PARENT/STANDALONE COMPANY: Create direct supplier entry ===
-          // When importing to a parent or standalone company, create standard voucher entries:
-          // DR Purchases (expense), CR Supplier (liability)
+          // === PARENT/STANDALONE COMPANY: Create local payable entry ===
+          // A configured intercompany account takes precedence for ERP companies.
+          // Without one, preserve the standard DR Purchases / CR Supplier behavior.
 
           // Find or create a Purchases account for the parent company
           let purchasesAccount = await storage.getLedgerAccountByName("Purchases", currentCompanyId);
@@ -741,11 +732,25 @@ export function registerPoImportRoutes(app: Express) {
             narration: `PO ${poNumber} - Container ${containerNumber}`,
           });
 
-          // CR Supplier — goods payable
-          if (supplierId) {
+          // CR configured intercompany account when explicitly selected for this
+          // ERP company; otherwise preserve the direct supplier payable behavior.
+          const creditTarget = resolvePoImportCreditTarget({
+            companyType,
+            configuredIntercompanyCreditAccountId,
+            supplierId,
+          });
+          if (creditTarget.kind === "intercompany") {
             await storage.createVoucherEntry({
               voucherId: voucher.id,
-              supplierId: supplierId,
+              ledgerAccountId: creditTarget.ledgerAccountId,
+              debitAmount: "0",
+              creditAmount: goodsAmount.toFixed(2),
+              narration: `PO ${poNumber} - Intercompany credit`,
+            });
+          } else if (creditTarget.supplierId) {
+            await storage.createVoucherEntry({
+              voucherId: voucher.id,
+              supplierId: creditTarget.supplierId,
               debitAmount: "0",
               creditAmount: goodsAmount.toFixed(2),
               narration: `PO ${poNumber} - Container ${containerNumber}`,
@@ -782,7 +787,7 @@ export function registerPoImportRoutes(app: Express) {
 
         const po = await storage.createPurchaseOrder(
           {
-            companyId: req.session.currentCompanyId!,
+            companyId: currentCompanyId,
             poNumber,
             containerId: container.id,
             supplierId,
