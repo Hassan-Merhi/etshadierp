@@ -245,6 +245,12 @@ describe("Golden Coast Phase 17 balance-sheet projection", () => {
       currentTranslatedBaseBalance: "110.00",
       translationDifference: "10.00",
     });
+    Object.assign(body, {
+      currencyRevaluation: {
+        currentTranslatedLedgerAccountIds: [5],
+        currentCashBankTranslationDifference: 10,
+      },
+    });
 
     const result = projectGoldenCoastResidualEquity({
       body,
@@ -263,6 +269,36 @@ describe("Golden Coast Phase 17 balance-sheet projection", () => {
       expect.arrayContaining([expect.objectContaining({ code: "GC-FX-TRANS", value: 10, balanceSide: "Cr" })])
     );
     expect(result.equity.accounts.some((account: { code?: string }) => account.code === "GC-UNCL-PNL")).toBe(false);
+  });
+
+  it("does not resurrect a historical cash balance when current translation resolves it to zero", () => {
+    const fixture = accounts({ cash: 100, freshCredit: 100 });
+    const body = baseBody({ tracker: OPENING_GC_SALES_CASH });
+    Object.assign(body, {
+      currencyRevaluation: {
+        currentTranslatedLedgerAccountIds: [5],
+        currentCashBankTranslationDifference: -100,
+      },
+    });
+
+    const result = projectGoldenCoastResidualEquity({
+      body,
+      companyAccounts: fixture.rows,
+      accountBalances: fixture.balances,
+    });
+
+    expect(result.forUs.total).toBe(497239);
+    expect(result.onUs.total).toBe(165875);
+    expect(result.netPosition).toBe(331364);
+    expect(result.equity.partnerCapitalTotal).toBe(331464);
+    expect(result.equity.currencyTranslationAdjustment).toBe(-100);
+    expect(result.equity.unclosedEarnings).toBe(0);
+    expect(result.equity.total).toBe(331364);
+    expect(result.forUs.accounts.some((account: { id?: number }) => account.id === 5)).toBe(false);
+    expect(result.onUs.accounts.some((account: { id?: number }) => account.id === 5)).toBe(false);
+    expect(result.equity.accounts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "GC-FX-TRANS", value: 100, balanceSide: "Dr" })])
+    );
   });
 
   it("does nothing to an ordinary Supplier Partner without Golden Coast equity roles", () => {
