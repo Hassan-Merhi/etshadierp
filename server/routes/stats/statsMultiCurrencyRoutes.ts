@@ -34,6 +34,15 @@ type NetPositionSide = {
   breakdown?: Array<{ name: string; value: number }>;
 };
 
+type NetPositionEquity = {
+  total?: number;
+  includedInNetPosition?: boolean;
+};
+
+type NetPositionBreakdown = {
+  equity?: NetPositionEquity;
+} & Record<string, unknown>;
+
 /** The net-position payload this route re-translates in place. */
 type NetPositionPayload = {
   forUs?: NetPositionSide;
@@ -42,7 +51,8 @@ type NetPositionPayload = {
   onUsTotal?: number;
   netPosition?: number;
   netWorth?: number;
-  equity?: { total?: number; includedInNetPosition?: boolean };
+  equity?: NetPositionEquity;
+  netPositionBreakdown?: NetPositionBreakdown;
   currency?: Record<string, unknown> & { currentCashBankTranslationApplied?: boolean };
   currencyRevaluation?: Record<string, unknown>;
 } & Record<string, unknown>;
@@ -57,6 +67,16 @@ function rebuildBreakdown(accounts: NetPositionAccountRow[]): Array<{ name: stri
     .map(([name, value]) => ({ name, value: round2(value) }))
     .filter((row) => Math.abs(row.value) >= 0.005)
     .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+}
+
+function restoreEquityInclusionContract(payload: NetPositionPayload) {
+  if (payload.equity && payload.equity.includedInNetPosition == null) {
+    payload.equity.includedInNetPosition = false;
+  }
+  if (payload.netPositionBreakdown?.equity && payload.netPositionBreakdown.equity.includedInNetPosition == null) {
+    payload.netPositionBreakdown.equity.includedInNetPosition = payload.equity?.includedInNetPosition ?? false;
+  }
+  return payload;
 }
 
 function applyCurrentCashTranslation(payload: NetPositionPayload, summaries: CashBankCurrencySummary[]) {
@@ -155,7 +175,7 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
         // repeated requests never reapply translation to the cached reference.
         const reportTotalsProvisional = Boolean(payload?.currencyRevaluation?.reportTotalsProvisional);
         const copy = payload == null ? payload : JSON.parse(JSON.stringify(payload));
-        const adjusted = applyCurrentCashTranslation(copy, revaluation.accounts);
+        const adjusted = restoreEquityInclusionContract(applyCurrentCashTranslation(copy, revaluation.accounts));
         if (adjusted?.currency) adjusted.currency.currentCashBankTranslationApplied = true;
         adjusted.currencyRevaluation = {
           currentCfaPerUsd: revaluation.currentCfaPerUsd,
