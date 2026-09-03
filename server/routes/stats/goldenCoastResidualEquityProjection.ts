@@ -1,10 +1,5 @@
 import type { Express } from "express";
-import {
-  getAccountNetBalance,
-  round2,
-  type AccountBalance,
-  type AccountLike,
-} from "../../netPositionHelper";
+import { getAccountNetBalance, round2, type AccountBalance, type AccountLike } from "../../netPositionHelper";
 import { logger } from "../../lib/logger";
 import { loadNetProfitData } from "./netProfitDataLoad";
 
@@ -40,21 +35,8 @@ type NetProfitResponse = {
   netPositionBreakdown?: Record<string, unknown>;
 };
 
-const ASSET_TYPES = new Set([
-  "Asset",
-  "Current Asset",
-  "Fixed Asset",
-  "Bank",
-  "Cash",
-  "Customer",
-]);
-const LIABILITY_TYPES = new Set([
-  "Liability",
-  "Loan",
-  "Loans",
-  "Duty Agent",
-  "Transporter Agent",
-]);
+const ASSET_TYPES = new Set(["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash", "Customer"]);
+const LIABILITY_TYPES = new Set(["Liability", "Loan", "Loans", "Duty Agent", "Transporter Agent"]);
 const INTERNAL_SP_SUBTYPES = new Set([
   "sp_stock",
   "sp_otw_clearing",
@@ -68,10 +50,7 @@ function numberValue(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function accountBalance(
-  accountId: number,
-  balances: Map<number, AccountBalance>,
-): AccountBalance {
+function accountBalance(accountId: number, balances: Map<number, AccountBalance>): AccountBalance {
   return balances.get(accountId) ?? { debit: 0, credit: 0 };
 }
 
@@ -82,43 +61,26 @@ function accountBalance(
  * posted entirely through vouchers in the opposite direction, fall back to the
  * current ledger magnitude rather than turning Hassan's claim negative.
  */
-export function goldenCoastHassanClaim(
-  account: LedgerRow,
-  balances: Map<number, AccountBalance>,
-): number {
+export function goldenCoastHassanClaim(account: LedgerRow, balances: Map<number, AccountBalance>): number {
   const movement = accountBalance(account.id, balances);
   const openingClaim = Math.abs(numberValue(account.openingBalance));
-  const creditNormalClaim = round2(
-    openingClaim + movement.credit - movement.debit,
-  );
+  const creditNormalClaim = round2(openingClaim + movement.credit - movement.debit);
   if (creditNormalClaim >= -0.005) return Math.max(0, creditNormalClaim);
   return round2(Math.abs(getAccountNetBalance(account, balances)));
 }
 
-function displayCategory(
-  account: LedgerRow,
-  side: "asset" | "liability",
-): string {
+function displayCategory(account: LedgerRow, side: "asset" | "liability"): string {
   if (account.subType === "sp_hadi_intercompany") return "HADI Intercompany";
   if (account.subType === "sp_goods_otw") return "Stock OTW";
-  if (
-    account.subType === "sp_prepaid" ||
-    account.subType === "sp_prepaid_expenses"
-  )
-    return "Prepaid";
+  if (account.subType === "sp_prepaid" || account.subType === "sp_prepaid_expenses") return "Prepaid";
   return account.accountType || (side === "asset" ? "Asset" : "Liability");
 }
 
-function addBreakdown(
-  accounts: DisplayAccount[],
-): Array<{ name: string; value: number }> {
+function addBreakdown(accounts: DisplayAccount[]): Array<{ name: string; value: number }> {
   const totals = new Map<string, number>();
   for (const account of accounts) {
     const category = account.category || "Other";
-    totals.set(
-      category,
-      round2((totals.get(category) || 0) + numberValue(account.value)),
-    );
+    totals.set(category, round2((totals.get(category) || 0) + numberValue(account.value)));
   }
   return [...totals.entries()]
     .filter(([, value]) => Math.abs(value) >= 0.005)
@@ -128,7 +90,7 @@ function addBreakdown(
 
 function removeAccountById(
   accounts: DisplayAccount[],
-  accountId: number,
+  accountId: number
 ): { accounts: DisplayAccount[]; removed: number } {
   let removed = 0;
   const kept = accounts.filter((account) => {
@@ -140,22 +102,15 @@ function removeAccountById(
 }
 
 function goldenCoastRoles(accounts: LedgerRow[]) {
-  const active = accounts.filter(
-    (account) => account.active !== false && account.deletedAt == null,
-  );
-  const fresh =
-    active.find((account) => account.subType === "gc_partner_capital") ?? null;
-  const hassan =
-    active.find((account) => account.subType === "gc_owner_capital") ?? null;
+  const active = accounts.filter((account) => account.active !== false && account.deletedAt == null);
+  const fresh = active.find((account) => account.subType === "gc_partner_capital") ?? null;
+  const hassan = active.find((account) => account.subType === "gc_owner_capital") ?? null;
   if (!fresh || !hassan) return null;
 
-  const payableCandidates = active.filter(
-    (account) => account.subType === "sp_payable",
-  );
+  const payableCandidates = active.filter((account) => account.subType === "sp_payable");
   const gcSalesCash =
-    payableCandidates.find((account) =>
-      /gc\s*sales\s*cash/i.test(account.name || ""),
-    ) ?? (payableCandidates.length === 1 ? payableCandidates[0] : null);
+    payableCandidates.find((account) => /gc\s*sales\s*cash/i.test(account.name || "")) ??
+    (payableCandidates.length === 1 ? payableCandidates[0] : null);
 
   return { active, fresh, hassan, gcSalesCash };
 }
@@ -175,8 +130,7 @@ export function projectGoldenCoastResidualEquity(input: {
   accountBalances: Map<number, AccountBalance>;
 }): NetProfitResponse {
   const { body, companyAccounts, accountBalances } = input;
-  if (!body || typeof body !== "object" || !body.forUs || !body.onUs)
-    return body;
+  if (!body || typeof body !== "object" || !body.forUs || !body.onUs) return body;
 
   const roles = goldenCoastRoles(companyAccounts);
   if (!roles) return body;
@@ -195,10 +149,7 @@ export function projectGoldenCoastResidualEquity(input: {
   // Coast sales-cash/HADI workflows; it must not be counted a second time here.
   if (roles.gcSalesCash) {
     const removedAsset = removeAccountById(forUsAccounts, roles.gcSalesCash.id);
-    const removedLiability = removeAccountById(
-      onUsAccounts,
-      roles.gcSalesCash.id,
-    );
+    const removedLiability = removeAccountById(onUsAccounts, roles.gcSalesCash.id);
     forUsAccounts = removedAsset.accounts;
     onUsAccounts = removedLiability.accounts;
     forUsTotal = round2(forUsTotal - removedAsset.removed);
@@ -208,7 +159,7 @@ export function projectGoldenCoastResidualEquity(input: {
   const existingIds = new Set<number>(
     [...forUsAccounts, ...onUsAccounts]
       .map((account) => Number(account.id ?? 0))
-      .filter((id) => Number.isInteger(id) && id > 0),
+      .filter((id) => Number.isInteger(id) && id > 0)
   );
 
   // The generic Supplier Partner dashboard intentionally uses a narrow set of
@@ -218,13 +169,11 @@ export function projectGoldenCoastResidualEquity(input: {
   for (const account of roles.active) {
     if (existingIds.has(account.id)) continue;
     if (INTERNAL_SP_SUBTYPES.has(account.subType || "")) continue;
-    if (account.id === roles.fresh.id || account.id === roles.hassan.id)
-      continue;
+    if (account.id === roles.fresh.id || account.id === roles.hassan.id) continue;
     if (roles.gcSalesCash && account.id === roles.gcSalesCash.id) continue;
 
     const isHadiIntercompany = account.subType === "sp_hadi_intercompany";
-    const isAsset =
-      ASSET_TYPES.has(account.accountType || "") || isHadiIntercompany;
+    const isAsset = ASSET_TYPES.has(account.accountType || "") || isHadiIntercompany;
     const isLiability = LIABILITY_TYPES.has(account.accountType || "");
     if (!isAsset && !isLiability) continue;
 
@@ -342,10 +291,7 @@ export function projectGoldenCoastResidualEquity(input: {
     equity,
     netPosition,
     netWorth: netPosition,
-    netPositionLabel:
-      netPosition >= 0
-        ? "We have more than we owe"
-        : "We owe more than we have",
+    netPositionLabel: netPosition >= 0 ? "We have more than we owe" : "We owe more than we have",
     netPositionBreakdown,
     forUsTotal,
     onUsTotal,
@@ -356,9 +302,7 @@ export function projectGoldenCoastResidualEquity(input: {
  * Installs a response projection immediately before the existing Net Profit
  * route. The accounting engine stays unchanged for every other company type.
  */
-export function registerGoldenCoastResidualEquityProjection(
-  app: Express,
-): void {
+export function registerGoldenCoastResidualEquityProjection(app: Express): void {
   app.use("/api/stats/net-profit", async (req, res, next) => {
     if (req.method !== "GET") return next();
     const companyId = req.session.currentCompanyId;
@@ -367,10 +311,8 @@ export function registerGoldenCoastResidualEquityProjection(
     try {
       const toDate = req.query.toDate ? String(req.query.toDate) : null;
       const reportData = await loadNetProfitData(companyId, toDate);
-      if (reportData.companyRecord?.companyType !== "supplier_partner")
-        return next();
-      if (!goldenCoastRoles(reportData.companyAccounts as LedgerRow[]))
-        return next();
+      if (reportData.companyRecord?.companyType !== "supplier_partner") return next();
+      if (!goldenCoastRoles(reportData.companyAccounts as LedgerRow[])) return next();
 
       const originalJson = res.json.bind(res);
       res.json = ((body: NetProfitResponse) =>
@@ -379,13 +321,10 @@ export function registerGoldenCoastResidualEquityProjection(
             body,
             companyAccounts: reportData.companyAccounts as LedgerRow[],
             accountBalances: reportData.accountBalances,
-          }),
+          })
         )) as typeof res.json;
     } catch (error) {
-      logger.warn(
-        "Golden Coast residual-equity projection unavailable; using base Net Position response",
-        { error },
-      );
+      logger.warn("Golden Coast residual-equity projection unavailable; using base Net Position response", { error });
     }
 
     return next();

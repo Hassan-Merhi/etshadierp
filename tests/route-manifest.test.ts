@@ -23,14 +23,9 @@ interface RatchetAllowances {
 }
 
 const MANIFEST_PATH = path.join(process.cwd(), "config/route-manifest.json");
-const ALLOWANCES_PATH = path.join(
-  process.cwd(),
-  "config/ci-ratchet-allowances.json",
-);
+const ALLOWANCES_PATH = path.join(process.cwd(), "config/ci-ratchet-allowances.json");
 const shouldUpdate = process.env.UPDATE_ROUTE_MANIFEST === "1";
-const allowances = JSON.parse(
-  fs.readFileSync(ALLOWANCES_PATH, "utf8"),
-) as RatchetAllowances;
+const allowances = JSON.parse(fs.readFileSync(ALLOWANCES_PATH, "utf8")) as RatchetAllowances;
 const reviewedSpMounts: string[] = [];
 // Raised from 152 when the route manifest was refreshed on 2026-08-05. Most of the increase is
 // deliberate layering: language-specific readers (factoryFrenchCatalogReadRoutes) and permission
@@ -64,17 +59,11 @@ async function buildManifest(): Promise<SerializedRouteManifest> {
   const originalUse = capturedApp.use.bind(app);
   capturedApp.use = (...args: unknown[]) => {
     const first = args[0];
-    const mountPath =
-      typeof first === "string"
-        ? first
-        : first instanceof RegExp
-          ? `re:${first.source}`
-          : "/";
+    const mountPath = typeof first === "string" ? first : first instanceof RegExp ? `re:${first.source}` : "/";
     const stack = capturedApp.router?.stack ?? capturedApp._router?.stack;
     const before = stack?.length ?? 0;
     const result = originalUse(...args);
-    const updatedStack =
-      capturedApp.router?.stack ?? capturedApp._router?.stack;
+    const updatedStack = capturedApp.router?.stack ?? capturedApp._router?.stack;
     for (const layer of updatedStack?.slice(before) ?? []) {
       layer.mountPath = mountPath;
     }
@@ -93,61 +82,42 @@ function normalizeReviewedMiddlewareWrappers(entry: string): string {
   return entry;
 }
 
-function describeDiff(
-  label: string,
-  expectedEntries: string[],
-  actualEntries: string[],
-): string {
-  const { added, removed, reordered } = diffManifestEntries(
-    expectedEntries,
-    actualEntries,
-  );
+function describeDiff(label: string, expectedEntries: string[], actualEntries: string[]): string {
+  const { added, removed, reordered } = diffManifestEntries(expectedEntries, actualEntries);
   const lines: string[] = [];
   if (removed.length)
     lines.push(
       `${label} removed (${removed.length}) - these no longer resolve:`,
-      ...removed.map((entry) => `  - ${entry}`),
+      ...removed.map((entry) => `  - ${entry}`)
     );
-  if (added.length)
-    lines.push(
-      `${label} added (${added.length}):`,
-      ...added.map((entry) => `  + ${entry}`),
-    );
+  if (added.length) lines.push(`${label} added (${added.length}):`, ...added.map((entry) => `  + ${entry}`));
   if (reordered) {
-    const index = expectedEntries.findIndex(
-      (entry, i) => entry !== actualEntries[i],
-    );
+    const index = expectedEntries.findIndex((entry, i) => entry !== actualEntries[i]);
     lines.push(
-      label +
-        " reordered - membership is unchanged but registration order moved.",
+      label + " reordered - membership is unchanged but registration order moved.",
       "Express resolves first-match, so this can change which handler wins.",
       `  first divergence at index ${index}:`,
       `    expected: ${expectedEntries[index]}`,
-      `    actual:   ${actualEntries[index]}`,
+      `    actual:   ${actualEntries[index]}`
     );
   }
   if (!lines.length) return "";
   lines.push(
     "",
     "If this change is intentional, regenerate with:",
-    "  UPDATE_ROUTE_MANIFEST=1 npm run test:backend -- route-manifest",
+    "  UPDATE_ROUTE_MANIFEST=1 npm run test:backend -- route-manifest"
   );
   return lines.join("\n");
 }
 
-function applyReviewedReplacements(
-  entries: string[],
-  replacements: RouteManifestReplacement[],
-): string[] {
+function applyReviewedReplacements(entries: string[], replacements: RouteManifestReplacement[]): string[] {
   const remaining = replacements.map((replacement) => ({
     ...replacement,
     remaining: 1,
   }));
   return entries.map((rawEntry) => {
     const entry = normalizeReviewedMiddlewareWrappers(rawEntry);
-    const replacement = remaining.find(
-      (candidate) => candidate.remaining > 0 && candidate.actual === entry,
-    );
+    const replacement = remaining.find((candidate) => candidate.remaining > 0 && candidate.actual === entry);
     if (!replacement) return entry;
     replacement.remaining -= 1;
     return replacement.expected;
@@ -157,11 +127,9 @@ function applyReviewedReplacements(
 function removeReviewedOccurrences(
   entries: string[],
   expectedEntries: string[],
-  reviewedEntries: Set<string>,
+  reviewedEntries: Set<string>
 ): string[] {
-  const remainingReviewed = new Map(
-    [...reviewedEntries].map((entry) => [entry, 1] as const),
-  );
+  const remainingReviewed = new Map([...reviewedEntries].map((entry) => [entry, 1] as const));
   const normalized: string[] = [];
   let expectedIndex = 0;
   for (const rawEntry of entries) {
@@ -186,99 +154,53 @@ describe("route manifest", () => {
     actual = await buildManifest();
     if (shouldUpdate) {
       fs.mkdirSync(path.dirname(MANIFEST_PATH), { recursive: true });
-      fs.writeFileSync(
-        MANIFEST_PATH,
-        `${JSON.stringify(actual, null, 2)}\n`,
-        "utf8",
-      );
+      fs.writeFileSync(MANIFEST_PATH, `${JSON.stringify(actual, null, 2)}\n`, "utf8");
     }
   });
 
   it("has a committed snapshot to compare against", () => {
-    expect(
-      fs.existsSync(MANIFEST_PATH),
-      "config/route-manifest.json is missing",
-    ).toBe(true);
+    expect(fs.existsSync(MANIFEST_PATH), "config/route-manifest.json is missing").toBe(true);
   });
-  it("registers a non-trivial number of routes", () =>
-    expect(actual.routeCount).toBeGreaterThan(500));
+  it("registers a non-trivial number of routes", () => expect(actual.routeCount).toBeGreaterThan(500));
   it("exposes no route without an identifiable handler chain", () => {
     expect(actual.routes.filter((entry) => entry.endsWith("[]"))).toEqual([]);
   });
   it("matches the committed snapshot plus exact reviewed deltas", () => {
-    const expected = JSON.parse(
-      fs.readFileSync(MANIFEST_PATH, "utf8"),
-    ) as SerializedRouteManifest;
+    const expected = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as SerializedRouteManifest;
     const reviewedRoutes = new Set(allowances.routeManifestAdditions);
-    const reviewedMounts = new Set([
-      ...allowances.routeManifestMountAdditions,
-      ...reviewedSpMounts,
-    ]);
+    const reviewedMounts = new Set([...allowances.routeManifestMountAdditions, ...reviewedSpMounts]);
     const reviewedReplacements = allowances.routeManifestReplacements ?? [];
-    const replacedRoutes = applyReviewedReplacements(
-      actual.routes,
-      reviewedReplacements,
-    );
-    const routes = removeReviewedOccurrences(
-      replacedRoutes,
-      expected.routes,
-      reviewedRoutes,
-    );
-    const mounts = removeReviewedOccurrences(
-      actual.middlewareMounts,
-      expected.middlewareMounts,
-      reviewedMounts,
-    );
+    const replacedRoutes = applyReviewedReplacements(actual.routes, reviewedReplacements);
+    const routes = removeReviewedOccurrences(replacedRoutes, expected.routes, reviewedRoutes);
+    const mounts = removeReviewedOccurrences(actual.middlewareMounts, expected.middlewareMounts, reviewedMounts);
     expect(expected.formatVersion).toBe(ROUTE_MANIFEST_FORMAT_VERSION);
     const routeDiff = describeDiff("Routes", expected.routes, routes);
     expect(routeDiff, routeDiff).toBe("");
     for (const addition of reviewedRoutes) {
-      const baselineCount = expected.routes.filter(
-        (entry) => entry === addition,
-      ).length;
+      const baselineCount = expected.routes.filter((entry) => entry === addition).length;
       const actualCount = actual.routes
         .map(normalizeReviewedMiddlewareWrappers)
         .filter((entry) => entry === addition).length;
       expect(actualCount).toBe(baselineCount + 1);
     }
-    const normalizedActualRoutes = actual.routes.map(
-      normalizeReviewedMiddlewareWrappers,
-    );
+    const normalizedActualRoutes = actual.routes.map(normalizeReviewedMiddlewareWrappers);
     for (const replacement of reviewedReplacements) {
       expect(replacement.actual).not.toBe(replacement.expected);
-      const baselineExpectedCount = expected.routes.filter(
-        (entry) => entry === replacement.expected,
-      ).length;
-      const baselineActualCount = expected.routes.filter(
-        (entry) => entry === replacement.actual,
-      ).length;
-      const currentExpectedCount = normalizedActualRoutes.filter(
-        (entry) => entry === replacement.expected,
-      ).length;
-      const currentActualCount = normalizedActualRoutes.filter(
-        (entry) => entry === replacement.actual,
-      ).length;
+      const baselineExpectedCount = expected.routes.filter((entry) => entry === replacement.expected).length;
+      const baselineActualCount = expected.routes.filter((entry) => entry === replacement.actual).length;
+      const currentExpectedCount = normalizedActualRoutes.filter((entry) => entry === replacement.expected).length;
+      const currentActualCount = normalizedActualRoutes.filter((entry) => entry === replacement.actual).length;
       expect(currentExpectedCount).toBe(baselineExpectedCount - 1);
       expect(currentActualCount).toBe(baselineActualCount + 1);
     }
-    const mountDiff = describeDiff(
-      "Middleware mounts",
-      expected.middlewareMounts,
-      mounts,
-    );
+    const mountDiff = describeDiff("Middleware mounts", expected.middlewareMounts, mounts);
     expect(mountDiff, mountDiff).toBe("");
     for (const addition of reviewedMounts) {
-      const baselineCount = expected.middlewareMounts.filter(
-        (entry) => entry === addition,
-      ).length;
-      expect(
-        actual.middlewareMounts.filter((entry) => entry === addition).length,
-      ).toBe(baselineCount + 1);
+      const baselineCount = expected.middlewareMounts.filter((entry) => entry === addition).length;
+      expect(actual.middlewareMounts.filter((entry) => entry === addition).length).toBe(baselineCount + 1);
     }
     expect(actual.routeCount).toBe(expected.routeCount + reviewedRoutes.size);
-    expect(actual.middlewareMountCount).toBe(
-      expected.middlewareMountCount + reviewedMounts.size,
-    );
+    expect(actual.middlewareMountCount).toBe(expected.middlewareMountCount + reviewedMounts.size);
   });
   it("does not add shadowed route registrations", () => {
     const counts = new Map<string, number>();
@@ -290,20 +212,14 @@ describe("route manifest", () => {
     for (const count of counts.values()) shadowed += count - 1;
     expect(
       shadowed,
-      `Shadowed registrations rose to ${shadowed} from a baseline of ${MAX_SHADOWED_REGISTRATIONS}.`,
+      `Shadowed registrations rose to ${shadowed} from a baseline of ${MAX_SHADOWED_REGISTRATIONS}.`
     ).toBeLessThanOrEqual(MAX_SHADOWED_REGISTRATIONS);
   });
   it("keeps every /api route behind an explicit guard", () => {
-    const snapshot = JSON.parse(
-      fs.readFileSync(MANIFEST_PATH, "utf8"),
-    ) as SerializedRouteManifest;
-    const publicRoutes = new Set(
-      snapshot.routes.filter((entry) => entry.includes("[<anonymous>]")),
-    );
+    const snapshot = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as SerializedRouteManifest;
+    const publicRoutes = new Set(snapshot.routes.filter((entry) => entry.includes("[<anonymous>]")));
     const unguarded = actual.routes.filter(
-      (entry) =>
-        entry.includes("[<anonymous>]") &&
-        !publicRoutes.has(normalizeReviewedMiddlewareWrappers(entry)),
+      (entry) => entry.includes("[<anonymous>]") && !publicRoutes.has(normalizeReviewedMiddlewareWrappers(entry))
     );
     expect(unguarded).toEqual([]);
   });

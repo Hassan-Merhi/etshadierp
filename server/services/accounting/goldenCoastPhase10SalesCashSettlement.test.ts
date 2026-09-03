@@ -44,15 +44,9 @@ describe("Golden Coast Phase 10 direct Fresh Start payment", () => {
   });
 
   it("rejects pre-cutover dates, invalid request ids and sub-cent amounts", () => {
-    expect(() => settlement({ settlementDate: "2026-08-31" })).toThrow(
-      /cutover date/,
-    );
-    expect(() => settlement({ clientRequestId: "bad request" })).toThrow(
-      GoldenCoastPhase10SettlementError,
-    );
-    expect(() => settlement({ amountUsd: "1.001" })).toThrow(
-      /at most 2 decimal places/,
-    );
+    expect(() => settlement({ settlementDate: "2026-08-31" })).toThrow(/cutover date/);
+    expect(() => settlement({ clientRequestId: "bad request" })).toThrow(GoldenCoastPhase10SettlementError);
+    expect(() => settlement({ amountUsd: "1.001" })).toThrow(/at most 2 decimal places/);
   });
 
   it("allows a partial payment against a credit GC Sales Cash payable", () => {
@@ -61,7 +55,7 @@ describe("Golden Coast Phase 10 direct Fresh Start payment", () => {
       planGoldenCoastPhase10Settlement({
         settlement: parsed,
         gcSalesCashDebitBalanceUsd: "-1800.00",
-      }),
+      })
     ).toMatchObject({
       gcSalesCashDebitBalanceBeforeUsd: "-1800.00",
       gcSalesCashDebitBalanceAfterUsd: "-1200.00",
@@ -76,7 +70,7 @@ describe("Golden Coast Phase 10 direct Fresh Start payment", () => {
       planGoldenCoastPhase10Settlement({
         settlement: parsed,
         gcSalesCashDebitBalanceUsd: "-1800.00",
-      }),
+      })
     ).toMatchObject({
       gcSalesCashDebitBalanceAfterUsd: "0.00",
       gcSalesCashPayableAfterUsd: "0.00",
@@ -85,7 +79,7 @@ describe("Golden Coast Phase 10 direct Fresh Start payment", () => {
       planGoldenCoastPhase10Settlement({
         settlement: parsed,
         gcSalesCashDebitBalanceUsd: "-1799.99",
-      }),
+      })
     ).toThrow(/exceeds the current GC Sales Cash payable/);
   });
 
@@ -94,13 +88,13 @@ describe("Golden Coast Phase 10 direct Fresh Start payment", () => {
       planGoldenCoastPhase10Settlement({
         settlement: settlement({ amountUsd: "1.00" }),
         gcSalesCashDebitBalanceUsd: "0",
-      }),
+      })
     ).toThrow(/payable 0.00/);
     expect(() =>
       planGoldenCoastPhase10Settlement({
         settlement: settlement({ amountUsd: "1.00" }),
         gcSalesCashDebitBalanceUsd: "50",
-      }),
+      })
     ).toThrow(/payable 0.00/);
   });
 
@@ -181,22 +175,20 @@ describe("Golden Coast Phase 10 direct Fresh Start payment", () => {
       goldenCoastPhase10SettlementDigest({
         settlement: differentBank,
         gcSalesCashAccountId: 44,
-      }),
+      })
     ).not.toBe(digest);
     expect(
       goldenCoastPhase10SettlementDigest({
         settlement: differentReference,
         gcSalesCashAccountId: 44,
-      }),
+      })
     ).not.toBe(digest);
     expect(
       goldenCoastPhase10SettlementDigest({
         settlement: base,
         gcSalesCashAccountId: 45,
-      }),
+      })
     ).not.toBe(digest);
-    expect(goldenCoastPhase10IdempotencyKey(7, base.clientRequestId)).toContain(
-      base.clientRequestId,
-    );
+    expect(goldenCoastPhase10IdempotencyKey(7, base.clientRequestId)).toContain(base.clientRequestId);
   });
 });

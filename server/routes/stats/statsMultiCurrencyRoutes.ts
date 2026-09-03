@@ -59,16 +59,11 @@ type NetPositionPayload = {
   currencyRevaluation?: Record<string, unknown>;
 } & Record<string, unknown>;
 
-function rebuildBreakdown(
-  accounts: NetPositionAccountRow[],
-): Array<{ name: string; value: number }> {
+function rebuildBreakdown(accounts: NetPositionAccountRow[]): Array<{ name: string; value: number }> {
   const totals = new Map<string, number>();
   for (const account of accounts) {
     const category = account.category || "Other";
-    totals.set(
-      category,
-      (totals.get(category) || 0) + Number(account.value || 0),
-    );
+    totals.set(category, (totals.get(category) || 0) + Number(account.value || 0));
   }
   return [...totals.entries()]
     .map(([name, value]) => ({ name, value: round2(value) }))
@@ -84,44 +79,28 @@ function restoreEquityInclusionContract(payload: NetPositionPayload) {
 
   const breakdownEquity = payload.netPositionBreakdown?.equity;
   if (breakdownEquity && breakdownEquity.includedInNetPosition == null) {
-    breakdownEquity.includedInNetPosition =
-      equity?.includedInNetPosition ?? false;
+    breakdownEquity.includedInNetPosition = equity?.includedInNetPosition ?? false;
   }
 
   return payload;
 }
 
-function applyCurrentCashTranslation(
-  payload: NetPositionPayload,
-  summaries: CashBankCurrencySummary[],
-) {
+function applyCurrentCashTranslation(payload: NetPositionPayload, summaries: CashBankCurrencySummary[]) {
   if (!payload?.forUs || !payload?.onUs) return payload;
 
-  const resolved = summaries.filter(
-    (row) => row.currentTranslatedBaseBalance !== null,
-  );
-  const resolvedLedgerIds = new Set(
-    resolved.filter((row) => row.accountKind === "ledger").map((row) => row.id),
-  );
+  const resolved = summaries.filter((row) => row.currentTranslatedBaseBalance !== null);
+  const resolvedLedgerIds = new Set(resolved.filter((row) => row.accountKind === "ledger").map((row) => row.id));
 
-  const oldForUsAccounts = Array.isArray(payload.forUs.accounts)
-    ? payload.forUs.accounts
-    : [];
-  const oldOnUsAccounts = Array.isArray(payload.onUs.accounts)
-    ? payload.onUs.accounts
-    : [];
-  const removedForUs = oldForUsAccounts.filter(
-    (row: NetPositionAccountRow) => row.id && resolvedLedgerIds.has(row.id),
-  );
-  const removedOnUs = oldOnUsAccounts.filter(
-    (row: NetPositionAccountRow) => row.id && resolvedLedgerIds.has(row.id),
-  );
+  const oldForUsAccounts = Array.isArray(payload.forUs.accounts) ? payload.forUs.accounts : [];
+  const oldOnUsAccounts = Array.isArray(payload.onUs.accounts) ? payload.onUs.accounts : [];
+  const removedForUs = oldForUsAccounts.filter((row: NetPositionAccountRow) => row.id && resolvedLedgerIds.has(row.id));
+  const removedOnUs = oldOnUsAccounts.filter((row: NetPositionAccountRow) => row.id && resolvedLedgerIds.has(row.id));
 
   const forUsAccounts = oldForUsAccounts.filter(
-    (row: NetPositionAccountRow) => !row.id || !resolvedLedgerIds.has(row.id),
+    (row: NetPositionAccountRow) => !row.id || !resolvedLedgerIds.has(row.id)
   );
   const onUsAccounts = oldOnUsAccounts.filter(
-    (row: NetPositionAccountRow) => !row.id || !resolvedLedgerIds.has(row.id),
+    (row: NetPositionAccountRow) => !row.id || !resolvedLedgerIds.has(row.id)
   );
 
   let forUsTotal = new Decimal(payload.forUs.total ?? payload.forUsTotal ?? 0);
@@ -155,15 +134,8 @@ function applyCurrentCashTranslation(
   const forUsRounded = round2(forUsTotal.toNumber());
   const onUsRounded = round2(onUsTotal.toNumber());
   const equityContribution =
-    payload.equity?.includedInNetPosition === true
-      ? new Decimal(payload.equity.total ?? 0)
-      : new Decimal(0);
-  const netPosition = round2(
-    new Decimal(forUsRounded)
-      .minus(onUsRounded)
-      .plus(equityContribution)
-      .toNumber(),
-  );
+    payload.equity?.includedInNetPosition === true ? new Decimal(payload.equity.total ?? 0) : new Decimal(0);
+  const netPosition = round2(new Decimal(forUsRounded).minus(onUsRounded).plus(equityContribution).toNumber());
 
   payload.forUs.accounts = forUsAccounts
     .filter((row) => Math.abs(Number(row.value || 0)) >= 0.005)
@@ -179,8 +151,7 @@ function applyCurrentCashTranslation(
   payload.onUsTotal = onUsRounded;
   payload.netPosition = netPosition;
   payload.netWorth = netPosition;
-  payload.netPositionLabel =
-    netPosition >= 0 ? "Net Assets" : "Net Liabilities";
+  payload.netPositionLabel = netPosition >= 0 ? "Net Assets" : "Net Liabilities";
   return payload;
 }
 
@@ -194,11 +165,7 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
   // only actual cash/bank accounts are translated at the current rate. Historical
   // or date-filtered snapshots remain based on their stored historical amounts.
   app.use(async (req, res, next) => {
-    if (
-      req.method !== "GET" ||
-      req.path !== "/api/stats/net-profit" ||
-      req.query.toDate
-    ) {
+    if (req.method !== "GET" || req.path !== "/api/stats/net-profit" || req.query.toDate) {
       return next();
     }
     const companyId = req.session.currentCompanyId;
@@ -210,18 +177,11 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
       res.json = ((payload) => {
         // The existing report engine caches its object. Clone before adjusting so
         // repeated requests never reapply translation to the cached reference.
-        const reportTotalsProvisional = Boolean(
-          payload?.currencyRevaluation?.reportTotalsProvisional,
-        );
-        const copy =
-          payload == null ? payload : JSON.parse(JSON.stringify(payload));
-        const translated = applyCurrentCashTranslation(
-          copy,
-          revaluation.accounts,
-        );
+        const reportTotalsProvisional = Boolean(payload?.currencyRevaluation?.reportTotalsProvisional);
+        const copy = payload == null ? payload : JSON.parse(JSON.stringify(payload));
+        const translated = applyCurrentCashTranslation(copy, revaluation.accounts);
         const adjusted = restoreEquityInclusionContract(translated);
-        if (adjusted?.currency)
-          adjusted.currency.currentCashBankTranslationApplied = true;
+        if (adjusted?.currency) adjusted.currency.currentCashBankTranslationApplied = true;
         adjusted.currencyRevaluation = {
           currentCfaPerUsd: revaluation.currentCfaPerUsd,
           unresolvedAccountCount: revaluation.unresolvedAccountCount,
@@ -231,12 +191,10 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
               accountKind: row.accountKind,
               id: row.id,
               name: row.name,
-              openingBalanceCurrencyUnresolved:
-                row.openingBalanceCurrencyUnresolved,
+              openingBalanceCurrencyUnresolved: row.openingBalanceCurrencyUnresolved,
               unresolvedLegacyEntryCount: row.unresolvedLegacyEntryCount,
               currentRateMissing: row.currentRateMissing,
-              unresolvedTranslationCurrencies:
-                row.unresolvedTranslationCurrencies,
+              unresolvedTranslationCurrencies: row.unresolvedTranslationCurrencies,
             })),
           appliedToCurrentSnapshotOnly: true,
           reportTotalsProvisional,
@@ -251,62 +209,41 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
     return next();
   });
 
-  app.get(
-    "/api/accounts/multi-currency/cash-bank-revaluation",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        const companyId = req.session.currentCompanyId;
-        if (!companyId)
-          return res.status(400).json({ message: "No company selected" });
-        return res.json(await getCashBankRevaluation(companyId));
-      } catch (error: unknown) {
-        logger.error("Multi-currency cash/bank revaluation failed:", {
-          error: error,
-        });
-        return res.status(500).json({ message: getErrorMessage(error) });
+  app.get("/api/accounts/multi-currency/cash-bank-revaluation", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      return res.json(await getCashBankRevaluation(companyId));
+    } catch (error: unknown) {
+      logger.error("Multi-currency cash/bank revaluation failed:", {
+        error: error,
+      });
+      return res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
+  app.get("/api/accounts/multi-currency/:kind/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const kind = req.params.kind;
+      if (kind !== "ledger" && kind !== "bank") {
+        return res.status(400).json({ message: "Account kind must be ledger or bank" });
       }
-    },
-  );
-
-  app.get(
-    "/api/accounts/multi-currency/:kind/:id",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        const companyId = req.session.currentCompanyId;
-        if (!companyId)
-          return res.status(400).json({ message: "No company selected" });
-
-        const kind = req.params.kind;
-        if (kind !== "ledger" && kind !== "bank") {
-          return res
-            .status(400)
-            .json({ message: "Account kind must be ledger or bank" });
-        }
-        const accountId = Number.parseInt(req.params.id, 10);
-        if (!Number.isInteger(accountId) || accountId <= 0) {
-          return res.status(400).json({ message: "Invalid account ID" });
-        }
-
-        const summary = await getCashBankAccountSummary(
-          companyId,
-          kind,
-          accountId,
-        );
-        if (!summary)
-          return res
-            .status(404)
-            .json({ message: "Cash/bank account not found" });
-        return res.json(summary);
-      } catch (error: unknown) {
-        logger.error("Multi-currency account summary failed:", {
-          error: error,
-        });
-        return res.status(500).json({ message: getErrorMessage(error) });
+      const accountId = Number.parseInt(req.params.id, 10);
+      if (!Number.isInteger(accountId) || accountId <= 0) {
+        return res.status(400).json({ message: "Invalid account ID" });
       }
-    },
-  );
+
+      const summary = await getCashBankAccountSummary(companyId, kind, accountId);
+      if (!summary) return res.status(404).json({ message: "Cash/bank account not found" });
+      return res.json(summary);
+    } catch (error: unknown) {
+      logger.error("Multi-currency account summary failed:", {
+        error: error,
+      });
+      return res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
 }

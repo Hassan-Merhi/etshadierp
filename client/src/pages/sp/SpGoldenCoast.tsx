@@ -13,10 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";
 import { releaseDebtEnglish } from "@/i18n/finalCloseoutTranslations";
-import {
-  GOLDEN_COAST_TABS,
-  type GoldenCoastTab,
-} from "./golden-coast/contracts";
+import { GOLDEN_COAST_TABS, type GoldenCoastTab } from "./golden-coast/contracts";
 import { FreshStartHadiPaymentPanel } from "./golden-coast/FreshStartHadiPaymentPanel";
 import { GcSalesCashPanel } from "./golden-coast/GcSalesCashPanel";
 import { GoldenCoastOverview } from "./golden-coast/GoldenCoastOverview";
@@ -39,18 +36,11 @@ export default function SpGoldenCoast() {
 
   if (!isSupplierPartner) {
     return (
-      <div
-        className="mx-auto max-w-5xl space-y-4"
-        data-testid="sp-golden-coast"
-      >
-        <h1 className="text-2xl font-semibold">
-          {releaseDebtEnglish("Golden Coast operations")}
-        </h1>
+      <div className="mx-auto max-w-5xl space-y-4" data-testid="sp-golden-coast">
+        <h1 className="text-2xl font-semibold">{releaseDebtEnglish("Golden Coast operations")}</h1>
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
-            {releaseDebtEnglish(
-              "Select a Supplier Partner company before opening Golden Coast operations.",
-            )}
+            {releaseDebtEnglish("Select a Supplier Partner company before opening Golden Coast operations.")}
           </CardContent>
         </Card>
       </div>
@@ -62,49 +52,28 @@ export default function SpGoldenCoast() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold">
-              {releaseDebtEnglish("Golden Coast operations")}
-            </h1>
+            <h1 className="text-2xl font-semibold">{releaseDebtEnglish("Golden Coast operations")}</h1>
             <Badge variant="outline">{selectedCompany?.name}</Badge>
           </div>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             {releaseDebtEnglish(
-              "Frontend controls for the already-approved Golden Coast flows. Accounting rules, account setup, and container semantics stay server-owned and unchanged.",
+              "Frontend controls for the already-approved Golden Coast flows. Accounting rules, account setup, and container semantics stay server-owned and unchanged."
             )}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={invalidateReadiness}
-          data-testid="button-gc-refresh-readiness"
-        >
+        <Button variant="outline" size="sm" onClick={invalidateReadiness} data-testid="button-gc-refresh-readiness">
           <RefreshCw className="mr-2 h-4 w-4" />
           {releaseDebtEnglish("Refresh readiness")}
         </Button>
       </div>
 
-      <Tabs
-        value={tab}
-        onValueChange={(value) => setTab(value as GoldenCoastTab)}
-      >
-        <TabsList
-          className="flex h-auto flex-wrap gap-1"
-          data-testid="tabs-golden-coast"
-        >
-          <TabsTrigger value="overview">
-            {releaseDebtEnglish("Overview")}
-          </TabsTrigger>
+      <Tabs value={tab} onValueChange={(value) => setTab(value as GoldenCoastTab)}>
+        <TabsList className="flex h-auto flex-wrap gap-1" data-testid="tabs-golden-coast">
+          <TabsTrigger value="overview">{releaseDebtEnglish("Overview")}</TabsTrigger>
           <TabsTrigger value="hadi">{releaseDebtEnglish("HADI")}</TabsTrigger>
-          <TabsTrigger value="savings">
-            {releaseDebtEnglish("Hassan Savings")}
-          </TabsTrigger>
-          <TabsTrigger value="sales-cash">
-            {releaseDebtEnglish("GC Sales Cash")}
-          </TabsTrigger>
-          <TabsTrigger value="monthly-close">
-            {releaseDebtEnglish("Monthly close")}
-          </TabsTrigger>
+          <TabsTrigger value="savings">{releaseDebtEnglish("Hassan Savings")}</TabsTrigger>
+          <TabsTrigger value="sales-cash">{releaseDebtEnglish("GC Sales Cash")}</TabsTrigger>
+          <TabsTrigger value="monthly-close">{releaseDebtEnglish("Monthly close")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-5 space-y-5">

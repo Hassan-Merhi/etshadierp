@@ -8,7 +8,7 @@ function accounts(
     hassanCredit?: number;
     tracker?: number;
     cash?: number;
-  } = {},
+  } = {}
 ) {
   const hadi = overrides.hadi ?? 165875;
   const tracker = overrides.tracker ?? hadi;
@@ -74,8 +74,7 @@ function accounts(
   }
 
   const balances = new Map<number, AccountBalance>();
-  if (overrides.hassanCredit)
-    balances.set(2, { debit: 0, credit: overrides.hassanCredit });
+  if (overrides.hassanCredit) balances.set(2, { debit: 0, credit: overrides.hassanCredit });
   return { rows, balances };
 }
 
@@ -85,10 +84,7 @@ function baseBody(input: { tracker: number; cash?: number; stock?: number }) {
   return {
     forUs: {
       total: stock + cash,
-      breakdown: [
-        { name: "Inventory", value: stock },
-        ...(cash ? [{ name: "Cash", value: cash }] : []),
-      ],
+      breakdown: [{ name: "Inventory", value: stock }, ...(cash ? [{ name: "Cash", value: cash }] : [])],
       accounts: [
         {
           name: "Stock In Hand / Stock on Floor",
@@ -172,11 +168,9 @@ describe("Golden Coast residual equity projection", () => {
       expect.arrayContaining([
         expect.objectContaining({ id: 1, value: 207997, balanceSide: "Cr" }),
         expect.objectContaining({ id: 2, value: 289242, balanceSide: "Cr" }),
-      ]),
+      ])
     );
-    expect(
-      result.onUs.accounts.some((account: { id?: number }) => account.id === 3),
-    ).toBe(false);
+    expect(result.onUs.accounts.some((account: { id?: number }) => account.id === 3)).toBe(false);
     expect(result.forUs.accounts).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -184,7 +178,7 @@ describe("Golden Coast residual equity projection", () => {
           value: 165875,
           category: "HADI Intercompany",
         }),
-      ]),
+      ])
     );
   });
 

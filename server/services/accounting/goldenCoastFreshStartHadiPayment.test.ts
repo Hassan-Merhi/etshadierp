@@ -52,9 +52,7 @@ describe("Golden Coast Fresh Start payment from HADI", () => {
       goldenCoastExchangeRate: null,
       hadiExchangeRate: null,
     });
-    const gc = postings.find(
-      (posting) => posting.role === "golden_coast",
-    )!.request;
+    const gc = postings.find((posting) => posting.role === "golden_coast")!.request;
     const hadi = postings.find((posting) => posting.role === "hadi")!.request;
 
     expect(gc.entries).toEqual(
@@ -69,7 +67,7 @@ describe("Golden Coast Fresh Start payment from HADI", () => {
           debitAmount: "0",
           creditAmount: "300",
         }),
-      ]),
+      ])
     );
     expect(hadi.entries).toEqual(
       expect.arrayContaining([
@@ -83,7 +81,7 @@ describe("Golden Coast Fresh Start payment from HADI", () => {
           debitAmount: "0",
           creditAmount: "300",
         }),
-      ]),
+      ])
     );
   });
 
@@ -94,7 +92,7 @@ describe("Golden Coast Fresh Start payment from HADI", () => {
         gcSalesCashPayableUsd: "250.00",
         outstandingHadiSalesCashUsd: "1000.00",
         hadiIntercompanyAssetUsd: "1000.00",
-      }),
+      })
     ).toThrow(GoldenCoastFreshStartHadiPaymentError);
 
     expect(() =>
@@ -103,7 +101,7 @@ describe("Golden Coast Fresh Start payment from HADI", () => {
         gcSalesCashPayableUsd: "1000.00",
         outstandingHadiSalesCashUsd: "250.00",
         hadiIntercompanyAssetUsd: "1000.00",
-      }),
+      })
     ).toThrow(GoldenCoastFreshStartHadiPaymentError);
 
     expect(() =>
@@ -112,7 +110,7 @@ describe("Golden Coast Fresh Start payment from HADI", () => {
         gcSalesCashPayableUsd: "1000.00",
         outstandingHadiSalesCashUsd: "1000.00",
         hadiIntercompanyAssetUsd: "250.00",
-      }),
+      })
     ).toThrow(GoldenCoastFreshStartHadiPaymentError);
   });
 
@@ -129,10 +127,8 @@ describe("Golden Coast Fresh Start payment from HADI", () => {
         hadiCashAccount: { kind: "bank", id: 301 },
       },
     });
-    expect(
-      goldenCoastFreshStartHadiPaymentDigest({ payment: first, accounts }),
-    ).not.toBe(
-      goldenCoastFreshStartHadiPaymentDigest({ payment: second, accounts }),
+    expect(goldenCoastFreshStartHadiPaymentDigest({ payment: first, accounts })).not.toBe(
+      goldenCoastFreshStartHadiPaymentDigest({ payment: second, accounts })
     );
   });
 });

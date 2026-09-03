@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  buildGoldenCoastPhase3CutoverPlan,
-  type GoldenCoastPhase3CutoverInput,
-} from "./goldenCoastPhase3Cutover";
+import { buildGoldenCoastPhase3CutoverPlan, type GoldenCoastPhase3CutoverInput } from "./goldenCoastPhase3Cutover";
 import {
   buildGoldenCoastPhase5SalePostings,
   goldenCoastPhase5SaleDigest,
@@ -86,41 +83,21 @@ const bank = {
   hassanPayout: 904,
 } as const;
 
-function ledgerNetDebit(
-  entries: PostingEntryLike[],
-  ledgerAccountId: number,
-): number {
+function ledgerNetDebit(entries: PostingEntryLike[], ledgerAccountId: number): number {
   return entries
     .filter((entry) => entry.ledgerAccountId === ledgerAccountId)
-    .reduce(
-      (sum, entry) =>
-        sum + Number(entry.debitAmount) - Number(entry.creditAmount),
-      0,
-    );
+    .reduce((sum, entry) => sum + Number(entry.debitAmount) - Number(entry.creditAmount), 0);
 }
 
-function bankNetDebit(
-  entries: PostingEntryLike[],
-  bankAccountId: number,
-): number {
+function bankNetDebit(entries: PostingEntryLike[], bankAccountId: number): number {
   return entries
     .filter((entry) => entry.bankAccountId === bankAccountId)
-    .reduce(
-      (sum, entry) =>
-        sum + Number(entry.debitAmount) - Number(entry.creditAmount),
-      0,
-    );
+    .reduce((sum, entry) => sum + Number(entry.debitAmount) - Number(entry.creditAmount), 0);
 }
 
 function expectBalanced(entries: PostingEntryLike[]): void {
-  const debits = entries.reduce(
-    (sum, entry) => sum + Number(entry.debitAmount),
-    0,
-  );
-  const credits = entries.reduce(
-    (sum, entry) => sum + Number(entry.creditAmount),
-    0,
-  );
+  const debits = entries.reduce((sum, entry) => sum + Number(entry.debitAmount), 0);
+  const credits = entries.reduce((sum, entry) => sum + Number(entry.creditAmount), 0);
   expect(debits).toBeCloseTo(credits, 8);
 }
 
@@ -273,12 +250,8 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
 
     expect(fundingPlan.totalFundingUsd).toBe("66300.00");
     expect(ledgerNetDebit(funding.entries, account.stockOtw)).toBe(44000);
-    expect(ledgerNetDebit(funding.entries, account.containerReserve)).toBe(
-      22300,
-    );
-    expect(ledgerNetDebit(funding.entries, account.gcOperatingCash)).toBe(
-      -66300,
-    );
+    expect(ledgerNetDebit(funding.entries, account.containerReserve)).toBe(22300);
+    expect(ledgerNetDebit(funding.entries, account.gcOperatingCash)).toBe(-66300);
     expect(ledgerNetDebit(funding.entries, account.freshStartEquity)).toBe(0);
     expect(ledgerNetDebit(funding.entries, account.hassanEquity)).toBe(0);
     expect(ledgerNetDebit(funding.entries, account.hassanSavings)).toBe(0);
@@ -296,9 +269,7 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
     expect(plan.lines[0].finalUnitCostUsd).toBe("32.350000");
     expect(ledgerNetDebit(posting.entries, account.stockInHand)).toBe(64700);
     expect(ledgerNetDebit(posting.entries, account.stockOtw)).toBe(-44000);
-    expect(ledgerNetDebit(posting.entries, account.containerReserve)).toBe(
-      -22300,
-    );
+    expect(ledgerNetDebit(posting.entries, account.containerReserve)).toBe(-22300);
     expect(ledgerNetDebit(posting.entries, account.gcOperatingCash)).toBe(1600);
     expect(ledgerNetDebit(posting.entries, account.hassanEquity)).toBe(1600);
     expect(ledgerNetDebit(posting.entries, account.hassanSavings)).toBe(-1600);
@@ -330,15 +301,12 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
       saleDigest,
       exchangeRate: null,
     });
-    const saleEntries = saleBatch.postings.flatMap(
-      (posting) => posting.request.entries,
-    );
+    const saleEntries = saleBatch.postings.flatMap((posting) => posting.request.entries);
     expect(ledgerNetDebit(saleEntries, account.gcSalesCash)).toBe(1800);
     expect(ledgerNetDebit(saleEntries, account.sales)).toBe(-1800);
     expect(ledgerNetDebit(saleEntries, account.cogs)).toBe(970.5);
     expect(ledgerNetDebit(saleEntries, account.stockInHand)).toBe(-970.5);
-    for (const posting of saleBatch.postings)
-      expectBalanced(posting.request.entries);
+    for (const posting of saleBatch.postings) expectBalanced(posting.request.entries);
 
     const deductionPlan = planGoldenCoastPhase6SpecialLocationDeduction({
       salePlan: plan,
@@ -393,24 +361,14 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
       goldenCoastExchangeRate: null,
       hadiExchangeRate: null,
     });
-    const gcCollection = collectionBatch.postings.find(
-      (posting) => posting.role === "golden_coast",
-    )?.request;
-    const hadiCollection = collectionBatch.postings.find(
-      (posting) => posting.role === "hadi",
-    )?.request;
+    const gcCollection = collectionBatch.postings.find((posting) => posting.role === "golden_coast")?.request;
+    const hadiCollection = collectionBatch.postings.find((posting) => posting.role === "hadi")?.request;
     expect(gcCollection).toBeDefined();
     expect(hadiCollection).toBeDefined();
-    expect(ledgerNetDebit(gcCollection!.entries, account.gcSalesCash)).toBe(
-      -600,
-    );
-    expect(
-      ledgerNetDebit(gcCollection!.entries, account.gcHadiIntercompany),
-    ).toBe(600);
+    expect(ledgerNetDebit(gcCollection!.entries, account.gcSalesCash)).toBe(-600);
+    expect(ledgerNetDebit(gcCollection!.entries, account.gcHadiIntercompany)).toBe(600);
     expect(bankNetDebit(hadiCollection!.entries, bank.hadiCash)).toBe(600);
-    expect(
-      ledgerNetDebit(hadiCollection!.entries, account.hadiGcIntercompany),
-    ).toBe(-600);
+    expect(ledgerNetDebit(hadiCollection!.entries, account.hadiGcIntercompany)).toBe(-600);
     expectBalanced(gcCollection!.entries);
     expectBalanced(hadiCollection!.entries);
 
@@ -438,12 +396,8 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
       gcSalesCashAccountId: account.gcSalesCash,
       settlementDigest,
     });
-    expect(bankNetDebit(settlementPosting.entries, bank.directCollection)).toBe(
-      -1275,
-    );
-    expect(ledgerNetDebit(settlementPosting.entries, account.gcSalesCash)).toBe(
-      1275,
-    );
+    expect(bankNetDebit(settlementPosting.entries, bank.directCollection)).toBe(-1275);
+    expect(ledgerNetDebit(settlementPosting.entries, account.gcSalesCash)).toBe(1275);
     expectBalanced(settlementPosting.entries);
 
     const remittance = parseGoldenCoastPhase7TransferInput({
@@ -462,10 +416,8 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
     const remittancePlan = planGoldenCoastPhase7Transfer({
       transfer: remittance,
       balances: {
-        gcSalesCashDebitBalanceUsd:
-          settlementPlan.gcSalesCashDebitBalanceAfterUsd,
-        outstandingHadiCollectionsUsd:
-          collectionPlan.outstandingHadiCollectionsAfterUsd,
+        gcSalesCashDebitBalanceUsd: settlementPlan.gcSalesCashDebitBalanceAfterUsd,
+        outstandingHadiCollectionsUsd: collectionPlan.outstandingHadiCollectionsAfterUsd,
       },
     });
     expect(remittancePlan.gcSalesCashDebitBalanceAfterUsd).toBe("0.00");
@@ -481,21 +433,11 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
       goldenCoastExchangeRate: null,
       hadiExchangeRate: null,
     });
-    const gcRemittance = remittanceBatch.postings.find(
-      (posting) => posting.role === "golden_coast",
-    )?.request;
-    const hadiRemittance = remittanceBatch.postings.find(
-      (posting) => posting.role === "hadi",
-    )?.request;
-    expect(ledgerNetDebit(gcRemittance!.entries, account.gcOperatingCash)).toBe(
-      600,
-    );
-    expect(
-      ledgerNetDebit(gcRemittance!.entries, account.gcHadiIntercompany),
-    ).toBe(-600);
-    expect(
-      ledgerNetDebit(hadiRemittance!.entries, account.hadiGcIntercompany),
-    ).toBe(600);
+    const gcRemittance = remittanceBatch.postings.find((posting) => posting.role === "golden_coast")?.request;
+    const hadiRemittance = remittanceBatch.postings.find((posting) => posting.role === "hadi")?.request;
+    expect(ledgerNetDebit(gcRemittance!.entries, account.gcOperatingCash)).toBe(600);
+    expect(ledgerNetDebit(gcRemittance!.entries, account.gcHadiIntercompany)).toBe(-600);
+    expect(ledgerNetDebit(hadiRemittance!.entries, account.hadiGcIntercompany)).toBe(600);
     expect(bankNetDebit(hadiRemittance!.entries, bank.hadiCash)).toBe(-600);
     expectBalanced(gcRemittance!.entries);
     expectBalanced(hadiRemittance!.entries);
@@ -526,12 +468,8 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
       hassanSavingsAccountId: account.hassanSavings,
       withdrawalDigest,
     });
-    expect(
-      ledgerNetDebit(withdrawalPosting.entries, account.hassanSavings),
-    ).toBe(1675);
-    expect(bankNetDebit(withdrawalPosting.entries, bank.hassanPayout)).toBe(
-      -1675,
-    );
+    expect(ledgerNetDebit(withdrawalPosting.entries, account.hassanSavings)).toBe(1675);
+    expect(bankNetDebit(withdrawalPosting.entries, bank.hassanPayout)).toBe(-1675);
     expectBalanced(withdrawalPosting.entries);
   });
 
@@ -572,13 +510,9 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
       digest,
     });
 
-    expect(ledgerNetDebit(posting.entries, account.freshStartEquity)).toBe(
-      -414.75,
-    );
+    expect(ledgerNetDebit(posting.entries, account.freshStartEquity)).toBe(-414.75);
     expect(ledgerNetDebit(posting.entries, account.hassanEquity)).toBe(-414.75);
-    expect(
-      ledgerNetDebit(posting.entries, account.profitPendingDistribution),
-    ).toBe(0);
+    expect(ledgerNetDebit(posting.entries, account.profitPendingDistribution)).toBe(0);
     for (const untouchedAccountId of [
       account.hassanSavings,
       account.gcSalesCash,

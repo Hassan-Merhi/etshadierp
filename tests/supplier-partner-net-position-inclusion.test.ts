@@ -3,20 +3,15 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = path.resolve(process.cwd());
-const read = (relativePath: string) =>
-  fs.readFileSync(path.join(root, relativePath), "utf8");
+const read = (relativePath: string) => fs.readFileSync(path.join(root, relativePath), "utf8");
 
 describe("supplier partner net position inclusion", () => {
   it("includes Golden Coast customer assets, Loan/Loans liabilities, and residual equity in the live Net Position", () => {
-    const source = read(
-      "server/routes/stats/goldenCoastResidualEquityProjection.ts",
-    );
+    const source = read("server/routes/stats/goldenCoastResidualEquityProjection.ts");
     expect(source).toContain('"Customer"');
     expect(source).toContain('"Loan"');
     expect(source).toContain('"Loans"');
-    expect(source).toContain(
-      "const freshStartResidual = round2(netPosition - hassanClaim)",
-    );
+    expect(source).toContain("const freshStartResidual = round2(netPosition - hassanClaim)");
     expect(source).toContain('residualFormula: "net_assets_minus_hassan"');
   });
 

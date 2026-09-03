@@ -35,10 +35,7 @@ import { registerSpMigrationPhase2Routes } from "./spMigrationPhase2Routes";
 import { registerSpMigrationCutoverRoutes } from "./spMigrationCutoverRoutes";
 import { registerSpMigrationFinalVerificationRoutes } from "./spMigrationFinalVerification";
 import { registerSpMigrationPhase4Routes } from "./spMigrationPhase4Routes";
-import {
-  ensureCutoverHardening,
-  installExplicitCompanyWriteGuard,
-} from "./spMigrationCutoverHardening";
+import { ensureCutoverHardening, installExplicitCompanyWriteGuard } from "./spMigrationCutoverHardening";
 import { runSpSupplierVoucherStartup } from "./spSupplierVoucherStartup";
 
 export function registerSpRoutes(app: Express) {
@@ -70,12 +67,9 @@ export function registerSpRoutes(app: Express) {
       }
     })
     .catch((error) => {
-      logger.warn(
-        "[SP] Supplier voucher synchronization deferred until Setup",
-        {
-          error: error instanceof Error ? error.message : String(error),
-        },
-      );
+      logger.warn("[SP] Supplier voucher synchronization deferred until Setup", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     });
 
   registerSpSetupRoutes(app);

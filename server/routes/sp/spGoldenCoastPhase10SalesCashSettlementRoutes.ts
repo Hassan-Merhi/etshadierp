@@ -1,13 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
-import {
-  accountingPostingRequests,
-  bankAccounts,
-  ledgerAccounts,
-  voucherEntries,
-  vouchers,
-} from "@shared/schema";
+import { accountingPostingRequests, bankAccounts, ledgerAccounts, voucherEntries, vouchers } from "@shared/schema";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { db } from "../../db";
 import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
@@ -61,11 +55,7 @@ class GoldenCoastPhase10RouteError extends Error {
   readonly code: string;
   readonly status: number;
 
-  constructor(
-    message: string,
-    code = "GC_PHASE10_SETTLEMENT_INVALID",
-    status = 400,
-  ) {
+  constructor(message: string, code = "GC_PHASE10_SETTLEMENT_INVALID", status = 400) {
     super(releaseDebtEnglish(message));
     this.name = "GoldenCoastPhase10RouteError";
     this.code = code;
@@ -74,8 +64,7 @@ class GoldenCoastPhase10RouteError extends Error {
 }
 
 function actorFromRequest(req: Request): PostingActor {
-  const reference =
-    typeof req.body?.reference === "string" ? req.body.reference.trim() : "";
+  const reference = typeof req.body?.reference === "string" ? req.body.reference.trim() : "";
   return {
     userId: req.user?.id ?? req.session.userId ?? null,
     username: req.session.username ?? null,
@@ -83,10 +72,7 @@ function actorFromRequest(req: Request): PostingActor {
   };
 }
 
-async function assertPhase10CutoverPosted(
-  conn: DbLike,
-  companyId: number,
-): Promise<void> {
+async function assertPhase10CutoverPosted(conn: DbLike, companyId: number): Promise<void> {
   const result = await conn.execute(sql`
     SELECT id
     FROM vouchers
@@ -99,14 +85,14 @@ async function assertPhase10CutoverPosted(
     throw new GoldenCoastPhase10RouteError(
       "Golden Coast Phase 3 cutover must be posted before Phase 10 Fresh Start payment",
       "GC_PHASE10_NOT_READY",
-      409,
+      409
     );
   }
 }
 
 async function resolveGcSalesCashAccount(
   conn: DbLike,
-  companyId: number,
+  companyId: number
 ): Promise<{ id: number; name: string; accountType: string }> {
   const definition = getGoldenCoastAccountDefinition(PHASE10_ROLE);
   const rows = await conn
@@ -121,8 +107,8 @@ async function resolveGcSalesCashAccount(
         eq(ledgerAccounts.companyId, companyId),
         eq(ledgerAccounts.subType, definition.subType),
         eq(ledgerAccounts.active, true),
-        isNull(ledgerAccounts.deletedAt),
-      ),
+        isNull(ledgerAccounts.deletedAt)
+      )
     )
     .orderBy(asc(ledgerAccounts.id))
     .limit(2);
@@ -133,7 +119,7 @@ async function resolveGcSalesCashAccount(
         ? "GC Sales Cash is not configured; run Golden Coast account setup first"
         : "GC Sales Cash is ambiguous; repair duplicate canonical accounts before paying Fresh Start",
       "GC_PHASE10_ACCOUNT_INVALID",
-      409,
+      409
     );
   }
   const account = {
@@ -145,7 +131,7 @@ async function resolveGcSalesCashAccount(
     throw new GoldenCoastPhase10RouteError(
       `GC Sales Cash must use account type ${definition.acceptedAccountTypes.join(" or ")}, not ${account.accountType}`,
       "GC_PHASE10_ACCOUNT_INVALID",
-      409,
+      409
     );
   }
   return account;
@@ -154,7 +140,7 @@ async function resolveGcSalesCashAccount(
 async function validatePaymentAccount(
   conn: DbLike,
   companyId: number,
-  account: GoldenCoastPhase10CashAccount,
+  account: GoldenCoastPhase10CashAccount
 ): Promise<void> {
   if (account.kind === "bank") {
     const [row] = await conn
@@ -165,15 +151,15 @@ async function validatePaymentAccount(
           eq(bankAccounts.id, account.id),
           eq(bankAccounts.companyId, companyId),
           eq(bankAccounts.active, true),
-          isNull(bankAccounts.deletedAt),
-        ),
+          isNull(bankAccounts.deletedAt)
+        )
       )
       .limit(1);
     if (!row) {
       throw new GoldenCoastPhase10RouteError(
         "paymentAccount must reference an active bank account in the selected Golden Coast company",
         "GC_PHASE10_PAYMENT_ACCOUNT_INVALID",
-        400,
+        400
       );
     }
     return;
@@ -188,15 +174,15 @@ async function validatePaymentAccount(
         eq(ledgerAccounts.companyId, companyId),
         eq(ledgerAccounts.active, true),
         isNull(ledgerAccounts.deletedAt),
-        inArray(ledgerAccounts.accountType, ["Cash", "Bank"]),
-      ),
+        inArray(ledgerAccounts.accountType, ["Cash", "Bank"])
+      )
     )
     .limit(1);
   if (!row) {
     throw new GoldenCoastPhase10RouteError(
       "paymentAccount must reference an active Cash/Bank ledger account in the selected Golden Coast company",
       "GC_PHASE10_PAYMENT_ACCOUNT_INVALID",
-      400,
+      400
     );
   }
 }
@@ -215,20 +201,14 @@ async function listPaymentAccounts(conn: DbLike, companyId: number) {
           eq(ledgerAccounts.companyId, companyId),
           eq(ledgerAccounts.active, true),
           isNull(ledgerAccounts.deletedAt),
-          inArray(ledgerAccounts.accountType, ["Cash", "Bank"]),
-        ),
+          inArray(ledgerAccounts.accountType, ["Cash", "Bank"])
+        )
       )
       .orderBy(asc(ledgerAccounts.name)),
     conn
       .select({ id: bankAccounts.id, name: bankAccounts.name })
       .from(bankAccounts)
-      .where(
-        and(
-          eq(bankAccounts.companyId, companyId),
-          eq(bankAccounts.active, true),
-          isNull(bankAccounts.deletedAt),
-        ),
-      )
+      .where(and(eq(bankAccounts.companyId, companyId), eq(bankAccounts.active, true), isNull(bankAccounts.deletedAt)))
       .orderBy(asc(bankAccounts.name)),
   ]);
   return [
@@ -252,7 +232,7 @@ async function gcSalesCashDebitBalance(
   conn: DbLike,
   companyId: number,
   accountId: number,
-  cutoffDate?: string,
+  cutoffDate?: string
 ): Promise<string> {
   const query = await conn.execute(sql`
     SELECT (
@@ -286,7 +266,7 @@ async function gcSalesCashDebitBalance(
     throw new GoldenCoastPhase10RouteError(
       "GC Sales Cash disappeared while its balance was being read",
       "GC_PHASE10_ACCOUNT_INVALID",
-      409,
+      409
     );
   }
   return String(row.debit_minus_credit ?? "0");
@@ -301,10 +281,7 @@ function amountEquals(left: unknown, right: string): boolean {
 }
 
 async function loadVoucherEntries(tx: DatabaseTransaction, voucherId: number) {
-  return tx
-    .select()
-    .from(voucherEntries)
-    .where(eq(voucherEntries.voucherId, voucherId));
+  return tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 }
 
 async function findReplayedSettlement(
@@ -312,12 +289,9 @@ async function findReplayedSettlement(
   companyId: number,
   settlement: GoldenCoastPhase10SettlementInput,
   gcSalesCashAccountId: number,
-  settlementDigest: string,
+  settlementDigest: string
 ) {
-  const idempotencyKey = goldenCoastPhase10IdempotencyKey(
-    companyId,
-    settlement.clientRequestId,
-  );
+  const idempotencyKey = goldenCoastPhase10IdempotencyKey(companyId, settlement.clientRequestId);
   const [marker] = await tx
     .select({
       voucherId: accountingPostingRequests.voucherId,
@@ -327,8 +301,8 @@ async function findReplayedSettlement(
     .where(
       and(
         eq(accountingPostingRequests.companyId, companyId),
-        eq(accountingPostingRequests.idempotencyKey, idempotencyKey),
-      ),
+        eq(accountingPostingRequests.idempotencyKey, idempotencyKey)
+      )
     )
     .limit(1);
   if (!marker) return null;
@@ -338,7 +312,7 @@ async function findReplayedSettlement(
     throw new GoldenCoastPhase10RouteError(
       "clientRequestId was already used for a different Fresh Start payment payload",
       "GC_PHASE10_IDEMPOTENCY_CONFLICT",
-      409,
+      409
     );
   }
 
@@ -346,29 +320,22 @@ async function findReplayedSettlement(
     .select()
     .from(vouchers)
     .where(
-      and(
-        eq(vouchers.id, Number(marker.voucherId)),
-        eq(vouchers.companyId, companyId),
-        isNull(vouchers.deletedAt),
-      ),
+      and(eq(vouchers.id, Number(marker.voucherId)), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt))
     )
     .limit(1);
   if (!voucher) {
     throw new GoldenCoastPhase10RouteError(
       "The Phase 10 idempotency marker references a missing or deleted voucher",
       "GC_PHASE10_IDEMPOTENCY_INCONSISTENT",
-      409,
+      409
     );
   }
   const entries = await loadVoucherEntries(tx, Number(voucher.id));
-  if (
-    entries.length !== 2 ||
-    !amountEquals(voucher.totalAmount, settlement.amountUsd)
-  ) {
+  if (entries.length !== 2 || !amountEquals(voucher.totalAmount, settlement.amountUsd)) {
     throw new GoldenCoastPhase10RouteError(
       "The persisted Phase 10 voucher no longer matches its idempotency marker",
       "GC_PHASE10_IDEMPOTENCY_INCONSISTENT",
-      409,
+      409
     );
   }
 
@@ -376,7 +343,7 @@ async function findReplayedSettlement(
     (entry) =>
       Number(entry.ledgerAccountId ?? 0) === gcSalesCashAccountId &&
       amountEquals(entry.debitAmount, settlement.amountUsd) &&
-      amountEquals(entry.creditAmount, "0"),
+      amountEquals(entry.creditAmount, "0")
   );
   const paymentCredit = entries.find((entry) => {
     const targetMatches =
@@ -384,16 +351,14 @@ async function findReplayedSettlement(
         ? Number(entry.bankAccountId ?? 0) === settlement.paymentAccount.id
         : Number(entry.ledgerAccountId ?? 0) === settlement.paymentAccount.id;
     return (
-      targetMatches &&
-      amountEquals(entry.debitAmount, "0") &&
-      amountEquals(entry.creditAmount, settlement.amountUsd)
+      targetMatches && amountEquals(entry.debitAmount, "0") && amountEquals(entry.creditAmount, settlement.amountUsd)
     );
   });
   if (!salesCashDebit || !paymentCredit) {
     throw new GoldenCoastPhase10RouteError(
       "The persisted Phase 10 voucher entries no longer match the requested Fresh Start payment routing",
       "GC_PHASE10_IDEMPOTENCY_INCONSISTENT",
-      409,
+      409
     );
   }
   return { voucher, entries };
@@ -406,17 +371,12 @@ function respondKnownError(res: Response, error: unknown): boolean {
   }
   if (error instanceof GoldenCoastPhase10SettlementError) {
     const status =
-      error.code === "GC_PHASE10_SETTLEMENT_EXCEEDS_BALANCE" ||
-      error.code === "GC_PHASE10_BALANCE_INVALID"
-        ? 409
-        : 400;
+      error.code === "GC_PHASE10_SETTLEMENT_EXCEEDS_BALANCE" || error.code === "GC_PHASE10_BALANCE_INVALID" ? 409 : 400;
     res.status(status).json({ code: error.code, message: error.message });
     return true;
   }
   if (error instanceof PostingValidationError) {
-    res
-      .status(400)
-      .json({ code: error.code, message: releaseDebtEnglish(error.message) });
+    res.status(400).json({ code: error.code, message: releaseDebtEnglish(error.message) });
     return true;
   }
   return false;
@@ -429,9 +389,7 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
     if (!(await isGoldenCoastCompany(db, companyId))) {
       res.status(409).json({
         code: "GC_PHASE10_NOT_CONFIGURED",
-        message: releaseDebtEnglish(
-          "Golden Coast account setup is not configured.",
-        ),
+        message: releaseDebtEnglish("Golden Coast account setup is not configured."),
       });
       return;
     }
@@ -466,9 +424,7 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
     if (!(await isGoldenCoastCompany(db, companyId))) {
       res.status(409).json({
         code: "GC_PHASE10_NOT_CONFIGURED",
-        message: releaseDebtEnglish(
-          "Golden Coast account setup is not configured.",
-        ),
+        message: releaseDebtEnglish("Golden Coast account setup is not configured."),
       });
       return;
     }
@@ -481,20 +437,16 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
     const outcome = await db.transaction(async (tx) => {
       // Phase 7 HADI payments and Phase 10 direct payments can both reduce the
       // GC Sales Cash tracker. Serialize them against the same company lock.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase7:${companyId}`}))`);
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase10:${companyId}`}))`);
       await tx.execute(
-        sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase7:${companyId}`}))`,
-      );
-      await tx.execute(
-        sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase10:${companyId}`}))`,
-      );
-      await tx.execute(
-        sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase10:${companyId}:${settlement.clientRequestId}`}))`,
+        sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase10:${companyId}:${settlement.clientRequestId}`}))`
       );
       if (!(await isGoldenCoastCompany(tx, companyId))) {
         throw new GoldenCoastPhase10RouteError(
           "Golden Coast account setup is not configured",
           "GC_PHASE10_NOT_CONFIGURED",
-          409,
+          409
         );
       }
 
@@ -506,30 +458,15 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
         settlement,
         gcSalesCashAccountId: gcSalesCashAccount.id,
       });
-      const replayed = await findReplayedSettlement(
-        tx,
-        companyId,
-        settlement,
-        gcSalesCashAccount.id,
-        settlementDigest,
-      );
+      const replayed = await findReplayedSettlement(tx, companyId, settlement, gcSalesCashAccount.id, settlementDigest);
       if (replayed) {
-        const currentBalance = await gcSalesCashDebitBalance(
-          tx,
-          companyId,
-          gcSalesCashAccount.id,
-        );
-        const payable = Decimal.max(
-          new Decimal(currentBalance).negated(),
-          0,
-        ).toFixed(2);
+        const currentBalance = await gcSalesCashDebitBalance(tx, companyId, gcSalesCashAccount.id);
+        const payable = Decimal.max(new Decimal(currentBalance).negated(), 0).toFixed(2);
         return {
           replayed: true as const,
           settlement,
           gcSalesCashAccount,
-          gcSalesCashDebitBalanceAfterUsd: new Decimal(currentBalance)
-            .toDecimalPlaces(2)
-            .toFixed(2),
+          gcSalesCashDebitBalanceAfterUsd: new Decimal(currentBalance).toDecimalPlaces(2).toFixed(2),
           gcSalesCashPayableAfterUsd: payable,
           voucher: replayed.voucher,
           entries: replayed.entries,
@@ -538,26 +475,20 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
 
       // Prevent any concurrent voucher writer from changing the capped payable
       // between the balance read and the Phase 10 posting commit.
-      await tx.execute(
-        sql`LOCK TABLE voucher_entries IN SHARE ROW EXCLUSIVE MODE`,
-      );
+      await tx.execute(sql`LOCK TABLE voucher_entries IN SHARE ROW EXCLUSIVE MODE`);
 
       const datedBalanceUsd = await gcSalesCashDebitBalance(
         tx,
         companyId,
         gcSalesCashAccount.id,
-        settlement.settlementDate,
+        settlement.settlementDate
       );
-      const allPostedBalanceUsd = await gcSalesCashDebitBalance(
-        tx,
-        companyId,
-        gcSalesCashAccount.id,
-      );
+      const allPostedBalanceUsd = await gcSalesCashDebitBalance(tx, companyId, gcSalesCashAccount.id);
       // Both values are signed Dr-minus-Cr. For a credit payable, the larger
       // (less negative) balance is the smaller safe amount payable now.
       const gcSalesCashDebitBalanceUsd = Decimal.max(
         new Decimal(datedBalanceUsd),
-        new Decimal(allPostedBalanceUsd),
+        new Decimal(allPostedBalanceUsd)
       ).toString();
       const plan = planGoldenCoastPhase10Settlement({
         settlement,
@@ -569,11 +500,7 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
         settlementDigest,
         actor,
       });
-      const posted = await postBalancedVoucherTx(
-        tx,
-        request,
-        postingDependencies,
-      );
+      const posted = await postBalancedVoucherTx(tx, request, postingDependencies);
       return {
         replayed: posted.replayed,
         settlement,
@@ -605,15 +532,13 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
   }
 }
 
-export function registerSpGoldenCoastPhase10SalesCashSettlementRoutes(
-  app: Express,
-): void {
+export function registerSpGoldenCoastPhase10SalesCashSettlementRoutes(app: Express): void {
   app.get(
     "/api/sp/golden-coast/phase10/sales-cash-settlement/readiness",
     privilegedReadRateLimit,
     requireAuth,
     requireNonPOS,
-    (req, res) => void handleReadiness(req, res),
+    (req, res) => void handleReadiness(req, res)
   );
 
   app.post(
@@ -622,6 +547,6 @@ export function registerSpGoldenCoastPhase10SalesCashSettlementRoutes(
     phase10RequestBudget,
     requireAuth,
     requireNonPOS,
-    (req, res) => void handleSettlement(req, res),
+    (req, res) => void handleSettlement(req, res)
   );
 }
