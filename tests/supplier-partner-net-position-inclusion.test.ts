@@ -5,15 +5,14 @@ import { describe, expect, it } from "vitest";
 const root = path.resolve(process.cwd());
 const read = (relativePath: string) => fs.readFileSync(path.join(root, relativePath), "utf8");
 
-// Supplier partners intentionally add signed equity after classifying assets and liabilities.
 describe("supplier partner net position inclusion", () => {
-  it("includes customer receivables, Loan/Loans, and signed equity in the live Net Position", () => {
-    const source = read("server/routes/stats/statsNetProfitRoutes.ts");
-    expect(source).toContain('a.accountType === "Loan"');
-    expect(source).toContain('a.accountType === "Loans"');
-    expect(source).toContain('a.subType === "Accounts Receivable"');
-    expect(source).toContain("equityNetPositionContribution");
-    expect(source).toContain("forUsTotal - onUsTotal + equityNetPositionContribution");
+  it("includes Golden Coast customer assets, Loan/Loans liabilities, and residual equity in the live Net Position", () => {
+    const source = read("server/routes/stats/goldenCoastResidualEquityProjection.ts");
+    expect(source).toContain('"Customer"');
+    expect(source).toContain('"Loan"');
+    expect(source).toContain('"Loans"');
+    expect(source).toContain("const freshStartResidual = round2(netPosition - hassanClaim)");
+    expect(source).toContain('residualFormula: "net_assets_minus_hassan"');
   });
 
   it("does not let current-cash translation erase supplier-partner equity", () => {
