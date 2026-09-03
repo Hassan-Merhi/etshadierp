@@ -171,10 +171,27 @@ beforeAll(async () => {
 
 afterAll(async () => {
   closeTestServer();
-  await cleanupTestData(TEST_PREFIX);
+
+  // The supplier row is company-scoped (the supplier company-scope migration
+  // backfills suppliers.company_id), so it blocks cleanupTestData's delete of
+  // the fixture company and therefore has to go first. Everything that points
+  // at the supplier has to go before it, in foreign-key order: purchase orders
+  // (po_line_items cascades), then the containers the import created, then the
+  // supplier-credit voucher entries raised in the parent company. Those entries
+  // would be removed by cleanupTestData's voucher delete anyway, but that
+  // happens per company and cannot be interleaved from here.
   if (supplierId) {
+    await pool.query("DELETE FROM purchase_orders WHERE supplier_id = $1", [supplierId]);
+    await pool.query(
+      "DELETE FROM import_logs WHERE container_id IN (SELECT id FROM containers WHERE supplier_id = $1)",
+      [supplierId]
+    );
+    await pool.query("DELETE FROM containers WHERE supplier_id = $1", [supplierId]);
+    await pool.query("DELETE FROM voucher_entries WHERE supplier_id = $1", [supplierId]);
     await pool.query("DELETE FROM suppliers WHERE id = $1", [supplierId]);
   }
+
+  await cleanupTestData(TEST_PREFIX);
 }, 30000);
 
 describe("PO import parent accounting", () => {
