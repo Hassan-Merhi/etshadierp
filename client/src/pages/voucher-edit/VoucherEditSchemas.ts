@@ -11,6 +11,7 @@ export const voucherEntrySchema = z.object({
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Amount must be a positive number",
     }),
+  narration: z.string().optional(),
 });
 
 export const journalEntrySchema = z.object({
@@ -25,6 +26,7 @@ export const journalEntrySchema = z.object({
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Amount must be a positive number",
     }),
+  narration: z.string().optional(),
 });
 
 export const salesLineItemSchema = z.object({
@@ -106,6 +108,7 @@ export const voucherFormSchema = z.object({
   voucherDate: z.date(),
   currency: z.enum(["USD", "CFA"]).default("USD"),
   entries: z.array(voucherEntrySchema).min(1, "Add at least one entry"),
+  paymentAccountNarration: z.string().optional(),
   notes: z.string().optional(),
 });
 

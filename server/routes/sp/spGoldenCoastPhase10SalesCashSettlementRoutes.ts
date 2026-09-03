@@ -36,7 +36,6 @@ import {
   type GoldenCoastPhase10SettlementInput,
 } from "../../services/accounting/goldenCoastPhase10SalesCashSettlement";
 import {
-  gcSalesCashConservativePayable,
   gcSalesCashPayableBalance,
   gcSalesCashSettleablePayable,
 } from "../../services/accounting/goldenCoastSalesCashPayable";
@@ -70,7 +69,7 @@ function actorFromRequest(req: Request): PostingActor {
   return {
     userId: req.user?.id ?? req.session.userId ?? null,
     username: req.session.username ?? null,
-    reason: reference || "Golden Coast Phase 10 GC Sales Cash settlement",
+    reason: reference || "Golden Coast Phase 10 Fresh Start payment",
   };
 }
 
@@ -85,7 +84,7 @@ async function assertPhase10CutoverPosted(conn: DbLike, companyId: number): Prom
   `);
   if (!resultRows(result)[0]) {
     throw new GoldenCoastPhase10RouteError(
-      "Golden Coast Phase 3 cutover must be posted before Phase 10 GC Sales Cash settlement",
+      "Golden Coast Phase 3 cutover must be posted before Phase 10 Fresh Start payment",
       "GC_PHASE10_NOT_READY",
       409
     );
@@ -115,7 +114,7 @@ async function resolveGcSalesCashAccount(
     throw new GoldenCoastPhase10RouteError(
       rows.length === 0
         ? "GC Sales Cash is not configured; run Golden Coast account setup first"
-        : "GC Sales Cash is ambiguous; repair duplicate canonical accounts before settling",
+        : "GC Sales Cash is ambiguous; repair duplicate canonical accounts before paying Fresh Start",
       "GC_PHASE10_ACCOUNT_INVALID",
       409
     );
@@ -180,7 +179,7 @@ async function resolveSharedChargesAccount(
   return account;
 }
 
-async function validateReceiptAccount(
+async function validatePaymentAccount(
   conn: DbLike,
   companyId: number,
   account: GoldenCoastPhase10CashAccount
@@ -200,8 +199,8 @@ async function validateReceiptAccount(
       .limit(1);
     if (!row) {
       throw new GoldenCoastPhase10RouteError(
-        "receiptAccount must reference an active bank account in the selected Golden Coast company",
-        "GC_PHASE10_RECEIPT_ACCOUNT_INVALID",
+        "paymentAccount must reference an active bank account in the selected Golden Coast company",
+        "GC_PHASE10_PAYMENT_ACCOUNT_INVALID",
         400
       );
     }
@@ -223,14 +222,14 @@ async function validateReceiptAccount(
     .limit(1);
   if (!row) {
     throw new GoldenCoastPhase10RouteError(
-      "receiptAccount must reference an active Cash/Bank ledger account in the selected Golden Coast company",
-      "GC_PHASE10_RECEIPT_ACCOUNT_INVALID",
+      "paymentAccount must reference an active Cash/Bank ledger account in the selected Golden Coast company",
+      "GC_PHASE10_PAYMENT_ACCOUNT_INVALID",
       400
     );
   }
 }
 
-async function listReceiptAccounts(conn: DbLike, companyId: number) {
+async function listPaymentAccounts(conn: DbLike, companyId: number) {
   const [ledgerRows, bankRows] = await Promise.all([
     conn
       .select({ id: ledgerAccounts.id, name: ledgerAccounts.name, accountType: ledgerAccounts.accountType })
@@ -262,11 +261,11 @@ async function listReceiptAccounts(conn: DbLike, companyId: number) {
 }
 
 /**
- * Raw debit-minus-credit on GC Sales Cash at the accounting date. GC Sales Cash
- * is credit-normal, so callers must convert this through
- * `gcSalesCashPayableBalance` before reasoning about what is still owed.
+ * Signed Dr-minus-Cr balance; negative means GC Sales Cash is payable. Callers
+ * convert it through `gcSalesCashPayableBalance` before reasoning about what is
+ * still owed.
  */
-async function gcSalesCashSignedBalance(
+async function gcSalesCashDebitBalance(
   conn: DbLike,
   companyId: number,
   accountId: number,
@@ -345,7 +344,7 @@ async function findReplayedSettlement(
   const expectedSourceId = goldenCoastPhase10SourceId(settlementDigest);
   if (String(marker.sourceId ?? "") !== expectedSourceId) {
     throw new GoldenCoastPhase10RouteError(
-      "clientRequestId was already used for a different GC Sales Cash settlement payload",
+      "clientRequestId was already used for a different Fresh Start payment payload",
       "GC_PHASE10_IDEMPOTENCY_CONFLICT",
       409
     );
@@ -383,12 +382,13 @@ async function findReplayedSettlement(
       amountEquals(entry.debitAmount, settlement.amountUsd) &&
       amountEquals(entry.creditAmount, "0")
   );
-  const receiptCredit = entries.find((entry) => {
+  const paymentCredit = entries.find((entry) => {
     const targetMatches =
-      settlement.receiptAccount.kind === "bank"
-        ? Number(entry.bankAccountId ?? 0) === settlement.receiptAccount.id
-        : Number(entry.ledgerAccountId ?? 0) === settlement.receiptAccount.id;
-    return targetMatches && amountEquals(entry.creditAmount, cashOutflowUsd) && amountEquals(entry.debitAmount, "0");
+      settlement.paymentAccount.kind === "bank"
+        ? Number(entry.bankAccountId ?? 0) === settlement.paymentAccount.id
+        : Number(entry.ledgerAccountId ?? 0) === settlement.paymentAccount.id;
+    // The paying account funds the settlement AND any transfer fee.
+    return targetMatches && amountEquals(entry.debitAmount, "0") && amountEquals(entry.creditAmount, cashOutflowUsd);
   });
   const feeDebit = !chargesFee
     ? true
@@ -398,9 +398,9 @@ async function findReplayedSettlement(
           amountEquals(entry.debitAmount, settlement.transferFeeUsd) &&
           amountEquals(entry.creditAmount, "0")
       );
-  if (!salesCashDebit || !receiptCredit || !feeDebit) {
+  if (!salesCashDebit || !paymentCredit || !feeDebit) {
     throw new GoldenCoastPhase10RouteError(
-      "The persisted Phase 10 voucher entries no longer match the requested settlement routing",
+      "The persisted Phase 10 voucher entries no longer match the requested Fresh Start payment routing",
       "GC_PHASE10_IDEMPOTENCY_INCONSISTENT",
       409
     );
@@ -439,22 +439,22 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
     }
     await assertPhase10CutoverPosted(db, companyId);
     const gcSalesCashAccount = await resolveGcSalesCashAccount(db, companyId);
-    const [signedBalanceUsd, receiptAccounts, sharedChargesAccount] = await Promise.all([
-      gcSalesCashSignedBalance(db, companyId, gcSalesCashAccount.id),
-      listReceiptAccounts(db, companyId),
+    const [balanceUsd, paymentAccounts, sharedChargesAccount] = await Promise.all([
+      gcSalesCashDebitBalance(db, companyId, gcSalesCashAccount.id),
+      listPaymentAccounts(db, companyId),
       resolveSharedChargesAccount(db, companyId, false),
     ]);
-    const payableBalance = new Decimal(gcSalesCashPayableBalance(signedBalanceUsd));
+    const rawBalance = new Decimal(balanceUsd).toDecimalPlaces(2);
+    const payableBalance = gcSalesCashSettleablePayable(gcSalesCashPayableBalance(rawBalance.toFixed()));
     res.json({
-      // An overpaid (negative) payable is a data problem, not a payable to pay.
-      ready: receiptAccounts.length > 0 && payableBalance.gte(0),
+      ready: paymentAccounts.length > 0 && new Decimal(payableBalance).gt(0),
       companyId,
       gcSalesCashAccount,
-      settleableSalesCashUsd: gcSalesCashSettleablePayable(payableBalance.toFixed()),
-      rawSalesCashPayableBalanceUsd: payableBalance.toFixed(2),
+      payableSalesCashUsd: payableBalance,
+      rawSalesCashDebitBalanceUsd: rawBalance.toFixed(2),
       // A transfer fee can only be charged when Shared Charges is configured.
       sharedChargesAccount,
-      receiptAccounts,
+      paymentAccounts,
       sourceType: GOLDEN_COAST_PHASE10_SOURCE_TYPE,
     });
   } catch (error: unknown) {
@@ -479,8 +479,8 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
     const actor = actorFromRequest(req);
 
     const outcome = await db.transaction(async (tx) => {
-      // Phase 7 and Phase 10 both move GC Sales Cash. Take Phase 7's
-      // company lock first so the two cap checks cannot race each other.
+      // Phase 7 HADI payments and Phase 10 direct payments can both reduce the
+      // GC Sales Cash tracker. Serialize them against the same company lock.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase7:${companyId}`}))`);
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`golden-coast-phase10:${companyId}`}))`);
       await tx.execute(
@@ -496,7 +496,7 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
 
       await assertPhase10CutoverPosted(tx, companyId);
       const gcSalesCashAccount = await resolveGcSalesCashAccount(tx, companyId);
-      await validateReceiptAccount(tx, companyId, settlement.receiptAccount);
+      await validatePaymentAccount(tx, companyId, settlement.paymentAccount);
 
       // Shared Charges is only resolved — and only required — when the payment
       // actually carries a transfer fee.
@@ -510,37 +510,40 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
       });
       const replayed = await findReplayedSettlement(tx, companyId, settlement, gcSalesCashAccount.id, settlementDigest);
       if (replayed) {
-        const currentBalance = await gcSalesCashSignedBalance(tx, companyId, gcSalesCashAccount.id);
+        const currentBalance = await gcSalesCashDebitBalance(tx, companyId, gcSalesCashAccount.id);
+        const payable = gcSalesCashSettleablePayable(gcSalesCashPayableBalance(currentBalance));
         return {
           replayed: true as const,
           settlement,
           gcSalesCashAccount,
-          gcSalesCashPayableBalanceAfterUsd: gcSalesCashPayableBalance(currentBalance),
+          gcSalesCashDebitBalanceAfterUsd: new Decimal(currentBalance).toDecimalPlaces(2).toFixed(2),
+          gcSalesCashPayableAfterUsd: payable,
           cashOutflowUsd: new Decimal(settlement.amountUsd).plus(settlement.transferFeeUsd).toFixed(2),
           voucher: replayed.voucher,
           entries: replayed.entries,
         };
       }
 
-      // The table lock conflicts with the ROW EXCLUSIVE lock taken by voucher entry inserts.
-      // This prevents any concurrent accounting path from changing the capped balance between
-      // the balance read and the Phase 10 posting commit.
+      // Prevent any concurrent voucher writer from changing the capped payable
+      // between the balance read and the Phase 10 posting commit.
       await tx.execute(sql`LOCK TABLE voucher_entries IN SHARE ROW EXCLUSIVE MODE`);
 
-      const datedSignedUsd = await gcSalesCashSignedBalance(
+      const datedBalanceUsd = await gcSalesCashDebitBalance(
         tx,
         companyId,
         gcSalesCashAccount.id,
         settlement.settlementDate
       );
-      const allPostedSignedUsd = await gcSalesCashSignedBalance(tx, companyId, gcSalesCashAccount.id);
-      // Take the lower payable of the two views: a future-dated sale cannot be
-      // paid early, while an already-posted later payment can never be ignored.
-      const gcSalesCashPayableBalanceUsd = gcSalesCashConservativePayable({
-        datedPayableUsd: gcSalesCashPayableBalance(datedSignedUsd),
-        allPostedPayableUsd: gcSalesCashPayableBalance(allPostedSignedUsd),
-      });
-      const plan = planGoldenCoastPhase10Settlement({ settlement, gcSalesCashPayableBalanceUsd });
+      const allPostedBalanceUsd = await gcSalesCashDebitBalance(tx, companyId, gcSalesCashAccount.id);
+      // Both values are signed Dr-minus-Cr. For a credit payable, the larger
+      // (less negative) balance is the smaller safe amount payable now: a
+      // future-dated sale cannot be paid early, and an already-posted later
+      // payment can never be ignored.
+      const gcSalesCashDebitBalanceUsd = Decimal.max(
+        new Decimal(datedBalanceUsd),
+        new Decimal(allPostedBalanceUsd)
+      ).toString();
+      const plan = planGoldenCoastPhase10Settlement({ settlement, gcSalesCashDebitBalanceUsd });
       const request = buildGoldenCoastPhase10SettlementPosting({
         plan,
         gcSalesCashAccountId: gcSalesCashAccount.id,
@@ -554,7 +557,8 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
         settlement,
         plan,
         gcSalesCashAccount,
-        gcSalesCashPayableBalanceAfterUsd: plan.gcSalesCashPayableBalanceAfterUsd,
+        gcSalesCashDebitBalanceAfterUsd: plan.gcSalesCashDebitBalanceAfterUsd,
+        gcSalesCashPayableAfterUsd: plan.gcSalesCashPayableAfterUsd,
         cashOutflowUsd: plan.cashOutflowUsd,
         voucher: posted.voucher,
         entries: posted.entries,
@@ -569,13 +573,14 @@ async function handleSettlement(req: Request, res: Response): Promise<void> {
       amountUsd: outcome.settlement.amountUsd,
       transferFeeUsd: outcome.settlement.transferFeeUsd,
       cashOutflowUsd: outcome.cashOutflowUsd,
-      gcSalesCashPayableBalanceAfterUsd: outcome.gcSalesCashPayableBalanceAfterUsd,
+      gcSalesCashDebitBalanceAfterUsd: outcome.gcSalesCashDebitBalanceAfterUsd,
+      gcSalesCashPayableAfterUsd: outcome.gcSalesCashPayableAfterUsd,
       gcSalesCashAccountId: outcome.gcSalesCashAccount.id,
       voucher: outcome.voucher,
       entries: outcome.entries,
     });
   } catch (error: unknown) {
-    logger.error("Golden Coast Phase 10 GC Sales Cash settlement failed", { error });
+    logger.error("Golden Coast Phase 10 Fresh Start payment failed", { error });
     if (respondKnownError(res, error)) return;
     res.status(500).json({ message: getErrorMessage(error) });
   }

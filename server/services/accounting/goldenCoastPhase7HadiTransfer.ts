@@ -4,6 +4,7 @@ import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import type { CentralPostingRequest, PostingActor } from "./centralPostingEngine";
 import { buildGenericVoucherPostingRequest } from "./genericVoucherPosting";
 import { GOLDEN_COAST_CUTOVER_DATE } from "./goldenCoastPhase4CutoverFifo";
+import { gcSalesCashPayableBalance } from "./goldenCoastSalesCashPayable";
 
 /**
  * Golden Coast Phase 7 deliberately owns only cash collection/remittance via
@@ -63,15 +64,18 @@ export interface GoldenCoastPhase7TransferInput {
 }
 
 export interface GoldenCoastPhase7Balances {
-  /** Outstanding credit-normal GC Sales Cash payable. */
-  gcSalesCashPayableBalanceUsd: string | number;
+  /** Signed Dr-minus-Cr on GC Sales Cash; negative means it is payable. */
+  gcSalesCashDebitBalanceUsd: string | number;
   /** Phase-7-only HADI collections not yet remitted to Golden Coast. */
   outstandingHadiCollectionsUsd: string | number;
 }
 
 export interface GoldenCoastPhase7TransferPlan extends GoldenCoastPhase7TransferInput {
-  gcSalesCashPayableBalanceBeforeUsd: string;
-  gcSalesCashPayableBalanceAfterUsd: string;
+  gcSalesCashDebitBalanceBeforeUsd: string;
+  gcSalesCashDebitBalanceAfterUsd: string;
+  /** Outstanding payable (credit-normal) before and after this transfer. */
+  gcSalesCashPayableBeforeUsd: string;
+  gcSalesCashPayableAfterUsd: string;
   outstandingHadiCollectionsBeforeUsd: string;
   outstandingHadiCollectionsAfterUsd: string;
 }
@@ -261,7 +265,8 @@ export function planGoldenCoastPhase7Transfer(input: {
   balances: GoldenCoastPhase7Balances;
 }): GoldenCoastPhase7TransferPlan {
   const amount = positiveMoney(input.transfer.amountUsd, "amountUsd");
-  const payable = balanceMoney(input.balances.gcSalesCashPayableBalanceUsd, "gcSalesCashPayableBalanceUsd");
+  const balance = balanceMoney(input.balances.gcSalesCashDebitBalanceUsd, "gcSalesCashDebitBalanceUsd");
+  const payable = new Decimal(gcSalesCashPayableBalance(balance.toFixed()));
   const outstanding = balanceMoney(input.balances.outstandingHadiCollectionsUsd, "outstandingHadiCollectionsUsd");
   if (outstanding.lessThan(0)) {
     throw new GoldenCoastPhase7TransferError(
@@ -273,8 +278,10 @@ export function planGoldenCoastPhase7Transfer(input: {
   if (input.transfer.operation === "collect_via_hadi") {
     return {
       ...input.transfer,
-      gcSalesCashPayableBalanceBeforeUsd: money(payable),
-      gcSalesCashPayableBalanceAfterUsd: money(payable.plus(amount)),
+      gcSalesCashDebitBalanceBeforeUsd: money(balance),
+      gcSalesCashDebitBalanceAfterUsd: money(balance.minus(amount)),
+      gcSalesCashPayableBeforeUsd: money(payable),
+      gcSalesCashPayableAfterUsd: money(payable.plus(amount)),
       outstandingHadiCollectionsBeforeUsd: money(outstanding),
       outstandingHadiCollectionsAfterUsd: money(outstanding.plus(amount)),
     };
@@ -289,8 +296,10 @@ export function planGoldenCoastPhase7Transfer(input: {
 
   return {
     ...input.transfer,
-    gcSalesCashPayableBalanceBeforeUsd: money(payable),
-    gcSalesCashPayableBalanceAfterUsd: money(payable),
+    gcSalesCashDebitBalanceBeforeUsd: money(balance),
+    gcSalesCashDebitBalanceAfterUsd: money(balance),
+    gcSalesCashPayableBeforeUsd: money(payable),
+    gcSalesCashPayableAfterUsd: money(payable),
     outstandingHadiCollectionsBeforeUsd: money(outstanding),
     outstandingHadiCollectionsAfterUsd: money(outstanding.minus(amount)),
   };

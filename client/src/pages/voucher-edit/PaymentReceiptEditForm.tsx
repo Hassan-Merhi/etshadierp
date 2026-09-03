@@ -90,6 +90,20 @@ export function PaymentReceiptEditForm({
 
               <FormField
                 control={form.control}
+                name="paymentAccountNarration"
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <FormLabel>Narration</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value ?? ""} placeholder="Narration for this account" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="voucherDate"
                 render={({ field }) => (
                   <FormItem>
@@ -209,6 +223,19 @@ export function PaymentReceiptEditForm({
                       </FormItem>
                     )}
                   />
+                  <FormField
+                    control={form.control}
+                    name={`entries.${index}.narration`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Narration</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value ?? ""} placeholder="Optional note" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
               ))}
               <div className="flex items-center justify-between gap-2 pt-2">
@@ -233,8 +260,9 @@ export function PaymentReceiptEditForm({
               <table className="w-full">
                 <thead className="bg-muted/50 sticky top-0 z-30">
                   <tr>
-                    <th className="text-left p-3 font-medium w-[70%]">Account</th>
-                    <th className="text-left p-3 font-medium w-[25%]">Amount</th>
+                    <th className="text-left p-3 font-medium w-[50%]">Account</th>
+                    <th className="text-left p-3 font-medium w-[20%]">Amount</th>
+                    <th className="text-left p-3 font-medium w-[25%]">Narration</th>
                     <th className="w-[5%]"></th>
                   </tr>
                 </thead>
@@ -319,6 +347,20 @@ export function PaymentReceiptEditForm({
                         />
                       </td>
                       <td className="p-2">
+                        <FormField
+                          control={form.control}
+                          name={`entries.${index}.narration`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input {...field} value={field.value ?? ""} placeholder="Optional note" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </td>
+                      <td className="p-2">
                         {fields.length > 1 && (
                           <Button
                             type="button"
@@ -336,7 +378,7 @@ export function PaymentReceiptEditForm({
                 </tbody>
                 <tfoot className="bg-muted/30 border-t-2">
                   <tr>
-                    <td colSpan={1} className="p-3">
+                    <td colSpan={2} className="p-3">
                       <Button
                         type="button"
                         variant="outline"

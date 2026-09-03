@@ -134,6 +134,7 @@ async function updateActivePaymentReceipt(req: Request, res: Response, next: Nex
         voucherDate: body.voucherDate,
         paymentAccountType: body.paymentAccountType,
         paymentAccountId: body.paymentAccountId,
+        paymentAccountNarration: body.paymentAccountNarration,
         entries: body.entries,
         notes: body.notes,
         currency: body.currency || "USD",

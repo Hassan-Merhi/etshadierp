@@ -30,7 +30,6 @@ import {
   type GoldenCoastPhase7RoleAccounts,
   type GoldenCoastPhase7TransferInput,
 } from "../../services/accounting/goldenCoastPhase7HadiTransfer";
-import { gcSalesCashPayableBalance } from "../../services/accounting/goldenCoastSalesCashPayable";
 import { getCompanyRequestRuntimeContext } from "../../services/security/companyRequestRuntimeContext";
 import { assertTransactionCompanyScope } from "../../services/security/transactionCompanyScope";
 import { getCurrentExchangeRate } from "../helpers/exchangeRateHelpers";
@@ -519,7 +518,7 @@ export async function postGoldenCoastAutomaticHadiCollectionTx(input: {
   const plan = planGoldenCoastPhase7Transfer({
     transfer,
     balances: {
-      gcSalesCashPayableBalanceUsd: gcSalesCashPayableBalance(gcSalesCashSignedUsd),
+      gcSalesCashDebitBalanceUsd: gcSalesCashSignedUsd,
       outstandingHadiCollectionsUsd,
     },
   });

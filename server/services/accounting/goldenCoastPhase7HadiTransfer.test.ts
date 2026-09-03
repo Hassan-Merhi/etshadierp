@@ -127,49 +127,52 @@ describe("Golden Coast Phase 7 HADI transfer planner", () => {
     const plan = planGoldenCoastPhase7Transfer({
       transfer: parsedCollect(),
       balances: {
-        gcSalesCashPayableBalanceUsd: "1800.00",
+        // Signed Dr-minus-Cr: -1,800.00 is a payable of 1,800.00.
+        gcSalesCashDebitBalanceUsd: "-1800.00",
         outstandingHadiCollectionsUsd: "100.00",
       },
     });
 
-    expect(plan.gcSalesCashPayableBalanceBeforeUsd).toBe("1800.00");
-    expect(plan.gcSalesCashPayableBalanceAfterUsd).toBe("2400.00");
+    expect(plan.gcSalesCashPayableBeforeUsd).toBe("1800.00");
+    expect(plan.gcSalesCashPayableAfterUsd).toBe("2400.00");
     expect(plan.outstandingHadiCollectionsBeforeUsd).toBe("100.00");
     expect(plan.outstandingHadiCollectionsAfterUsd).toBe("700.00");
   });
 
   it("does not cap a collection against the payable it grows", () => {
     // The old receivable reading capped a collection at a positive Dr balance
-    // on GC Sales Cash, which a company with real sales never has — so the
-    // operation, and the automatic HADI POS routing that calls it, always failed.
+    // on GC Sales Cash. A collection raises the payable, so capping it against
+    // the very account it grows was the contradiction Phase 15/17 removed.
     const plan = planGoldenCoastPhase7Transfer({
       transfer: parsedCollect({ amountUsd: "1800" }),
-      balances: { gcSalesCashPayableBalanceUsd: "0", outstandingHadiCollectionsUsd: "0" },
+      balances: { gcSalesCashDebitBalanceUsd: "0", outstandingHadiCollectionsUsd: "0" },
     });
-    expect(plan.gcSalesCashPayableBalanceAfterUsd).toBe("1800.00");
+    expect(plan.gcSalesCashPayableAfterUsd).toBe("1800.00");
     expect(plan.outstandingHadiCollectionsAfterUsd).toBe("1800.00");
   });
 
   it("collects normally even when GC Sales Cash has been overpaid", () => {
     const plan = planGoldenCoastPhase7Transfer({
       transfer: parsedCollect({ amountUsd: "1" }),
-      balances: { gcSalesCashPayableBalanceUsd: "-50", outstandingHadiCollectionsUsd: "0" },
+      // A positive signed balance means GC Sales Cash has been OVERPAID.
+      balances: { gcSalesCashDebitBalanceUsd: "50", outstandingHadiCollectionsUsd: "0" },
     });
-    expect(plan.gcSalesCashPayableBalanceAfterUsd).toBe("-49.00");
+    expect(plan.gcSalesCashPayableBeforeUsd).toBe("-50.00");
+    expect(plan.gcSalesCashPayableAfterUsd).toBe("-49.00");
   });
 
   it("plans a HADI remittance only against unremitted Phase 7 collections", () => {
     const plan = planGoldenCoastPhase7Transfer({
       transfer: parsedRemit(),
       balances: {
-        gcSalesCashPayableBalanceUsd: "1200.00",
+        gcSalesCashDebitBalanceUsd: "-1200.00",
         outstandingHadiCollectionsUsd: "700.00",
       },
     });
 
     // A remittance moves cash between the two companies; it never touches the
     // payable Golden Coast owes Fresh Start.
-    expect(plan.gcSalesCashPayableBalanceAfterUsd).toBe("1200.00");
+    expect(plan.gcSalesCashPayableAfterUsd).toBe("1200.00");
     expect(plan.outstandingHadiCollectionsBeforeUsd).toBe("700.00");
     expect(plan.outstandingHadiCollectionsAfterUsd).toBe("450.00");
   });
@@ -180,7 +183,7 @@ describe("Golden Coast Phase 7 HADI transfer planner", () => {
         planGoldenCoastPhase7Transfer({
           transfer: parsedRemit({ amountUsd: "700.01" }),
           balances: {
-            gcSalesCashPayableBalanceUsd: "1200.00",
+            gcSalesCashDebitBalanceUsd: "-1200.00",
             outstandingHadiCollectionsUsd: "700.00",
           },
         }),
@@ -194,7 +197,7 @@ describe("Golden Coast Phase 7 HADI transfer planner", () => {
         planGoldenCoastPhase7Transfer({
           transfer: parsedRemit({ amountUsd: "1" }),
           balances: {
-            gcSalesCashPayableBalanceUsd: "100",
+            gcSalesCashDebitBalanceUsd: "100",
             outstandingHadiCollectionsUsd: "-0.01",
           },
         }),
@@ -206,7 +209,7 @@ describe("Golden Coast Phase 7 HADI transfer planner", () => {
     const transfer = parsedCollect();
     const plan = planGoldenCoastPhase7Transfer({
       transfer,
-      balances: { gcSalesCashPayableBalanceUsd: "1800", outstandingHadiCollectionsUsd: "0" },
+      balances: { gcSalesCashDebitBalanceUsd: "1800", outstandingHadiCollectionsUsd: "0" },
     });
     const transferDigest = goldenCoastPhase7TransferDigest({ transfer, accounts });
     const batch = buildGoldenCoastPhase7TransferPostings({
@@ -241,7 +244,7 @@ describe("Golden Coast Phase 7 HADI transfer planner", () => {
     const transfer = parsedRemit();
     const plan = planGoldenCoastPhase7Transfer({
       transfer,
-      balances: { gcSalesCashPayableBalanceUsd: "1200", outstandingHadiCollectionsUsd: "700" },
+      balances: { gcSalesCashDebitBalanceUsd: "1200", outstandingHadiCollectionsUsd: "700" },
     });
     const transferDigest = goldenCoastPhase7TransferDigest({ transfer, accounts });
     const batch = buildGoldenCoastPhase7TransferPostings({
@@ -273,7 +276,7 @@ describe("Golden Coast Phase 7 HADI transfer planner", () => {
     const transfer = parsedCollect();
     const plan = planGoldenCoastPhase7Transfer({
       transfer,
-      balances: { gcSalesCashPayableBalanceUsd: "1800", outstandingHadiCollectionsUsd: "0" },
+      balances: { gcSalesCashDebitBalanceUsd: "1800", outstandingHadiCollectionsUsd: "0" },
     });
     const transferDigest = goldenCoastPhase7TransferDigest({ transfer, accounts });
     const batch = buildGoldenCoastPhase7TransferPostings({
@@ -330,7 +333,7 @@ describe("Golden Coast Phase 7 HADI transfer planner", () => {
     };
     const plan = planGoldenCoastPhase7Transfer({
       transfer,
-      balances: { gcSalesCashPayableBalanceUsd: "1800", outstandingHadiCollectionsUsd: "0" },
+      balances: { gcSalesCashDebitBalanceUsd: "1800", outstandingHadiCollectionsUsd: "0" },
     });
     expectTransferError(
       () =>

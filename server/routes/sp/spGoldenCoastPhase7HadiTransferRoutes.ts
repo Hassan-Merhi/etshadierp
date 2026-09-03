@@ -669,7 +669,7 @@ async function handlePostTransfer(req: Request, res: Response): Promise<void> {
       const plan = planGoldenCoastPhase7Transfer({
         transfer,
         balances: {
-          gcSalesCashPayableBalanceUsd: gcSalesCashPayableBalance(gcSalesCashSignedUsd),
+          gcSalesCashDebitBalanceUsd: gcSalesCashSignedUsd,
           outstandingHadiCollectionsUsd,
         },
       });
@@ -736,8 +736,8 @@ async function handlePostTransfer(req: Request, res: Response): Promise<void> {
       replayed: result.replayed,
       balances: result.plan
         ? {
-            gcSalesCashPayableBalanceBeforeUsd: result.plan.gcSalesCashPayableBalanceBeforeUsd,
-            gcSalesCashPayableBalanceAfterUsd: result.plan.gcSalesCashPayableBalanceAfterUsd,
+            gcSalesCashPayableBeforeUsd: result.plan.gcSalesCashPayableBeforeUsd,
+            gcSalesCashPayableAfterUsd: result.plan.gcSalesCashPayableAfterUsd,
             outstandingHadiCollectionsBeforeUsd: result.plan.outstandingHadiCollectionsBeforeUsd,
             outstandingHadiCollectionsAfterUsd: result.plan.outstandingHadiCollectionsAfterUsd,
           }

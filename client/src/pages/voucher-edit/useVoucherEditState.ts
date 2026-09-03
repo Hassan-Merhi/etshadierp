@@ -60,6 +60,7 @@ export function useVoucherEditState({
       voucherDate: new Date(),
       currency: selectedCurrency as "USD" | "CFA",
       entries: [],
+      paymentAccountNarration: "",
       notes: "",
     },
   });

@@ -50,18 +50,16 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement route surface", () => {
     expect(routeSource).toContain("definition.acceptedAccountTypes.includes(account.accountType)");
   });
 
-  it("validates every direct receipt target as same-company active Cash/Bank", () => {
+  it("validates every direct payment target as same-company active Cash/Bank", () => {
+    expect(routeSource).toContain("validatePaymentAccount");
     expect(routeSource).toContain("eq(bankAccounts.companyId, companyId)");
     expect(routeSource).toContain("eq(bankAccounts.active, true)");
     expect(routeSource).toContain("isNull(bankAccounts.deletedAt)");
     expect(routeSource).toContain('inArray(ledgerAccounts.accountType, ["Cash", "Bank"])');
   });
 
-  it("computes the outstanding payable from opening semantics plus posted vouchers at the settlement date", () => {
-    expect(routeSource).toContain("gcSalesCashSignedBalance");
-    // The raw ledger figure is signed Dr-minus-Cr; GC Sales Cash is credit-normal,
-    // so the route must convert it before capping a payment against it.
-    expect(routeSource).toContain("gcSalesCashPayableBalance(");
+  it("computes the payable balance from opening semantics plus posted vouchers at the settlement date", () => {
+    expect(routeSource).toContain("gcSalesCashDebitBalance");
     expect(routeSource).toContain("SUM(CAST(ve.debit_amount AS numeric) - CAST(ve.credit_amount AS numeric))");
     expect(routeSource).toContain("WHEN la.opening_balance_side = 'Cr'");
     expect(routeSource).toContain("ELSE COALESCE(la.opening_balance, 0)::numeric");
@@ -74,8 +72,8 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement route surface", () => {
     const digestIndex = routeSource.indexOf("const settlementDigest = goldenCoastPhase10SettlementDigest");
     const replayIndex = routeSource.indexOf("const replayed = await findReplayedSettlement");
     const lockIndex = routeSource.indexOf("LOCK TABLE voucher_entries IN SHARE ROW EXCLUSIVE MODE");
-    const datedBalanceIndex = routeSource.indexOf("const datedSignedUsd = await gcSalesCashSignedBalance");
-    const allPostedBalanceIndex = routeSource.indexOf("const allPostedSignedUsd = await gcSalesCashSignedBalance");
+    const datedBalanceIndex = routeSource.indexOf("const datedBalanceUsd = await gcSalesCashDebitBalance");
+    const allPostedBalanceIndex = routeSource.indexOf("const allPostedBalanceUsd = await gcSalesCashDebitBalance");
 
     expect(digestIndex).toBeGreaterThan(-1);
     expect(replayIndex).toBeGreaterThan(digestIndex);
@@ -102,23 +100,24 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement route surface", () => {
     expect(routeSource).not.toContain("tx.insert(voucherEntries)");
   });
 
-  it("binds replay identity to amount, date, reference, receipt routing and canonical GC Sales Cash", () => {
+  it("binds replay identity to amount, date, reference, payment routing and canonical GC Sales Cash", () => {
     expect(serviceSource).toContain("goldenCoastPhase10SettlementDigest");
-    expect(serviceSource).toContain("receiptAccount: input.settlement.receiptAccount");
+    expect(serviceSource).toContain("paymentAccount: input.settlement.paymentAccount");
     expect(serviceSource).toContain("reference: input.settlement.reference");
     expect(serviceSource).toContain("gcSalesCashAccountId:");
     expect(serviceSource).toContain("GOLDEN_COAST_PHASE10_SOURCE_TYPE");
   });
 
-  it("posts only Dr GC Sales Cash / Cr Cash-Bank and does not duplicate other phase accounting", () => {
-    // A payment reduces the credit-normal payable, so GC Sales Cash carries the
-    // debit and the paying cash/bank account carries the credit.
+  it("posts only Dr GC Sales Cash / Cr Cash/Bank and does not duplicate other phase accounting", () => {
     expect(serviceSource).toContain("Dr canonical GC Sales Cash / Cr selected Golden Coast Cash/Bank");
-    expect(serviceSource).toContain('voucherType: "Payment"');
-    expect(serviceSource).not.toContain('voucherType: "Receipt"');
+    expect(serviceSource).not.toContain("Hassan Savings withdrawal");
+    expect(routeSource).not.toContain("spStockMovements");
+    expect(routeSource).not.toContain("adjustSpInventoryAtomic");
+    expect(routeSource).not.toContain("spSaleLines");
+    expect(routeSource).not.toContain("hadiCompanyId");
   });
 
-  it("books a transfer fee to Shared Charges instead of shrinking the settlement", () => {
+  it("books a transfer fee to Shared Charges instead of shrinking the payment", () => {
     // The payable is relieved by amountUsd alone; the fee rides on the paying
     // account, so the credit is the combined outflow.
     expect(serviceSource).toContain("debitAmount: input.plan.amountUsd");
@@ -129,10 +128,11 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement route surface", () => {
     expect(routeSource).toContain("eq(ledgerAccounts.subType, SHARED_CHARGES_SUBTYPE)");
     // A fee is only accepted when that account genuinely resolves.
     expect(routeSource).toContain("resolveSharedChargesAccount(tx, companyId, true)");
-    expect(serviceSource).not.toContain("Hassan Savings withdrawal");
-    expect(routeSource).not.toContain("spStockMovements");
-    expect(routeSource).not.toContain("adjustSpInventoryAtomic");
-    expect(routeSource).not.toContain("spSaleLines");
-    expect(routeSource).not.toContain("hadiCompanyId");
+  });
+
+  it("reads the credit-normal payable through the shared sign convention", () => {
+    // One module owns the negation, so no route re-derives the sign itself.
+    expect(routeSource).toContain("gcSalesCashPayableBalance(");
+    expect(routeSource).toContain("gcSalesCashSettleablePayable(");
   });
 });

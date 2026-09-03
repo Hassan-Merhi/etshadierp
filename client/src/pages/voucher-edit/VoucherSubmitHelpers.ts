@@ -47,6 +47,7 @@ export const preparePaymentReceiptData = (
     supplierId: data.paymentAccountType === "supplier" ? data.paymentAccountId : null,
     factorySupplierId: data.paymentAccountType === "factorySupplier" ? data.paymentAccountId : null,
     employeeId: data.paymentAccountType === "employee" ? data.paymentAccountId : null,
+    narration: data.paymentAccountNarration || null,
     debitAmount:
       (voucherType === "Receipt" && !isLiabilityPayment) || (voucherType === "Payment" && isLiabilityPayment)
         ? total
@@ -73,6 +74,7 @@ export const preparePaymentReceiptData = (
         (voucherType === "Receipt" && !isLiabilityPayment) || (voucherType === "Payment" && isLiabilityPayment)
           ? usdAmount
           : "0",
+      narration: entry.narration || null,
     };
   });
 
@@ -96,6 +98,7 @@ export const prepareJournalData = (data: JournalFormData, exchangeRate: number |
       factorySupplierId: entry.accountType === "factorySupplier" ? entry.accountId : null,
       debitAmount: entry.type === "DR" ? usdAmount : "0",
       creditAmount: entry.type === "CR" ? usdAmount : "0",
+      narration: entry.narration || null,
     };
   });
 

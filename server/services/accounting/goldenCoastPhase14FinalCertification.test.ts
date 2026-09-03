@@ -329,17 +329,14 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
         hadiCashAccount: { kind: "bank", id: bank.hadiCash },
       },
     });
-    // Sales already credited 1,875.00 to the GC Sales Cash payable. Collecting
-    // 600.00 through HADI recognises further sale cash Golden Coast now owes
-    // Fresh Start, so the payable rises rather than being cleared.
     const collectionPlan = planGoldenCoastPhase7Transfer({
       transfer: collection,
       balances: {
-        gcSalesCashPayableBalanceUsd: "1875.00",
+        gcSalesCashDebitBalanceUsd: "1875.00",
         outstandingHadiCollectionsUsd: "0.00",
       },
     });
-    expect(collectionPlan.gcSalesCashPayableBalanceAfterUsd).toBe("2475.00");
+    expect(collectionPlan.gcSalesCashDebitBalanceAfterUsd).toBe("1275.00");
     expect(collectionPlan.outstandingHadiCollectionsAfterUsd).toBe("600.00");
     const phase7Accounts = {
       gcSalesCashAccountId: account.gcSalesCash,
@@ -371,16 +368,15 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
         settlementDate: "2026-09-13",
         amountUsd: "1275.00",
         clientRequestId: "phase14-direct-settlement",
-        receiptAccount: { kind: "bank", id: bank.directCollection },
-        reference: "Clear remaining GC Sales Cash",
+        paymentAccount: { kind: "bank", id: bank.directCollection },
+        reference: "Pay remaining GC Sales Cash payable",
       },
     });
-    // Phase 10 pays 1,275.00 of that payable down out of a Golden Coast bank.
     const settlementPlan = planGoldenCoastPhase10Settlement({
       settlement,
-      gcSalesCashPayableBalanceUsd: collectionPlan.gcSalesCashPayableBalanceAfterUsd,
+      gcSalesCashDebitBalanceUsd: "-1275.00",
     });
-    expect(settlementPlan.gcSalesCashPayableBalanceAfterUsd).toBe("1200.00");
+    expect(settlementPlan.gcSalesCashDebitBalanceAfterUsd).toBe("0.00");
     const settlementDigest = goldenCoastPhase10SettlementDigest({
       settlement,
       gcSalesCashAccountId: account.gcSalesCash,
@@ -390,9 +386,8 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
       gcSalesCashAccountId: account.gcSalesCash,
       settlementDigest,
     });
-    // Paying the liability debits GC Sales Cash and credits the paying bank.
-    expect(ledgerNetDebit(settlementPosting.entries, account.gcSalesCash)).toBe(1275);
     expect(bankNetDebit(settlementPosting.entries, bank.directCollection)).toBe(-1275);
+    expect(ledgerNetDebit(settlementPosting.entries, account.gcSalesCash)).toBe(1275);
     expectBalanced(settlementPosting.entries);
 
     const remittance = parseGoldenCoastPhase7TransferInput({
@@ -408,16 +403,14 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
         goldenCoastCashAccount: { kind: "ledger", id: account.gcOperatingCash },
       },
     });
-    // Remitting HADI's cash back is a cash move between the two companies; the
-    // payable Golden Coast owes Fresh Start is untouched by it.
     const remittancePlan = planGoldenCoastPhase7Transfer({
       transfer: remittance,
       balances: {
-        gcSalesCashPayableBalanceUsd: settlementPlan.gcSalesCashPayableBalanceAfterUsd,
+        gcSalesCashDebitBalanceUsd: settlementPlan.gcSalesCashDebitBalanceAfterUsd,
         outstandingHadiCollectionsUsd: collectionPlan.outstandingHadiCollectionsAfterUsd,
       },
     });
-    expect(remittancePlan.gcSalesCashPayableBalanceAfterUsd).toBe("1200.00");
+    expect(remittancePlan.gcSalesCashDebitBalanceAfterUsd).toBe("0.00");
     expect(remittancePlan.outstandingHadiCollectionsAfterUsd).toBe("0.00");
     const remittanceDigest = goldenCoastPhase7TransferDigest({ transfer: remittance, accounts: phase7Accounts });
     const remittanceBatch = buildGoldenCoastPhase7TransferPostings({

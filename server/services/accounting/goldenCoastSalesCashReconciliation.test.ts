@@ -102,7 +102,7 @@ function collectVia(ledger: Ledger, amountUsd: string, clientRequestId: string):
   });
   const plan = planGoldenCoastPhase7Transfer({
     transfer,
-    balances: { gcSalesCashPayableBalanceUsd: ledger.payable(), outstandingHadiCollectionsUsd: "0" },
+    balances: { gcSalesCashDebitBalanceUsd: ledger.signed(GC_SALES_CASH), outstandingHadiCollectionsUsd: "0" },
   });
   const batch = buildGoldenCoastPhase7TransferPostings({
     plan,
@@ -114,7 +114,7 @@ function collectVia(ledger: Ledger, amountUsd: string, clientRequestId: string):
   // Only Golden Coast's own voucher belongs in this company's ledger; HADI's
   // reciprocal voucher lives in the parent company's book.
   ledger.post(batch.postings.find((p) => p.role === "golden_coast")!.request.entries as Entry[]);
-  return plan.gcSalesCashPayableBalanceAfterUsd;
+  return plan.gcSalesCashPayableAfterUsd;
 }
 
 function payDown(ledger: Ledger, amountUsd: string, transferFeeUsd: string, clientRequestId: string): string {
@@ -125,11 +125,14 @@ function payDown(ledger: Ledger, amountUsd: string, transferFeeUsd: string, clie
       amountUsd,
       transferFeeUsd,
       clientRequestId,
-      receiptAccount: { kind: "bank", id: 92 },
+      paymentAccount: { kind: "bank", id: 92 },
       reference: null,
     },
   });
-  const plan = planGoldenCoastPhase10Settlement({ settlement, gcSalesCashPayableBalanceUsd: ledger.payable() });
+  const plan = planGoldenCoastPhase10Settlement({
+    settlement,
+    gcSalesCashDebitBalanceUsd: ledger.signed(GC_SALES_CASH),
+  });
   const posting = buildGoldenCoastPhase10SettlementPosting({
     plan,
     gcSalesCashAccountId: GC_SALES_CASH,
@@ -141,7 +144,7 @@ function payDown(ledger: Ledger, amountUsd: string, transferFeeUsd: string, clie
     }),
   });
   ledger.post(posting.entries as Entry[]);
-  return plan.gcSalesCashPayableBalanceAfterUsd;
+  return plan.gcSalesCashPayableAfterUsd;
 }
 
 describe("GC Sales Cash reconciliation across a full lifetime", () => {
@@ -206,7 +209,7 @@ describe("GC Sales Cash reconciliation across a full lifetime", () => {
 
     // 100.00 is payable; a 40.00 fee must not create room for a 120.00 payment.
     expect(() => payDown(ledger, "120.00", "40.00", "recon-pay-4")).toThrow(
-      /exceeds the outstanding GC Sales Cash payable 100.00/
+      /exceeds the current GC Sales Cash payable 100.00/
     );
     expect(ledger.payable()).toBe("100.00");
   });

@@ -154,7 +154,7 @@ describe("Phase 7 HADI transfers", () => {
     });
     const plan = planGoldenCoastPhase7Transfer({
       transfer: parsedTransfer,
-      balances: { gcSalesCashPayableBalanceUsd: "0", outstandingHadiCollectionsUsd: "0" },
+      balances: { gcSalesCashDebitBalanceUsd: "0", outstandingHadiCollectionsUsd: "0" },
     });
     const batch = buildGoldenCoastPhase7TransferPostings({
       plan,
@@ -181,7 +181,7 @@ describe("Phase 7 HADI transfers", () => {
     });
     const plan = planGoldenCoastPhase7Transfer({
       transfer: parsedTransfer,
-      balances: { gcSalesCashPayableBalanceUsd: "1200", outstandingHadiCollectionsUsd: "600" },
+      balances: { gcSalesCashDebitBalanceUsd: "-1200", outstandingHadiCollectionsUsd: "600" },
     });
     const batch = buildGoldenCoastPhase7TransferPostings({
       plan,
@@ -209,11 +209,12 @@ describe("Phase 10 payment reduces the payable", () => {
         amountUsd: "600.00",
         transferFeeUsd: "12.50",
         clientRequestId: "gc-paths-payment",
-        receiptAccount: { kind: "bank", id: 91 },
+        paymentAccount: { kind: "bank", id: 91 },
         reference: null,
       },
     });
-    const plan = planGoldenCoastPhase10Settlement({ settlement, gcSalesCashPayableBalanceUsd: "1800.00" });
+    // Signed Dr-minus-Cr: -1,800.00 is a payable of 1,800.00.
+    const plan = planGoldenCoastPhase10Settlement({ settlement, gcSalesCashDebitBalanceUsd: "-1800.00" });
     const posting = buildGoldenCoastPhase10SettlementPosting({
       plan,
       gcSalesCashAccountId: GC_SALES_CASH,
