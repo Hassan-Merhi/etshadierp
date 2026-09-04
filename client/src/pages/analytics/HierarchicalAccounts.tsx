@@ -14,6 +14,11 @@ interface HierarchicalAccountsProps {
   parentAccounts: Account[];
 }
 
+function keepsZeroBalanceChildren(parentName: string): boolean {
+  const normalized = parentName.trim().toLowerCase();
+  return normalized === "salary expense - workers" || normalized === "bonus expense - workers";
+}
+
 export function HierarchicalAccounts({
   expandedAccounts,
   toggleAccount,
@@ -30,8 +35,15 @@ export function HierarchicalAccounts({
         const childrenTotal = hasChildren ? calculateChildrenTotal(parent.accountId, accountMap) : 0;
         const parentBalance = parseBalance(parent.balance);
         const displayBalance = hasChildren ? childrenTotal : parentBalance;
-        if (displayBalance === 0) return null;
-        const nonZeroChildren = children.filter((child) => parseBalance(child.balance) !== 0);
+        const preservePayrollChildren = keepsZeroBalanceChildren(parent.name);
+        const visibleChildren = preservePayrollChildren
+          ? children
+          : children.filter((child) => parseBalance(child.balance) !== 0);
+
+        // Ordinary zero-balance accounts stay hidden. Payroll worker groups are different:
+        // their children are historical expense accounts, so a worker who is inactive or
+        // has no movement in the currently selected period must still remain visible.
+        if (displayBalance === 0 && !(preservePayrollChildren && visibleChildren.length > 0)) return null;
 
         return (
           <Fragment key={parent.id}>
@@ -62,7 +74,7 @@ export function HierarchicalAccounts({
             </TableRow>
             {hasChildren &&
               isExpanded &&
-              nonZeroChildren.map((child) => (
+              visibleChildren.map((child) => (
                 <TableRow
                   key={child.id}
                   data-testid={`row-account-${child.id}`}

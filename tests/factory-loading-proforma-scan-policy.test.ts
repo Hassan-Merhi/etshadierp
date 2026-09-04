@@ -3,6 +3,7 @@ import {
   normalizeLoadingArticleCode,
   shouldEnforceProformaOverload,
   shouldRequireProformaMembership,
+  sumProformaQuantityLimit,
 } from "../server/routes/factory/customer-orders/bale-scanning/proformaScanPolicy";
 
 describe("factory loading proforma scan policy", () => {
@@ -33,6 +34,10 @@ describe("factory loading proforma scan policy", () => {
         allowBypassOverload: true,
       })
     ).toBe(false);
+  });
+
+  it("sums equivalent proforma rows into one quantity limit", () => {
+    expect(sumProformaQuantityLimit([{ quantity: 8 }, { quantity: 12 }, { quantity: "5" }])).toBe(25);
   });
 
   it("Ignore Proforma bypasses not-in-proforma confirmation but normal mode still requires it", () => {
