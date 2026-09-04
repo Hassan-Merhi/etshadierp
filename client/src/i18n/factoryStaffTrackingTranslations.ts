@@ -1,5 +1,11 @@
 import type { ApplicationLanguage } from "@shared/applicationLanguageContract";
 
+export const FACTORY_TRACKING_STATUSES = {
+  present: "Present",
+  absent: "Absent",
+  new: "New",
+} as const;
+
 const factoryStaffTrackingTranslations = {
   productionTargets: {
     en: "Production Targets",
