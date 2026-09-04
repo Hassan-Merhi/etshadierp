@@ -20,6 +20,17 @@ import {
 import { eq, and } from "drizzle-orm";
 import { autoSavePriceToPriceList } from "./_helpers";
 
+function hasDuplicateNormalizedArticleCodes(lines: Array<{ articleCode?: unknown }>): boolean {
+  const seen = new Set<string>();
+  for (const line of lines) {
+    const normalized = String(line.articleCode ?? "").trim().toLowerCase();
+    if (!normalized) continue;
+    if (seen.has(normalized)) return true;
+    seen.add(normalized);
+  }
+  return false;
+}
+
 export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
   app.post("/api/factory/customer-proformas/bulk", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -38,6 +49,11 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
         return res
           .status(400)
           .json({ message: "At least one line must have articleCode, productName, and quantity > 0" });
+      }
+      if (hasDuplicateNormalizedArticleCodes(validLines)) {
+        return res.status(400).json({
+          message: "Article code already exists in this proforma",
+        });
       }
 
       const parsed = insertCustomerProformaSchema.parse({ companyId, customerId, name, isActive: isActive || false });
@@ -103,6 +119,11 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
         return res
           .status(400)
           .json({ message: "At least one line must have articleCode, productName, and quantity > 0" });
+      }
+      if (hasDuplicateNormalizedArticleCodes(validLines)) {
+        return res.status(400).json({
+          message: "Article code already exists in this proforma",
+        });
       }
 
       const result = await db.transaction(async (tx) => {

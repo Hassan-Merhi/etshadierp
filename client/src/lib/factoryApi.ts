@@ -261,7 +261,7 @@ async function hydrateCompactBaleScanResponse(
 
   if (!current) {
     try {
-      const fullResponse = await delegate("GET", `/api/factory/customer-orders/${orderId}`);
+      const fullResponse = await delegate("GET", `/api/factory/customer-orders/${orderId}?continuationFromOrderId=${orderId}`);
       if (fullResponse.ok) current = await fullResponse.json();
     } catch {
       // The scan has already committed. Fall back to the compact order seed
