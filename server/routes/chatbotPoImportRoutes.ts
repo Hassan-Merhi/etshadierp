@@ -369,7 +369,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
 
       const visibleSuppliers = await supplierService.list(companyId, "", true);
       if (!visibleSuppliers.some((supplier) => supplier.id === Number(supplierId))) {
-        return res.status(400).json({ message: "Selected supplier not found" });
+        return res.status(400).json({ message: "Supplier not found" });
       }
 
       const unresolved = lines.filter((l: any) => !l.stockItemId);

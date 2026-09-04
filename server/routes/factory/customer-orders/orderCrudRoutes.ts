@@ -211,14 +211,21 @@ export function registerOrderCrudRoutes(app: Express) {
         const loadedByArticle = new Map<string, number>();
         for (const bale of relatedBales) {
           if (bale.articleCode) {
-            loadedByArticle.set(bale.articleCode, (loadedByArticle.get(bale.articleCode) || 0) + 1);
+            const normalizedArticleCode = String(bale.articleCode).trim().toLowerCase();
+            loadedByArticle.set(
+              normalizedArticleCode,
+              (loadedByArticle.get(normalizedArticleCode) || 0) + 1
+            );
           }
         }
         proformaRemainingLines = proformaLines.map((line) => ({
           id: line.id,
           articleCode: line.articleCode,
           productName: line.productName,
-          quantity: Math.max(0, line.quantity - (loadedByArticle.get(line.articleCode) || 0)),
+          quantity: Math.max(
+            0,
+            line.quantity - (loadedByArticle.get(String(line.articleCode || "").trim().toLowerCase()) || 0)
+          ),
           pricePerBale: line.pricePerBale,
           pricingMode: line.pricingMode,
           pricePerKg: line.pricePerKg,

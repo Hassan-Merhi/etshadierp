@@ -16,6 +16,7 @@ import {
   normalizeLoadingArticleCode,
   shouldEnforceProformaOverload,
   shouldRequireProformaMembership,
+  sumProformaQuantityLimit,
 } from "./proformaScanPolicy";
 import {
   factoryBaleProducts,
@@ -222,7 +223,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
         if (productForBale?.sellingPrice) priceUsed = productForBale.sellingPrice;
 
         if (order.proformaIdUsed) {
-          const [pl] = await tx
+          const matchingProformaLines = await tx
             .select()
             .from(customerProformaLines)
             .where(
@@ -231,7 +232,11 @@ export function registerOrderBaleScanRoutes(app: Express) {
                 sql`LOWER(TRIM(${customerProformaLines.articleCode})) = ${normalizedEffectiveArticleCode}`
               )
             );
-          const proformaLine = pl || null;
+          const matchedProformaLine = matchingProformaLines[0] || null;
+          const proformaQuantityLimit = sumProformaQuantityLimit(matchingProformaLines);
+          const proformaLine = matchedProformaLine
+            ? { ...matchedProformaLine, quantity: proformaQuantityLimit }
+            : null;
           if (proformaLine) {
             const pricingMode = proformaLine.pricingMode ?? "per_bale";
             const perKgVal = proformaLine.pricePerKg;
@@ -265,7 +270,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
                   )
                 );
               const currentCount = countResult?.count || 0;
-              if (currentCount >= proformaLine.quantity) {
+              if (currentCount >= proformaQuantityLimit) {
                 return {
                   ok: false,
                   httpStatus: 400,
