@@ -104,6 +104,19 @@ function writesSensitiveTable(source) {
   return null;
 }
 
+const READS_FILE_CONTENTS = /\breadFileSync\b|\breadFile\b/;
+const TEXT_ASSERTION = /\.(?:toContain|toMatch)\(/;
+
+/**
+ * True when a test reads file contents and asserts substrings against them.
+ * Such a test pins source text rather than exercising behaviour, so a route
+ * path appearing in it is evidence the route is still registered, not evidence
+ * anything calls it.
+ */
+function assertsAgainstFileContents(source) {
+  return READS_FILE_CONTENTS.test(source) && TEXT_ASSERTION.test(source);
+}
+
 function walk(dir, extensions, out = []) {
   const absolute = path.join(projectRoot, dir);
   if (!fs.existsSync(absolute)) return out;
@@ -121,10 +134,15 @@ export function auditWriteRouteCoverage(options = {}) {
   const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 
-  const serverFiles = walk("server", [".ts"]).filter((file) => !file.endsWith(".test.ts"));
+  const allServerFiles = walk("server", [".ts"]);
+  const serverFiles = allServerFiles.filter((file) => !file.endsWith(".test.ts"));
   const sources = new Map(serverFiles.map((file) => [file, fs.readFileSync(path.join(projectRoot, file), "utf8")]));
 
-  const testFiles = [...walk("tests", [".ts"]), ...serverFiles.filter((file) => file.endsWith(".test.ts"))];
+  // Colocated server tests have to be selected from the unfiltered walk.
+  // `serverFiles` has already had every `.test.ts` removed, so filtering it for
+  // `.test.ts` could only ever yield nothing, and a route whose only test sits
+  // beside its route file read as having no test at all.
+  const testFiles = [...walk("tests", [".ts"]), ...allServerFiles.filter((file) => file.endsWith(".test.ts"))];
   const readTest = (file) => fs.readFileSync(path.join(projectRoot, file), "utf8");
   const sweepText = testFiles.includes(GUARD_SWEEP_TEST) ? readTest(GUARD_SWEEP_TEST) : "";
   const authenticatedSweepText = testFiles.includes(AUTHENTICATED_SAFETY_SWEEP_TEST)
@@ -133,9 +151,23 @@ export function auditWriteRouteCoverage(options = {}) {
   const authenticatedSafetySweepPresent = AUTHENTICATED_SAFETY_SWEEP_SIGNATURES.every((signature) =>
     authenticatedSweepText.includes(signature)
   );
+  // Naming a route inside a source-text assertion is not behavioural coverage.
+  // A test that reads a route file and asserts substrings against it proves the
+  // path is still registered; it never sends a request, so it cannot say the
+  // handler still posts balanced vouchers or holds its tenant boundary. Letting
+  // such a mention count as "tested elsewhere" takes the route out of
+  // guardOnlySensitive - the set tests/write-route-authenticated-safety-sweep
+  // enumerates - so the one gate that does exercise it would stop covering it.
+  //
+  // This is deliberately looser than the pinned-path rule in
+  // audit-source-text-assertions.mjs: colocated tests read their sibling with a
+  // relative `new URL("./routes.ts", import.meta.url)`, which that audit's
+  // repo-rooted path pattern does not match. Reading any file and asserting a
+  // substring is enough to disqualify the mention here.
   const otherTestText = testFiles
     .filter((file) => file !== GUARD_SWEEP_TEST && file !== AUTHENTICATED_SAFETY_SWEEP_TEST)
     .map(readTest)
+    .filter((source) => !assertsAgainstFileContents(source))
     .join("\n");
 
   // Route path -> the file that registers it, built in one pass over the server
