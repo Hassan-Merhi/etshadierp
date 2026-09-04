@@ -98,17 +98,40 @@ describe("supplier parent fallback scope", () => {
     expect(supplierRepository.list).toHaveBeenNthCalledWith(2, parentCompanyId, "");
   });
 
-  it("does not fall back on a failed search when the active company has its own suppliers", async () => {
+  // Inheritance is a property of the caller, not of how many suppliers the
+  // active company happens to own. An opted-in picker that searches for an
+  // inherited supplier must still find it when the active company has its own
+  // suppliers, so the parent master is consulted on the opted-in path rather
+  // than only when the active company looks empty.
+  it("still offers the parent master to an opted-in caller whose own search finds nothing", async () => {
     vi.mocked(resolveParentCompanyId).mockResolvedValue(parentCompanyId);
-    vi.mocked(supplierRepository.list).mockResolvedValue([]);
+    vi.mocked(supplierRepository.list).mockImplementation((companyId: number) =>
+      Promise.resolve(companyId === parentCompanyId ? [parentSupplier] : [])
+    );
     vi.mocked(supplierRepository.listAll).mockResolvedValue([
       { id: 91, companyId: activeCompanyId, legalName: "Local Supplier" } as unknown as SupplierRow,
     ]);
 
     const result = await supplierService.list(activeCompanyId, "HMD", true);
 
+    expect(result).toEqual([parentSupplier]);
+    expect(supplierRepository.list).toHaveBeenNthCalledWith(1, activeCompanyId, "HMD");
+    expect(supplierRepository.list).toHaveBeenNthCalledWith(2, parentCompanyId, "HMD");
+    expect(supplierRepository.listAll).not.toHaveBeenCalled();
+  });
+
+  // The strict path is what keeps a foreign supplier ID out of ordinary
+  // accounting pickers: without the opt-in, the parent is never resolved.
+  it("keeps a search strict to the active company when the caller does not opt in", async () => {
+    vi.mocked(resolveParentCompanyId).mockResolvedValue(parentCompanyId);
+    vi.mocked(supplierRepository.list).mockImplementation((companyId: number) =>
+      Promise.resolve(companyId === parentCompanyId ? [parentSupplier] : [])
+    );
+
+    const result = await supplierService.list(activeCompanyId, "HMD");
+
     expect(result).toEqual([]);
-    expect(supplierRepository.listAll).toHaveBeenCalledWith(activeCompanyId);
+    expect(supplierRepository.list).toHaveBeenCalledWith(activeCompanyId, "HMD");
     expect(resolveParentCompanyId).not.toHaveBeenCalled();
   });
 });
