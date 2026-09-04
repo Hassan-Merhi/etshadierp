@@ -86,7 +86,11 @@ export function projectGoldenCoastAccountsEquity(body: AccountsAllResponse): Acc
 }
 
 export function registerGoldenCoastAccountsEquityPresentation(app: Express): void {
-  app.get("/api/accounts/all", (req, res, next) => {
+  // Response middleware only: preserve the existing /api/accounts/all route and
+  // route-manifest ordering while adjusting the final Accounts Overview payload.
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || req.path !== "/api/accounts/all") return next();
+
     const originalJson = res.json.bind(res);
     res.json = ((body: AccountsAllResponse) => originalJson(projectGoldenCoastAccountsEquity(body))) as typeof res.json;
     return next();
