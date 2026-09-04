@@ -121,15 +121,10 @@ export function auditWriteRouteCoverage(options = {}) {
   const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 
-  const allServerFiles = walk("server", [".ts"]);
-  const serverFiles = allServerFiles.filter((file) => !file.endsWith(".test.ts"));
+  const serverFiles = walk("server", [".ts"]).filter((file) => !file.endsWith(".test.ts"));
   const sources = new Map(serverFiles.map((file) => [file, fs.readFileSync(path.join(projectRoot, file), "utf8")]));
 
-  // Colocated server tests count as coverage. They have to be selected from the
-  // unfiltered walk: `serverFiles` has already had every `.test.ts` removed, so
-  // filtering it for test files could only ever yield nothing, and a route whose
-  // only test sits beside its route file read as uncovered.
-  const testFiles = [...walk("tests", [".ts"]), ...allServerFiles.filter((file) => file.endsWith(".test.ts"))];
+  const testFiles = [...walk("tests", [".ts"]), ...serverFiles.filter((file) => file.endsWith(".test.ts"))];
   const readTest = (file) => fs.readFileSync(path.join(projectRoot, file), "utf8");
   const sweepText = testFiles.includes(GUARD_SWEEP_TEST) ? readTest(GUARD_SWEEP_TEST) : "";
   const authenticatedSweepText = testFiles.includes(AUTHENTICATED_SAFETY_SWEEP_TEST)
