@@ -7,6 +7,7 @@ const harness = vi.hoisted(() => ({
   normalizeOpeningBalanceCurrency: vi.fn(),
   getCashBankAccountSummary: vi.fn(),
   getCashBankRevaluation: vi.fn(),
+  getCashLedgerAccountSummary: vi.fn(),
   schema: {
     companies: { id: "companies.id", baseCurrency: "companies.baseCurrency" },
     ledgerAccounts: {
@@ -34,6 +35,9 @@ vi.mock("../server/services/accounting/openingBalanceCurrency", () => ({
 vi.mock("../server/services/accounting/cashBankRevaluationService", () => ({
   getCashBankAccountSummary: harness.getCashBankAccountSummary,
   getCashBankRevaluation: harness.getCashBankRevaluation,
+}));
+vi.mock("../server/services/accounting/cashLedgerAccountSummaryService", () => ({
+  getCashLedgerAccountSummary: harness.getCashLedgerAccountSummary,
 }));
 vi.mock("../server/lib/httpHandlers", () => ({
   getErrorMessage: (error: unknown) => (error instanceof Error ? error.message : String(error)),
@@ -70,6 +74,7 @@ describe("account currency and historical opening behavior", () => {
     harness.selectResults.splice(0);
     harness.getCashBankAccountSummary.mockReset();
     harness.getCashBankRevaluation.mockReset();
+    harness.getCashLedgerAccountSummary.mockReset();
     harness.normalizeOpeningBalanceCurrency.mockReset();
     registerAccountCurrencyRoutes({
       get: (path: string, ...callbacks: any[]) => harness.handlers.set(path, callbacks.at(-1)!),
@@ -225,7 +230,7 @@ describe("account currency and historical opening behavior", () => {
   });
 
   it("adds unresolved opening and legacy raw net to a translated cash balance", async () => {
-    harness.getCashBankAccountSummary.mockResolvedValueOnce({
+    harness.getCashLedgerAccountSummary.mockResolvedValueOnce({
       currentTranslatedBaseBalance: "100.5",
       historicalBaseBalance: "90",
       openingBalanceCurrencyUnresolved: true,
@@ -239,12 +244,12 @@ describe("account currency and historical opening behavior", () => {
       { session: { currentCompanyId: 4 }, params: { id: "7" } },
       res
     );
-    expect(harness.getCashBankAccountSummary).toHaveBeenCalledWith(4, "ledger", 7);
+    expect(harness.getCashLedgerAccountSummary).toHaveBeenCalledWith(4, 7);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ balance: 125, totalsProvisional: true }));
   });
 
   it("falls back to historical ledger accounting and flags unresolved legacy values as provisional", async () => {
-    harness.getCashBankAccountSummary.mockResolvedValueOnce(null);
+    harness.getCashLedgerAccountSummary.mockResolvedValueOnce(null);
     harness.selectResults.push([
       {
         id: 7,

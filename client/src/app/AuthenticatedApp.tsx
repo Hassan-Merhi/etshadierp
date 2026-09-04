@@ -37,7 +37,12 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   const isPOS = user.role === "POS";
 
   const { chatUnread, posImportEnabled, myAccess, myAccessLoading, myAccessError, factorySettings } =
-    useAuthenticatedAppData({ selectedCompanyId: selectedCompany?.id, userPresent: true, isPOS });
+    useAuthenticatedAppData({
+      selectedCompanyId: selectedCompany?.id,
+      companyType: selectedCompany?.companyType,
+      userPresent: true,
+      isPOS,
+    });
 
   if (companyLoading || !selectedCompany) return <AppLoadingState />;
 
@@ -52,8 +57,10 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
     factorySettings,
   });
 
-  if (routeState.decision.kind === "loading") return <AppLoadingState />;
-  if (routeState.decision.kind === "empty") return null;
+  if (routeState.decision.kind === "loading") return <AppLoadingState message="Loading Factory access" />;
+  if (routeState.decision.kind === "bootstrap-error") {
+    return <AppLoadingState message="Loading Factory access" showRecovery />;
+  }
   if (routeState.decision.kind === "redirect") return <Redirect replace to={routeState.decision.to} />;
 
   const leaveConfirmDialog = (

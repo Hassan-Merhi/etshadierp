@@ -27,6 +27,7 @@ import {
 } from "./startup-schema";
 import { registerProcessErrorHandlers } from "./startup/registerProcessErrorHandlers";
 import { runStartupMigrations, warmupDb } from "./startup/runServerStartupMigrations";
+import { ensureFactoryStaffTrackingSchema } from "./startup/factoryStaffTrackingSchema";
 import { ORIGIN_GUARD_EXEMPT_PATHS, originGuard } from "./security/originGuard";
 
 registerProcessErrorHandlers();
@@ -822,6 +823,16 @@ let migrationsDone = false;
 
       await ensureCanonicalStockMovementJournal(pool);
       await ensureFinancialOperationRequests(pool);
+      try {
+        // Factory Production Targets and Attendance Register must be available
+        // even when production skips the bulk startup migration pass.
+        await ensureFactoryStaffTrackingSchema(pool);
+        logger.info("[startup] ✓ Factory staff tracking schema ensured");
+      } catch (staffTrackingSchemaErr: unknown) {
+        logger.error("[startup] ✗ Could not ensure Factory staff tracking schema:", {
+          error: getErrorMessage(staffTrackingSchemaErr),
+        });
+      }
       if (migrationsEnabled) {
         try {
           await runMigrations();

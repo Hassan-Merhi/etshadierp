@@ -18,14 +18,8 @@ import {
   shouldRequireProformaMembership,
   sumProformaQuantityLimit,
 } from "./proformaScanPolicy";
-import {
-  factoryBaleProducts,
-  factoryBales,
-  customerProformaLines,
-  customerOrders,
-  customerOrderBales,
-} from "@shared/schema";
-import { eq, and, or, sql, inArray, ilike, isNull, ne } from "drizzle-orm";
+import { factoryBales, customerProformaLines, customerOrders, customerOrderBales } from "@shared/schema";
+import { eq, and, or, sql, isNull } from "drizzle-orm";
 import { firstRow } from "../../../../lib/queryResult";
 
 export function registerOrderBaleScanRoutes(app: Express) {
@@ -35,10 +29,16 @@ export function registerOrderBaleScanRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
-
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
+
       const { scanCode, locationId } = req.body;
       if (!scanCode || !locationId) return res.status(400).json({ message: "scanCode and locationId are required" });
+
+      const parsedLocationId = Number.parseInt(String(locationId), 10);
+      if (!Number.isInteger(parsedLocationId) || parsedLocationId <= 0) {
+        return res.status(400).json({ message: "scanCode and locationId are required" });
+      }
+
       const scannerName: string | null = req.session?.username || req.session?.name || req.session?.email || null;
 
       const [order] = await db
@@ -46,10 +46,11 @@ export function registerOrderBaleScanRoutes(app: Express) {
         .from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
-      if (!["DRAFT", "LOADING", "PENDING_VERIFICATION"].includes(order.status))
+      if (!["DRAFT", "LOADING", "PENDING_VERIFICATION"].includes(order.status)) {
         return res
           .status(400)
           .json({ message: "Can only add bales to DRAFT, LOADING, or PENDING_VERIFICATION orders" });
+      }
 
       // V5 guard: proformaIdUsed IS NOT NULL
       // V5 bales are SOLD once the order reaches PENDING_VERIFICATION — no further scanning allowed.
@@ -60,85 +61,39 @@ export function registerOrderBaleScanRoutes(app: Express) {
           .json({ message: "Cannot add bales to a V5 order that is already in PENDING_VERIFICATION" });
       }
 
-      // Check if this scan code matches a bale already reserved (status = RESERVED_FOR_ORDER).
-      // Only match by unique bale identifiers (referenceNumber, baleCode) — NOT by articleCode or
-      // productName, which are shared across many bales and would falsely block scanning the next
-      // available bale of the same product type.
-      const scanLower = scanCode.trim().toLowerCase();
-      const [reservedBale] = await db
-        .select()
-        .from(factoryBales)
-        .where(
-          and(
-            eq(factoryBales.companyId, companyId),
-            eq(factoryBales.status, "RESERVED_FOR_ORDER"),
-            or(
-              sql`LOWER(${factoryBales.referenceNumber}) = ${scanLower}`,
-              sql`LOWER(${factoryBales.baleCode}) = ${scanLower}`
+      const scanTrimmed = String(scanCode).trim();
+      const scanLower = scanTrimmed.toLowerCase();
+      const scanLike = `%${scanTrimmed}%`;
+
+      // Successful scans used to pay for two preflight reads before entering the
+      // transaction: one RESERVED_FOR_ORDER lookup and one product-name lookup.
+      // Fold both into the locked candidate query instead. Exact reserved unique
+      // identifiers still win so the user keeps the same descriptive error.
+      const uniqueIdentifierCondition = or(
+        sql`LOWER(${factoryBales.referenceNumber}) = ${scanLower}`,
+        sql`LOWER(${factoryBales.baleCode}) = ${scanLower}`
+      );
+      const availableNameCondition = or(
+        uniqueIdentifierCondition,
+        sql`LOWER(${factoryBales.articleCode}) = ${scanLower}`,
+        sql`LOWER(${factoryBales.productName}) = ${scanLower}`,
+        sql`EXISTS (
+          SELECT 1
+          FROM factory_bale_products fbp
+          WHERE fbp.id = ${factoryBales.productId}
+            AND fbp.company_id = ${companyId}
+            AND (
+              LOWER(fbp.name) = ${scanLower}
+              OR fbp.name ILIKE ${scanLike}
+              OR LOWER(fbp.article_code) = ${scanLower}
+              OR fbp.article_code ILIKE ${scanLike}
             )
-          )
-        );
+        )`
+      );
 
-      if (reservedBale) {
-        const [inThisOrder] = await db
-          .select()
-          .from(customerOrderBales)
-          .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.baleId, reservedBale.id)));
-        if (inThisOrder) {
-          return res
-            .status(400)
-            .json({ message: `${reservedBale.referenceNumber || scanCode} is already loaded in this order` });
-        }
-        return res
-          .status(400)
-          .json({ message: `Bale ${reservedBale.referenceNumber || scanCode} is reserved for another loading order` });
-      }
-
-      // Also look up product IDs whose current name or articleCode matches the scan code
-      const matchingProductsByName = await db
-        .select({ id: factoryBaleProducts.id })
-        .from(factoryBaleProducts)
-        .where(
-          and(
-            eq(factoryBaleProducts.companyId, companyId),
-            or(
-              sql`LOWER(${factoryBaleProducts.name}) = ${scanLower}`,
-              ilike(factoryBaleProducts.name, `%${scanCode.trim()}%`),
-              sql`LOWER(${factoryBaleProducts.articleCode}) = ${scanLower}`,
-              ilike(factoryBaleProducts.articleCode, `%${scanCode.trim()}%`)
-            )
-          )
-        );
-      const matchingProductIds = matchingProductsByName.map((p) => p.id);
-
-      const nameConditions =
-        matchingProductIds.length > 0
-          ? or(
-              sql`LOWER(${factoryBales.referenceNumber}) = ${scanLower}`,
-              sql`LOWER(${factoryBales.baleCode}) = ${scanLower}`,
-              sql`LOWER(${factoryBales.articleCode}) = ${scanLower}`,
-              sql`LOWER(${factoryBales.productName}) = ${scanLower}`,
-              inArray(factoryBales.productId, matchingProductIds)
-            )
-          : or(
-              sql`LOWER(${factoryBales.referenceNumber}) = ${scanLower}`,
-              sql`LOWER(${factoryBales.baleCode}) = ${scanLower}`,
-              sql`LOWER(${factoryBales.articleCode}) = ${scanLower}`,
-              sql`LOWER(${factoryBales.productName}) = ${scanLower}`
-            );
-
-      // Pick the bale + verify it's not already in this order + (V5) check no
-      // other active order has it + insert the join row + flip status — all
-      // inside one transaction with SELECT FOR UPDATE so two concurrent scans
-      // of the same article cannot both claim the same physical bale.
-      // Errors with `httpStatus` and `body` are returned from the transaction
-      // and translated back to res.status(...).json(...) below.
       type PickResult =
         | {
             ok: true;
-            // Both come straight from the writes below, so they are described by
-            // the row that was inserted and by the recalculation's own return
-            // type rather than restated here.
             bale: typeof customerOrderBales.$inferSelect;
             line: ScannedArticleTotalsPatch["line"];
             totals: ScannedArticleTotalsPatch["totals"];
@@ -147,17 +102,58 @@ export function registerOrderBaleScanRoutes(app: Express) {
 
       const result: PickResult = await db.transaction(async (tx) => {
         const [bale] = await tx
-          .select()
+          .select({
+            id: factoryBales.id,
+            status: factoryBales.status,
+            referenceNumber: factoryBales.referenceNumber,
+            baleCode: factoryBales.baleCode,
+            articleCode: factoryBales.articleCode,
+            productName: factoryBales.productName,
+            productId: factoryBales.productId,
+            weightKg: factoryBales.weightKg,
+            productArticleCode: sql<string | null>`(
+              SELECT fbp.article_code
+              FROM factory_bale_products fbp
+              WHERE fbp.id = ${factoryBales.productId}
+                AND fbp.company_id = ${companyId}
+              LIMIT 1
+            )`,
+            canonicalProductName: sql<string | null>`(
+              SELECT fbp.name
+              FROM factory_bale_products fbp
+              WHERE fbp.id = ${factoryBales.productId}
+                AND fbp.company_id = ${companyId}
+              LIMIT 1
+            )`,
+            productSellingPrice: sql<string | null>`(
+              SELECT fbp.selling_price
+              FROM factory_bale_products fbp
+              WHERE fbp.id = ${factoryBales.productId}
+                AND fbp.company_id = ${companyId}
+              LIMIT 1
+            )`,
+            reservedInThisOrder: sql<boolean>`EXISTS (
+              SELECT 1
+              FROM customer_order_bales cob
+              WHERE cob.order_id = ${orderId}
+                AND cob.bale_id = ${factoryBales.id}
+            )`,
+          })
           .from(factoryBales)
           .where(
             and(
               eq(factoryBales.companyId, companyId),
-              eq(factoryBales.status, "IN_STOCK"),
-              eq(factoryBales.erpLocationId, parseInt(locationId)),
-              nameConditions
+              or(
+                and(eq(factoryBales.status, "RESERVED_FOR_ORDER"), uniqueIdentifierCondition),
+                and(
+                  eq(factoryBales.status, "IN_STOCK"),
+                  eq(factoryBales.erpLocationId, parsedLocationId),
+                  availableNameCondition
+                )
+              )
             )
           )
-          .orderBy(factoryBales.id)
+          .orderBy(sql`CASE WHEN ${factoryBales.status} = 'RESERVED_FOR_ORDER' THEN 0 ELSE 1 END`, factoryBales.id)
           .limit(1)
           .for("update");
 
@@ -169,28 +165,39 @@ export function registerOrderBaleScanRoutes(app: Express) {
           };
         }
 
-        const [alreadyAdded] = await tx
-          .select()
-          .from(customerOrderBales)
-          .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.baleId, bale.id)));
-        if (alreadyAdded) {
-          return { ok: false, httpStatus: 400, body: { message: "Bale already added to this order" } };
+        if (bale.status === "RESERVED_FOR_ORDER") {
+          const reservedBale = bale;
+          if (reservedBale.reservedInThisOrder) {
+            return {
+              ok: false,
+              httpStatus: 400,
+              body: { message: `${reservedBale.referenceNumber || scanCode} is already loaded in this order` },
+            };
+          }
+          return {
+            ok: false,
+            httpStatus: 400,
+            body: { message: `Bale ${reservedBale.referenceNumber || scanCode} is reserved for another loading order` },
+          };
         }
 
-        // Universal cross-order duplicate check: block if this bale is already in any other
-        // active (non-CANCELLED) order. This covers both V5 orders (bales stay IN_STOCK so the
-        // RESERVED_FOR_ORDER status check above cannot catch them) and non-V5 mixed scenarios
-        // where a V5 order's IN_STOCK bale could otherwise slip through onto a non-V5 order.
-        const crossOrderDupCheck = await tx.execute(
-          sql`SELECT cob.order_id, co.status, co.invoice_number FROM customer_order_bales cob
+        // One active-order lookup covers both "already in this order" and
+        // "already in another order". V5 bales stay IN_STOCK while loading, so
+        // status alone cannot enforce this duplicate rule.
+        const activeOrderCheck = await tx.execute(
+          sql`SELECT cob.order_id, co.status, co.invoice_number
+              FROM customer_order_bales cob
               JOIN customer_orders co ON co.id = cob.order_id
               WHERE cob.bale_id = ${bale.id}
                 AND co.status != 'CANCELLED'
-                AND cob.order_id != ${orderId}
+              ORDER BY CASE WHEN cob.order_id = ${orderId} THEN 0 ELSE 1 END, cob.order_id
               LIMIT 1`
         );
-        const crossOrderDupRow = firstRow(crossOrderDupCheck);
+        const crossOrderDupRow = firstRow(activeOrderCheck);
         if (crossOrderDupRow) {
+          if (Number(crossOrderDupRow.order_id) === orderId) {
+            return { ok: false, httpStatus: 400, body: { message: "Bale already added to this order" } };
+          }
           const orderRef = crossOrderDupRow.invoice_number
             ? `invoice ${crossOrderDupRow.invoice_number}`
             : `loading #${crossOrderDupRow.order_id}`;
@@ -203,28 +210,41 @@ export function registerOrderBaleScanRoutes(app: Express) {
           };
         }
 
-        // Resolve the product record first so its articleCode can be used as a
-        // fallback when bale.articleCode is null. Bales pressed before the
-        // articleCode column was added (or imported without it) can otherwise
-        // bypass the proforma overload check entirely.
-        let productForBale = null;
-        if (bale.productId) {
-          const [p] = await tx.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.id, bale.productId));
-          productForBale = p || null;
-        }
-
-        // Effective article code: prefer the bale's own field, fall back to the
-        // product master's articleCode so the proforma check is consistent.
-        const effectiveArticleCode: string = (bale.articleCode || productForBale?.articleCode || "").trim();
+        const effectiveArticleCode: string = (bale.articleCode || bale.productArticleCode || "").trim();
         const normalizedEffectiveArticleCode = normalizeLoadingArticleCode(effectiveArticleCode);
         const ignoreProforma = req.body.allowBypassProforma === true;
+        const enforceOverload = shouldEnforceProformaOverload({
+          ignoreProforma,
+          allowBypassOverload: req.body.allowBypassOverload === true,
+        });
 
-        let priceUsed = "0";
-        if (productForBale?.sellingPrice) priceUsed = productForBale.sellingPrice;
+        let priceUsed = bale.productSellingPrice || "0";
 
         if (order.proformaIdUsed) {
+          // Membership and pricing always come from the proforma line. The
+          // potentially expensive active-bale COUNT is only needed while the
+          // overload guard is actually enforced; confirmed/bypass scans use 0.
+          const currentCountExpression = enforceOverload
+            ? sql<number>`(
+                SELECT COUNT(*)::int
+                FROM customer_order_bales cob
+                JOIN customer_orders ON customer_orders.id = cob.order_id
+                WHERE customer_orders.company_id = ${companyId}
+                  AND customer_orders.proforma_id_used = ${order.proformaIdUsed}
+                  AND customer_orders.status != 'CANCELLED'
+                  AND ${isNull(customerOrders.deletedAt)}
+                  AND LOWER(TRIM(COALESCE(cob.article_code, ''))) = ${normalizedEffectiveArticleCode}
+              )`
+            : sql<number>`0`;
+
           const matchingProformaLines = await tx
-            .select()
+            .select({
+              quantity: customerProformaLines.quantity,
+              pricingMode: customerProformaLines.pricingMode,
+              pricePerKg: customerProformaLines.pricePerKg,
+              pricePerBale: customerProformaLines.pricePerBale,
+              currentCount: currentCountExpression,
+            })
             .from(customerProformaLines)
             .where(
               and(
@@ -234,9 +254,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
             );
           const matchedProformaLine = matchingProformaLines[0] || null;
           const proformaQuantityLimit = sumProformaQuantityLimit(matchingProformaLines);
-          const proformaLine = matchedProformaLine
-            ? { ...matchedProformaLine, quantity: proformaQuantityLimit }
-            : null;
+          const proformaLine = matchedProformaLine ? { ...matchedProformaLine, quantity: proformaQuantityLimit } : null;
           if (proformaLine) {
             const pricingMode = proformaLine.pricingMode ?? "per_bale";
             const perKgVal = proformaLine.pricePerKg;
@@ -245,43 +263,20 @@ export function registerOrderBaleScanRoutes(app: Express) {
               const pkgRate = parseFloat(String(perKgVal));
               priceUsed = !isNaN(weightKg) && !isNaN(pkgRate) ? (weightKg * pkgRate).toFixed(2) : "0";
             } else {
-              priceUsed = proformaLine.pricePerBale;
+              priceUsed = proformaLine.pricePerBale || "0";
             }
-            // "Ignore Proforma" means exactly that: when enabled the first scan
-            // must not be stopped by either membership or quantity/overload checks.
-            // Normal mode still keeps the existing explicit second-scan bypass.
-            if (
-              shouldEnforceProformaOverload({
-                ignoreProforma,
-                allowBypassOverload: req.body.allowBypassOverload === true,
-              })
-            ) {
-              const [countResult] = await tx
-                .select({ count: sql<number>`COUNT(*)::int` })
-                .from(customerOrderBales)
-                .innerJoin(customerOrders, eq(customerOrders.id, customerOrderBales.orderId))
-                .where(
-                  and(
-                    eq(customerOrders.companyId, companyId),
-                    eq(customerOrders.proformaIdUsed, order.proformaIdUsed),
-                    ne(customerOrders.status, "CANCELLED"),
-                    isNull(customerOrders.deletedAt),
-                    sql`LOWER(TRIM(COALESCE(${customerOrderBales.articleCode}, ''))) = ${normalizedEffectiveArticleCode}`
-                  )
-                );
-              const currentCount = countResult?.count || 0;
-              if (currentCount >= proformaQuantityLimit) {
-                return {
-                  ok: false,
-                  httpStatus: 400,
-                  body: {
-                    confirmationRequired: true,
-                    confirmationType: "overload",
-                    overloaded: true,
-                    message: `Quantity exceeded (${currentCount}/${proformaLine.quantity}). Scan again to bypass.`,
-                  },
-                };
-              }
+            const currentCount = Number(proformaLine.currentCount || 0);
+            if (enforceOverload && currentCount >= proformaQuantityLimit) {
+              return {
+                ok: false,
+                httpStatus: 400,
+                body: {
+                  confirmationRequired: true,
+                  confirmationType: "overload",
+                  overloaded: true,
+                  message: `Quantity exceeded (${currentCount}/${proformaLine.quantity}). Scan again to bypass.`,
+                },
+              };
             }
           } else if (
             shouldRequireProformaMembership({
@@ -302,8 +297,8 @@ export function registerOrderBaleScanRoutes(app: Express) {
           }
         }
 
-        // Always prefer the canonical product name from factoryBaleProducts
-        const resolvedBaleName = productForBale?.name || bale.productName || bale.articleCode || bale.baleCode;
+        const resolvedBaleName =
+          bale.canonicalProductName || bale.productName || bale.articleCode || bale.baleCode || "Bale";
 
         const [insertedOrderBale] = await tx
           .insert(customerOrderBales)
@@ -311,7 +306,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
             orderId,
             baleId: bale.id,
             baleReference: bale.referenceNumber,
-            locationId: parseInt(locationId),
+            locationId: parsedLocationId,
             weight: bale.weightKg,
             articleCode: effectiveArticleCode || bale.articleCode,
             baleName: resolvedBaleName,
@@ -320,7 +315,6 @@ export function registerOrderBaleScanRoutes(app: Express) {
           })
           .returning();
 
-        // V5 guard: proformaIdUsed IS NOT NULL
         // V5 bales remain IN_STOCK during loading — only legacy V2/V3 orders set RESERVED_FOR_ORDER.
         if (!order.proformaIdUsed) {
           await tx
@@ -351,9 +345,6 @@ export function registerOrderBaleScanRoutes(app: Express) {
         return res.status(result.httpStatus).json(result.body);
       }
 
-      // Phase 3 compact response: the client merges this tiny patch into its
-      // already-cached order instead of downloading all historical bales/lines/
-      // charges after every scan.
       return res.json({
         compactBaleScan: true,
         orderId,
@@ -366,7 +357,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
         totals: result.totals,
       });
     } catch (error: unknown) {
-      logger.error("Error adding bale to order:", { error: error });
+      logger.error("Error adding bale to order:", { error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
