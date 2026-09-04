@@ -11,6 +11,7 @@ let ctx: TestContext;
 let agent: request.SuperAgentTest;
 let parentCompanyId: number;
 let supplierId: number;
+let childSupplierId: number;
 let parentFreightAccountId: number;
 
 type ImportOptions = {
@@ -19,6 +20,7 @@ type ImportOptions = {
   itemTotal: number;
   freight: number;
   freightPaidBy: "supplier" | "parent";
+  supplierId?: number;
 };
 
 function importPayload(options: ImportOptions) {
@@ -27,7 +29,7 @@ function importPayload(options: ImportOptions) {
     fileHash: `${TEST_PREFIX}-HASH-${options.suffix}`,
     fileName: `${TEST_PREFIX}-${options.suffix}.xlsx`,
     containerNumber,
-    supplierId,
+    supplierId: options.supplierId ?? supplierId,
     importDate: "2026-09-01",
     freightPaidBy: options.freightPaidBy,
     freightParentAccountId: options.freightPaidBy === "parent" ? parentFreightAccountId : null,
@@ -162,6 +164,20 @@ beforeAll(async () => {
     })
     .returning();
   supplierId = supplier.id;
+  await pool.query("UPDATE suppliers SET company_id = $1 WHERE id = $2", [parentCompanyId, supplierId]);
+
+  const childSupplier = await pool.query<{ id: number }>(
+    `INSERT INTO suppliers (code, legal_name, email, company_id)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id`,
+    [
+      `${TEST_PREFIX.toUpperCase()}CHILD`,
+      `${TEST_PREFIX} Child Supplier`,
+      `${TEST_PREFIX}-child@example.test`,
+      ctx.companyId,
+    ]
+  );
+  childSupplierId = childSupplier.rows[0].id;
 
   await db
     .update(schema.companies)
@@ -180,21 +196,60 @@ afterAll(async () => {
   // supplier-credit voucher entries raised in the parent company. Those entries
   // would be removed by cleanupTestData's voucher delete anyway, but that
   // happens per company and cannot be interleaved from here.
-  if (supplierId) {
-    await pool.query("DELETE FROM purchase_orders WHERE supplier_id = $1", [supplierId]);
+  for (const id of [supplierId, childSupplierId]) {
+    if (!id) continue;
+    await pool.query("DELETE FROM purchase_orders WHERE supplier_id = $1", [id]);
     await pool.query(
       "DELETE FROM import_logs WHERE container_id IN (SELECT id FROM containers WHERE supplier_id = $1)",
-      [supplierId]
+      [id]
     );
-    await pool.query("DELETE FROM containers WHERE supplier_id = $1", [supplierId]);
-    await pool.query("DELETE FROM voucher_entries WHERE supplier_id = $1", [supplierId]);
-    await pool.query("DELETE FROM suppliers WHERE id = $1", [supplierId]);
+    await pool.query("DELETE FROM containers WHERE supplier_id = $1", [id]);
+    await pool.query("DELETE FROM voucher_entries WHERE supplier_id = $1", [id]);
+    await pool.query("DELETE FROM suppliers WHERE id = $1", [id]);
   }
 
   await cleanupTestData(TEST_PREFIX);
 }, 30000);
 
 describe("PO import parent accounting", () => {
+  it("lists current and parent suppliers once and validates an inherited supplier", async () => {
+    const listed = await agent.get("/api/suppliers?allowParentFallback=true");
+    expect(listed.status).toBe(200);
+
+    const listedIds = listed.body.map((supplier: { id: number }) => supplier.id);
+    expect(new Set(listedIds).size).toBe(listedIds.length);
+    expect(listedIds).toEqual(expect.arrayContaining([supplierId, childSupplierId]));
+
+    const validation = await agent.post("/api/po-import/validate").send({
+      containerNumber: `${TEST_PREFIX}-INHERITED-VALIDATE`,
+      supplierId,
+      preview: [
+        {
+          containerNumber: `${TEST_PREFIX}-INHERITED-VALIDATE`,
+          items: [
+            {
+              barcode: `${TEST_PREFIX}-ITEM1`,
+              itemName: "Test Item 1",
+              poNumber: "PO-INHERITED-VALIDATE",
+              quantity: 1,
+              rate: 20,
+              lineTotal: 20,
+              currency: "USD",
+            },
+          ],
+          charges: {},
+          itemsTotal: 20,
+          chargesTotal: 0,
+          grandTotal: 20,
+          itemsCount: 1,
+        },
+      ],
+    });
+
+    expect(validation.status).toBe(200);
+    expect(validation.body).toMatchObject({ valid: true, errors: [] });
+  });
+
   it("keeps SP OTW/Clearing and creates a parent supplier credit for supplier-paid freight", async () => {
     const result = await agent.post("/api/po-import/import").send(
       importPayload({
@@ -207,6 +262,26 @@ describe("PO import parent accounting", () => {
     );
 
     expect(result.status).toBe(200);
+
+    const ownership = await pool.query<{
+      container_company_id: number;
+      po_company_id: number;
+      voucher_company_id: number;
+    }>(
+      `SELECT c.company_id AS container_company_id,
+              po.company_id AS po_company_id,
+              v.company_id AS voucher_company_id
+         FROM containers c
+         JOIN purchase_orders po ON po.container_id = c.id
+         JOIN vouchers v ON v.id = po.voucher_id
+        WHERE c.id = $1`,
+      [result.body.containerId]
+    );
+    expect(ownership.rows[0]).toEqual({
+      container_company_id: ctx.companyId,
+      po_company_id: ctx.companyId,
+      voucher_company_id: ctx.companyId,
+    });
 
     const parentPosting = await postingFor("PO-SP-SUPPLIER");
     expect(parentPosting).not.toBeNull();
@@ -285,6 +360,7 @@ describe("PO import parent accounting", () => {
         itemTotal: 40,
         freight: 0,
         freightPaidBy: "supplier",
+        supplierId: childSupplierId,
       })
     );
 
