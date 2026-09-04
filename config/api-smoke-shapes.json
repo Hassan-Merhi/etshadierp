@@ -731,6 +731,10 @@
       "status": 403,
       "shape": "{code:scalar,message:scalar}"
     },
+    "/api/factory/staff-tracking": {
+      "status": 403,
+      "shape": "{code:scalar,message:scalar}"
+    },
     "/api/factory/status-builder/log": {
       "status": 403,
       "shape": "{code:scalar,message:scalar}"
@@ -970,6 +974,10 @@
     "/api/global/transactions/voucher-types": {
       "status": 200,
       "shape": "[]"
+    },
+    "/api/golden-coast/accounting/phase1/accounts": {
+      "status": 400,
+      "shape": "{code:scalar,message:scalar}"
     },
     "/api/health": {
       "status": 200,
@@ -1383,6 +1391,38 @@
       "status": 403,
       "shape": "{message:scalar}"
     },
+    "/api/sp/golden-coast/phase10/sales-cash-settlement/readiness": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
+    "/api/sp/golden-coast/phase11/profit-splits/monthly-close/readiness": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
+    "/api/sp/golden-coast/phase3/status": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
+    "/api/sp/golden-coast/phase6/pos-sale/readiness": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
+    "/api/sp/golden-coast/phase7/sales-cash-pay-fresh-start/readiness": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
+    "/api/sp/golden-coast/phase7/sales-cash-transfer/readiness": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
+    "/api/sp/golden-coast/phase8/container-offload/readiness": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
+    "/api/sp/golden-coast/phase9/hassan-savings-withdrawal/readiness": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
     "/api/sp/opening-stock": {
       "status": 403,
       "shape": "{message:scalar}"
@@ -1439,6 +1479,10 @@
       "status": 403,
       "shape": "{message:scalar}"
     },
+    "/api/sp/setup/golden-coast/status": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
     "/api/sp/setup/status": {
       "status": 403,
       "shape": "{message:scalar}"
@@ -1477,7 +1521,7 @@
     },
     "/api/stats/net-profit": {
       "status": 200,
-      "shape": "{currency:{currentCashBankTranslationApplied:scalar,historicalBaseCreditTotal:scalar,historicalBaseDebitTotal:scalar,historicalValuesLocked:scalar,nativeCreditByCurrency:{},nativeDebitByCurrency:{},provisionalReason:scalar,rateConvention:scalar,totalsProvisional:scalar,unresolvedLegacyEntryCount:scalar,unresolvedLegacyRawNet:scalar},currencyRevaluation:{appliedToCurrentSnapshotOnly:scalar,currentCfaPerUsd:scalar,reportTotalsProvisional:scalar,unresolvedAccountCount:scalar,unresolvedAccounts:[]},equity:{accounts:[],total:scalar},expenses:{accounts:[],breakdown:[],total:scalar},expensesTotal:scalar,forUs:{accounts:[{…}],breakdown:[{…}],total:scalar},forUsTotal:scalar,income:{accounts:[],breakdown:[],total:scalar},incomeTotal:scalar,netPosition:scalar,netPositionBreakdown:{assets:{breakdown:[…],total:scalar},equity:{accounts:[],total:scalar},expenses:{breakdown:[],total:scalar},income:{breakdown:[],total:scalar},liabilities:{breakdown:[],total:scalar},netPosition:scalar},netPositionLabel:scalar,netProfit:scalar,netWorth:scalar,onUs:{accounts:[],breakdown:[],total:scalar},onUsTotal:scalar,ownersCapital:scalar,spPosProfit:scalar,totalExpenses:scalar,totalIncome:scalar}"
+      "shape": "{currency:{currentCashBankTranslationApplied:scalar,historicalBaseCreditTotal:scalar,historicalBaseDebitTotal:scalar,historicalValuesLocked:scalar,nativeCreditByCurrency:{},nativeDebitByCurrency:{},provisionalReason:scalar,rateConvention:scalar,totalsProvisional:scalar,unresolvedLegacyEntryCount:scalar,unresolvedLegacyRawNet:scalar},currencyRevaluation:{appliedToCurrentSnapshotOnly:scalar,currentCfaPerUsd:scalar,reportTotalsProvisional:scalar,unresolvedAccountCount:scalar,unresolvedAccounts:[]},equity:{accounts:[],includedInNetPosition:scalar,total:scalar},expenses:{accounts:[],breakdown:[],total:scalar},expensesTotal:scalar,forUs:{accounts:[{…}],breakdown:[{…}],total:scalar},forUsTotal:scalar,income:{accounts:[],breakdown:[],total:scalar},incomeTotal:scalar,netPosition:scalar,netPositionBreakdown:{assets:{breakdown:[…],total:scalar},equity:{accounts:[],includedInNetPosition:scalar,total:scalar},expenses:{breakdown:[],total:scalar},income:{breakdown:[],total:scalar},liabilities:{breakdown:[],total:scalar},netPosition:scalar},netPositionLabel:scalar,netProfit:scalar,netWorth:scalar,onUs:{accounts:[],breakdown:[],total:scalar},onUsTotal:scalar,ownersCapital:scalar,spPosProfit:scalar,totalExpenses:scalar,totalIncome:scalar}"
     },
     "/api/stats/stock-summary": {
       "status": 200,
