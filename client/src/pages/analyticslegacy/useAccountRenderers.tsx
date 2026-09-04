@@ -25,6 +25,16 @@ import {
  */
 
 /**
+ * Payroll expense groups are historical ledgers, not just current-period rows.
+ * Workers can leave after being paid, but their account still needs to remain
+ * visible under the group so the expense history is traceable.
+ */
+function keepsZeroBalanceChildren(parentName: string): boolean {
+  const normalized = parentName.trim().toLowerCase();
+  return normalized === "salary expense - workers" || normalized === "bonus expense - workers";
+}
+
+/**
  * The three account-table renderers used by the Analytics panels.
  *
  * Split out of useAnalyticsLegacy because that hook reached 902 lines — two over
@@ -52,8 +62,14 @@ export function useAccountRenderers(deps: {
     totalIncome: _totalIncome,
   } = deps;
   const renderNetProfitAccountsList = (accts: NetProfitAccount[]) => {
-    const nonZero = accts.filter((a) => Number(a.debit) !== 0 || Number(a.credit) !== 0);
-    if (nonZero.length === 0)
+    const payrollParentIds = new Set(accts.filter((a) => keepsZeroBalanceChildren(a.name)).map((a) => a.id));
+    const activityAccounts = accts.filter((a) => Number(a.debit) !== 0 || Number(a.credit) !== 0);
+    const payrollChildren = accts.filter((a) => a.parentId && payrollParentIds.has(a.parentId));
+    const visibleById = new Map<number, NetProfitAccount>();
+    [...activityAccounts, ...payrollChildren].forEach((account) => visibleById.set(account.id, account));
+    const visibleAccounts = [...visibleById.values()];
+
+    if (visibleAccounts.length === 0)
       return (
         <TableRow>
           <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
@@ -62,12 +78,14 @@ export function useAccountRenderers(deps: {
         </TableRow>
       );
 
-    // Include group-parent accounts (zero-balance containers) when they have non-zero children
-    const nonZeroParentIds = new Set(nonZero.filter((a) => a.parentId).map((a) => a.parentId!));
+    // Include group-parent accounts (zero-balance containers) when they have visible children.
+    const visibleParentIds = new Set(visibleAccounts.filter((a) => a.parentId).map((a) => a.parentId!));
     const groupParents = accts.filter(
-      (a) => nonZeroParentIds.has(a.id) && Number(a.debit) === 0 && Number(a.credit) === 0
+      (a) => visibleParentIds.has(a.id) && Number(a.debit) === 0 && Number(a.credit) === 0
     );
-    const allVisible = [...nonZero, ...groupParents];
+    const allVisibleById = new Map<number, NetProfitAccount>();
+    [...visibleAccounts, ...groupParents].forEach((account) => allVisibleById.set(account.id, account));
+    const allVisible = [...allVisibleById.values()];
 
     const acctIds = new Set(allVisible.map((a) => a.id));
     const parents = allVisible.filter((a) => !a.parentId || !acctIds.has(a.parentId));
@@ -128,7 +146,7 @@ export function useAccountRenderers(deps: {
     });
   };
 
-  // Render hierarchical accounts (filters out zero-balance accounts)
+  // Render hierarchical accounts (ordinary zero-balance accounts stay hidden).
   const renderHierarchicalAccounts = (accountList: Account[]) => {
     const { parentAccounts, accountMap } = groupAccountsByParent(accountList);
 
@@ -141,12 +159,15 @@ export function useAccountRenderers(deps: {
           const childrenTotal = hasChildren ? calculateChildrenTotal(parent.accountId, accountMap) : 0;
           const parentBalance = parseBalance(parent.balance);
           const displayBalance = hasChildren ? childrenTotal : parentBalance;
+          const preservePayrollChildren = keepsZeroBalanceChildren(parent.name);
+          const visibleChildren = preservePayrollChildren
+            ? children
+            : children.filter((child) => parseBalance(child.balance) !== 0);
 
-          // Skip accounts with 0 balance (check children total for parent accounts)
-          if (displayBalance === 0) return null;
-
-          // Filter out children with 0 balance
-          const nonZeroChildren = children.filter((child) => parseBalance(child.balance) !== 0);
+          // Payroll worker ledgers are historical audit rows. Keep the group and its
+          // children visible even when the selected period has zero movement, so
+          // paid/deactivated workers do not disappear from Salary Expense - Workers.
+          if (displayBalance === 0 && !(preservePayrollChildren && visibleChildren.length > 0)) return null;
 
           return (
             <Fragment key={parent.id}>
@@ -177,7 +198,7 @@ export function useAccountRenderers(deps: {
               </TableRow>
               {hasChildren &&
                 isExpanded &&
-                nonZeroChildren.map((child) => (
+                visibleChildren.map((child) => (
                   <TableRow
                     key={child.id}
                     data-testid={`row-account-${child.id}`}
