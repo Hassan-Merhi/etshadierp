@@ -24,7 +24,7 @@ import { describe, expect, it } from "vitest";
 import { startupMigrations } from "../server/startup-schema";
 
 /** Statement count of the reviewed composed array. */
-const EXPECTED_STATEMENT_COUNT = 1353;
+const EXPECTED_STATEMENT_COUNT = 1354;
 
 /**
  * sha256 of JSON.stringify(startupMigrations) for the reviewed composed array.
@@ -90,8 +90,12 @@ const EXPECTED_STATEMENT_COUNT = 1353;
  * against factory_containers, so the validation compared rows against the wrong
  * parent table and raised foreign_key_violation on every boot of a database
  * holding factory rows. Only those three were deleted and no statement moved.
+ *
+ * Re-pinned again when the guarded HMD KINSHASA → HADI L'SHI parent-company
+ * repair was appended as startup stage 026, taking the count from 1353 to
+ * 1354.
  */
-const EXPECTED_CONTENT_HASH = "d17bf4eb726113164fcbd8b291fb097b5928f9f0e30e9ba05650c1f7cdbc18e2";
+const EXPECTED_CONTENT_HASH = "9bdf1a2c75ed8139a7a6f1eda36845bf4b08ee1ef83d349b6d87c2034528fb58";
 /**
  * sha256 of JSON.stringify(startupMigrations) for the reviewed composed array.
  *
