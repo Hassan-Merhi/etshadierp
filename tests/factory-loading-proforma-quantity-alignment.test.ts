@@ -4,10 +4,12 @@ import { describe, expect, it } from "vitest";
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
 describe("factory loading proforma quantity alignment", () => {
-  it("manual scanning uses the summed proforma target", () => {
+  it("manual scanning uses the summed proforma target for enforcement and warning display", () => {
     const source = read("server/routes/factory/customer-orders/bale-scanning/scan.ts");
     expect(source).toContain("sumProformaQuantityLimit(matchingProformaLines)");
     expect(source).toContain("currentCount >= proformaQuantityLimit");
+    expect(source).toContain("quantity: proformaQuantityLimit");
+    expect(source).toContain("${currentCount}/${proformaLine.quantity}");
   });
 
   it("factory loading requests sibling-aware remaining quantities", () => {
