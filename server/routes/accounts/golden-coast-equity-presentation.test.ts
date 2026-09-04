@@ -42,8 +42,9 @@ function baseBody(overrides: { freshBalance?: number; freshSide?: "Dr" | "Cr" } 
 describe("Golden Coast Accounts Overview equity presentation", () => {
   it("matches the Phase 17 Net Position Fresh Start residual instead of showing the raw Dr opening", () => {
     const result = projectGoldenCoastAccountsEquity(baseBody());
-    const fresh = result.accounts.find((row: any) => row.subType === "gc_partner_capital");
-    const hassan = result.accounts.find((row: any) => row.subType === "gc_owner_capital");
+    const rows = result.accounts as any[];
+    const fresh = rows.find((row) => row.subType === "gc_partner_capital");
+    const hassan = rows.find((row) => row.subType === "gc_owner_capital");
 
     expect(fresh).toMatchObject({ balance: "42122.00", balanceSide: "Cr" });
     expect(hassan).toMatchObject({ balance: "289242.00", balanceSide: "Cr" });
@@ -53,7 +54,8 @@ describe("Golden Coast Accounts Overview equity presentation", () => {
     // A $1 debit after cutover makes the raw Accounts balance 207,998 Dr,
     // while the credit-normal Net Position claim correctly becomes 42,121 Cr.
     const result = projectGoldenCoastAccountsEquity(baseBody({ freshBalance: 207998, freshSide: "Dr" }));
-    const fresh = result.accounts.find((row: any) => row.subType === "gc_partner_capital");
+    const rows = result.accounts as any[];
+    const fresh = rows.find((row) => row.subType === "gc_partner_capital");
 
     expect(fresh).toMatchObject({ balance: "42121.00", balanceSide: "Cr" });
   });
