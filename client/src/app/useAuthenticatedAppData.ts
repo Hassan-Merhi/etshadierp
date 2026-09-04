@@ -22,13 +22,21 @@ interface CompanySettings {
 
 interface UseAuthenticatedAppDataOptions {
   selectedCompanyId?: number;
+  companyType?: string | null;
   userPresent: boolean;
   isPOS: boolean;
 }
 
-export function useAuthenticatedAppData({ selectedCompanyId, userPresent, isPOS }: UseAuthenticatedAppDataOptions) {
+export function useAuthenticatedAppData({
+  selectedCompanyId,
+  companyType,
+  userPresent,
+  isPOS,
+}: UseAuthenticatedAppDataOptions) {
   const { toast } = useToast();
   const prevUnreadRef = useRef<number>(-1);
+  const isFactoryCompany = companyType === "factory" || companyType === "factory_v2";
+  const factoryBootstrapEnabled = userPresent && !isPOS && !!selectedCompanyId && isFactoryCompany;
 
   const { data: chatUnread } = useQuery<{ count: number }>({
     queryKey: companyQueryKey("/api/chat/unread-count", selectedCompanyId),
@@ -66,7 +74,7 @@ export function useAuthenticatedAppData({ selectedCompanyId, userPresent, isPOS 
   } = useQuery<FactoryAccess>({
     queryKey: companyQueryKey("/api/factory/my-access", selectedCompanyId),
     ...accessQueryPolicy,
-    enabled: userPresent && !isPOS && !!selectedCompanyId,
+    enabled: factoryBootstrapEnabled,
     retry: 2,
   });
 
@@ -77,7 +85,7 @@ export function useAuthenticatedAppData({ selectedCompanyId, userPresent, isPOS 
       return response.ok ? response.json() : {};
     },
     ...stableSettingsQueryPolicy,
-    enabled: userPresent && !isPOS && !!selectedCompanyId,
+    enabled: factoryBootstrapEnabled,
   });
 
   return {

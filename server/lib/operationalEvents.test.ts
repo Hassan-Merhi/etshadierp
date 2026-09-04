@@ -121,4 +121,24 @@ describe("operational event detection", () => {
     expect(event.code).toBe("voucher_balance_mismatch_");
     expect(event.message).toHaveLength(200);
   });
+
+  it("drops invalid user and company IDs instead of logging NaN", () => {
+    recordOperationalEvent({
+      category: "error",
+      code: "http_server_error",
+      severity: "critical",
+      message: "HTTP server error detected",
+      userId: Number.NaN,
+      companyId: Number.NaN,
+    });
+
+    const [event] = getOperationalEventSnapshot().recent;
+
+    expect(event.userId).toBeUndefined();
+    expect(event.companyId).toBeUndefined();
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      "HTTP server error detected",
+      expect.objectContaining({ userId: undefined, companyId: undefined })
+    );
+  });
 });
