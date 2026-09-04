@@ -12,11 +12,11 @@ describe("supplier partner net position inclusion", () => {
     expect(source).toContain('"Loan"');
     expect(source).toContain('"Loans"');
     expect(source).toContain("const netPosition = round2(forUsTotal - onUsTotal)");
-    expect(source).toContain(
-      'residualFormula: "ledger_partner_capital_plus_unclosed_earnings_plus_fx_translation"'
-    );
+    expect(source).toContain('residualFormula: "ledger_partner_capital_plus_unclosed_earnings_plus_fx_translation"');
     expect(source).toContain("const freshStartTotalEntitlement = round2(freshStartClaim + gcSalesCashPayable)");
-    expect(source).toContain("for (const accountId of currentTranslatedLedgerAccountIds(body)) existingIds.add(accountId)");
+    expect(source).toContain(
+      "for (const accountId of currentTranslatedLedgerAccountIds(body)) existingIds.add(accountId)"
+    );
   });
 
   it("does not let current-cash translation erase supplier-partner equity", () => {

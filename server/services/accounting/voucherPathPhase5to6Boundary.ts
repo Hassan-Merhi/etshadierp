@@ -23,10 +23,7 @@ type GuardRow = {
 };
 
 export type VoucherPathClaimResult =
-  | { kind: "owner" }
-  | { kind: "replay"; status: number; body: unknown }
-  | { kind: "conflict" }
-  | { kind: "uncertain" };
+  { kind: "owner" } | { kind: "replay"; status: number; body: unknown } | { kind: "conflict" } | { kind: "uncertain" };
 
 let ensureTablePromise: Promise<void> | null = null;
 
