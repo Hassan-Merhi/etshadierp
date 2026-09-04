@@ -1,5 +1,5 @@
 {
-  "description": "Reviewed CI ratchet deltas for intentional functionality added before the architecture snapshots were refreshed. Every allowance is exact so unrelated growth or routes still fail. The route-manifest additions were folded into config/route-manifest.json on 2026-08-05 and again when the earlier Golden Coast phases reached main, so these lists only contain exact reviewed deltas since that snapshot: the three Phase 7 sales-cash-transfer middleware mounts introduced by the Phase 16 HADI transfer guard. The source-text delta is raised by four over main's ceiling because spGoldenCoastPhase16HadiTransferGuard is itself a structural source guard over the Phase 16 HADI transfer boundary, which is the kind of assertion this ratchet permits but counts.",
+  "description": "Reviewed CI ratchet deltas for intentional functionality added before the architecture snapshots were refreshed. Every allowance is exact so unrelated growth or routes still fail. The route-manifest additions were folded into config/route-manifest.json on 2026-08-05 and again when the earlier Golden Coast phases reached main, so these lists only contain exact reviewed deltas since that snapshot: the three Phase 7 sales-cash-transfer middleware mounts introduced by the Phase 16 HADI transfer guard. The source-text delta is raised to 728: main is itself over its recorded 717 at 724 (tests/factory-loading-proforma-quantity-alignment.test.ts arrived source-coupled and unrecorded, and is registered here), and this branch adds four more because spGoldenCoastPhase16HadiTransferGuard is itself a structural source guard over the Phase 16 HADI transfer boundary, which is the kind of assertion this ratchet permits but counts.",
   "godFileLineCaps": {
     "server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.ts": 909,
     "server/services/factory/postOffloadPhase6Safety.ts": 927,
@@ -65,8 +65,9 @@
       "tests/supplier-partner-net-position-inclusion.test.ts",
       "tests/supplier-partner-customer-authoritative-net-position.test.ts",
       "tests/phase4-hotpath-performance-regression.test.ts",
-      "tests/ui/factory-bootstrap-phase3.test.ts"
+      "tests/ui/factory-bootstrap-phase3.test.ts",
+      "tests/factory-loading-proforma-quantity-alignment.test.ts"
     ],
-    "maxAdditionalTextAssertions": 717
+    "maxAdditionalTextAssertions": 728
   }
 }
