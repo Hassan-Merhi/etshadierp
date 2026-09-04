@@ -169,7 +169,6 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/staff-tracking"] });
       toast({
         title: mode === "production" ? tr("productionSaved") : tr("attendanceSaved"),
-        description: `${period.start}${period.end !== period.start ? ` — ${period.end}` : ""}`,
       });
     },
     onError: (error: Error) => {
