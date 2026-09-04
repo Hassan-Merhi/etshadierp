@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
+import { factoryStaffTrackingMessages } from "../../i18n/factoryStaffTrackingMessages";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { resultRows } from "../../lib/queryResult";
 import { sqlArray } from "../../lib/sqlArray";
@@ -46,13 +47,17 @@ function isNew(joinDate: string | null | undefined, start: string, end: string):
   return Boolean(joinDate && joinDate >= start && joinDate <= end);
 }
 
+function joinedByPeriodEnd(joinDate: string | null | undefined, periodEnd: string): boolean {
+  return !joinDate || joinDate <= periodEnd;
+}
+
 export function registerFactoryStaffTrackingRoutes(app: Express): void {
   app.get("/api/factory/staff-tracking", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
-      if (!companyId) return res.status(400).json({ message: "No factory company selected" });
+      if (!companyId) return res.status(400).json({ message: factoryStaffTrackingMessages.noFactoryCompany });
       const query = parseTrackingQuery(req);
-      if (!query) return res.status(400).json({ message: "Invalid tracking period" });
+      if (!query) return res.status(400).json({ message: factoryStaffTrackingMessages.invalidPeriod });
 
       const savedResult = await db.execute(sql`
         SELECT
@@ -109,8 +114,14 @@ export function registerFactoryStaffTrackingRoutes(app: Express): void {
         .where(and(eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"), sql`${employees.deletedAt} IS NULL`))
         .orderBy(employees.firstName, employees.lastName);
 
-      const includedWorkers = workers.filter((person) => person.active || savedMap.has(`worker:${person.id}`));
-      const includedEmployees = emps.filter((person) => person.active || savedMap.has(`employee:${person.id}`));
+      const includedWorkers = workers.filter(
+        (person) =>
+          savedMap.has(`worker:${person.id}`) || (person.active && joinedByPeriodEnd(person.dateJoined, query.periodEnd))
+      );
+      const includedEmployees = emps.filter(
+        (person) =>
+          savedMap.has(`employee:${person.id}`) || (person.active && joinedByPeriodEnd(person.joinDate, query.periodEnd))
+      );
 
       const workerAttendance = new Map<number, string>();
       const employeeAttendance = new Map<number, string>();
@@ -203,7 +214,7 @@ export function registerFactoryStaffTrackingRoutes(app: Express): void {
   app.post("/api/factory/staff-tracking/bulk", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
-      if (!companyId) return res.status(400).json({ message: "No factory company selected" });
+      if (!companyId) return res.status(400).json({ message: factoryStaffTrackingMessages.noFactoryCompany });
 
       const page = String(req.body?.page || "") as TrackingPage;
       const periodType = String(req.body?.periodType || "") as PeriodType;
@@ -211,10 +222,10 @@ export function registerFactoryStaffTrackingRoutes(app: Express): void {
       const periodEnd = String(req.body?.periodEnd || "");
       const records = Array.isArray(req.body?.records) ? req.body.records : [];
       if (!PAGE_TYPES.has(page) || !PERIOD_TYPES.has(periodType) || !ISO_DATE.test(periodStart) || !ISO_DATE.test(periodEnd) || periodEnd < periodStart) {
-        return res.status(400).json({ message: "Invalid tracking period" });
+        return res.status(400).json({ message: factoryStaffTrackingMessages.invalidPeriod });
       }
       if (records.length === 0 || records.length > 500) {
-        return res.status(400).json({ message: "records must contain between 1 and 500 rows" });
+        return res.status(400).json({ message: factoryStaffTrackingMessages.invalidRecordCount });
       }
 
       const allWorkers = await db.select({ id: factoryWorkers.id }).from(factoryWorkers).where(eq(factoryWorkers.companyId, companyId));
@@ -230,13 +241,13 @@ export function registerFactoryStaffTrackingRoutes(app: Express): void {
         const personId = Number(raw?.personId);
         const status = String(raw?.status || "Present") as TrackingStatus;
         if (!Number.isInteger(personId) || personId <= 0 || !STATUSES.has(status)) {
-          return res.status(400).json({ message: "Invalid tracking row" });
+          return res.status(400).json({ message: factoryStaffTrackingMessages.invalidRow });
         }
         if ((personType === "worker" && !workerIds.has(personId)) || (personType === "employee" && !employeeIds.has(personId))) {
-          return res.status(400).json({ message: "Person does not belong to this factory company" });
+          return res.status(400).json({ message: factoryStaffTrackingMessages.personOutsideFactory });
         }
         if (personType !== "worker" && personType !== "employee") {
-          return res.status(400).json({ message: "Invalid person type" });
+          return res.status(400).json({ message: factoryStaffTrackingMessages.invalidPersonType });
         }
 
         const category = String(raw?.category || "").trim().slice(0, 150) || null;
@@ -245,7 +256,7 @@ export function registerFactoryStaffTrackingRoutes(app: Express): void {
         const producedBales = numberOrNull(raw?.producedBales);
         if ((raw?.targetBales !== null && raw?.targetBales !== undefined && raw?.targetBales !== "" && targetBales === null) ||
             (raw?.producedBales !== null && raw?.producedBales !== undefined && raw?.producedBales !== "" && producedBales === null)) {
-          return res.status(400).json({ message: "Target and produced bales must be non-negative numbers" });
+          return res.status(400).json({ message: factoryStaffTrackingMessages.invalidBaleNumbers });
         }
 
         await db.execute(sql`
