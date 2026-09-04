@@ -7,13 +7,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { useToast } from "@/hooks/use-toast";
+import {
+  FACTORY_TRACKING_STATUSES,
+  translateFactoryStaffTrackingText,
+  type FactoryStaffTrackingTranslationKey,
+} from "@/i18n/factoryStaffTrackingTranslations";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { queryClient } from "@/lib/queryClient";
 
 type TrackingMode = "production" | "attendance";
 type PeriodType = "daily" | "weekly" | "monthly";
-type TrackingStatus = "Present" | "Absent" | "New";
+type TrackingStatus = (typeof FACTORY_TRACKING_STATUSES)[keyof typeof FACTORY_TRACKING_STATUSES];
 type PersonType = "worker" | "employee";
 
 interface TrackingRow {
@@ -64,9 +70,15 @@ function periodFor(type: PeriodType, referenceDate: string) {
 }
 
 function statusClass(status: TrackingStatus) {
-  if (status === "Absent") return "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300";
-  if (status === "New") return "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
+  if (status === FACTORY_TRACKING_STATUSES.absent) return "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300";
+  if (status === FACTORY_TRACKING_STATUSES.new) return "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
   return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300";
+}
+
+function statusTranslationKey(status: TrackingStatus): FactoryStaffTrackingTranslationKey {
+  if (status === FACTORY_TRACKING_STATUSES.absent) return "absent";
+  if (status === FACTORY_TRACKING_STATUSES.new) return "new";
+  return "present";
 }
 
 function differenceText(target: number | null, produced: number | null) {
@@ -99,6 +111,8 @@ function SummaryTile({ label, value, icon }: { label: string; value: string | nu
 
 export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
   const { toast } = useToast();
+  const { language } = useApplicationLanguage();
+  const tr = (key: FactoryStaffTrackingTranslationKey) => translateFactoryStaffTrackingText(key, language);
   const [periodType, setPeriodType] = useState<PeriodType>("daily");
   const [referenceDate, setReferenceDate] = useState(() => localDateStr(new Date()));
   const [search, setSearch] = useState("");
@@ -115,10 +129,14 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
         periodEnd: period.end,
       });
       const res = await factoryApiRequest("GET", `/api/factory/staff-tracking?${params.toString()}`);
-      if (!res.ok) throw new Error("Failed to load factory tracking data");
+      if (!res.ok) throw new Error(tr("loadFailed"));
       return res.json();
     },
   });
+
+  useEffect(() => {
+    setRows([]);
+  }, [mode, periodType, period.start, period.end]);
 
   useEffect(() => {
     if (data) setRows(data.rows);
@@ -143,19 +161,19 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || "Failed to save factory tracking data");
+        throw new Error(body.message || tr("saveDataFailed"));
       }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/staff-tracking"] });
       toast({
-        title: mode === "production" ? "Production targets saved" : "Attendance register saved",
-        description: `${period.start}${period.end !== period.start ? ` to ${period.end}` : ""}`,
+        title: mode === "production" ? tr("productionSaved") : tr("attendanceSaved"),
+        description: `${period.start}${period.end !== period.start ? ` — ${period.end}` : ""}`,
       });
     },
     onError: (error: Error) => {
-      toast({ title: "Save failed", description: error.message, variant: "destructive" });
+      toast({ title: tr("saveFailed"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -172,9 +190,9 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
       target,
       produced,
       difference: produced - target,
-      present: rows.filter((row) => row.status === "Present").length,
-      absent: rows.filter((row) => row.status === "Absent").length,
-      newCount: rows.filter((row) => row.status === "New").length,
+      present: rows.filter((row) => row.status === FACTORY_TRACKING_STATUSES.present).length,
+      absent: rows.filter((row) => row.status === FACTORY_TRACKING_STATUSES.absent).length,
+      newCount: rows.filter((row) => row.status === FACTORY_TRACKING_STATUSES.new).length,
     };
   }, [rows]);
 
@@ -182,12 +200,11 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
     setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
   };
 
-  const markAllPresent = () => setRows((current) => current.map((row) => ({ ...row, status: "Present" })));
+  const markAllPresent = () =>
+    setRows((current) => current.map((row) => ({ ...row, status: FACTORY_TRACKING_STATUSES.present })));
 
-  const title = mode === "production" ? "Production Targets" : "Attendance Register";
-  const subtitle = mode === "production"
-    ? "Set bale targets, record production and see the difference by worker category."
-    : "Organize factory staff by category, mark Present / Absent / New, and add notes.";
+  const title = mode === "production" ? tr("productionTargets") : tr("attendanceRegister");
+  const subtitle = mode === "production" ? tr("productionSubtitle") : tr("attendanceSubtitle");
 
   return (
     <div className="space-y-4">
@@ -201,26 +218,32 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Period</p>
+            <p className="text-xs text-muted-foreground">{tr("period")}</p>
             <Select value={periodType} onValueChange={(value) => setPeriodType(value as PeriodType)}>
               <SelectTrigger className="w-[130px]" data-testid={`select-${mode}-period-type`}><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="daily">Daily</SelectItem>
-                <SelectItem value="weekly">Weekly</SelectItem>
-                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="daily">{tr("daily")}</SelectItem>
+                <SelectItem value="weekly">{tr("weekly")}</SelectItem>
+                <SelectItem value="monthly">{tr("monthly")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Reference date</p>
+            <p className="text-xs text-muted-foreground">{tr("referenceDate")}</p>
             <Input type="date" value={referenceDate} onChange={(e) => setReferenceDate(e.target.value)} className="w-[155px]" />
           </div>
           {mode === "attendance" && (
-            <Button variant="outline" onClick={markAllPresent} disabled={rows.length === 0}>Mark all present</Button>
+            <Button variant="outline" onClick={markAllPresent} disabled={rows.length === 0 || isFetching}>
+              {tr("markAllPresent")}
+            </Button>
           )}
-          <Button onClick={() => saveMutation.mutate()} disabled={rows.length === 0 || saveMutation.isPending} data-testid={`button-save-${mode}`}>
+          <Button
+            onClick={() => saveMutation.mutate()}
+            disabled={rows.length === 0 || saveMutation.isPending || isFetching}
+            data-testid={`button-save-${mode}`}
+          >
             <Save className="mr-2 h-4 w-4" />
-            {saveMutation.isPending ? "Saving..." : "Save"}
+            {saveMutation.isPending ? tr("saving") : tr("save")}
           </Button>
         </div>
       </div>
@@ -228,48 +251,56 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
       <div className="rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
         <CalendarDays className="mr-1.5 inline h-3.5 w-3.5" />
         {period.start}{period.end !== period.start ? ` — ${period.end}` : ""}
-        {isFetching && !isLoading ? " · Refreshing…" : ""}
+        {isFetching && !isLoading ? ` · ${tr("refreshing")}` : ""}
       </div>
 
       {mode === "production" ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <SummaryTile label="Total Target" value={totals.target} icon={<Target className="h-5 w-5" />} />
-          <SummaryTile label="Bales Produced" value={totals.produced} icon={<CheckCircle2 className="h-5 w-5" />} />
-          <SummaryTile label="Difference" value={totals.difference > 0 ? `+${totals.difference}` : totals.difference} icon={<ClipboardCheck className="h-5 w-5" />} />
-          <SummaryTile label="People" value={rows.length} icon={<Users className="h-5 w-5" />} />
+          <SummaryTile label={tr("totalTarget")} value={totals.target} icon={<Target className="h-5 w-5" />} />
+          <SummaryTile label={tr("balesProduced")} value={totals.produced} icon={<CheckCircle2 className="h-5 w-5" />} />
+          <SummaryTile label={tr("difference")} value={totals.difference > 0 ? `+${totals.difference}` : totals.difference} icon={<ClipboardCheck className="h-5 w-5" />} />
+          <SummaryTile label={tr("people")} value={rows.length} icon={<Users className="h-5 w-5" />} />
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <SummaryTile label="Total People" value={rows.length} icon={<Users className="h-5 w-5" />} />
-          <SummaryTile label="Present" value={totals.present} icon={<CheckCircle2 className="h-5 w-5" />} />
-          <SummaryTile label="Absent" value={totals.absent} icon={<XCircle className="h-5 w-5" />} />
-          <SummaryTile label="New" value={totals.newCount} icon={<UserPlus className="h-5 w-5" />} />
+          <SummaryTile label={tr("totalPeople")} value={rows.length} icon={<Users className="h-5 w-5" />} />
+          <SummaryTile label={tr("present")} value={totals.present} icon={<CheckCircle2 className="h-5 w-5" />} />
+          <SummaryTile label={tr("absent")} value={totals.absent} icon={<XCircle className="h-5 w-5" />} />
+          <SummaryTile label={tr("new")} value={totals.newCount} icon={<UserPlus className="h-5 w-5" />} />
         </div>
       )}
 
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, code or category..." className="pl-9" />
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tr("searchPlaceholder")} className="pl-9" />
       </div>
 
       <div className="overflow-x-auto rounded-xl border">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/60 hover:bg-muted/60">
-              <TableHead className="min-w-[220px]">Person</TableHead>
-              <TableHead className="min-w-[180px]">Category</TableHead>
-              {mode === "production" && <TableHead className="w-[130px] text-right">Target</TableHead>}
-              {mode === "production" && <TableHead className="w-[130px] text-right">Produced</TableHead>}
-              {mode === "production" && <TableHead className="w-[120px] text-right">Difference</TableHead>}
-              <TableHead className="w-[145px]">Status</TableHead>
-              {mode === "attendance" && <TableHead className="min-w-[260px]">Notes</TableHead>}
+              <TableHead className="min-w-[220px]">{tr("person")}</TableHead>
+              <TableHead className="min-w-[180px]">{tr("category")}</TableHead>
+              {mode === "production" && <TableHead className="w-[130px] text-right">{tr("target")}</TableHead>}
+              {mode === "production" && <TableHead className="w-[130px] text-right">{tr("produced")}</TableHead>}
+              {mode === "production" && <TableHead className="w-[120px] text-right">{tr("difference")}</TableHead>}
+              <TableHead className="w-[145px]">{tr("status")}</TableHead>
+              {mode === "attendance" && <TableHead className="min-w-[260px]">{tr("notes")}</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={mode === "production" ? 6 : 4} className="py-12 text-center text-muted-foreground">Loading factory staff…</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={mode === "production" ? 6 : 4} className="py-12 text-center text-muted-foreground">
+                  {tr("loadingStaff")}
+                </TableCell>
+              </TableRow>
             ) : visibleRows.length === 0 ? (
-              <TableRow><TableCell colSpan={mode === "production" ? 6 : 4} className="py-12 text-center text-muted-foreground">No matching factory staff.</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={mode === "production" ? 6 : 4} className="py-12 text-center text-muted-foreground">
+                  {tr("noMatchingStaff")}
+                </TableCell>
+              </TableRow>
             ) : (
               visibleRows.map((row) => {
                 const sourceIndex = rows.findIndex((item) => item.personType === row.personType && item.personId === row.personId);
@@ -278,13 +309,17 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
                     <TableCell>
                       <div className="font-medium">{row.name}</div>
                       <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{row.personType === "worker" ? "Worker" : "Employee"}</span>
+                        <span>{row.personType === "worker" ? tr("worker") : tr("employee")}</span>
                         {row.code && <span>· {row.code}</span>}
-                        {!row.active && <Badge variant="outline" className="h-5 px-1.5 text-[10px]">Inactive</Badge>}
+                        {!row.active && <Badge variant="outline" className="h-5 px-1.5 text-[10px]">{tr("inactive")}</Badge>}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Input value={row.category} onChange={(e) => setRow(sourceIndex, { category: e.target.value })} placeholder="Category / station" />
+                      <Input
+                        value={row.category}
+                        onChange={(e) => setRow(sourceIndex, { category: e.target.value })}
+                        placeholder={tr("categoryStation")}
+                      />
                     </TableCell>
                     {mode === "production" && (
                       <TableCell>
@@ -319,16 +354,22 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
                       <Select value={row.status} onValueChange={(value) => setRow(sourceIndex, { status: value as TrackingStatus })}>
                         <SelectTrigger className="w-[125px]"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Present">Present</SelectItem>
-                          <SelectItem value="Absent">Absent</SelectItem>
-                          <SelectItem value="New">New</SelectItem>
+                          <SelectItem value={FACTORY_TRACKING_STATUSES.present}>{tr("present")}</SelectItem>
+                          <SelectItem value={FACTORY_TRACKING_STATUSES.absent}>{tr("absent")}</SelectItem>
+                          <SelectItem value={FACTORY_TRACKING_STATUSES.new}>{tr("new")}</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Badge className={`mt-1.5 border-0 ${statusClass(row.status)}`}>{row.status}</Badge>
+                      <Badge className={`mt-1.5 border-0 ${statusClass(row.status)}`}>
+                        {tr(statusTranslationKey(row.status))}
+                      </Badge>
                     </TableCell>
                     {mode === "attendance" && (
                       <TableCell>
-                        <Input value={row.notes} onChange={(e) => setRow(sourceIndex, { notes: e.target.value })} placeholder="Notes" />
+                        <Input
+                          value={row.notes}
+                          onChange={(e) => setRow(sourceIndex, { notes: e.target.value })}
+                          placeholder={tr("notes")}
+                        />
                       </TableCell>
                     )}
                   </TableRow>
