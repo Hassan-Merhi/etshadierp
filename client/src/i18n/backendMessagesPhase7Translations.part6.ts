@@ -17,6 +17,11 @@ export const backendMessagesPhase7TranslationsPart6: readonly Phase7BackendMessa
     fr: "Le fournisseur est requis",
   },
   {
+    en: "Selected supplier not found",
+    ar: "المورد المحدد غير موجود",
+    fr: "Le fournisseur sélectionné est introuvable",
+  },
+  {
     en: "At least one line item is required",
     ar: "يلزم بند واحد على الأقل",
     fr: "Au moins une ligne d’article est requise",
