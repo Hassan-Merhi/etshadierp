@@ -5,11 +5,16 @@ import FactoryEmployeesHub from "@/pages/factory/FactoryEmployeesHub";
 import FactoryInsurance from "@/pages/factory/FactoryInsurance";
 import { FactoryStaffTracking } from "@/pages/factory/FactoryStaffTracking";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
+import { translateFactoryStaffTrackingText } from "@/i18n/factoryStaffTrackingTranslations";
 
 type Section = "workers" | "employees" | "production-targets" | "attendance-register" | "insurance";
 
 export default function FactoryPayrollHub() {
   const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
+  const { language } = useApplicationLanguage();
+  const tr = (key: Parameters<typeof translateFactoryStaffTrackingText>[0]) =>
+    translateFactoryStaffTrackingText(key, language);
 
   const hasInsuranceAccess =
     !myAccess ||
@@ -32,8 +37,8 @@ export default function FactoryPayrollHub() {
   const allTabs: TabDef[] = [
     { key: "workers", label: "Workers", Icon: HardHat },
     { key: "employees", label: "Employees", Icon: Users },
-    { key: "production-targets", label: "Production Targets", Icon: Target },
-    { key: "attendance-register", label: "Attendance Register", Icon: ClipboardCheck },
+    { key: "production-targets", label: tr("productionTargets"), Icon: Target },
+    { key: "attendance-register", label: tr("attendanceRegister"), Icon: ClipboardCheck },
     { key: "insurance", label: "Insurance", Icon: Shield },
   ];
   const tabs = allTabs.filter((tab) => sections.includes(tab.key));
@@ -47,7 +52,7 @@ export default function FactoryPayrollHub() {
           </div>
           <div>
             <h1 className="text-base font-semibold leading-tight">Payroll & Benefits</h1>
-            <p className="text-xs text-muted-foreground">Workers, employees, production targets, attendance and insurance</p>
+            <p className="text-xs text-muted-foreground">{tr("hubDescription")}</p>
           </div>
         </div>
 
