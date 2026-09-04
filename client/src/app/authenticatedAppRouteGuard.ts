@@ -13,7 +13,7 @@ const SUPPLIER_PARTNER_PATHS = new Set([
 ]);
 
 export type AuthenticatedAppRouteDecision =
-  { kind: "continue" } | { kind: "loading" } | { kind: "empty" } | { kind: "redirect"; to: string };
+  { kind: "continue" } | { kind: "loading" } | { kind: "bootstrap-error" } | { kind: "redirect"; to: string };
 
 interface ResolveAuthenticatedAppRouteOptions {
   currentLocation: string;
@@ -40,9 +40,12 @@ export function resolveAuthenticatedAppRoute({
   const isSupplierPartnerRoute = currentLocation === "/sp" || currentLocation.startsWith("/sp/");
   const isFactoryCompany = companyType === "factory" || companyType === "factory_v2";
   const isFactoryRoute = currentLocation.startsWith("/factory/");
-  const hasErpAccess = !myAccess || myAccess.hasErpAccess;
-  const hasFactoryAccess = !myAccess || myAccess.hasFactoryAccess;
+  const hasErpAccess = !isFactoryCompany || !myAccess || myAccess.hasErpAccess;
+  const hasFactoryAccess = isFactoryCompany && (!myAccess || myAccess.hasFactoryAccess);
   const factoryDefaultPage = computeFactoryDefaultPage(myAccess);
+  const isFactoryBootstrapExemptRoute =
+    currentLocation === "/my-settings" || currentLocation === "/intercompany-requests";
+  const isFactoryBootstrapRoute = isFactoryCompany && (isFactoryRoute || !isFactoryBootstrapExemptRoute);
 
   let decision: AuthenticatedAppRouteDecision = { kind: "continue" };
 
@@ -63,26 +66,27 @@ export function resolveAuthenticatedAppRoute({
     decision = { kind: "redirect", to: "/sp/setup" };
   } else if (isSupplierPartnerCompany && isSupplierPartnerRoute && !SUPPLIER_PARTNER_PATHS.has(currentLocation)) {
     decision = { kind: "redirect", to: "/sp" };
+  } else if (isFactoryRoute && !isFactoryCompany) {
+    // Factory-only bootstrap data must never gate an ERP/non-Factory company.
+    // The company type alone is enough to reject a stale /factory/* route.
+    decision = { kind: "redirect", to: "/" };
+  } else if (isFactoryBootstrapRoute && myAccessLoading && myAccess === undefined) {
+    decision = { kind: "loading" };
+  } else if (isFactoryBootstrapRoute && myAccess === undefined && !myAccessError) {
+    decision = { kind: "loading" };
+  } else if (isFactoryBootstrapRoute && myAccess === undefined && myAccessError) {
+    // React Query has exhausted its configured retries before any usable access
+    // data was loaded. A background refetch error must not evict cached access.
+    decision = { kind: "bootstrap-error" };
   } else if (
     isFactoryCompany &&
     !isFactoryRoute &&
     currentLocation !== "/my-settings" &&
     currentLocation !== "/intercompany-requests"
   ) {
-    if (myAccessLoading) decision = { kind: "loading" };
-    else if (myAccess === undefined && !myAccessError) decision = { kind: "empty" };
-    else decision = { kind: "redirect", to: factoryDefaultPage };
+    decision = { kind: "redirect", to: factoryDefaultPage };
   } else if (isFactoryRoute && !hasFactoryAccess) {
     decision = { kind: "redirect", to: "/" };
-  } else if (
-    !isFactoryCompany &&
-    !hasErpAccess &&
-    hasFactoryAccess &&
-    !isFactoryRoute &&
-    currentLocation !== "/my-settings" &&
-    currentLocation !== "/intercompany-requests"
-  ) {
-    decision = { kind: "redirect", to: factoryDefaultPage };
   } else {
     const factoryGuardRedirect = computeFactoryGuardRedirect({
       isFactoryRoute,
@@ -94,11 +98,6 @@ export function resolveAuthenticatedAppRoute({
     });
     if (factoryGuardRedirect) {
       decision = { kind: "redirect", to: factoryGuardRedirect };
-    } else if (isFactoryRoute && !isFactoryCompany) {
-      // Switch away from /factory/* immediately when the company is not a factory
-      // type — don't wait for myAccess to finish loading. The company type alone
-      // is enough to know these routes don't apply.
-      decision = { kind: "redirect", to: "/" };
     }
   }
 
