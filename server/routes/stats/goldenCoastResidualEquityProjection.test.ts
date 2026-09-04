@@ -146,10 +146,14 @@ describe("Golden Coast Phase 17 balance-sheet projection", () => {
     expect(result.equity.balanceSheetIdentity).toBe("assets_minus_liabilities_equals_equity");
     expect(result.equity.legacyOpeningPayableReclassification).toBe(165875);
     expect(result.equity.freshStartClaim).toBe(42122);
+    expect(result.equity.freshStartLedgerClaim).toBe(207997);
     expect(result.equity.hassanClaim).toBe(289242);
     expect(result.equity.unclosedEarnings).toBe(0);
     expect(result.equity.currencyTranslationAdjustment).toBe(0);
     expect(result.equity.freshStartTotalEntitlement).toBe(207997);
+    expect(result.equity.accounts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 1, value: 207997, balanceSide: "Cr" })])
+    );
     expect(result.onUs.accounts).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: 3, value: 165875, category: "Liability" })])
     );
@@ -182,7 +186,7 @@ describe("Golden Coast Phase 17 balance-sheet projection", () => {
     expect(result.equity.freshStartTotalEntitlement).toBe(207997);
     expect(result.equity.accounts).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: 1, value: 41122, balanceSide: "Cr" }),
+        expect.objectContaining({ id: 1, value: 206997, balanceSide: "Cr" }),
         expect.objectContaining({ id: 2, value: 289242, balanceSide: "Cr" }),
         expect.objectContaining({ code: "GC-UNCL-PNL", value: 400, balanceSide: "Cr" }),
       ])
