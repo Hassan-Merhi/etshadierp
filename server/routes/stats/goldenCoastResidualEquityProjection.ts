@@ -148,12 +148,12 @@ function goldenCoastRoles(accounts: LedgerRow[]) {
  *   Assets - Liabilities = Total Equity
  *
  * GC Sales Cash is a real credit-normal liability. HADI Intercompany is a real
- * Golden Coast asset. Fresh Start and Hassan are displayed from their actual
- * credit-normal partner-capital ledgers. The historical GC Sales Cash opening
- * balance predates the Phase 15 capital-to-payable bridge, so that opening
- * payable is reclassified out of Fresh Start capital exactly once for the
- * balance-sheet presentation. New Phase 15 sales already debit Fresh Start and
- * therefore need no additional residual adjustment.
+ * Golden Coast asset. Fresh Start's displayed row uses its actual partner-capital
+ * ledger claim so Net Position matches the Accounts page. The historical GC Sales
+ * Cash opening still predates the Phase 15 capital-to-payable bridge, so that
+ * opening payable is reclassified only in the residual-equity math to avoid
+ * double-counting the same Fresh Start claim. New Phase 15 sales already debit
+ * Fresh Start and therefore need no additional residual adjustment.
  *
  * Profit/loss that has not yet been closed by Phase 11 is shown separately as
  * Current Period Earnings (Unclosed). Current cash/bank translation is also
@@ -275,7 +275,10 @@ export function projectGoldenCoastResidualEquity(input: {
       id: roles.fresh.id,
       name: roles.fresh.name,
       code: roles.fresh.code || "",
-      value: round2(Math.abs(freshStartClaim)),
+      // Display the actual Fresh Start ledger claim. The legacy opening payable
+      // reclassification belongs to residual math only and must not shrink the
+      // account balance shown to users compared with Accounts Overview.
+      value: round2(Math.abs(freshLedgerClaim)),
       category: "Partner Capital / Equity",
       balanceSide: freshStartClaim >= 0 ? "Cr" : "Dr",
     },
