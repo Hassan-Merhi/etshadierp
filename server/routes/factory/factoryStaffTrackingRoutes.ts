@@ -296,7 +296,7 @@ export function registerFactoryStaffTrackingRoutes(app: Express): void {
         }
         const recordKey = `${personType}:${personId}`;
         if (recordKeys.has(recordKey)) {
-          return res.status(400).json({ message: "Each worker or employee may appear only once per batch" });
+          return res.status(400).json({ message: factoryStaffTrackingMessages.duplicatePersonInBatch });
         }
         recordKeys.add(recordKey);
 
