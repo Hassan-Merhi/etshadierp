@@ -60,6 +60,15 @@ export const supplierService = {
     // linked parent as an inherited supplier source. Keep ordinary supplier
     // routes strict to the active company so a foreign supplier ID cannot be
     // selected outside an intentional inheritance flow.
+    // A search that matched nothing is not the same as a company with no
+    // supplier master data. Inherit from the parent only in the second case,
+    // otherwise a mistyped search in a company that has its own suppliers
+    // would silently offer the parent's.
+    if (suppliers.length === 0) {
+      const ownSuppliers = (await supplierRepository.listAll(companyId)) ?? [];
+      if (ownSuppliers.length > 0) return suppliers;
+    }
+
     const parentCompanyId = await resolveParentCompanyId(companyId);
     if (parentCompanyId === companyId) return suppliers;
 
