@@ -5,5 +5,6 @@ export const factoryStaffTrackingMessages = {
   invalidRow: "Invalid tracking row",
   personOutsideFactory: "Person does not belong to this factory company",
   invalidPersonType: "Invalid person type",
+  duplicatePersonInBatch: "Each worker or employee may appear only once per batch",
   invalidBaleNumbers: "Target and produced bales must be non-negative numbers",
 } as const;

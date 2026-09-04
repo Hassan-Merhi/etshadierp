@@ -121,10 +121,13 @@ export function auditWriteRouteCoverage(options = {}) {
   const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 
-  const serverFiles = walk("server", [".ts"]).filter((file) => !file.endsWith(".test.ts"));
+  const allServerFiles = walk("server", [".ts"]);
+  const serverFiles = allServerFiles.filter((file) => !file.endsWith(".test.ts"));
   const sources = new Map(serverFiles.map((file) => [file, fs.readFileSync(path.join(projectRoot, file), "utf8")]));
 
-  const testFiles = [...walk("tests", [".ts"]), ...serverFiles.filter((file) => file.endsWith(".test.ts"))];
+  // Colocated server tests count as tests too: serverFiles has already had them
+  // filtered out, so they have to come from the unfiltered walk.
+  const testFiles = [...walk("tests", [".ts"]), ...allServerFiles.filter((file) => file.endsWith(".test.ts"))];
   const readTest = (file) => fs.readFileSync(path.join(projectRoot, file), "utf8");
   const sweepText = testFiles.includes(GUARD_SWEEP_TEST) ? readTest(GUARD_SWEEP_TEST) : "";
   const authenticatedSweepText = testFiles.includes(AUTHENTICATED_SAFETY_SWEEP_TEST)

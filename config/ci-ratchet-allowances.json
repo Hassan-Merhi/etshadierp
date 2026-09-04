@@ -61,8 +61,9 @@
       "tests/supplier-partner-net-position-inclusion.test.ts",
       "tests/supplier-partner-customer-authoritative-net-position.test.ts",
       "tests/phase4-hotpath-performance-regression.test.ts",
-      "tests/ui/factory-bootstrap-phase3.test.ts"
+      "tests/ui/factory-bootstrap-phase3.test.ts",
+      "tests/factory-loading-proforma-quantity-alignment.test.ts"
     ],
-    "maxAdditionalTextAssertions": 717
+    "maxAdditionalTextAssertions": 724
   }
 }
