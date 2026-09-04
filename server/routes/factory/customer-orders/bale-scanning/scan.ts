@@ -16,6 +16,7 @@ import {
   normalizeLoadingArticleCode,
   shouldEnforceProformaOverload,
   shouldRequireProformaMembership,
+  sumProformaQuantityLimit,
 } from "./proformaScanPolicy";
 import { factoryBales, customerProformaLines, customerOrders, customerOrderBales } from "@shared/schema";
 import { eq, and, or, sql, isNull } from "drizzle-orm";
@@ -236,7 +237,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
               )`
             : sql<number>`0`;
 
-          const [proformaLine] = await tx
+          const matchingProformaLines = await tx
             .select({
               quantity: customerProformaLines.quantity,
               pricingMode: customerProformaLines.pricingMode,
@@ -250,9 +251,10 @@ export function registerOrderBaleScanRoutes(app: Express) {
                 eq(customerProformaLines.proformaId, order.proformaIdUsed),
                 sql`LOWER(TRIM(${customerProformaLines.articleCode})) = ${normalizedEffectiveArticleCode}`
               )
-            )
-            .limit(1);
-
+            );
+          const matchedProformaLine = matchingProformaLines[0] || null;
+          const proformaQuantityLimit = sumProformaQuantityLimit(matchingProformaLines);
+          const proformaLine = matchedProformaLine ? { ...matchedProformaLine, quantity: proformaQuantityLimit } : null;
           if (proformaLine) {
             const pricingMode = proformaLine.pricingMode ?? "per_bale";
             const perKgVal = proformaLine.pricePerKg;
@@ -263,9 +265,8 @@ export function registerOrderBaleScanRoutes(app: Express) {
             } else {
               priceUsed = proformaLine.pricePerBale || "0";
             }
-
             const currentCount = Number(proformaLine.currentCount || 0);
-            if (enforceOverload && currentCount >= proformaLine.quantity) {
+            if (enforceOverload && currentCount >= proformaQuantityLimit) {
               return {
                 ok: false,
                 httpStatus: 400,

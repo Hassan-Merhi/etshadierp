@@ -24,8 +24,6 @@ import { describe, expect, it } from "vitest";
 import { startupMigrations } from "../server/startup-schema";
 
 /** Statement count of the reviewed composed array. */
-const EXPECTED_STATEMENT_COUNT = 1354;
-
 /**
  * sha256 of JSON.stringify(startupMigrations) for the reviewed composed array.
  *
@@ -93,9 +91,12 @@ const EXPECTED_STATEMENT_COUNT = 1354;
  *
  * Re-pinned again when the guarded HMD KINSHASA → HADI L'SHI parent-company
  * repair was appended as startup stage 026, taking the count from 1353 to
- * 1354.
+ * 1354, then stage 027 added the Factory staff-tracking table and two indexes,
+ * taking the count to 1357. The same stage is also run unconditionally before
+ * the bulk startup migration pass because production may disable that pass.
  */
-const EXPECTED_CONTENT_HASH = "9bdf1a2c75ed8139a7a6f1eda36845bf4b08ee1ef83d349b6d87c2034528fb58";
+const EXPECTED_STATEMENT_COUNT = 1357;
+const EXPECTED_CONTENT_HASH = "510756db9828d983df2cfd390de30acc23661e2d985a902c389aa3797dff1d31";
 /**
  * sha256 of JSON.stringify(startupMigrations) for the reviewed composed array.
  *

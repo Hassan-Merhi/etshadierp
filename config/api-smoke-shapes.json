@@ -731,6 +731,10 @@
       "status": 403,
       "shape": "{code:scalar,message:scalar}"
     },
+    "/api/factory/staff-tracking": {
+      "status": 403,
+      "shape": "{code:scalar,message:scalar}"
+    },
     "/api/factory/status-builder/log": {
       "status": 403,
       "shape": "{code:scalar,message:scalar}"
@@ -970,6 +974,10 @@
     "/api/global/transactions/voucher-types": {
       "status": 200,
       "shape": "[]"
+    },
+    "/api/golden-coast/accounting/phase1/accounts": {
+      "status": 400,
+      "shape": "{code:scalar,message:scalar}"
     },
     "/api/health": {
       "status": 200,
@@ -1383,6 +1391,38 @@
       "status": 403,
       "shape": "{message:scalar}"
     },
+    "/api/sp/golden-coast/phase10/sales-cash-settlement/readiness": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
+    "/api/sp/golden-coast/phase11/profit-splits/monthly-close/readiness": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
+    "/api/sp/golden-coast/phase3/status": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
+    "/api/sp/golden-coast/phase6/pos-sale/readiness": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
+    "/api/sp/golden-coast/phase7/sales-cash-pay-fresh-start/readiness": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
+    "/api/sp/golden-coast/phase7/sales-cash-transfer/readiness": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
+    "/api/sp/golden-coast/phase8/container-offload/readiness": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
+    "/api/sp/golden-coast/phase9/hassan-savings-withdrawal/readiness": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
     "/api/sp/opening-stock": {
       "status": 403,
       "shape": "{message:scalar}"
@@ -1436,6 +1476,10 @@
       "shape": "{message:scalar}"
     },
     "/api/sp/sales": {
+      "status": 403,
+      "shape": "{message:scalar}"
+    },
+    "/api/sp/setup/golden-coast/status": {
       "status": 403,
       "shape": "{message:scalar}"
     },

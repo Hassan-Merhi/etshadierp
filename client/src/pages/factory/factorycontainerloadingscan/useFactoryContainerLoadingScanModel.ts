@@ -162,7 +162,8 @@ export function useFactoryContainerLoadingScanModel() {
   const { data: orderDetail } = useQuery<OrderDetail>({
     queryKey: ["/api/factory/customer-orders", orderId],
     queryFn: async () => {
-      const continuationQuery = continuationFromOrderId ? `?continuationFromOrderId=${continuationFromOrderId}` : "";
+      const effectiveContinuationFromOrderId = continuationFromOrderId || String(orderId);
+      const continuationQuery = `?continuationFromOrderId=${effectiveContinuationFromOrderId}`;
       const res = await fetch(`/api/factory/customer-orders/${orderId}${continuationQuery}`, {
         credentials: "include",
       });
