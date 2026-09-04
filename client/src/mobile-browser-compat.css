@@ -230,7 +230,7 @@ body {
   }
 }
 
-/* Net Position keeps historical-currency accounting internally; hide the informational context card from the UI. */
-[data-testid="net-position-currency-context"] {
+/* Hide only the resolved currency context card; provisional warnings must remain visible. */
+[data-testid="net-position-currency-context"].bg-muted\/20 {
   display: none !important;
 }
