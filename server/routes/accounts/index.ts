@@ -6,6 +6,7 @@
  * handler serves a request - config/route-manifest.json pins the result.
  */
 import type { Express } from "express";
+import { registerGoldenCoastAccountsEquityPresentation } from "./golden-coast-equity-presentation";
 import { registerAccountListRoutes } from "./all";
 import { registerAccountPayableRoutes } from "./payables";
 import { registerAccountLedgerListRoutes } from "./all-ledger";
@@ -15,6 +16,7 @@ import { registerAccountSubModules } from "./sub-modules";
 import { registerAccountWhatsappRoutes } from "./whatsapp";
 
 export function registerAccountRoutes(app: Express) {
+  registerGoldenCoastAccountsEquityPresentation(app);
   registerAccountListRoutes(app);
   registerAccountPayableRoutes(app);
   registerAccountLedgerListRoutes(app);
