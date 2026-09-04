@@ -271,10 +271,11 @@ async function guardContainerOffload(req: Request, res: Response, next: NextFunc
     const parentFreightAccountIds = uniquePositiveIds(
       purchaseOrders.rows.filter((row) => row.freight_paid_by === "parent").map((row) => row.freight_parent_account_id)
     );
-    // Only enforce parent-ledger ownership when this company has an explicit
-    // companies.parent_company_id relationship. Standalone/root companies can
-    // carry legacy freightPaidBy='parent' metadata, but that stale global-parent
-    // reference must not block a local container offload.
+    // Parent-paid freight account ownership belongs to the PO accounting workflow,
+    // not to the atomic inventory offload lifecycle. Older POs can retain a stale
+    // freight_parent_account_id after company/account changes. The central offload
+    // service does not post to this account, so keep this lookup as diagnostics but
+    // never block a valid inventory offload because of legacy freight metadata.
     if (parentFreightAccountIds.length > 0 && parentCompanyId) {
       const validCompanyIds = uniquePositiveIds([companyId, parentCompanyId]);
       const parentFreightRows = await client.query<{ id: number }>(
@@ -290,10 +291,12 @@ async function guardContainerOffload(req: Request, res: Response, next: NextFunc
       const foundIds = new Set(parentFreightRows.rows.map((row) => Number(row.id)));
       const missingId = parentFreightAccountIds.find((id) => !foundIds.has(id));
       if (missingId) {
-        res.status(400).json({
-          message: `Parent-paid freight ledger #${missingId} is unavailable in the current or parent company`,
+        logger.warn("Container offload ignored stale parent-paid freight ledger metadata", {
+          companyId,
+          parentCompanyId,
+          containerId,
+          missingLedgerId: missingId,
         });
-        return;
       }
     }
 
