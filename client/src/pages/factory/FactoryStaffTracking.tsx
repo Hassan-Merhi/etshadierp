@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   CalendarDays,
@@ -50,6 +50,11 @@ interface TrackingResponse {
   periodType: PeriodType;
   periodStart: string;
   periodEnd: string;
+  rows: TrackingRow[];
+}
+
+interface TrackingCategoryGroup {
+  category: string;
   rows: TrackingRow[];
 }
 
@@ -188,15 +193,42 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
     },
   });
 
-  const visibleRows = rows.filter((row) => {
+  const groupedVisibleRows = useMemo<TrackingCategoryGroup[]>(() => {
     const needle = search.trim().toLowerCase();
-    if (!needle) return true;
-    return (
-      row.name.toLowerCase().includes(needle) ||
-      row.category.toLowerCase().includes(needle) ||
-      (row.code || "").toLowerCase().includes(needle)
-    );
-  });
+    const groups = new Map<string, TrackingCategoryGroup>();
+
+    for (const row of rows) {
+      const matchesSearch =
+        !needle ||
+        row.name.toLowerCase().includes(needle) ||
+        row.category.toLowerCase().includes(needle) ||
+        (row.code || "").toLowerCase().includes(needle);
+      if (!matchesSearch) continue;
+
+      const category = row.category.trim();
+      const groupKey = category.toLocaleLowerCase();
+      const existing = groups.get(groupKey);
+      if (existing) {
+        existing.rows.push(row);
+      } else {
+        groups.set(groupKey, { category, rows: [row] });
+      }
+    }
+
+    return [...groups.values()]
+      .sort((left, right) => {
+        if (!left.category && !right.category) return 0;
+        if (!left.category) return 1;
+        if (!right.category) return -1;
+        return left.category.localeCompare(right.category, undefined, { sensitivity: "base", numeric: true });
+      })
+      .map((group) => ({
+        ...group,
+        rows: [...group.rows].sort((left, right) =>
+          left.name.localeCompare(right.name, undefined, { sensitivity: "base", numeric: true })
+        ),
+      }));
+  }, [rows, search]);
 
   const totals = useMemo(() => {
     const target = rows.reduce((sum, row) => sum + (row.targetBales ?? 0), 0);
@@ -220,6 +252,7 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
 
   const title = mode === "production" ? tr("productionTargets") : tr("attendanceRegister");
   const subtitle = mode === "production" ? tr("productionSubtitle") : tr("attendanceSubtitle");
+  const tableColumnCount = mode === "production" ? 6 : 4;
 
   return (
     <div className="space-y-4">
@@ -331,112 +364,128 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={mode === "production" ? 6 : 4} className="py-12 text-center text-muted-foreground">
+                <TableCell colSpan={tableColumnCount} className="py-12 text-center text-muted-foreground">
                   {tr("loadingStaff")}
                 </TableCell>
               </TableRow>
-            ) : visibleRows.length === 0 ? (
+            ) : groupedVisibleRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={mode === "production" ? 6 : 4} className="py-12 text-center text-muted-foreground">
+                <TableCell colSpan={tableColumnCount} className="py-12 text-center text-muted-foreground">
                   {tr("noMatchingStaff")}
                 </TableCell>
               </TableRow>
             ) : (
-              visibleRows.map((row) => {
-                const sourceIndex = rows.findIndex(
-                  (item) => item.personType === row.personType && item.personId === row.personId
-                );
-                return (
-                  <TableRow
-                    key={`${row.personType}-${row.personId}`}
-                    className={!row.active ? "opacity-60" : undefined}
-                  >
-                    <TableCell>
-                      <div className="font-medium">{row.name}</div>
-                      <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{row.personType === "worker" ? tr("worker") : tr("employee")}</span>
-                        {row.code && <span>· {row.code}</span>}
-                        {!row.active && (
-                          <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
-                            {tr("inactive")}
-                          </Badge>
-                        )}
+              groupedVisibleRows.map((group) => (
+                <Fragment key={group.category.toLocaleLowerCase() || "__blank-category__"}>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    <TableCell colSpan={tableColumnCount} className="border-y py-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold">{group.category || "—"}</span>
+                        <Badge variant="secondary" className="font-normal tabular-nums">
+                          {group.rows.length}
+                        </Badge>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <Input
-                        value={row.category}
-                        onChange={(e) => setRow(sourceIndex, { category: e.target.value })}
-                        placeholder={tr("categoryStation")}
-                      />
-                    </TableCell>
-                    {mode === "production" && (
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="1"
-                          className="text-right tabular-nums"
-                          value={row.targetBales ?? ""}
-                          onChange={(e) =>
-                            setRow(sourceIndex, { targetBales: e.target.value === "" ? null : Number(e.target.value) })
-                          }
-                        />
-                      </TableCell>
-                    )}
-                    {mode === "production" && (
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="1"
-                          className="text-right tabular-nums"
-                          value={row.producedBales ?? ""}
-                          onChange={(e) =>
-                            setRow(sourceIndex, {
-                              producedBales: e.target.value === "" ? null : Number(e.target.value),
-                            })
-                          }
-                        />
-                      </TableCell>
-                    )}
-                    {mode === "production" && (
-                      <TableCell
-                        className={`text-right font-semibold tabular-nums ${differenceClass(row.targetBales, row.producedBales)}`}
-                      >
-                        {differenceText(row.targetBales, row.producedBales)}
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      <Select
-                        value={row.status}
-                        onValueChange={(value) => setRow(sourceIndex, { status: value as TrackingStatus })}
-                      >
-                        <SelectTrigger className="w-[125px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={FACTORY_TRACKING_STATUSES.present}>{tr("present")}</SelectItem>
-                          <SelectItem value={FACTORY_TRACKING_STATUSES.absent}>{tr("absent")}</SelectItem>
-                          <SelectItem value={FACTORY_TRACKING_STATUSES.new}>{tr("new")}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Badge className={`mt-1.5 border-0 ${statusClass(row.status)}`}>
-                        {tr(statusTranslationKey(row.status))}
-                      </Badge>
-                    </TableCell>
-                    {mode === "attendance" && (
-                      <TableCell>
-                        <Input
-                          value={row.notes}
-                          onChange={(e) => setRow(sourceIndex, { notes: e.target.value })}
-                          placeholder={tr("notes")}
-                        />
-                      </TableCell>
-                    )}
                   </TableRow>
-                );
-              })
+                  {group.rows.map((row) => {
+                    const sourceIndex = rows.findIndex(
+                      (item) => item.personType === row.personType && item.personId === row.personId
+                    );
+                    return (
+                      <TableRow
+                        key={`${row.personType}-${row.personId}`}
+                        className={!row.active ? "opacity-60" : undefined}
+                      >
+                        <TableCell>
+                          <div className="font-medium">{row.name}</div>
+                          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{row.personType === "worker" ? tr("worker") : tr("employee")}</span>
+                            {row.code && <span>· {row.code}</span>}
+                            {!row.active && (
+                              <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                                {tr("inactive")}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={row.category}
+                            onChange={(e) => setRow(sourceIndex, { category: e.target.value })}
+                            placeholder={tr("categoryStation")}
+                          />
+                        </TableCell>
+                        {mode === "production" && (
+                          <TableCell>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="1"
+                              className="text-right tabular-nums"
+                              value={row.targetBales ?? ""}
+                              onChange={(e) =>
+                                setRow(sourceIndex, {
+                                  targetBales: e.target.value === "" ? null : Number(e.target.value),
+                                })
+                              }
+                            />
+                          </TableCell>
+                        )}
+                        {mode === "production" && (
+                          <TableCell>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="1"
+                              className="text-right tabular-nums"
+                              value={row.producedBales ?? ""}
+                              onChange={(e) =>
+                                setRow(sourceIndex, {
+                                  producedBales: e.target.value === "" ? null : Number(e.target.value),
+                                })
+                              }
+                            />
+                          </TableCell>
+                        )}
+                        {mode === "production" && (
+                          <TableCell
+                            className={`text-right font-semibold tabular-nums ${differenceClass(row.targetBales, row.producedBales)}`}
+                          >
+                            {differenceText(row.targetBales, row.producedBales)}
+                          </TableCell>
+                        )}
+                        <TableCell>
+                          <Select
+                            value={row.status}
+                            onValueChange={(value) => setRow(sourceIndex, { status: value as TrackingStatus })}
+                          >
+                            <SelectTrigger className="w-[125px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={FACTORY_TRACKING_STATUSES.present}>{tr("present")}</SelectItem>
+                              <SelectItem value={FACTORY_TRACKING_STATUSES.absent}>{tr("absent")}</SelectItem>
+                              <SelectItem value={FACTORY_TRACKING_STATUSES.new}>{tr("new")}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Badge className={`mt-1.5 border-0 ${statusClass(row.status)}`}>
+                            {tr(statusTranslationKey(row.status))}
+                          </Badge>
+                        </TableCell>
+                        {mode === "attendance" && (
+                          <TableCell>
+                            <Input
+                              value={row.notes}
+                              onChange={(e) => setRow(sourceIndex, { notes: e.target.value })}
+                              placeholder={tr("notes")}
+                            />
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })}
+                </Fragment>
+              ))
             )}
           </TableBody>
         </Table>
