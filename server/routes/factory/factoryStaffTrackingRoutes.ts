@@ -4,6 +4,7 @@ import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { resultRows } from "../../lib/queryResult";
+import { sqlArray } from "../../lib/sqlArray";
 import { employees, factoryAttendance, factoryWorkers } from "@shared/schema";
 
 type TrackingPage = "production" | "attendance";
@@ -15,55 +16,6 @@ const PAGE_TYPES = new Set<TrackingPage>(["production", "attendance"]);
 const PERIOD_TYPES = new Set<PeriodType>(["daily", "weekly", "monthly"]);
 const STATUSES = new Set<TrackingStatus>(["Present", "Absent", "New"]);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-let storageReady: Promise<void> | null = null;
-
-async function ensureFactoryStaffTrackingStorage(): Promise<void> {
-  if (!storageReady) {
-    storageReady = (async () => {
-      await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS factory_staff_tracking_entries (
-          id serial PRIMARY KEY,
-          company_id integer NOT NULL,
-          page_type varchar(20) NOT NULL,
-          period_type varchar(20) NOT NULL,
-          period_start date NOT NULL,
-          period_end date NOT NULL,
-          person_type varchar(20) NOT NULL,
-          person_id integer NOT NULL,
-          category varchar(150),
-          target_bales numeric(12, 2),
-          produced_bales numeric(12, 2),
-          status varchar(20) NOT NULL DEFAULT 'Present',
-          notes text,
-          created_by integer,
-          created_at timestamp NOT NULL DEFAULT now(),
-          updated_at timestamp NOT NULL DEFAULT now(),
-          CONSTRAINT factory_staff_tracking_page_check CHECK (page_type IN ('production', 'attendance')),
-          CONSTRAINT factory_staff_tracking_period_check CHECK (period_type IN ('daily', 'weekly', 'monthly')),
-          CONSTRAINT factory_staff_tracking_person_check CHECK (person_type IN ('worker', 'employee')),
-          CONSTRAINT factory_staff_tracking_status_check CHECK (status IN ('Present', 'Absent', 'New')),
-          CONSTRAINT factory_staff_tracking_period_order_check CHECK (period_end >= period_start),
-          CONSTRAINT factory_staff_tracking_target_nonnegative CHECK (target_bales IS NULL OR target_bales >= 0),
-          CONSTRAINT factory_staff_tracking_produced_nonnegative CHECK (produced_bales IS NULL OR produced_bales >= 0)
-        )
-      `);
-      await db.execute(sql`
-        CREATE UNIQUE INDEX IF NOT EXISTS factory_staff_tracking_unique_period_person
-        ON factory_staff_tracking_entries
-          (company_id, page_type, period_type, period_start, period_end, person_type, person_id)
-      `);
-      await db.execute(sql`
-        CREATE INDEX IF NOT EXISTS factory_staff_tracking_company_period_idx
-        ON factory_staff_tracking_entries (company_id, page_type, period_start, period_end)
-      `);
-    })().catch((error) => {
-      storageReady = null;
-      throw error;
-    });
-  }
-  await storageReady;
-}
 
 function getFactoryCompanyId(req: Request): number | undefined {
   return req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -101,7 +53,6 @@ export function registerFactoryStaffTrackingRoutes(app: Express): void {
       if (!companyId) return res.status(400).json({ message: "No factory company selected" });
       const query = parseTrackingQuery(req);
       if (!query) return res.status(400).json({ message: "Invalid tracking period" });
-      await ensureFactoryStaffTrackingStorage();
 
       const savedResult = await db.execute(sql`
         SELECT
@@ -186,7 +137,7 @@ export function registerFactoryStaffTrackingRoutes(app: Express): void {
             FROM employee_attendance
             WHERE company_id = ${companyId}
               AND attendance_date = ${query.periodStart}
-              AND employee_id = ANY(${employeeIds})
+              AND employee_id = ANY(${sqlArray(employeeIds)})
           `);
           const rows = resultRows(attendanceResult) as Array<{ employeeId: number; status: string }>;
           rows.forEach((row) => employeeAttendance.set(Number(row.employeeId), row.status));
@@ -253,7 +204,6 @@ export function registerFactoryStaffTrackingRoutes(app: Express): void {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No factory company selected" });
-      await ensureFactoryStaffTrackingStorage();
 
       const page = String(req.body?.page || "") as TrackingPage;
       const periodType = String(req.body?.periodType || "") as PeriodType;
