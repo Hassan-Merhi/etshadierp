@@ -229,3 +229,8 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Net Position keeps historical-currency accounting internally; hide the informational context card from the UI. */
+[data-testid="net-position-currency-context"] {
+  display: none !important;
+}
