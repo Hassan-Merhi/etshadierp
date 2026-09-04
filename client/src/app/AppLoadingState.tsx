@@ -3,6 +3,7 @@ import { ErrorState, LoadingState } from "@/components/ui/page-state";
 
 interface AppLoadingStateProps {
   message?: string;
+  showRecovery?: boolean;
 }
 
 const STARTUP_TIMEOUT_MS = 12_000;
@@ -13,19 +14,20 @@ function reloadWithFreshAssets() {
   window.location.replace(url.toString());
 }
 
-export function AppLoadingState({ message = "Loading application" }: AppLoadingStateProps) {
+export function AppLoadingState({ message = "Loading application", showRecovery = false }: AppLoadingStateProps) {
   const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
+    if (showRecovery) return;
     const timer = window.setTimeout(() => setTimedOut(true), STARTUP_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [showRecovery]);
 
-  if (timedOut) {
+  if (showRecovery || timedOut) {
     return (
       <ErrorState
         className="h-full min-h-64 border-0 bg-transparent"
-        title="Application loading took too long"
+        title={showRecovery ? "Application data could not be loaded" : "Application loading took too long"}
         description="The browser may be using outdated company or application data. Reload with fresh files to continue."
         actionLabel="Reload application"
         onAction={reloadWithFreshAssets}

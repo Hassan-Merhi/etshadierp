@@ -6,6 +6,7 @@ import { db, pool } from "../db";
 import { requireAuth, requireNonPOS } from "../auth";
 import { bankAccounts, companies, ledgerAccounts } from "@shared/schema";
 import { normalizeOpeningBalanceCurrency } from "../services/accounting/openingBalanceCurrency";
+import { getCashLedgerAccountSummary } from "../services/accounting/cashLedgerAccountSummaryService";
 import { getCashBankAccountSummary, getCashBankRevaluation } from "../services/accounting/cashBankRevaluationService";
 
 const OPENING_FIELDS = [
@@ -253,7 +254,7 @@ export function registerAccountCurrencyRoutes(app: Express) {
       const id = Number.parseInt(req.params.id, 10);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid account ID" });
 
-      const cashSummary = await getCashBankAccountSummary(companyId, "ledger", id);
+      const cashSummary = await getCashLedgerAccountSummary(companyId, id);
       if (cashSummary) {
         const displayBalance = cashSummary.currentTranslatedBaseBalance ?? cashSummary.historicalBaseBalance;
         // historicalBaseBalance only covers entries whose currency is fully resolved to a
