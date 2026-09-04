@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { HardHat, Users, Shield } from "lucide-react";
+import { ClipboardCheck, HardHat, Shield, Target, Users } from "lucide-react";
 import FactoryWorkersHub from "@/pages/factory/FactoryWorkersHub";
 import FactoryEmployeesHub from "@/pages/factory/FactoryEmployeesHub";
 import FactoryInsurance from "@/pages/factory/FactoryInsurance";
+import { FactoryStaffTracking } from "@/pages/factory/FactoryStaffTracking";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";
 
-type Section = "workers" | "employees" | "insurance";
+type Section = "workers" | "employees" | "production-targets" | "attendance-register" | "insurance";
 
 export default function FactoryPayrollHub() {
   const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
@@ -17,8 +18,8 @@ export default function FactoryPayrollHub() {
     myAccess.pageKeys.includes("factory/insurance");
 
   const sections: Section[] = hasInsuranceAccess
-    ? ["workers", "employees", "insurance"]
-    : ["workers", "employees"];
+    ? ["workers", "employees", "production-targets", "attendance-register", "insurance"]
+    : ["workers", "employees", "production-targets", "attendance-register"];
 
   const [activeSection, setActiveSection] = useHubQueryState<Section>({
     key: "section",
@@ -31,6 +32,8 @@ export default function FactoryPayrollHub() {
   const allTabs: TabDef[] = [
     { key: "workers", label: "Workers", Icon: HardHat },
     { key: "employees", label: "Employees", Icon: Users },
+    { key: "production-targets", label: "Production Targets", Icon: Target },
+    { key: "attendance-register", label: "Attendance Register", Icon: ClipboardCheck },
     { key: "insurance", label: "Insurance", Icon: Shield },
   ];
   const tabs = allTabs.filter((tab) => sections.includes(tab.key));
@@ -44,11 +47,11 @@ export default function FactoryPayrollHub() {
           </div>
           <div>
             <h1 className="text-base font-semibold leading-tight">Payroll & Benefits</h1>
-            <p className="text-xs text-muted-foreground">Workers, employees and insurance management</p>
+            <p className="text-xs text-muted-foreground">Workers, employees, production targets, attendance and insurance</p>
           </div>
         </div>
 
-        <div className="flex gap-0 px-4" role="tablist">
+        <div className="flex gap-0 px-4 overflow-x-auto" role="tablist">
           {tabs.map(({ key, label, Icon }) => {
             const active = activeSection === key;
             return (
@@ -74,6 +77,8 @@ export default function FactoryPayrollHub() {
       <div className="flex-1 overflow-auto min-h-0">
         {activeSection === "workers" && <div className="p-4"><FactoryWorkersHub /></div>}
         {activeSection === "employees" && <div className="p-4"><FactoryEmployeesHub /></div>}
+        {activeSection === "production-targets" && <div className="p-4"><FactoryStaffTracking mode="production" /></div>}
+        {activeSection === "attendance-register" && <div className="p-4"><FactoryStaffTracking mode="attendance" /></div>}
         {activeSection === "insurance" && hasInsuranceAccess && <FactoryInsurance />}
       </div>
     </div>
