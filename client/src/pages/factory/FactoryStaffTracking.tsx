@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { CalendarDays, CheckCircle2, ClipboardCheck, Save, Search, Target, UserPlus, Users, XCircle } from "lucide-react";
+import {
+  CalendarDays,
+  CheckCircle2,
+  ClipboardCheck,
+  Save,
+  Search,
+  Target,
+  UserPlus,
+  Users,
+  XCircle,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -70,8 +80,10 @@ function periodFor(type: PeriodType, referenceDate: string) {
 }
 
 function statusClass(status: TrackingStatus) {
-  if (status === FACTORY_TRACKING_STATUSES.absent) return "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300";
-  if (status === FACTORY_TRACKING_STATUSES.new) return "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
+  if (status === FACTORY_TRACKING_STATUSES.absent)
+    return "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300";
+  if (status === FACTORY_TRACKING_STATUSES.new)
+    return "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
   return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300";
 }
 
@@ -179,7 +191,11 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
   const visibleRows = rows.filter((row) => {
     const needle = search.trim().toLowerCase();
     if (!needle) return true;
-    return row.name.toLowerCase().includes(needle) || row.category.toLowerCase().includes(needle) || (row.code || "").toLowerCase().includes(needle);
+    return (
+      row.name.toLowerCase().includes(needle) ||
+      row.category.toLowerCase().includes(needle) ||
+      (row.code || "").toLowerCase().includes(needle)
+    );
   });
 
   const totals = useMemo(() => {
@@ -210,7 +226,11 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            {mode === "production" ? <Target className="h-5 w-5 text-primary" /> : <ClipboardCheck className="h-5 w-5 text-primary" />}
+            {mode === "production" ? (
+              <Target className="h-5 w-5 text-primary" />
+            ) : (
+              <ClipboardCheck className="h-5 w-5 text-primary" />
+            )}
             <h2 className="text-lg font-semibold">{title}</h2>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
@@ -219,7 +239,9 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">{tr("period")}</p>
             <Select value={periodType} onValueChange={(value) => setPeriodType(value as PeriodType)}>
-              <SelectTrigger className="w-[130px]" data-testid={`select-${mode}-period-type`}><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[130px]" data-testid={`select-${mode}-period-type`}>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="daily">{tr("daily")}</SelectItem>
                 <SelectItem value="weekly">{tr("weekly")}</SelectItem>
@@ -229,7 +251,12 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">{tr("referenceDate")}</p>
-            <Input type="date" value={referenceDate} onChange={(e) => setReferenceDate(e.target.value)} className="w-[155px]" />
+            <Input
+              type="date"
+              value={referenceDate}
+              onChange={(e) => setReferenceDate(e.target.value)}
+              className="w-[155px]"
+            />
           </div>
           {mode === "attendance" && (
             <Button variant="outline" onClick={markAllPresent} disabled={rows.length === 0 || isFetching}>
@@ -249,15 +276,24 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
 
       <div className="rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
         <CalendarDays className="mr-1.5 inline h-3.5 w-3.5" />
-        {period.start}{period.end !== period.start ? ` — ${period.end}` : ""}
+        {period.start}
+        {period.end !== period.start ? ` — ${period.end}` : ""}
         {isFetching && !isLoading ? ` · ${tr("refreshing")}` : ""}
       </div>
 
       {mode === "production" ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <SummaryTile label={tr("totalTarget")} value={totals.target} icon={<Target className="h-5 w-5" />} />
-          <SummaryTile label={tr("balesProduced")} value={totals.produced} icon={<CheckCircle2 className="h-5 w-5" />} />
-          <SummaryTile label={tr("difference")} value={totals.difference > 0 ? `+${totals.difference}` : totals.difference} icon={<ClipboardCheck className="h-5 w-5" />} />
+          <SummaryTile
+            label={tr("balesProduced")}
+            value={totals.produced}
+            icon={<CheckCircle2 className="h-5 w-5" />}
+          />
+          <SummaryTile
+            label={tr("difference")}
+            value={totals.difference > 0 ? `+${totals.difference}` : totals.difference}
+            icon={<ClipboardCheck className="h-5 w-5" />}
+          />
           <SummaryTile label={tr("people")} value={rows.length} icon={<Users className="h-5 w-5" />} />
         </div>
       ) : (
@@ -271,7 +307,12 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
 
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tr("searchPlaceholder")} className="pl-9" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={tr("searchPlaceholder")}
+          className="pl-9"
+        />
       </div>
 
       <div className="overflow-x-auto rounded-xl border">
@@ -302,15 +343,24 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
               </TableRow>
             ) : (
               visibleRows.map((row) => {
-                const sourceIndex = rows.findIndex((item) => item.personType === row.personType && item.personId === row.personId);
+                const sourceIndex = rows.findIndex(
+                  (item) => item.personType === row.personType && item.personId === row.personId
+                );
                 return (
-                  <TableRow key={`${row.personType}-${row.personId}`} className={!row.active ? "opacity-60" : undefined}>
+                  <TableRow
+                    key={`${row.personType}-${row.personId}`}
+                    className={!row.active ? "opacity-60" : undefined}
+                  >
                     <TableCell>
                       <div className="font-medium">{row.name}</div>
                       <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                         <span>{row.personType === "worker" ? tr("worker") : tr("employee")}</span>
                         {row.code && <span>· {row.code}</span>}
-                        {!row.active && <Badge variant="outline" className="h-5 px-1.5 text-[10px]">{tr("inactive")}</Badge>}
+                        {!row.active && (
+                          <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                            {tr("inactive")}
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -328,7 +378,9 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
                           step="1"
                           className="text-right tabular-nums"
                           value={row.targetBales ?? ""}
-                          onChange={(e) => setRow(sourceIndex, { targetBales: e.target.value === "" ? null : Number(e.target.value) })}
+                          onChange={(e) =>
+                            setRow(sourceIndex, { targetBales: e.target.value === "" ? null : Number(e.target.value) })
+                          }
                         />
                       </TableCell>
                     )}
@@ -340,18 +392,29 @@ export function FactoryStaffTracking({ mode }: { mode: TrackingMode }) {
                           step="1"
                           className="text-right tabular-nums"
                           value={row.producedBales ?? ""}
-                          onChange={(e) => setRow(sourceIndex, { producedBales: e.target.value === "" ? null : Number(e.target.value) })}
+                          onChange={(e) =>
+                            setRow(sourceIndex, {
+                              producedBales: e.target.value === "" ? null : Number(e.target.value),
+                            })
+                          }
                         />
                       </TableCell>
                     )}
                     {mode === "production" && (
-                      <TableCell className={`text-right font-semibold tabular-nums ${differenceClass(row.targetBales, row.producedBales)}`}>
+                      <TableCell
+                        className={`text-right font-semibold tabular-nums ${differenceClass(row.targetBales, row.producedBales)}`}
+                      >
                         {differenceText(row.targetBales, row.producedBales)}
                       </TableCell>
                     )}
                     <TableCell>
-                      <Select value={row.status} onValueChange={(value) => setRow(sourceIndex, { status: value as TrackingStatus })}>
-                        <SelectTrigger className="w-[125px]"><SelectValue /></SelectTrigger>
+                      <Select
+                        value={row.status}
+                        onValueChange={(value) => setRow(sourceIndex, { status: value as TrackingStatus })}
+                      >
+                        <SelectTrigger className="w-[125px]">
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value={FACTORY_TRACKING_STATUSES.present}>{tr("present")}</SelectItem>
                           <SelectItem value={FACTORY_TRACKING_STATUSES.absent}>{tr("absent")}</SelectItem>

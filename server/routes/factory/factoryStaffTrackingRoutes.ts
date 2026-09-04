@@ -111,16 +111,24 @@ export function registerFactoryStaffTrackingRoutes(app: Express): void {
           active: employees.active,
         })
         .from(employees)
-        .where(and(eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"), sql`${employees.deletedAt} IS NULL`))
+        .where(
+          and(
+            eq(employees.companyId, companyId),
+            eq(employees.employeeType, "Employee"),
+            sql`${employees.deletedAt} IS NULL`
+          )
+        )
         .orderBy(employees.firstName, employees.lastName);
 
       const includedWorkers = workers.filter(
         (person) =>
-          savedMap.has(`worker:${person.id}`) || (person.active && joinedByPeriodEnd(person.dateJoined, query.periodEnd))
+          savedMap.has(`worker:${person.id}`) ||
+          (person.active && joinedByPeriodEnd(person.dateJoined, query.periodEnd))
       );
       const includedEmployees = emps.filter(
         (person) =>
-          savedMap.has(`employee:${person.id}`) || (person.active && joinedByPeriodEnd(person.joinDate, query.periodEnd))
+          savedMap.has(`employee:${person.id}`) ||
+          (person.active && joinedByPeriodEnd(person.joinDate, query.periodEnd))
       );
 
       const workerAttendance = new Map<number, string>();
@@ -169,8 +177,12 @@ export function registerFactoryStaffTrackingRoutes(app: Express): void {
           name: worker.fullName,
           code: worker.employeeCode,
           category: savedRow?.category ?? worker.position ?? worker.department ?? "",
-          targetBales: savedRow?.targetBales === null || savedRow?.targetBales === undefined ? null : Number(savedRow.targetBales),
-          producedBales: savedRow?.producedBales === null || savedRow?.producedBales === undefined ? null : Number(savedRow.producedBales),
+          targetBales:
+            savedRow?.targetBales === null || savedRow?.targetBales === undefined ? null : Number(savedRow.targetBales),
+          producedBales:
+            savedRow?.producedBales === null || savedRow?.producedBales === undefined
+              ? null
+              : Number(savedRow.producedBales),
           status: savedRow?.status ?? defaultStatus,
           notes: savedRow?.notes ?? "",
           active: worker.active,
@@ -191,8 +203,12 @@ export function registerFactoryStaffTrackingRoutes(app: Express): void {
           name: `${employee.firstName} ${employee.lastName}`.trim(),
           code: employee.code,
           category: savedRow?.category ?? employee.department ?? "",
-          targetBales: savedRow?.targetBales === null || savedRow?.targetBales === undefined ? null : Number(savedRow.targetBales),
-          producedBales: savedRow?.producedBales === null || savedRow?.producedBales === undefined ? null : Number(savedRow.producedBales),
+          targetBales:
+            savedRow?.targetBales === null || savedRow?.targetBales === undefined ? null : Number(savedRow.targetBales),
+          producedBales:
+            savedRow?.producedBales === null || savedRow?.producedBales === undefined
+              ? null
+              : Number(savedRow.producedBales),
           status: savedRow?.status ?? defaultStatus,
           notes: savedRow?.notes ?? "",
           active: employee.active,
@@ -221,20 +237,46 @@ export function registerFactoryStaffTrackingRoutes(app: Express): void {
       const periodStart = String(req.body?.periodStart || "");
       const periodEnd = String(req.body?.periodEnd || "");
       const records = Array.isArray(req.body?.records) ? req.body.records : [];
-      if (!PAGE_TYPES.has(page) || !PERIOD_TYPES.has(periodType) || !ISO_DATE.test(periodStart) || !ISO_DATE.test(periodEnd) || periodEnd < periodStart) {
+      if (
+        !PAGE_TYPES.has(page) ||
+        !PERIOD_TYPES.has(periodType) ||
+        !ISO_DATE.test(periodStart) ||
+        !ISO_DATE.test(periodEnd) ||
+        periodEnd < periodStart
+      ) {
         return res.status(400).json({ message: factoryStaffTrackingMessages.invalidPeriod });
       }
       if (records.length === 0 || records.length > 500) {
         return res.status(400).json({ message: factoryStaffTrackingMessages.invalidRecordCount });
       }
 
-      const allWorkers = await db.select({ id: factoryWorkers.id }).from(factoryWorkers).where(eq(factoryWorkers.companyId, companyId));
+      const allWorkers = await db
+        .select({ id: factoryWorkers.id })
+        .from(factoryWorkers)
+        .where(eq(factoryWorkers.companyId, companyId));
       const allEmployees = await db
         .select({ id: employees.id })
         .from(employees)
-        .where(and(eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"), sql`${employees.deletedAt} IS NULL`));
+        .where(
+          and(
+            eq(employees.companyId, companyId),
+            eq(employees.employeeType, "Employee"),
+            sql`${employees.deletedAt} IS NULL`
+          )
+        );
       const workerIds = new Set(allWorkers.map((row) => row.id));
       const employeeIds = new Set(allEmployees.map((row) => row.id));
+
+      const normalizedRecords: Array<{
+        personType: PersonType;
+        personId: number;
+        category: string | null;
+        notes: string | null;
+        targetBales: number | null;
+        producedBales: number | null;
+        status: TrackingStatus;
+      }> = [];
+      const recordKeys = new Set<string>();
 
       for (const raw of records) {
         const personType = String(raw?.personType || "") as PersonType;
@@ -243,32 +285,69 @@ export function registerFactoryStaffTrackingRoutes(app: Express): void {
         if (!Number.isInteger(personId) || personId <= 0 || !STATUSES.has(status)) {
           return res.status(400).json({ message: factoryStaffTrackingMessages.invalidRow });
         }
-        if ((personType === "worker" && !workerIds.has(personId)) || (personType === "employee" && !employeeIds.has(personId))) {
+        if (
+          (personType === "worker" && !workerIds.has(personId)) ||
+          (personType === "employee" && !employeeIds.has(personId))
+        ) {
           return res.status(400).json({ message: factoryStaffTrackingMessages.personOutsideFactory });
         }
         if (personType !== "worker" && personType !== "employee") {
           return res.status(400).json({ message: factoryStaffTrackingMessages.invalidPersonType });
         }
+        const recordKey = `${personType}:${personId}`;
+        if (recordKeys.has(recordKey)) {
+          return res.status(400).json({ message: "Each worker or employee may appear only once per batch" });
+        }
+        recordKeys.add(recordKey);
 
-        const category = String(raw?.category || "").trim().slice(0, 150) || null;
-        const notes = String(raw?.notes || "").trim().slice(0, 4000) || null;
+        const category =
+          String(raw?.category || "")
+            .trim()
+            .slice(0, 150) || null;
+        const notes =
+          String(raw?.notes || "")
+            .trim()
+            .slice(0, 4000) || null;
         const targetBales = numberOrNull(raw?.targetBales);
         const producedBales = numberOrNull(raw?.producedBales);
-        if ((raw?.targetBales !== null && raw?.targetBales !== undefined && raw?.targetBales !== "" && targetBales === null) ||
-            (raw?.producedBales !== null && raw?.producedBales !== undefined && raw?.producedBales !== "" && producedBales === null)) {
+        if (
+          (raw?.targetBales !== null &&
+            raw?.targetBales !== undefined &&
+            raw?.targetBales !== "" &&
+            targetBales === null) ||
+          (raw?.producedBales !== null &&
+            raw?.producedBales !== undefined &&
+            raw?.producedBales !== "" &&
+            producedBales === null)
+        ) {
           return res.status(400).json({ message: factoryStaffTrackingMessages.invalidBaleNumbers });
         }
 
-        await db.execute(sql`
+        normalizedRecords.push({
+          personType,
+          personId,
+          category,
+          notes,
+          targetBales,
+          producedBales,
+          status,
+        });
+      }
+
+      const values = normalizedRecords.map(
+        ({ personType, personId, category, targetBales, producedBales, status, notes }) => sql`(
+          ${companyId}, ${page}, ${periodType}, ${periodStart}, ${periodEnd},
+          ${personType}, ${personId}, ${category}, ${targetBales}, ${producedBales},
+          ${status}, ${notes}, ${req.session.userId || null}, now()
+        )`
+      );
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`
           INSERT INTO factory_staff_tracking_entries (
             company_id, page_type, period_type, period_start, period_end,
             person_type, person_id, category, target_bales, produced_bales,
             status, notes, created_by, updated_at
-          ) VALUES (
-            ${companyId}, ${page}, ${periodType}, ${periodStart}, ${periodEnd},
-            ${personType}, ${personId}, ${category}, ${targetBales}, ${producedBales},
-            ${status}, ${notes}, ${req.session.userId || null}, now()
-          )
+          ) VALUES ${sql.join(values, sql`, `)}
           ON CONFLICT (company_id, page_type, period_type, period_start, period_end, person_type, person_id)
           DO UPDATE SET
             category = EXCLUDED.category,
@@ -278,7 +357,7 @@ export function registerFactoryStaffTrackingRoutes(app: Express): void {
             notes = EXCLUDED.notes,
             updated_at = now()
         `);
-      }
+      });
 
       res.json({ success: true, saved: records.length });
     } catch (error: unknown) {

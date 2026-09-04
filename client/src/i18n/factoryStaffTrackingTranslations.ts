@@ -60,24 +60,44 @@ const factoryStaffTrackingTranslations = {
   produced: { en: "Produced", ar: "المنتج", fr: "Produit" },
   status: { en: "Status", ar: "الحالة", fr: "Statut" },
   notes: { en: "Notes", ar: "ملاحظات", fr: "Notes" },
-  loadingStaff: { en: "Loading factory staff…", ar: "جارٍ تحميل موظفي المصنع…", fr: "Chargement du personnel de l’usine…" },
-  noMatchingStaff: { en: "No matching factory staff.", ar: "لا يوجد موظفون مطابقون في المصنع.", fr: "Aucun membre du personnel correspondant." },
+  loadingStaff: {
+    en: "Loading factory staff…",
+    ar: "جارٍ تحميل موظفي المصنع…",
+    fr: "Chargement du personnel de l’usine…",
+  },
+  noMatchingStaff: {
+    en: "No matching factory staff.",
+    ar: "لا يوجد موظفون مطابقون في المصنع.",
+    fr: "Aucun membre du personnel correspondant.",
+  },
   worker: { en: "Worker", ar: "عامل", fr: "Ouvrier" },
   employee: { en: "Employee", ar: "موظف", fr: "Employé" },
   inactive: { en: "Inactive", ar: "غير نشط", fr: "Inactif" },
   categoryStation: { en: "Category / station", ar: "الفئة / المحطة", fr: "Catégorie / poste" },
-  productionSaved: { en: "Production targets saved", ar: "تم حفظ أهداف الإنتاج", fr: "Objectifs de production enregistrés" },
+  productionSaved: {
+    en: "Production targets saved",
+    ar: "تم حفظ أهداف الإنتاج",
+    fr: "Objectifs de production enregistrés",
+  },
   attendanceSaved: { en: "Attendance register saved", ar: "تم حفظ سجل الحضور", fr: "Registre de présence enregistré" },
   saveFailed: { en: "Save failed", ar: "فشل الحفظ", fr: "Échec de l’enregistrement" },
-  loadFailed: { en: "Failed to load factory tracking data", ar: "تعذر تحميل بيانات متابعة المصنع", fr: "Impossible de charger les données de suivi de l’usine" },
-  saveDataFailed: { en: "Failed to save factory tracking data", ar: "تعذر حفظ بيانات متابعة المصنع", fr: "Impossible d’enregistrer les données de suivi de l’usine" },
+  loadFailed: {
+    en: "Failed to load factory tracking data",
+    ar: "تعذر تحميل بيانات متابعة المصنع",
+    fr: "Impossible de charger les données de suivi de l’usine",
+  },
+  saveDataFailed: {
+    en: "Failed to save factory tracking data",
+    ar: "تعذر حفظ بيانات متابعة المصنع",
+    fr: "Impossible d’enregistrer les données de suivi de l’usine",
+  },
 } as const;
 
 export type FactoryStaffTrackingTranslationKey = keyof typeof factoryStaffTrackingTranslations;
 
 export function translateFactoryStaffTrackingText(
   key: FactoryStaffTrackingTranslationKey,
-  language: ApplicationLanguage,
+  language: ApplicationLanguage
 ): string {
   const entry = factoryStaffTrackingTranslations[key];
   return entry[language] || entry.en;

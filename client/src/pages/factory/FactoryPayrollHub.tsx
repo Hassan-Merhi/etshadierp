@@ -68,7 +68,9 @@ export default function FactoryPayrollHub() {
                 onClick={() => setActiveSection(key)}
                 className={[
                   "flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-                  active ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+                  active
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
                 ].join(" ")}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -80,10 +82,26 @@ export default function FactoryPayrollHub() {
       </div>
 
       <div className="flex-1 overflow-auto min-h-0">
-        {activeSection === "workers" && <div className="p-4"><FactoryWorkersHub /></div>}
-        {activeSection === "employees" && <div className="p-4"><FactoryEmployeesHub /></div>}
-        {activeSection === "production-targets" && <div className="p-4"><FactoryStaffTracking mode="production" /></div>}
-        {activeSection === "attendance-register" && <div className="p-4"><FactoryStaffTracking mode="attendance" /></div>}
+        {activeSection === "workers" && (
+          <div className="p-4">
+            <FactoryWorkersHub />
+          </div>
+        )}
+        {activeSection === "employees" && (
+          <div className="p-4">
+            <FactoryEmployeesHub />
+          </div>
+        )}
+        {activeSection === "production-targets" && (
+          <div className="p-4">
+            <FactoryStaffTracking mode="production" />
+          </div>
+        )}
+        {activeSection === "attendance-register" && (
+          <div className="p-4">
+            <FactoryStaffTracking mode="attendance" />
+          </div>
+        )}
         {activeSection === "insurance" && hasInsuranceAccess && <FactoryInsurance />}
       </div>
     </div>
