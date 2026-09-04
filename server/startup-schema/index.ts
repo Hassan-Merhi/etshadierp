@@ -36,6 +36,7 @@ import { tenantControlIntegrityRepairs } from "./022-tenant-control-integrity-re
 import { financialOperationRequests } from "./023-financial-operation-requests";
 import { stockItemSchemaCatchup } from "./024-stock-item-schema-catchup";
 import { insuranceMonthlyAmounts } from "./025-insurance-monthly-amounts";
+import { poImportParentCompany } from "./026-po-import-parent-company";
 
 export const startupMigrations: string[] = [
   ...coreTablesAndColumns,
@@ -69,6 +70,7 @@ export const startupMigrations: string[] = [
   // PO Import performs full-row stock reads and otherwise fails before parsing.
   ...stockItemSchemaCatchup,
   ...insuranceMonthlyAmounts,
+  ...poImportParentCompany,
 ];
 
 // Re-exported so server/index.ts can bootstrap the journal from the module it
