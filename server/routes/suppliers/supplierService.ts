@@ -54,20 +54,25 @@ function supplierAuditChanges(existing: Record<string, unknown>, updated: Record
 export const supplierService = {
   async list(companyId: number, search: string, allowParentFallback = false) {
     const suppliers = await supplierRepository.list(companyId, search);
-    if (suppliers.length > 0 || !allowParentFallback) return suppliers;
+    if (!allowParentFallback) return suppliers;
 
-    // PO Import is the one compatibility flow that may intentionally resolve
-    // the configured parent supplier master when a new child company has no
-    // company-owned suppliers yet. Every normal supplier/accounting picker must
-    // remain strict to the active company so a foreign supplier ID can never be
-    // selected and then rejected by the central posting ownership guard.
-    const companySuppliers = search ? await supplierRepository.listAll(companyId) : suppliers;
-    if (companySuppliers.length > 0) return suppliers;
-
+    // PO Import and other explicitly opted-in master-data pickers may use the
+    // linked parent as an inherited supplier source. Keep ordinary supplier
+    // routes strict to the active company so a foreign supplier ID cannot be
+    // selected outside an intentional inheritance flow.
     const parentCompanyId = await resolveParentCompanyId(companyId);
     if (parentCompanyId === companyId) return suppliers;
 
-    return supplierRepository.list(parentCompanyId, search);
+    const parentSuppliers = await supplierRepository.list(parentCompanyId, search);
+    const deduplicated = new Map<number, (typeof suppliers)[number]>();
+    for (const supplier of [...suppliers, ...parentSuppliers]) {
+      deduplicated.set(supplier.id, supplier);
+    }
+
+    return [...deduplicated.values()].sort((a, b) => {
+      const nameOrder = a.legalName.localeCompare(b.legalName);
+      return nameOrder !== 0 ? nameOrder : a.id - b.id;
+    });
   },
 
   async stats(companyId: number) {
