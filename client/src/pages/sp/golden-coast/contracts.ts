@@ -49,7 +49,8 @@ export interface Phase7Readiness {
     hadiGoldenCoastIntercompanyAccountName: string;
   } | null;
   balances: {
-    gcSalesCashDebitBalanceUsd: string;
+    /** Outstanding credit-normal GC Sales Cash payable; a collection raises it. */
+    gcSalesCashPayableBalanceUsd: string;
     outstandingHadiCollectionsUsd: string;
   } | null;
   hadiCashAccounts: CashAccountOption[];
@@ -71,8 +72,12 @@ export interface Phase10Readiness {
   ready: boolean;
   companyId: number;
   gcSalesCashAccount: { id: number; name?: string };
-  collectibleSalesCashUsd: string;
-  rawSalesCashDebitBalanceUsd: string;
+  /** GC Sales Cash is credit-normal: this is what may still be paid down. */
+  settleableSalesCashUsd: string;
+  /** Outstanding payable, negative when GC Sales Cash has been overpaid. */
+  rawSalesCashPayableBalanceUsd: string;
+  /** Expense account a transfer fee is booked to; null when not configured. */
+  sharedChargesAccount: { id: number; name: string } | null;
   receiptAccounts: CashAccountOption[];
   sourceType: string;
 }

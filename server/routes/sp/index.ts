@@ -8,6 +8,7 @@ import { registerSpGoldenCoastExistingPositionCarryForwardRoutes } from "./spGol
 import { registerSpGoldenCoastPhase3CutoverRoutes } from "./spGoldenCoastPhase3CutoverRoutes";
 import { registerSpGoldenCoastPhase4CutoverFifoRoutes } from "./spGoldenCoastPhase4CutoverFifoRoutes";
 import { registerSpGoldenCoastPhase6PosSaleRoutes } from "./spGoldenCoastPhase6PosSaleRegistration";
+import { registerSpGoldenCoastPhase16HadiTransferGuard } from "./spGoldenCoastPhase16HadiTransferGuard";
 import { registerSpGoldenCoastPhase7HadiTransferRoutes } from "./spGoldenCoastPhase7HadiTransferRoutes";
 import { registerSpGoldenCoastFreshStartHadiPaymentRoutes } from "./spGoldenCoastFreshStartHadiPaymentRoutes";
 import { registerSpGoldenCoastPhase8ContainerOffloadRoutes } from "./spGoldenCoastPhase8ContainerOffloadRoutes";
@@ -61,7 +62,9 @@ export function registerSpRoutes(app: Express) {
   void runSpSupplierVoucherStartup()
     .then((repairedCount) => {
       if (repairedCount > 0) {
-        logger.info("[SP] Repaired Goods-OTW voucher supplier links", { repairedCount });
+        logger.info("[SP] Repaired Goods-OTW voucher supplier links", {
+          repairedCount,
+        });
       }
     })
     .catch((error) => {
@@ -76,13 +79,15 @@ export function registerSpRoutes(app: Express) {
   registerSpGoldenCoastPhase3CutoverRoutes(app);
   registerSpGoldenCoastPhase4CutoverFifoRoutes(app);
   // Phase 6 supersedes the Phase 5 mutation surface: it keeps the same FIFO
-  // revenue/COGS behavior and atomically adds the Golden Coast special-location
-  // Hassan Savings deduction. The Phase 5 source remains in the repository for
-  // history/tests, but its production route is intentionally no longer mounted.
+  // revenue/COGS behavior and atomically routes Golden Coast sale proceeds into
+  // the configured HADI company before Phase 15 creates the credit payable.
   registerSpGoldenCoastPhase6PosSaleRoutes(app);
+  // Phase 16 leaves the Phase 7 readiness probe available for HADI discovery,
+  // but fail-closes the obsolete manual debit-model POST before its legacy
+  // handler can run. HADI-held sales proceeds are paid through the Fresh Start
+  // settlement route below.
+  registerSpGoldenCoastPhase16HadiTransferGuard(app);
   registerSpGoldenCoastPhase7HadiTransferRoutes(app);
-  // Paying Fresh Start is distinct from merely moving cash between GC and HADI:
-  // it reduces Fresh Start equity and the GC-side HADI intercompany asset.
   registerSpGoldenCoastFreshStartHadiPaymentRoutes(app);
   registerSpGoldenCoastPhase8ContainerOffloadRoutes(app);
   registerSpGoldenCoastPhase9HassanSavingsWithdrawalRoutes(app);

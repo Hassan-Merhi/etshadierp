@@ -109,7 +109,11 @@ function cutoverInput(): GoldenCoastPhase3CutoverInput {
     containerReserveUsd: "22300.00",
     freshStartContributedStockOtwUsd: "44000.00",
     gcSalesCashUsd: "0.00",
-    cashAccount: { kind: "bank", id: bank.openingCash, name: "Golden Coast opening bank" },
+    cashAccount: {
+      kind: "bank",
+      id: bank.openingCash,
+      name: "Golden Coast opening bank",
+    },
     accounts: {
       freshStartEquityAccountId: account.freshStartEquity,
       hassanEquityAccountId: account.hassanEquity,
@@ -280,7 +284,10 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
     expect(plan.cogsUsd).toBe("970.50");
     expect(plan.grossProfitUsd).toBe("829.50");
 
-    const saleSideAccount = { kind: "ledger", id: account.gcSalesCash } as const;
+    const saleSideAccount = {
+      kind: "ledger",
+      id: account.gcSalesCash,
+    } as const;
     const saleDigest = goldenCoastPhase5SaleDigest({ sale, saleSideAccount });
     const saleBatch = buildGoldenCoastPhase5SalePostings({
       plan,
@@ -343,7 +350,10 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
       goldenCoastHadiIntercompanyAccountId: account.gcHadiIntercompany,
       hadiGoldenCoastIntercompanyAccountId: account.hadiGcIntercompany,
     };
-    const collectionDigest = goldenCoastPhase7TransferDigest({ transfer: collection, accounts: phase7Accounts });
+    const collectionDigest = goldenCoastPhase7TransferDigest({
+      transfer: collection,
+      accounts: phase7Accounts,
+    });
     const collectionBatch = buildGoldenCoastPhase7TransferPostings({
       plan: collectionPlan,
       accounts: phase7Accounts,
@@ -412,7 +422,10 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
     });
     expect(remittancePlan.gcSalesCashDebitBalanceAfterUsd).toBe("0.00");
     expect(remittancePlan.outstandingHadiCollectionsAfterUsd).toBe("0.00");
-    const remittanceDigest = goldenCoastPhase7TransferDigest({ transfer: remittance, accounts: phase7Accounts });
+    const remittanceDigest = goldenCoastPhase7TransferDigest({
+      transfer: remittance,
+      accounts: phase7Accounts,
+    });
     const remittanceBatch = buildGoldenCoastPhase7TransferPostings({
       plan: remittancePlan,
       accounts: phase7Accounts,
@@ -441,7 +454,10 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
         confirmation: GOLDEN_COAST_PHASE9_CONFIRMATION,
       },
     });
-    const withdrawalPlan = planGoldenCoastPhase9Withdrawal({ withdrawal, savingsBalanceUsd: "79375.00" });
+    const withdrawalPlan = planGoldenCoastPhase9Withdrawal({
+      withdrawal,
+      savingsBalanceUsd: "79375.00",
+    });
     expect(withdrawalPlan.savingsBalanceAfterUsd).toBe("77700.00");
     const withdrawalDigest = goldenCoastPhase9WithdrawalDigest({
       withdrawal,
@@ -484,8 +500,15 @@ describe("Golden Coast Phase 14 final lifecycle certification", () => {
       freshStartEquityAccountId: account.freshStartEquity,
       hassanEquityAccountId: account.hassanEquity,
     };
-    const digest = goldenCoastPhase11CloseDigest({ plan: closePlan, accounts: closeAccounts });
-    const posting = buildGoldenCoastPhase11MonthlyClosePosting({ plan: closePlan, accounts: closeAccounts, digest });
+    const digest = goldenCoastPhase11CloseDigest({
+      plan: closePlan,
+      accounts: closeAccounts,
+    });
+    const posting = buildGoldenCoastPhase11MonthlyClosePosting({
+      plan: closePlan,
+      accounts: closeAccounts,
+      digest,
+    });
 
     expect(ledgerNetDebit(posting.entries, account.freshStartEquity)).toBe(-414.75);
     expect(ledgerNetDebit(posting.entries, account.hassanEquity)).toBe(-414.75);

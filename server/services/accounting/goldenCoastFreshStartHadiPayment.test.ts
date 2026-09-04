@@ -41,7 +41,10 @@ describe("Golden Coast Fresh Start payment from HADI", () => {
     expect(plan.outstandingHadiSalesCashAfterUsd).toBe("700.00");
     expect(plan.hadiIntercompanyAssetAfterUsd).toBe("700.00");
 
-    const digest = goldenCoastFreshStartHadiPaymentDigest({ payment: parsed, accounts });
+    const digest = goldenCoastFreshStartHadiPaymentDigest({
+      payment: parsed,
+      accounts,
+    });
     const postings = buildGoldenCoastFreshStartHadiPaymentPostings({
       plan,
       accounts,
@@ -54,14 +57,30 @@ describe("Golden Coast Fresh Start payment from HADI", () => {
 
     expect(gc.entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ ledgerAccountId: 101, debitAmount: "300", creditAmount: "0" }),
-        expect.objectContaining({ ledgerAccountId: 102, debitAmount: "0", creditAmount: "300" }),
+        expect.objectContaining({
+          ledgerAccountId: 101,
+          debitAmount: "300",
+          creditAmount: "0",
+        }),
+        expect.objectContaining({
+          ledgerAccountId: 102,
+          debitAmount: "0",
+          creditAmount: "300",
+        }),
       ])
     );
     expect(hadi.entries).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ ledgerAccountId: 201, debitAmount: "300", creditAmount: "0" }),
-        expect.objectContaining({ bankAccountId: 301, debitAmount: "0", creditAmount: "300" }),
+        expect.objectContaining({
+          ledgerAccountId: 201,
+          debitAmount: "300",
+          creditAmount: "0",
+        }),
+        expect.objectContaining({
+          bankAccountId: 301,
+          debitAmount: "0",
+          creditAmount: "300",
+        }),
       ])
     );
   });

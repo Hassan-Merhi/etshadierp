@@ -114,7 +114,7 @@ describe("Phase 7 HADI cash routing", () => {
       hadiCompanyName: "HADI",
     },
     accounts: null,
-    balances: { gcSalesCashDebitBalanceUsd: "500.00", outstandingHadiCollectionsUsd: "120.00" },
+    balances: { gcSalesCashPayableBalanceUsd: "500.00", outstandingHadiCollectionsUsd: "120.00" },
     hadiCashAccounts: [{ kind: "ledger", id: 11, name: "HADI Cash", type: "cash" }],
     goldenCoastCashAccounts: [{ kind: "bank", id: 22, name: "GC Bank", type: "bank" }],
     blockers: [],
@@ -154,11 +154,19 @@ describe("Phase 7 HADI cash routing", () => {
     });
   });
 
-  it("refuses an amount above the server-reported cap for the selected direction", () => {
+  it("refuses a remittance above the unremitted collections the server reports", () => {
+    render(<HadiCashRoutingPanel companyKey={42} />);
+    fireEvent.change(screen.getByLabelText(/Operation/i), { target: { value: "remit_from_hadi" } });
+    setValue("input-gc-phase7-amount", "120.01");
+
+    expect(screen.getByTestId("button-gc-phase7-submit").hasAttribute("disabled")).toBe(true);
+  });
+
+  it("does not cap a collection against the GC Sales Cash payable it raises", () => {
     render(<HadiCashRoutingPanel companyKey={42} />);
     setValue("input-gc-phase7-amount", "500.01");
 
-    expect(screen.getByTestId("button-gc-phase7-submit").hasAttribute("disabled")).toBe(true);
+    expect(screen.getByTestId("button-gc-phase7-submit").hasAttribute("disabled")).toBe(false);
   });
 
   it("stays blocked while the server reports the pair cannot transfer", () => {
@@ -233,8 +241,9 @@ describe("Phase 10 GC Sales Cash settlement", () => {
       ready: true,
       companyId: 42,
       gcSalesCashAccount: { id: 8, name: "GC Sales Cash" },
-      collectibleSalesCashUsd: "400.00",
-      rawSalesCashDebitBalanceUsd: "650.00",
+      settleableSalesCashUsd: "400.00",
+      rawSalesCashPayableBalanceUsd: "650.00",
+      sharedChargesAccount: { id: 9, name: "Shared Charges" },
       receiptAccounts: [{ kind: "bank", id: 44, name: "GC Bank", type: "bank" }],
       sourceType: "ledger",
     });
@@ -248,12 +257,38 @@ describe("Phase 10 GC Sales Cash settlement", () => {
     await waitFor(() => expect(harness.apiRequest).toHaveBeenCalled());
     const request = lastRequest();
     expect(request.url).toBe(PHASE10);
-    expect(request.body).toMatchObject({ amountUsd: "400", receiptAccount: { kind: "bank", id: 44 } });
+    expect(request.body).toMatchObject({
+      amountUsd: "400",
+      transferFeeUsd: "0",
+      receiptAccount: { kind: "bank", id: 44 },
+    });
   });
 
-  it("settles no more than the collectible balance, not the raw debit balance", () => {
+  it("pays no more than the settleable payable", () => {
     render(<GcSalesCashPanel companyKey={42} />);
     setValue("input-gc-phase10-amount", "650");
+
+    expect(screen.getByTestId("button-gc-phase10-submit").hasAttribute("disabled")).toBe(true);
+  });
+
+  it("sends a transfer fee on top of the settlement without shrinking it", async () => {
+    render(<GcSalesCashPanel companyKey={42} />);
+    setValue("input-gc-phase10-amount", "400");
+    setValue("input-gc-phase10-transfer-fee", "12.50");
+    fireEvent.click(screen.getByTestId("button-gc-phase10-submit"));
+
+    await waitFor(() => expect(harness.apiRequest).toHaveBeenCalled());
+    expect(lastRequest().body).toMatchObject({ amountUsd: "400", transferFeeUsd: "12.50" });
+  });
+
+  it("blocks a transfer fee when the server reports no Shared Charges account", () => {
+    harness.readiness.set(`${PHASE10}/readiness`, {
+      ...(harness.readiness.get(`${PHASE10}/readiness`) as Record<string, unknown>),
+      sharedChargesAccount: null,
+    });
+    render(<GcSalesCashPanel companyKey={42} />);
+    setValue("input-gc-phase10-amount", "400");
+    setValue("input-gc-phase10-transfer-fee", "12.50");
 
     expect(screen.getByTestId("button-gc-phase10-submit").hasAttribute("disabled")).toBe(true);
   });

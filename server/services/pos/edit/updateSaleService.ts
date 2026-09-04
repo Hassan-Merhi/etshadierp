@@ -16,7 +16,7 @@ import { salesItems, voucherEntries, stockItems, vouchers } from "@shared/schema
 import { and, eq } from "drizzle-orm";
 import type { HandlerErrorResult, UpdatePosSaleParams } from "./posEditSaleTypes";
 import { fetchSpEditAccountingContext, fetchSpEditDeductionPerQty } from "./posEditSaleHelpers";
-import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../../lib/migratedVoucherGuard";
+import { voucherMutationBlockReason } from "../../../lib/migratedVoucherGuard";
 import {
   validateItemsPositive,
   loadAndValidateExistingVoucher,
@@ -69,8 +69,9 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
   if ("error" in voucherResult) return err(voucherResult.error);
   const preExistingVoucher = voucherResult.existingVoucher;
 
-  if (isReadonlyMigratedVoucher(preExistingVoucher)) {
-    return err({ status: 403, body: { message: READONLY_MIGRATED_VOUCHER_MESSAGE } });
+  const blockedVoucherReason = voucherMutationBlockReason(preExistingVoucher);
+  if (blockedVoucherReason) {
+    return err({ status: 403, body: { message: blockedVoucherReason } });
   }
 
   const preRestrictionResult = applyPosRoleRestrictions(userRole, newLocationId, preExistingVoucher.locationId);
@@ -97,8 +98,9 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
         },
       };
     }
-    if (isReadonlyMigratedVoucher(lockedVoucher)) {
-      return { error: { status: 403, body: { message: READONLY_MIGRATED_VOUCHER_MESSAGE } } };
+    const blockedVoucherReason = voucherMutationBlockReason(lockedVoucher);
+    if (blockedVoucherReason) {
+      return { error: { status: 403, body: { message: blockedVoucherReason } } };
     }
 
     const restrictionResult = applyPosRoleRestrictions(userRole, newLocationId, lockedVoucher.locationId);

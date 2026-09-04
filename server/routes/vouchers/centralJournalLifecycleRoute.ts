@@ -15,7 +15,7 @@ import { requireAuth, requireNonPOS, requireRole } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
+import { voucherMutationBlockReason } from "../../lib/migratedVoucherGuard";
 import { storage } from "../../storage";
 import { applyEmployeeBalanceDeltasTx } from "../../services/accounting/employeeBalancePosting";
 import { createDatabasePostingDependencies } from "../../services/accounting/databasePostingDependencies";
@@ -209,8 +209,9 @@ async function updateActiveJournal(req: Request, res: Response, next: NextFuncti
       res.status(403).json({ message: "Access denied: Voucher belongs to a different company" });
       return;
     }
-    if (isReadonlyMigratedVoucher(existing)) {
-      res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+    const blockedVoucherReason = voucherMutationBlockReason(existing);
+    if (blockedVoucherReason) {
+      res.status(403).json({ message: blockedVoucherReason });
       return;
     }
 
@@ -450,8 +451,9 @@ async function deleteActiveJournal(req: Request, res: Response, next: NextFuncti
       res.status(403).json({ message: "Access denied: Voucher belongs to a different company" });
       return;
     }
-    if (isReadonlyMigratedVoucher(voucher)) {
-      res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+    const blockedVoucherReason = voucherMutationBlockReason(voucher);
+    if (blockedVoucherReason) {
+      res.status(403).json({ message: blockedVoucherReason });
       return;
     }
 
@@ -474,7 +476,7 @@ async function deleteActiveJournal(req: Request, res: Response, next: NextFuncti
         .limit(1);
       if (!lockedVoucher) throw new Error("Voucher not found");
       if (lockedVoucher.deletedAt) {
-        return { replayed: true, voucher: lockedVoucher, entries: ([]) };
+        return { replayed: true, voucher: lockedVoucher, entries: [] };
       }
 
       const entries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));

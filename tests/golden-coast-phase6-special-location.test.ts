@@ -112,6 +112,9 @@ describe("Golden Coast Phase 6 special-location allocation", () => {
       "special_deduction",
       "hadi_collection_golden_coast",
       "hadi_collection_hadi",
+      // Phase 15 posts the Fresh Start capital-to-payable bridge alongside the
+      // collection, so every automatically routed sale carries a third leg.
+      "hadi_collection_sales_payable",
     ]);
 
     const deductionPosting = res.body.postings.find(
@@ -141,6 +144,9 @@ describe("Golden Coast Phase 6 special-location allocation", () => {
       "cogs",
       "hadi_collection_golden_coast",
       "hadi_collection_hadi",
+      // Phase 15 posts the Fresh Start capital-to-payable bridge alongside the
+      // collection, so every automatically routed sale carries a third leg.
+      "hadi_collection_sales_payable",
     ]);
   });
 

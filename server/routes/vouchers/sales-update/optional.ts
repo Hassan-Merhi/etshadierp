@@ -9,7 +9,7 @@ import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { storage } from "../../../storage";
 import { requireAuth, requireNonPOS } from "../../../auth";
-import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../../lib/migratedVoucherGuard";
+import { voucherMutationBlockReason } from "../../../lib/migratedVoucherGuard";
 import { logAudit, syncEmployeeBalancesFromEntries } from "../../_helpers";
 import {
   stockTransferVouchers,
@@ -55,8 +55,9 @@ export function registerVoucherOptionalUpdateRoutes(app: Express) {
         });
       }
 
-      if (isReadonlyMigratedVoucher(existingVoucher)) {
-        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+      const blockedVoucherReason = voucherMutationBlockReason(existingVoucher);
+      if (blockedVoucherReason) {
+        return res.status(403).json({ message: blockedVoucherReason });
       }
 
       // Only Admin and Owner can toggle optional status

@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { requireAuth } from "../auth";
 import { voucherEntries, vouchers } from "@shared/schema";
-import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../lib/migratedVoucherGuard";
+import { voucherMutationBlockReason } from "../lib/migratedVoucherGuard";
 import { normalizeVoucherEntryAmounts } from "../services/accounting/currencyAmounts";
 import { autoReallocateLoansAccounts } from "../lib/transporterAllocation";
 
@@ -36,8 +36,9 @@ export function registerVoucherEntryCurrencyEditRoutes(app: Express) {
         .limit(1);
 
       if (!row) return res.status(404).json({ message: "Voucher entry not found" });
-      if (isReadonlyMigratedVoucher(row.voucher)) {
-        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+      const blockedVoucherReason = voucherMutationBlockReason(row.voucher);
+      if (blockedVoucherReason) {
+        return res.status(403).json({ message: blockedVoucherReason });
       }
 
       const role = req.session.currentRole;
@@ -67,10 +68,13 @@ export function registerVoucherEntryCurrencyEditRoutes(app: Express) {
       const transactionCurrency =
         req.body.transactionCurrency || row.entry.transactionCurrency || row.voucher.currency || "USD";
       const isLegacyForeign =
-        !row.entry.transactionCurrency &&
-        String(row.voucher.currency || "USD").toUpperCase() !== "USD";
+        !row.entry.transactionCurrency && String(row.voucher.currency || "USD").toUpperCase() !== "USD";
 
-      if (isLegacyForeign && req.body.transactionDebitAmount === undefined && req.body.transactionCreditAmount === undefined) {
+      if (
+        isLegacyForeign &&
+        req.body.transactionDebitAmount === undefined &&
+        req.body.transactionCreditAmount === undefined
+      ) {
         return res.status(409).json({
           code: "HISTORICAL_CURRENCY_DATA_UNRESOLVED",
           message:
@@ -94,10 +98,7 @@ export function registerVoucherEntryCurrencyEditRoutes(app: Express) {
         row.entry.creditAmount ??
         "0";
       const historicalRate =
-        req.body.historicalExchangeRate ??
-        row.entry.historicalExchangeRate ??
-        row.voucher.exchangeRate ??
-        null;
+        req.body.historicalExchangeRate ?? row.entry.historicalExchangeRate ?? row.voucher.exchangeRate ?? null;
 
       const normalized = normalizeVoucherEntryAmounts({
         transactionCurrency,

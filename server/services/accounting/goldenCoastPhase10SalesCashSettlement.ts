@@ -4,6 +4,11 @@ import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import type { CentralPostingRequest, PostingActor } from "./centralPostingEngine";
 import { buildGenericVoucherPostingRequest } from "./genericVoucherPosting";
 import { GOLDEN_COAST_CUTOVER_DATE } from "./goldenCoastPhase4CutoverFifo";
+import {
+  gcSalesCashPayableAfterPayment,
+  gcSalesCashPayableBalance,
+  gcSalesCashSettleablePayable,
+} from "./goldenCoastSalesCashPayable";
 
 /**
  * Phase 10 is the direct-Golden-Coast alternative to the HADI settlement flow:
@@ -12,6 +17,12 @@ import { GOLDEN_COAST_CUTOVER_DATE } from "./goldenCoastPhase4CutoverFifo";
  * GC Sales Cash is an operational payable tracker. Fresh Start itself is the
  * residual equity formula in Net Position, so this payment reduces the tracker
  * and a real asset; it does not post directly to the Fresh Start equity ledger.
+ *
+ * The tracker is credit-normal, so the raw debit-minus-credit ledger figure is
+ * the negative of what is still owed; `goldenCoastSalesCashPayable` owns that
+ * conversion for every caller. A payment may also carry a transfer fee, which
+ * is an expense rather than a reduction of the debt: the payable falls by the
+ * settlement alone while the fee is booked to Shared Charges.
  */
 export const GOLDEN_COAST_PHASE10_SOURCE_TYPE = "golden-coast-phase10-sales-cash-settlement";
 export const GOLDEN_COAST_PHASE10_MAX_REQUEST_ID_LENGTH = 64;
@@ -44,7 +55,14 @@ export interface GoldenCoastPhase10CashAccount {
 export interface GoldenCoastPhase10SettlementInput {
   companyId: number;
   settlementDate: string;
+  /** Amount applied against the payable. The payable falls by this in full. */
   amountUsd: string;
+  /**
+   * Bank or transfer fee paid on top of the settlement. It is an expense, never
+   * a reduction of what Fresh Start is owed, so it leaves the paying account
+   * alongside `amountUsd` and lands in Shared Charges.
+   */
+  transferFeeUsd: string;
   clientRequestId: string;
   paymentAccount: GoldenCoastPhase10CashAccount;
   reference: string | null;
@@ -53,8 +71,12 @@ export interface GoldenCoastPhase10SettlementInput {
 export interface GoldenCoastPhase10SettlementPlan extends GoldenCoastPhase10SettlementInput {
   gcSalesCashDebitBalanceBeforeUsd: string;
   gcSalesCashDebitBalanceAfterUsd: string;
+  /** Outstanding payable (credit-normal) before this payment. */
   gcSalesCashPayableBeforeUsd: string;
+  /** Outstanding payable after this payment is posted. */
   gcSalesCashPayableAfterUsd: string;
+  /** Total leaving the paying cash/bank account: settlement plus fee. */
+  cashOutflowUsd: string;
 }
 
 function positiveId(value: unknown, field: string): number {
@@ -86,6 +108,17 @@ function positiveMoney(value: unknown, field: string): Decimal {
   const parsed = decimal(value, field);
   if (!parsed.greaterThan(0)) {
     throw new GoldenCoastPhase10SettlementError(`${field} must be greater than zero`);
+  }
+  if (parsed.decimalPlaces() > MONEY_SCALE) {
+    throw new GoldenCoastPhase10SettlementError(`${field} supports at most ${MONEY_SCALE} decimal places`);
+  }
+  return parsed;
+}
+
+function nonNegativeMoney(value: unknown, field: string): Decimal {
+  const parsed = decimal(value, field);
+  if (parsed.lessThan(0)) {
+    throw new GoldenCoastPhase10SettlementError(`${field} cannot be negative`);
   }
   if (parsed.decimalPlaces() > MONEY_SCALE) {
     throw new GoldenCoastPhase10SettlementError(`${field} supports at most ${MONEY_SCALE} decimal places`);
@@ -173,6 +206,7 @@ export function parseGoldenCoastPhase10SettlementInput(input: {
     companyId,
     settlementDate: settlementDate(raw.settlementDate),
     amountUsd: money(positiveMoney(raw.amountUsd, "amountUsd")),
+    transferFeeUsd: money(nonNegativeMoney(raw.transferFeeUsd ?? "0", "transferFeeUsd")),
     clientRequestId: clientRequestId(raw.clientRequestId),
     // receiptAccount is accepted as a compatibility alias for older clients,
     // but all new UI calls use the correct paymentAccount name.
@@ -184,7 +218,8 @@ export function parseGoldenCoastPhase10SettlementInput(input: {
 /**
  * GC Sales Cash is credit-normal here: a negative Dr-minus-Cr balance is the
  * amount still payable to Fresh Start. A payment moves the signed balance
- * toward zero by debiting GC Sales Cash.
+ * toward zero by debiting GC Sales Cash. It may be partial, but never clears
+ * more than the outstanding payable, and a transfer fee never widens that cap.
  */
 export function planGoldenCoastPhase10Settlement(input: {
   settlement: GoldenCoastPhase10SettlementInput;
@@ -192,25 +227,30 @@ export function planGoldenCoastPhase10Settlement(input: {
 }): GoldenCoastPhase10SettlementPlan {
   const amount = positiveMoney(input.settlement.amountUsd, "amountUsd");
   const balance = balanceMoney(input.gcSalesCashDebitBalanceUsd, "gcSalesCashDebitBalanceUsd");
-  const payable = Decimal.max(balance.negated(), 0);
+  const payable = new Decimal(gcSalesCashSettleablePayable(gcSalesCashPayableBalance(balance.toFixed())));
   if (amount.greaterThan(payable)) {
     throw new GoldenCoastPhase10SettlementError(
       `Payment ${money(amount)} exceeds the current GC Sales Cash payable ${money(payable)}`,
       "GC_PHASE10_SETTLEMENT_EXCEEDS_BALANCE"
     );
   }
+  const fee = nonNegativeMoney(input.settlement.transferFeeUsd, "transferFeeUsd");
   return {
     ...input.settlement,
     gcSalesCashDebitBalanceBeforeUsd: money(balance),
+    // Only the settlement moves the ledger; the fee funds Shared Charges.
     gcSalesCashDebitBalanceAfterUsd: money(balance.plus(amount)),
     gcSalesCashPayableBeforeUsd: money(payable),
-    gcSalesCashPayableAfterUsd: money(payable.minus(amount)),
+    gcSalesCashPayableAfterUsd: gcSalesCashPayableAfterPayment(payable.toFixed(), amount.toFixed()),
+    cashOutflowUsd: money(amount.plus(fee)),
   };
 }
 
 export function goldenCoastPhase10SettlementDigest(input: {
   settlement: GoldenCoastPhase10SettlementInput;
   gcSalesCashAccountId: number;
+  /** Required whenever the settlement carries a transfer fee. */
+  sharedChargesAccountId?: number | null;
 }): string {
   return createHash("sha256")
     .update(
@@ -218,10 +258,12 @@ export function goldenCoastPhase10SettlementDigest(input: {
         companyId: input.settlement.companyId,
         settlementDate: input.settlement.settlementDate,
         amountUsd: money(positiveMoney(input.settlement.amountUsd, "amountUsd")),
+        transferFeeUsd: money(nonNegativeMoney(input.settlement.transferFeeUsd, "transferFeeUsd")),
         clientRequestId: input.settlement.clientRequestId,
         paymentAccount: input.settlement.paymentAccount,
         reference: input.settlement.reference,
         gcSalesCashAccountId: positiveId(input.gcSalesCashAccountId, "gcSalesCashAccountId"),
+        sharedChargesAccountId: input.sharedChargesAccountId ?? null,
       })
     )
     .digest("hex")
@@ -241,18 +283,59 @@ function cashTarget(account: GoldenCoastPhase10CashAccount): Record<string, numb
   return account.kind === "bank" ? { bankAccountId: account.id } : { ledgerAccountId: account.id };
 }
 
-/** Dr canonical GC Sales Cash / Cr selected Golden Coast Cash/Bank. */
+/**
+ * Dr canonical GC Sales Cash / Cr selected Golden Coast Cash/Bank: paying the
+ * liability down reduces both the payable and the cash that settles it.
+ *
+ * A transfer fee never shrinks what Fresh Start is owed, so the payable is
+ * still relieved by the full settlement amount and the fee is debited
+ * separately to Shared Charges; the paying account carries both:
+ *
+ *   Dr GC Sales Cash   amountUsd
+ *   Dr Shared Charges  transferFeeUsd   (omitted when the fee is zero)
+ *   Cr Cash/Bank       amountUsd + transferFeeUsd
+ */
 export function buildGoldenCoastPhase10SettlementPosting(input: {
   plan: GoldenCoastPhase10SettlementPlan;
   gcSalesCashAccountId: number;
+  /** Required whenever the plan carries a non-zero transfer fee. */
+  sharedChargesAccountId?: number | null;
   settlementDigest: string;
   exchangeRate?: string | null;
   actor?: PostingActor;
 }): CentralPostingRequest {
   const gcSalesCashAccountId = positiveId(input.gcSalesCashAccountId, "gcSalesCashAccountId");
+  const fee = nonNegativeMoney(input.plan.transferFeeUsd, "transferFeeUsd");
   const description = releaseDebtEnglish(
     `Fresh Start payment from Golden Coast${input.plan.reference ? ` — ${input.plan.reference}` : ""}`
   );
+  const entries: Array<Record<string, unknown>> = [
+    {
+      ledgerAccountId: gcSalesCashAccountId,
+      debitAmount: input.plan.amountUsd,
+      creditAmount: "0",
+      narration: description,
+    },
+  ];
+  if (fee.greaterThan(0)) {
+    const sharedChargesAccountId = positiveId(input.sharedChargesAccountId, "sharedChargesAccountId");
+    if (sharedChargesAccountId === gcSalesCashAccountId) {
+      throw new GoldenCoastPhase10SettlementError("Shared Charges and GC Sales Cash must resolve to distinct accounts");
+    }
+    entries.push({
+      ledgerAccountId: sharedChargesAccountId,
+      debitAmount: input.plan.transferFeeUsd,
+      creditAmount: "0",
+      narration: releaseDebtEnglish(`Transfer fee on ${description}`),
+    });
+  }
+  entries.push({
+    ...cashTarget(input.plan.paymentAccount),
+    debitAmount: "0",
+    creditAmount: input.plan.cashOutflowUsd,
+    narration: description,
+  });
+
   const posting = buildGenericVoucherPostingRequest({
     companyId: input.plan.companyId,
     clientRequestId: input.plan.clientRequestId,
@@ -263,20 +346,7 @@ export function buildGoldenCoastPhase10SettlementPosting(input: {
       description,
       currency: "USD",
     },
-    entries: [
-      {
-        ledgerAccountId: gcSalesCashAccountId,
-        debitAmount: input.plan.amountUsd,
-        creditAmount: "0",
-        narration: description,
-      },
-      {
-        ...cashTarget(input.plan.paymentAccount),
-        debitAmount: "0",
-        creditAmount: input.plan.amountUsd,
-        narration: description,
-      },
-    ],
+    entries,
     exchangeRate: input.exchangeRate ?? null,
     actor: input.actor,
   });

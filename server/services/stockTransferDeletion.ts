@@ -11,7 +11,7 @@ import {
   voucherEntries,
   vouchers,
 } from "@shared/schema";
-import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../lib/migratedVoucherGuard";
+import { voucherMutationBlockReason } from "../lib/migratedVoucherGuard";
 import { journalStockTransferLeg, nextStockTransferRevision } from "./inventory/stockTransferJournal";
 import { applyEmployeeBalanceDeltasTx } from "./accounting/employeeBalancePosting";
 
@@ -130,8 +130,9 @@ export async function deleteStockTransferVoucher(input: {
     if (!isStockTransferVoucherType(lockedVoucher.voucherType)) {
       throw new StockTransferDeletionError("NOT_STOCK_TRANSFER", "Voucher is not a stock transfer", 400);
     }
-    if (isReadonlyMigratedVoucher(lockedVoucher)) {
-      throw new StockTransferDeletionError("MIGRATED_VOUCHER_READONLY", READONLY_MIGRATED_VOUCHER_MESSAGE, 403);
+    const blockedVoucherReason = voucherMutationBlockReason(lockedVoucher);
+    if (blockedVoucherReason) {
+      throw new StockTransferDeletionError("MIGRATED_VOUCHER_READONLY", blockedVoucherReason, 403);
     }
 
     const entries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));

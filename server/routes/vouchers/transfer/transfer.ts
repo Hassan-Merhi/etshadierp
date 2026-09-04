@@ -11,7 +11,7 @@ import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
 import { storage } from "../../../storage";
 import { requireAuth, requireNonPOS } from "../../../auth";
-import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../../lib/migratedVoucherGuard";
+import { voucherMutationBlockReason } from "../../../lib/migratedVoucherGuard";
 import { logAudit, buildItemLevelChanges } from "../../_helpers";
 import { stockTransferVouchers, stockTransferItems, vouchers } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -59,8 +59,9 @@ export function registerVoucherTransferOnlyRoutes(app: Express) {
         });
       }
 
-      if (isReadonlyMigratedVoucher(existingVoucher)) {
-        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+      const blockedVoucherReason = voucherMutationBlockReason(existingVoucher);
+      if (blockedVoucherReason) {
+        return res.status(403).json({ message: blockedVoucherReason });
       }
 
       // Check edit permissions

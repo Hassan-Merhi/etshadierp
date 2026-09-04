@@ -34,6 +34,15 @@ type NetPositionSide = {
   breakdown?: Array<{ name: string; value: number }>;
 };
 
+type NetPositionEquity = {
+  total?: number;
+  includedInNetPosition?: boolean;
+};
+
+type NetPositionBreakdown = {
+  equity?: NetPositionEquity;
+} & Record<string, unknown>;
+
 /** The net-position payload this route re-translates in place. */
 type NetPositionPayload = {
   forUs?: NetPositionSide;
@@ -42,8 +51,11 @@ type NetPositionPayload = {
   onUsTotal?: number;
   netPosition?: number;
   netWorth?: number;
-  equity?: { total?: number; includedInNetPosition?: boolean };
-  currency?: Record<string, unknown> & { currentCashBankTranslationApplied?: boolean };
+  equity?: NetPositionEquity;
+  netPositionBreakdown?: NetPositionBreakdown;
+  currency?: Record<string, unknown> & {
+    currentCashBankTranslationApplied?: boolean;
+  };
   currencyRevaluation?: Record<string, unknown>;
 } & Record<string, unknown>;
 
@@ -57,6 +69,20 @@ function rebuildBreakdown(accounts: NetPositionAccountRow[]): Array<{ name: stri
     .map(([name, value]) => ({ name, value: round2(value) }))
     .filter((row) => Math.abs(row.value) >= 0.005)
     .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+}
+
+function restoreEquityInclusionContract(payload: NetPositionPayload) {
+  const equity = payload.equity;
+  if (equity && equity.includedInNetPosition == null) {
+    equity.includedInNetPosition = false;
+  }
+
+  const breakdownEquity = payload.netPositionBreakdown?.equity;
+  if (breakdownEquity && breakdownEquity.includedInNetPosition == null) {
+    breakdownEquity.includedInNetPosition = equity?.includedInNetPosition ?? false;
+  }
+
+  return payload;
 }
 
 function applyCurrentCashTranslation(payload: NetPositionPayload, summaries: CashBankCurrencySummary[]) {
@@ -109,9 +135,7 @@ function applyCurrentCashTranslation(payload: NetPositionPayload, summaries: Cas
   const onUsRounded = round2(onUsTotal.toNumber());
   const equityContribution =
     payload.equity?.includedInNetPosition === true ? new Decimal(payload.equity.total ?? 0) : new Decimal(0);
-  const netPosition = round2(
-    new Decimal(forUsRounded).minus(onUsRounded).plus(equityContribution).toNumber()
-  );
+  const netPosition = round2(new Decimal(forUsRounded).minus(onUsRounded).plus(equityContribution).toNumber());
 
   payload.forUs.accounts = forUsAccounts
     .filter((row) => Math.abs(Number(row.value || 0)) >= 0.005)
@@ -149,13 +173,21 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
 
     try {
       const revaluation = await getCashBankRevaluation(companyId);
+      const resolvedAccounts = revaluation.accounts.filter((row) => row.currentTranslatedBaseBalance !== null);
+      const currentTranslatedLedgerAccountIds = resolvedAccounts
+        .filter((row) => row.accountKind === "ledger")
+        .map((row) => row.id);
+      const currentCashBankTranslationDifference = round2(
+        resolvedAccounts.reduce((total, row) => total.plus(row.translationDifference ?? 0), new Decimal(0)).toNumber()
+      );
       const originalJson = res.json.bind(res);
       res.json = ((payload) => {
         // The existing report engine caches its object. Clone before adjusting so
         // repeated requests never reapply translation to the cached reference.
         const reportTotalsProvisional = Boolean(payload?.currencyRevaluation?.reportTotalsProvisional);
         const copy = payload == null ? payload : JSON.parse(JSON.stringify(payload));
-        const adjusted = applyCurrentCashTranslation(copy, revaluation.accounts);
+        const translated = applyCurrentCashTranslation(copy, revaluation.accounts);
+        const adjusted = restoreEquityInclusionContract(translated);
         if (adjusted?.currency) adjusted.currency.currentCashBankTranslationApplied = true;
         adjusted.currencyRevaluation = {
           currentCfaPerUsd: revaluation.currentCfaPerUsd,
@@ -173,11 +205,15 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
             })),
           appliedToCurrentSnapshotOnly: true,
           reportTotalsProvisional,
+          currentTranslatedLedgerAccountIds,
+          currentCashBankTranslationDifference,
         };
         return originalJson(adjusted);
       }) as typeof res.json;
     } catch (error) {
-      logger.error("Unable to prepare cash-only Net Position translation:", { error: error });
+      logger.error("Unable to prepare cash-only Net Position translation:", {
+        error: error,
+      });
     }
     return next();
   });
@@ -188,7 +224,9 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       return res.json(await getCashBankRevaluation(companyId));
     } catch (error: unknown) {
-      logger.error("Multi-currency cash/bank revaluation failed:", { error: error });
+      logger.error("Multi-currency cash/bank revaluation failed:", {
+        error: error,
+      });
       return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
@@ -211,7 +249,9 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
       if (!summary) return res.status(404).json({ message: "Cash/bank account not found" });
       return res.json(summary);
     } catch (error: unknown) {
-      logger.error("Multi-currency account summary failed:", { error: error });
+      logger.error("Multi-currency account summary failed:", {
+        error: error,
+      });
       return res.status(500).json({ message: getErrorMessage(error) });
     }
   });

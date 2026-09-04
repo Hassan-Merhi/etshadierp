@@ -98,5 +98,7 @@
 - [Golden Coast cutover removal](golden-coast-existing-position-carry-forward.md) — active POS/container flows do not require the opening cutover; POS lazily costs current inventory while historical bridge support remains.
 - [Golden Coast normal POS settlement](golden-coast-normal-pos-settlement.md) — shared itemized POS journal plus atomic paired GC/HADI cash settlement; reclassify only when payable and canonical GC cash differ.
 - [Golden Coast normal POS integration](golden-coast-normal-pos-integration.md) — cross-company fixtures must link HADI, authorize targetCompanyId, and assert source cash plus paired settlement legs.
+- [GC Sales Cash is a credit-normal payable](golden-coast-sales-cash-payable.md) — sales credit it, payments debit it; negate the raw Dr-minus-Cr figure via goldenCoastSalesCashPayable before any cap or report, and book transfer fees to Shared Charges instead of shrinking the settlement.
+- [Golden Coast vouchers are immutable](golden-coast-voucher-immutability.md) — every GC- voucher is idempotency-tracked and corrected by reversal, never edited; voucher write paths must call voucherMutationBlockReason, not isReadonlyMigratedVoucher alone.
 - [GitHub push fallback](github-api-push-fallback.md) — when HTTPS Git credentials fail, create the branch commit through the authorized GitHub API using incremental tree uploads.
 - [Git tree manifest safety](github-tree-manifest-safety.md) — large tree output can truncate in CodeExecution; build manifests with direct child_process/fs reads, never returned shell text.

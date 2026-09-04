@@ -123,63 +123,56 @@ describe("Golden Coast Phase 7 HADI transfer planner", () => {
     expectTransferError(() => parsedCollect({ hadiCashAccount: null }));
   });
 
-  it("plans a partial HADI collection against the current GC Sales Cash debit balance", () => {
+  it("raises the GC Sales Cash payable by the collected amount", () => {
     const plan = planGoldenCoastPhase7Transfer({
       transfer: parsedCollect(),
       balances: {
-        gcSalesCashDebitBalanceUsd: "1800.00",
+        // Signed Dr-minus-Cr: -1,800.00 is a payable of 1,800.00.
+        gcSalesCashDebitBalanceUsd: "-1800.00",
         outstandingHadiCollectionsUsd: "100.00",
       },
     });
 
-    expect(plan.gcSalesCashDebitBalanceBeforeUsd).toBe("1800.00");
-    expect(plan.gcSalesCashDebitBalanceAfterUsd).toBe("1200.00");
+    expect(plan.gcSalesCashPayableBeforeUsd).toBe("1800.00");
+    expect(plan.gcSalesCashPayableAfterUsd).toBe("2400.00");
     expect(plan.outstandingHadiCollectionsBeforeUsd).toBe("100.00");
     expect(plan.outstandingHadiCollectionsAfterUsd).toBe("700.00");
   });
 
-  it("allows an exact collection that clears the collectible GC Sales Cash debit balance", () => {
-    const transfer = parsedCollect({ amountUsd: "1800" });
+  it("does not cap a collection against the payable it grows", () => {
+    // The old receivable reading capped a collection at a positive Dr balance
+    // on GC Sales Cash. A collection raises the payable, so capping it against
+    // the very account it grows was the contradiction Phase 15/17 removed.
     const plan = planGoldenCoastPhase7Transfer({
-      transfer,
-      balances: { gcSalesCashDebitBalanceUsd: "1800", outstandingHadiCollectionsUsd: "0" },
+      transfer: parsedCollect({ amountUsd: "1800" }),
+      balances: { gcSalesCashDebitBalanceUsd: "0", outstandingHadiCollectionsUsd: "0" },
     });
-    expect(plan.gcSalesCashDebitBalanceAfterUsd).toBe("0.00");
+    expect(plan.gcSalesCashPayableAfterUsd).toBe("1800.00");
     expect(plan.outstandingHadiCollectionsAfterUsd).toBe("1800.00");
   });
 
-  it("fails closed when a collection exceeds the collectible GC Sales Cash balance", () => {
-    expectTransferError(
-      () =>
-        planGoldenCoastPhase7Transfer({
-          transfer: parsedCollect({ amountUsd: "1800.01" }),
-          balances: { gcSalesCashDebitBalanceUsd: "1800", outstandingHadiCollectionsUsd: "0" },
-        }),
-      "GC_PHASE7_COLLECTION_EXCEEDS_BALANCE"
-    );
-  });
-
-  it("treats a credit GC Sales Cash balance as having zero collectible amount", () => {
-    expectTransferError(
-      () =>
-        planGoldenCoastPhase7Transfer({
-          transfer: parsedCollect({ amountUsd: "1" }),
-          balances: { gcSalesCashDebitBalanceUsd: "-50", outstandingHadiCollectionsUsd: "0" },
-        }),
-      "GC_PHASE7_COLLECTION_EXCEEDS_BALANCE"
-    );
+  it("collects normally even when GC Sales Cash has been overpaid", () => {
+    const plan = planGoldenCoastPhase7Transfer({
+      transfer: parsedCollect({ amountUsd: "1" }),
+      // A positive signed balance means GC Sales Cash has been OVERPAID.
+      balances: { gcSalesCashDebitBalanceUsd: "50", outstandingHadiCollectionsUsd: "0" },
+    });
+    expect(plan.gcSalesCashPayableBeforeUsd).toBe("-50.00");
+    expect(plan.gcSalesCashPayableAfterUsd).toBe("-49.00");
   });
 
   it("plans a HADI remittance only against unremitted Phase 7 collections", () => {
     const plan = planGoldenCoastPhase7Transfer({
       transfer: parsedRemit(),
       balances: {
-        gcSalesCashDebitBalanceUsd: "1200.00",
+        gcSalesCashDebitBalanceUsd: "-1200.00",
         outstandingHadiCollectionsUsd: "700.00",
       },
     });
 
-    expect(plan.gcSalesCashDebitBalanceAfterUsd).toBe("1200.00");
+    // A remittance moves cash between the two companies; it never touches the
+    // payable Golden Coast owes Fresh Start.
+    expect(plan.gcSalesCashPayableAfterUsd).toBe("1200.00");
     expect(plan.outstandingHadiCollectionsBeforeUsd).toBe("700.00");
     expect(plan.outstandingHadiCollectionsAfterUsd).toBe("450.00");
   });
@@ -190,7 +183,7 @@ describe("Golden Coast Phase 7 HADI transfer planner", () => {
         planGoldenCoastPhase7Transfer({
           transfer: parsedRemit({ amountUsd: "700.01" }),
           balances: {
-            gcSalesCashDebitBalanceUsd: "1200.00",
+            gcSalesCashDebitBalanceUsd: "-1200.00",
             outstandingHadiCollectionsUsd: "700.00",
           },
         }),

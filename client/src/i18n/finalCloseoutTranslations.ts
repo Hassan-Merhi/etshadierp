@@ -153,6 +153,42 @@ const FINAL_CLOSEOUT_TRANSLATIONS: Record<string, { ar: string; fr: string }> = 
     ar: "لم يتم العثور على إدخال سجل التدقيق",
     fr: "Entrée du journal d’audit introuvable",
   },
+  // ── Golden Coast payable model (Phase 15/17) ───────────────────────────────
+  "GC Sales Cash payable": { ar: "مستحقات نقد مبيعات GC", fr: "Dette Trésorerie ventes GC" },
+  "GC Sales Cash payable due": { ar: "المستحق من نقد مبيعات GC", fr: "Dette Trésorerie ventes GC exigible" },
+  "Outstanding payable balance": { ar: "رصيد المستحقات القائم", fr: "Solde de la dette en cours" },
+  "Direct GC Sales Cash payment is ready.": {
+    ar: "الدفع المباشر لنقد مبيعات GC جاهز.",
+    fr: "Le paiement direct de la Trésorerie ventes GC est prêt.",
+  },
+  "Payment is not ready. Refresh after resolving the server-reported account state.": {
+    ar: "الدفع غير جاهز. حدّث الصفحة بعد معالجة حالة الحسابات التي أبلغ عنها الخادم.",
+    fr: "Le paiement n’est pas prêt. Actualisez après avoir corrigé l’état des comptes signalé par le serveur.",
+  },
+  "Payment date": { ar: "تاريخ الدفع", fr: "Date de paiement" },
+  "Paying cash/bank account": { ar: "حساب النقد أو البنك الدافع", fr: "Compte de trésorerie ou bancaire payeur" },
+  "Transfer fee (USD)": { ar: "رسوم التحويل (دولار)", fr: "Frais de transfert (USD)" },
+  "Shared Charges is not configured, so no transfer fee can be charged.": {
+    ar: "حساب المصاريف المشتركة غير مُهيأ، لذا لا يمكن احتساب رسوم تحويل.",
+    fr: "Le compte Charges partagées n’est pas configuré ; aucun frais de transfert ne peut être imputé.",
+  },
+  "Paid on top of the settlement and booked to Shared Charges; the payable still falls by the full amount.": {
+    ar: "تُدفع إضافةً إلى التسوية وتُقيَّد في المصاريف المشتركة؛ وتنخفض المستحقات بالمبلغ الكامل.",
+    fr: "Payés en sus du règlement et imputés aux Charges partagées ; la dette diminue tout de même du montant total.",
+  },
+  "The outstanding sales-cash payable was refreshed.": {
+    ar: "تم تحديث مستحقات نقد المبيعات القائمة.",
+    fr: "La dette de trésorerie des ventes en cours a été actualisée.",
+  },
+  "Phase 10 pays down only the server-calculated outstanding GC Sales Cash payable, out of an approved Golden Coast cash or bank account.":
+    {
+      ar: "تسدّد المرحلة 10 فقط مستحقات نقد مبيعات GC القائمة التي يحسبها الخادم، من حساب نقد أو بنك معتمد لدى غولدن كوست.",
+      fr: "La phase 10 ne règle que la dette Trésorerie ventes GC en cours calculée par le serveur, depuis un compte de trésorerie ou bancaire Golden Coast approuvé.",
+    },
+  "A collection raises the GC Sales Cash payable and is not capped by it.": {
+    ar: "التحصيل يزيد مستحقات نقد مبيعات GC ولذلك لا يُقيَّد بها.",
+    fr: "Un encaissement augmente la dette Trésorerie ventes GC et n’est donc pas plafonné par celle-ci.",
+  },
 };
 
 export function releaseDebtEnglish<T extends string>(value: T): T {

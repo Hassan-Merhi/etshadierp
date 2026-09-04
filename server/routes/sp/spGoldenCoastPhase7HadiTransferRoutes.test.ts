@@ -115,7 +115,7 @@ describe("Golden Coast Phase 7 HADI transfer route surface", () => {
   it("detects a full idempotent replay before mutable balance validation", () => {
     const digestIndex = routeSource.indexOf("const transferDigest = goldenCoastPhase7TransferDigest");
     const replayIndex = routeSource.indexOf("const replayed = await findReplayedTransfer");
-    const balanceIndex = routeSource.indexOf("const [gcSalesCashDebitBalanceUsd, outstandingHadiCollectionsUsd]");
+    const balanceIndex = routeSource.indexOf("const [gcSalesCashSignedUsd, outstandingHadiCollectionsUsd]");
 
     expect(digestIndex).toBeGreaterThan(-1);
     expect(replayIndex).toBeGreaterThan(digestIndex);
@@ -148,10 +148,14 @@ describe("Golden Coast Phase 7 HADI transfer route surface", () => {
     expect(routeSource).not.toContain("SUM(CASE WHEN la.sub_type = 'sp_hadi_intercompany'");
   });
 
-  it("caps HADI collection by the active GC Sales Cash balance", () => {
-    expect(routeSource).toContain("gcSalesCashDebitBalance");
+  it("reads GC Sales Cash as a credit-normal payable rather than capping collection against it", () => {
+    expect(routeSource).toContain("gcSalesCashSignedBalance");
     expect(routeSource).toContain("SUM(CAST(ve.debit_amount AS numeric) - CAST(ve.credit_amount AS numeric))");
-    expect(serviceSource).toContain("GC_PHASE7_COLLECTION_EXCEEDS_BALANCE");
+    // The signed ledger figure is converted before it reaches the planner.
+    expect(routeSource).toContain("gcSalesCashPayableBalance(");
+    // A collection raises that payable, so it must not be capped by it.
+    expect(serviceSource).not.toContain("GC_PHASE7_COLLECTION_EXCEEDS_BALANCE");
+    expect(serviceSource).toContain("GC_PHASE7_REMITTANCE_EXCEEDS_COLLECTIONS");
   });
 
   it("does not depend on or copy Phase 6 special-location implementation", () => {

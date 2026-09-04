@@ -242,6 +242,12 @@ const VOLATILE_KEYS = new Set([
   // standing between an extraction and a silent change to a money figure —
   // strictness is worth more here than a rule that pre-empts the next one.
   "offloadedAt",
+  // Phase 17 reports which cash/bank ledger accounts were FX-translated. The
+  // values are raw ledger account ids from the seeded fixture, so they differ on
+  // every capture and would make this pin unsettleable. The translation figures
+  // beside it (currentCashBankTranslationDifference, unresolvedAccountCount)
+  // stay hashed, so a change to the money still fails here.
+  "currentTranslatedLedgerAccountIds",
 ]);
 
 function isVolatileKey(key: string): boolean {

@@ -20,7 +20,10 @@ export class GoldenCoastFreshStartHadiPaymentError extends Error {
   }
 }
 
-export type GoldenCoastFreshStartHadiCashAccount = { kind: "ledger" | "bank"; id: number };
+export type GoldenCoastFreshStartHadiCashAccount = {
+  kind: "ledger" | "bank";
+  id: number;
+};
 
 export interface GoldenCoastFreshStartHadiPaymentInput {
   companyId: number;
@@ -288,7 +291,10 @@ export function buildGoldenCoastFreshStartHadiPaymentPostings(input: {
   });
 
   return [
-    { role: "golden_coast", request: tag(gc.request, plan.companyId, "golden_coast") },
+    {
+      role: "golden_coast",
+      request: tag(gc.request, plan.companyId, "golden_coast"),
+    },
     { role: "hadi", request: tag(hadi.request, plan.hadiCompanyId, "hadi") },
   ];
 }

@@ -9,7 +9,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth } from "../../auth";
-import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
+import { voucherMutationBlockReason } from "../../lib/migratedVoucherGuard";
 import { autoReallocateLoansAccounts } from "../../lib/transporterAllocation";
 import { voucherEntries } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -35,8 +35,9 @@ export function registerVoucherEntryWriteRoutes(app: Express) {
         });
       }
 
-      if (isReadonlyMigratedVoucher(voucher)) {
-        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+      const blockedVoucherReason = voucherMutationBlockReason(voucher);
+      if (blockedVoucherReason) {
+        return res.status(403).json({ message: blockedVoucherReason });
       }
 
       // Check permissions based on role (same logic as voucher edit)
@@ -110,8 +111,9 @@ export function registerVoucherEntryWriteRoutes(app: Express) {
         });
       }
 
-      if (isReadonlyMigratedVoucher(voucher)) {
-        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+      const blockedVoucherReason = voucherMutationBlockReason(voucher);
+      if (blockedVoucherReason) {
+        return res.status(403).json({ message: blockedVoucherReason });
       }
 
       // Check edit permissions based on role (same logic as voucher edit)
@@ -141,7 +143,26 @@ export function registerVoucherEntryWriteRoutes(app: Express) {
       }
 
       // Only allow updating debit/credit amounts and narration
-      const allowedUpdates: Partial<{ voucherId: number; narration?: string | null | undefined; transactionCurrency?: string | null | undefined; transactionDebitAmount?: string | null | undefined; transactionCreditAmount?: string | null | undefined; baseDebitAmount?: string | null | undefined; baseCreditAmount?: string | null | undefined; historicalExchangeRate?: string | null | undefined; rateConvention?: string | null | undefined; ledgerAccountId?: number | undefined; bankAccountId?: number | undefined; fixedAssetId?: number | undefined; supplierId?: number | undefined; employeeId?: number | undefined; customerId?: number | undefined; factorySupplierId?: number | undefined; debitAmount?: string | undefined; creditAmount?: string | undefined; }> = {};
+      const allowedUpdates: Partial<{
+        voucherId: number;
+        narration?: string | null | undefined;
+        transactionCurrency?: string | null | undefined;
+        transactionDebitAmount?: string | null | undefined;
+        transactionCreditAmount?: string | null | undefined;
+        baseDebitAmount?: string | null | undefined;
+        baseCreditAmount?: string | null | undefined;
+        historicalExchangeRate?: string | null | undefined;
+        rateConvention?: string | null | undefined;
+        ledgerAccountId?: number | undefined;
+        bankAccountId?: number | undefined;
+        fixedAssetId?: number | undefined;
+        supplierId?: number | undefined;
+        employeeId?: number | undefined;
+        customerId?: number | undefined;
+        factorySupplierId?: number | undefined;
+        debitAmount?: string | undefined;
+        creditAmount?: string | undefined;
+      }> = {};
       if (req.body.debitAmount !== undefined) allowedUpdates.debitAmount = req.body.debitAmount;
       if (req.body.creditAmount !== undefined) allowedUpdates.creditAmount = req.body.creditAmount;
       if (req.body.narration !== undefined) allowedUpdates.narration = req.body.narration;

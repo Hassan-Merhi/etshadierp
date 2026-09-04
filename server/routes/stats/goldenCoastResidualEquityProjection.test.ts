@@ -2,9 +2,21 @@ import { describe, expect, it } from "vitest";
 import type { AccountBalance } from "../../netPositionHelper";
 import { projectGoldenCoastResidualEquity } from "./goldenCoastResidualEquityProjection";
 
-function accounts(overrides: { hadi?: number; hassanCredit?: number; tracker?: number; cash?: number } = {}) {
-  const hadi = overrides.hadi ?? 165875;
-  const tracker = overrides.tracker ?? hadi;
+const OPENING_GC_SALES_CASH = 165875;
+
+function accounts(
+  overrides: {
+    hadi?: number;
+    cash?: number;
+    freshDebit?: number;
+    freshCredit?: number;
+    hassanDebit?: number;
+    hassanCredit?: number;
+    gcSalesDebit?: number;
+    gcSalesCredit?: number;
+  } = {}
+) {
+  const hadi = overrides.hadi ?? OPENING_GC_SALES_CASH;
   const cash = overrides.cash ?? 0;
   const rows = [
     {
@@ -35,7 +47,7 @@ function accounts(overrides: { hadi?: number; hassanCredit?: number; tracker?: n
       code: "SP-PAY",
       accountType: "Liability",
       subType: "sp_payable",
-      openingBalance: tracker.toFixed(2),
+      openingBalance: OPENING_GC_SALES_CASH.toFixed(2),
       openingBalanceSide: "Cr",
       active: true,
       deletedAt: null,
@@ -67,7 +79,15 @@ function accounts(overrides: { hadi?: number; hassanCredit?: number; tracker?: n
   }
 
   const balances = new Map<number, AccountBalance>();
-  if (overrides.hassanCredit) balances.set(2, { debit: 0, credit: overrides.hassanCredit });
+  const freshDebit = overrides.freshDebit ?? 0;
+  const freshCredit = overrides.freshCredit ?? 0;
+  const hassanDebit = overrides.hassanDebit ?? 0;
+  const hassanCredit = overrides.hassanCredit ?? 0;
+  const gcSalesDebit = overrides.gcSalesDebit ?? 0;
+  const gcSalesCredit = overrides.gcSalesCredit ?? 0;
+  if (freshDebit || freshCredit) balances.set(1, { debit: freshDebit, credit: freshCredit });
+  if (hassanDebit || hassanCredit) balances.set(2, { debit: hassanDebit, credit: hassanCredit });
+  if (gcSalesDebit || gcSalesCredit) balances.set(3, { debit: gcSalesDebit, credit: gcSalesCredit });
   return { rows, balances };
 }
 
@@ -94,6 +114,7 @@ function baseBody(input: { tracker: number; cash?: number; stock?: number }) {
         { id: 1, name: "Fresh Start FZ Equity", code: "GC-FSCAP", value: 207997, balanceSide: "Dr" },
         { id: 2, name: "Hassan Dakik Equity", code: "GC-HCAP", value: 289242, balanceSide: "Dr" },
       ],
+      includedInNetPosition: true,
     },
     netPosition: stock + cash - input.tracker,
     netWorth: stock + cash - input.tracker,
@@ -108,68 +129,176 @@ function baseBody(input: { tracker: number; cash?: number; stock?: number }) {
   };
 }
 
-describe("Golden Coast residual equity projection", () => {
-  it("matches the 1-Sep balance sheet: Fresh Start = net assets - Hassan", () => {
-    const fixture = accounts({ hadi: 165875, tracker: 165875 });
+describe("Golden Coast Phase 17 balance-sheet projection", () => {
+  it("counts the opening GC Sales Cash credit as a real liability without double-counting Fresh Start", () => {
+    const fixture = accounts();
     const result = projectGoldenCoastResidualEquity({
-      body: baseBody({ tracker: 165875 }),
+      body: baseBody({ tracker: OPENING_GC_SALES_CASH }),
       companyAccounts: fixture.rows,
       accountBalances: fixture.balances,
     });
 
     expect(result.forUs.total).toBe(497239);
-    expect(result.onUs.total).toBe(0);
-    expect(result.netPosition).toBe(497239);
+    expect(result.onUs.total).toBe(165875);
+    expect(result.netPosition).toBe(331364);
+    expect(result.equity.total).toBe(331364);
+    expect(result.equity.includedInNetPosition).toBe(false);
+    expect(result.equity.balanceSheetIdentity).toBe("assets_minus_liabilities_equals_equity");
+    expect(result.equity.legacyOpeningPayableReclassification).toBe(165875);
+    expect(result.equity.freshStartClaim).toBe(42122);
     expect(result.equity.hassanClaim).toBe(289242);
-    expect(result.equity.freshStartResidual).toBe(207997);
-    expect(result.equity.accounts).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: 1, value: 207997, balanceSide: "Cr" }),
-        expect.objectContaining({ id: 2, value: 289242, balanceSide: "Cr" }),
-      ])
+    expect(result.equity.unclosedEarnings).toBe(0);
+    expect(result.equity.currencyTranslationAdjustment).toBe(0);
+    expect(result.equity.freshStartTotalEntitlement).toBe(207997);
+    expect(result.onUs.accounts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 3, value: 165875, category: "Liability" })])
     );
-    expect(result.onUs.accounts.some((account: { id?: number }) => account.id === 3)).toBe(false);
     expect(result.forUs.accounts).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: 4, value: 165875, category: "HADI Intercompany" })])
     );
   });
 
-  it("keeps Fresh Start unchanged when value only moves from HADI into GC cash", () => {
-    const fixture = accounts({ hadi: 125875, tracker: 165875, cash: 40000 });
+  it("shows a post-Phase-15 sale as payable plus unclosed earnings without distributing profit to either partner", () => {
+    const fixture = accounts({
+      hadi: 166875,
+      freshDebit: 1000,
+      gcSalesCredit: 1000,
+    });
     const result = projectGoldenCoastResidualEquity({
-      body: baseBody({ tracker: 165875, cash: 40000 }),
+      body: baseBody({ tracker: 166875, stock: 330764 }),
+      companyAccounts: fixture.rows,
+      accountBalances: fixture.balances,
+    });
+
+    expect(result.forUs.total).toBe(497639);
+    expect(result.onUs.total).toBe(166875);
+    expect(result.netPosition).toBe(330764);
+    expect(result.equity.freshStartClaim).toBe(41122);
+    expect(result.equity.hassanClaim).toBe(289242);
+    expect(result.equity.partnerCapitalTotal).toBe(330364);
+    expect(result.equity.unclosedEarnings).toBe(400);
+    expect(result.equity.currencyTranslationAdjustment).toBe(0);
+    expect(result.equity.total).toBe(330764);
+    expect(result.equity.freshStartTotalEntitlement).toBe(207997);
+    expect(result.equity.accounts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 1, value: 41122, balanceSide: "Cr" }),
+        expect.objectContaining({ id: 2, value: 289242, balanceSide: "Cr" }),
+        expect.objectContaining({ code: "GC-UNCL-PNL", value: 400, balanceSide: "Cr" }),
+      ])
+    );
+  });
+
+  it("keeps partner equity unchanged when HADI pays an existing Fresh Start payable", () => {
+    const fixture = accounts({
+      hadi: 164875,
+      gcSalesDebit: 1000,
+    });
+    const result = projectGoldenCoastResidualEquity({
+      body: baseBody({ tracker: 164875 }),
+      companyAccounts: fixture.rows,
+      accountBalances: fixture.balances,
+    });
+
+    expect(result.forUs.total).toBe(496239);
+    expect(result.onUs.total).toBe(164875);
+    expect(result.netPosition).toBe(331364);
+    expect(result.equity.freshStartClaim).toBe(42122);
+    expect(result.equity.hassanClaim).toBe(289242);
+    expect(result.equity.unclosedEarnings).toBe(0);
+    expect(result.equity.freshStartTotalEntitlement).toBe(206997);
+  });
+
+  it("moves unclosed profit into the two partner ledgers only after the Phase 11 50/50 close", () => {
+    const fixture = accounts({
+      hadi: 166875,
+      freshDebit: 1000,
+      freshCredit: 200,
+      hassanCredit: 200,
+      gcSalesCredit: 1000,
+    });
+    const result = projectGoldenCoastResidualEquity({
+      body: baseBody({ tracker: 166875, stock: 330764 }),
+      companyAccounts: fixture.rows,
+      accountBalances: fixture.balances,
+    });
+
+    expect(result.netPosition).toBe(330764);
+    expect(result.equity.freshStartClaim).toBe(41322);
+    expect(result.equity.hassanClaim).toBe(289442);
+    expect(result.equity.partnerCapitalTotal).toBe(330764);
+    expect(result.equity.unclosedEarnings).toBe(0);
+    expect(result.equity.total).toBe(330764);
+    expect(result.equity.freshStartTotalEntitlement).toBe(208197);
+    expect(result.equity.accounts.some((account: { code?: string }) => account.code === "GC-UNCL-PNL")).toBe(false);
+  });
+
+  it("keeps live cash FX translation separate from Phase 11 distributable earnings", () => {
+    const fixture = accounts({ cash: 100, freshCredit: 100 });
+    const body = baseBody({ tracker: OPENING_GC_SALES_CASH, cash: 110 });
+    const translatedCash = body.forUs.accounts.find((account) => account.id === 5);
+    if (!translatedCash) throw new Error("Cash fixture missing");
+    Object.assign(translatedCash, {
+      category: "Cash / Bank (Current Translation)",
+      currencyRevalued: true,
+      historicalBaseBalance: "100.00",
+      currentTranslatedBaseBalance: "110.00",
+      translationDifference: "10.00",
+    });
+    Object.assign(body, {
+      currencyRevaluation: {
+        currentTranslatedLedgerAccountIds: [5],
+        currentCashBankTranslationDifference: 10,
+      },
+    });
+
+    const result = projectGoldenCoastResidualEquity({
+      body,
+      companyAccounts: fixture.rows,
+      accountBalances: fixture.balances,
+    });
+
+    expect(result.forUs.total).toBe(497349);
+    expect(result.onUs.total).toBe(165875);
+    expect(result.netPosition).toBe(331474);
+    expect(result.equity.partnerCapitalTotal).toBe(331464);
+    expect(result.equity.currencyTranslationAdjustment).toBe(10);
+    expect(result.equity.unclosedEarnings).toBe(0);
+    expect(result.equity.total).toBe(331474);
+    expect(result.equity.accounts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "GC-FX-TRANS", value: 10, balanceSide: "Cr" })])
+    );
+    expect(result.equity.accounts.some((account: { code?: string }) => account.code === "GC-UNCL-PNL")).toBe(false);
+  });
+
+  it("does not resurrect a historical cash balance when current translation resolves it to zero", () => {
+    const fixture = accounts({ cash: 100, freshCredit: 100 });
+    const body = baseBody({ tracker: OPENING_GC_SALES_CASH });
+    Object.assign(body, {
+      currencyRevaluation: {
+        currentTranslatedLedgerAccountIds: [5],
+        currentCashBankTranslationDifference: -100,
+      },
+    });
+
+    const result = projectGoldenCoastResidualEquity({
+      body,
       companyAccounts: fixture.rows,
       accountBalances: fixture.balances,
     });
 
     expect(result.forUs.total).toBe(497239);
-    expect(result.equity.freshStartResidual).toBe(207997);
-  });
-
-  it("reduces Fresh Start dollar-for-dollar when a real asset leaves and Hassan is unchanged", () => {
-    const fixture = accounts({ hadi: 125875, tracker: 125875 });
-    const result = projectGoldenCoastResidualEquity({
-      body: baseBody({ tracker: 125875 }),
-      companyAccounts: fixture.rows,
-      accountBalances: fixture.balances,
-    });
-
-    expect(result.netPosition).toBe(457239);
-    expect(result.equity.hassanClaim).toBe(289242);
-    expect(result.equity.freshStartResidual).toBe(167997);
-  });
-
-  it("leaves half of a closed profit in Fresh Start after Hassan receives his half", () => {
-    const fixture = accounts({ hadi: 166175, tracker: 166175, hassanCredit: 150 });
-    const result = projectGoldenCoastResidualEquity({
-      body: baseBody({ tracker: 166175 }),
-      companyAccounts: fixture.rows,
-      accountBalances: fixture.balances,
-    });
-
-    expect(result.netPosition).toBe(497539);
-    expect(result.equity.hassanClaim).toBe(289392);
-    expect(result.equity.freshStartResidual).toBe(208147);
+    expect(result.onUs.total).toBe(165875);
+    expect(result.netPosition).toBe(331364);
+    expect(result.equity.partnerCapitalTotal).toBe(331464);
+    expect(result.equity.currencyTranslationAdjustment).toBe(-100);
+    expect(result.equity.unclosedEarnings).toBe(0);
+    expect(result.equity.total).toBe(331364);
+    expect(result.forUs.accounts.some((account: { id?: number }) => account.id === 5)).toBe(false);
+    expect(result.onUs.accounts.some((account: { id?: number }) => account.id === 5)).toBe(false);
+    expect(result.equity.accounts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "GC-FX-TRANS", value: 100, balanceSide: "Dr" })])
+    );
   });
 
   it("does nothing to an ordinary Supplier Partner without Golden Coast equity roles", () => {

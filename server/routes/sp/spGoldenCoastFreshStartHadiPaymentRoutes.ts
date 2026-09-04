@@ -45,7 +45,10 @@ import { isGoldenCoastCompany } from "./spGoldenCoastPhase4CutoverFifoRoutes";
 import { requireSpCompany } from "./spHelpers";
 
 const postingDependencies = createDatabasePostingDependencies();
-const requestBudget = privilegedRequestBudget({ maxBodyBytes: 16 * 1024, maxCollectionItems: 10 });
+const requestBudget = privilegedRequestBudget({
+  maxBodyBytes: 16 * 1024,
+  maxCollectionItems: 10,
+});
 
 type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type DbLike = typeof db | DatabaseTransaction;
@@ -133,7 +136,11 @@ async function singleLedgerAccount(
 ): Promise<{ id: number; name: string }> {
   await assertTransactionCompanyScope(tx, companyId);
   const rows = await tx
-    .select({ id: ledgerAccounts.id, name: ledgerAccounts.name, accountType: ledgerAccounts.accountType })
+    .select({
+      id: ledgerAccounts.id,
+      name: ledgerAccounts.name,
+      accountType: ledgerAccounts.accountType,
+    })
     .from(ledgerAccounts)
     .where(
       and(
@@ -196,7 +203,11 @@ async function listHadiCashAccounts(tx: DatabaseTransaction, hadiCompanyId: numb
   await assertTransactionCompanyScope(tx, hadiCompanyId);
   const [ledgerRows, bankRows] = await Promise.all([
     tx
-      .select({ id: ledgerAccounts.id, name: ledgerAccounts.name, accountType: ledgerAccounts.accountType })
+      .select({
+        id: ledgerAccounts.id,
+        name: ledgerAccounts.name,
+        accountType: ledgerAccounts.accountType,
+      })
       .from(ledgerAccounts)
       .where(
         and(
@@ -355,7 +366,10 @@ async function findReplay(
       item.role
     );
     const [marker] = await tx
-      .select({ voucherId: accountingPostingRequests.voucherId, sourceId: accountingPostingRequests.sourceId })
+      .select({
+        voucherId: accountingPostingRequests.voucherId,
+        sourceId: accountingPostingRequests.sourceId,
+      })
       .from(accountingPostingRequests)
       .where(
         and(eq(accountingPostingRequests.companyId, item.companyId), eq(accountingPostingRequests.idempotencyKey, key))
@@ -456,7 +470,9 @@ async function handleReadiness(req: Request, res: Response): Promise<void> {
     });
     res.json(result);
   } catch (error) {
-    logger.error("Golden Coast Fresh Start HADI payment readiness failed", { error });
+    logger.error("Golden Coast Fresh Start HADI payment readiness failed", {
+      error,
+    });
     if (error instanceof FreshStartHadiRouteError) {
       res.status(error.status).json({ code: error.code, message: error.message });
       return;
@@ -492,14 +508,27 @@ async function handlePayment(req: Request, res: Response): Promise<void> {
         body: req.body,
       });
       const accounts = await resolveAccounts(tx, pair);
-      const digest = goldenCoastFreshStartHadiPaymentDigest({ payment, accounts: accounts.ids });
+      const digest = goldenCoastFreshStartHadiPaymentDigest({
+        payment,
+        accounts: accounts.ids,
+      });
       const replayed = await findReplay(tx, pair, payment, digest);
-      if (replayed) return { replayed: true as const, pair, payment, plan: null, postings: replayed };
+      if (replayed)
+        return {
+          replayed: true as const,
+          pair,
+          payment,
+          plan: null,
+          postings: replayed,
+        };
 
       await validateHadiCashAccount(tx, pair.hadiCompanyId, payment.hadiCashAccount);
       await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
       const balances = await balancesForPayment(tx, companyId, accounts.ids);
-      const plan = planGoldenCoastFreshStartHadiPayment({ payment, ...balances });
+      const plan = planGoldenCoastFreshStartHadiPayment({
+        payment,
+        ...balances,
+      });
       const [goldenCoastExchangeRate, hadiExchangeRate] = await Promise.all([
         getCurrentExchangeRate(pair.goldenCoastCompanyId),
         getCurrentExchangeRate(pair.hadiCompanyId),
@@ -532,7 +561,11 @@ async function handlePayment(req: Request, res: Response): Promise<void> {
             409
           );
         }
-        postings.push({ role: item.role, voucher: posted.voucher, entries: posted.entries });
+        postings.push({
+          role: item.role,
+          voucher: posted.voucher,
+          entries: posted.entries,
+        });
       }
       await assertTransactionCompanyScope(tx, pair.goldenCoastCompanyId);
       return { replayed: false as const, pair, payment, plan, postings };
@@ -558,10 +591,16 @@ async function handlePayment(req: Request, res: Response): Promise<void> {
             hadiIntercompanyAssetAfterUsd: outcome.plan.hadiIntercompanyAssetAfterUsd,
           }
         : null,
-      postings: outcome.postings.map((item) => ({ role: item.role, voucher: item.voucher, entries: item.entries })),
+      postings: outcome.postings.map((item) => ({
+        role: item.role,
+        voucher: item.voucher,
+        entries: item.entries,
+      })),
     });
   } catch (error) {
-    logger.error("Golden Coast Fresh Start payment from HADI failed", { error });
+    logger.error("Golden Coast Fresh Start payment from HADI failed", {
+      error,
+    });
     if (error instanceof FreshStartHadiRouteError) {
       res.status(error.status).json({ code: error.code, message: error.message });
       return;

@@ -116,4 +116,10 @@ describe("Golden Coast Phase 10 GC Sales Cash settlement route surface", () => {
     expect(routeSource).not.toContain("spSaleLines");
     expect(routeSource).not.toContain("hadiCompanyId");
   });
+
+  it("resolves Shared Charges by canonical sub type, never by account name", () => {
+    // The fee's posting shape is proven behaviourally in the service suite; what
+    // only source can show is that the expense account is found by its role.
+    expect(routeSource).toContain("eq(ledgerAccounts.subType, SHARED_CHARGES_SUBTYPE)");
+  });
 });
