@@ -28,3 +28,30 @@ re-deriving parent status or re-summing entries itself. A caller-supplied
 `companyId` query param on a supplier endpoint must be authorized against
 the requesting user's actual company roles, never trusted directly, since
 suppliers are shared master records readable cross-company.
+
+For an explicitly opted-in supplier master-data picker such as PO Import,
+visibility is the deduplicated union of active-company suppliers and suppliers
+owned by that company's explicit parent. This inherited visibility changes only
+which supplier ID may be selected; containers, purchase orders, and vouchers
+must still be written under the active company, with any parent-side accounting
+remaining a separate parent-company posting.
+
+**Why:** child companies need the parent supplier master to import POs, while
+silently moving the operational transaction to the parent would violate tenant
+ownership and distort the subsidiary's books.
+
+**How to apply:** keep normal supplier routes strict unless they explicitly opt
+into inheritance; use the shared visible-supplier lookup for every PO Import
+supplier selection, validation, and confirmation path.
+
+An empty PO Import supplier list can be a company-data configuration failure:
+the child must have `companies.parentCompanyId` set to the intended parent, and
+the parent supplier rows must carry that parent's ownership. Repair the
+relationship before debugging the supplier query or import accounting.
+
+**Why:** the code can correctly merge the parent supplier master while still
+returning no rows when the active company has no explicit parent link.
+
+**How to apply:** verify the active company and parent supplier ownership in
+the target database; use an idempotent, guarded startup repair only when the
+company relationship is an established deployment invariant.
