@@ -221,18 +221,25 @@ export async function completeVoucherPathRequest(
   `);
 }
 
-function captureResponse(res: Response): { read: () => unknown } {
+export function captureResponse(res: Response): { read: () => unknown } {
   let body: unknown = null;
+  let capturedStructuredBody = false;
   const originalJson = res.json.bind(res);
   const originalSend = res.send.bind(res);
 
   res.json = ((value: unknown) => {
     body = value;
+    capturedStructuredBody = true;
     return originalJson(value);
   }) as Response["json"];
 
   res.send = ((value: unknown) => {
-    body = value;
+    // res.json() serializes and then delegates to res.send(), so without this
+    // guard the string overwrites the structured value json() just captured and
+    // the stored replay becomes a JSON-encoded string of the response rather
+    // than the response itself. A caller retrying the request would then get a
+    // string where the original returned an object.
+    if (!capturedStructuredBody) body = value;
     return originalSend(value as never);
   }) as Response["send"];
 

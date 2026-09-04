@@ -175,8 +175,15 @@ describe("Golden Coast Phase 16 — HADI credit-payable settlement", () => {
     const paymentReplay = await fixture.agent
       .post(`${FRESH_START_PAYMENT_URL}?targetCompanyId=${fixture.hadiCompanyId}`)
       .send(paymentBody);
-    expect(paymentReplay.status).toBe(200);
-    expect(paymentReplay.body.replayed).toBe(true);
+    // Every state-changing /api/sp/ request is claimed by the Phase 5-to-6
+    // voucher-path boundary, a durable HTTP-level idempotency layer: a repeat
+    // with the same clientRequestId and fingerprint replays the ORIGINAL
+    // response verbatim and never reaches this route. The guarantee to assert
+    // is therefore that the replay is identical to the first response and that
+    // nothing was posted twice, not a route-level `replayed: true` the boundary
+    // short-circuits before the handler can set.
+    expect(paymentReplay.status).toBe(payment.status);
+    expect(paymentReplay.body).toEqual(payment.body);
     expect(await netDebit(fixture.saleSideAccountId)).toBeCloseTo(afterPayment.payable, 2);
     expect(await netDebit(freshStartEquity)).toBeCloseTo(afterPayment.fresh, 2);
     expect(await phase16PaymentMarkerCount()).toBe(markersBefore + 2);
@@ -231,8 +238,10 @@ describe("Golden Coast Phase 16 — HADI credit-payable settlement", () => {
     const remitReplay = await fixture.agent
       .post(`${LEGACY_PHASE7_URL}?targetCompanyId=${fixture.hadiCompanyId}`)
       .send(remitBody);
-    expect(remitReplay.status).toBe(200);
-    expect(remitReplay.body.replayed).toBe(true);
+    // Same boundary replay as the payment above: identical response, no second
+    // set of journals.
+    expect(remitReplay.status).toBe(remittance.status);
+    expect(remitReplay.body).toEqual(remittance.body);
     expect(await netDebit(fixture.goldenCoastHadiIntercompanyAccountId)).toBeCloseTo(afterRemit.gcHadi, 2);
     expect(await netDebit(fixture.ctx.cashAccountId)).toBeCloseTo(afterRemit.gcCash, 2);
     expect(await netDebit(fixture.hadiCashAccountId)).toBeCloseTo(afterRemit.hadiCash, 2);
