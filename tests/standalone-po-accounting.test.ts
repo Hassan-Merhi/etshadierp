@@ -93,8 +93,8 @@ afterAll(async () => {
 }, 30000);
 
 describe("standalone purchase-order accounting", () => {
-  it("keeps the legacy supplier parent resolver on the configured global parent", async () => {
-    await expect(resolveParentCompanyId(ctx.companyId)).resolves.toBe(legacyParentCompanyId);
+  it("keeps supplier parent resolution inside an explicitly unlinked company", async () => {
+    await expect(resolveParentCompanyId(ctx.companyId)).resolves.toBe(ctx.companyId);
   });
 
   it("posts Purchases and Supplier inside the unlinked company and does not touch the global parent", async () => {

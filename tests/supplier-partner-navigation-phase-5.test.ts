@@ -7,11 +7,14 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 
 describe("Supplier Partner navigation phase 5", () => {
   const routeGuard = read("client/src/app/authenticatedAppRouteGuard.ts");
+  const normalizedRouteGuard = routeGuard.replace(/\s+/g, " ");
   const appNavigation = read("client/src/app/useAppNavigation.ts");
 
   it("returns unknown Supplier Partner routes to the Overview with replacement history", () => {
     expect(routeGuard).toContain("const SUPPLIER_PARTNER_PATHS = new Set");
-    expect(routeGuard).toContain("isSupplierPartnerRoute && !SUPPLIER_PARTNER_PATHS.has(currentLocation)");
+    expect(normalizedRouteGuard).toContain(
+      "isSupplierPartnerCompany && isSupplierPartnerRoute && !SUPPLIER_PARTNER_PATHS.has(currentLocation)"
+    );
     expect(routeGuard).toContain('decision = { kind: "redirect", to: "/sp" }');
   });
 

@@ -79,6 +79,10 @@ function normalizeMessage(message: string): string {
   return message.trim().slice(0, 200) || "Operational event detected";
 }
 
+function normalizeOptionalId(value: number | undefined): number | undefined {
+  return Number.isSafeInteger(value) && Number(value) > 0 ? Number(value) : undefined;
+}
+
 function updateCodeSummary(event: OperationalEventRecord): void {
   const key = `${event.category}:${event.code}`;
   const existing = codeSummaries.get(key);
@@ -97,6 +101,8 @@ export function recordOperationalEvent(input: OperationalEventInput): void {
     ...input,
     code: normalizeCode(input.code),
     message: normalizeMessage(input.message),
+    companyId: normalizeOptionalId(input.companyId),
+    userId: normalizeOptionalId(input.userId),
     timestamp: new Date().toISOString(),
   };
 
