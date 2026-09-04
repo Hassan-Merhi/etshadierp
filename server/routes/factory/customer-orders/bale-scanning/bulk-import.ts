@@ -11,7 +11,7 @@ import { parseId } from "../../../../lib/parseId";
 import { db } from "../../../../db";
 import { requireAuth } from "../../../../auth";
 import { recalculateOrderTotals } from "../../_helpers";
-import { shouldEnforceProformaOverload } from "./proformaScanPolicy";
+import { shouldEnforceProformaOverload, sumProformaQuantityLimit } from "./proformaScanPolicy";
 import {
   factoryBaleProducts,
   factoryBales,
@@ -126,7 +126,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
               bale.articleCode &&
               shouldEnforceProformaOverload({ ignoreProforma, allowBypassOverload: false })
             ) {
-              const [proformaLine] = await tx
+              const matchingProformaLines = await tx
                 .select({ quantity: customerProformaLines.quantity })
                 .from(customerProformaLines)
                 .where(
@@ -135,7 +135,8 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
                     sql`LOWER(TRIM(${customerProformaLines.articleCode})) = LOWER(TRIM(${bale.articleCode}))`
                   )
                 );
-              if (proformaLine) {
+              if (matchingProformaLines.length > 0) {
+                const proformaQuantityLimit = sumProformaQuantityLimit(matchingProformaLines);
                 const [loadedCount] = await tx
                   .select({ count: sql<number>`COUNT(*)::int` })
                   .from(customerOrderBales)
@@ -149,7 +150,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
                       sql`LOWER(TRIM(COALESCE(${customerOrderBales.articleCode}, ''))) = LOWER(TRIM(${bale.articleCode}))`
                     )
                   );
-                if ((loadedCount?.count || 0) >= proformaLine.quantity) return { kind: "notFound" as const };
+                if ((loadedCount?.count || 0) >= proformaQuantityLimit) return { kind: "notFound" as const };
               }
             }
 
@@ -336,7 +337,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
               bale.articleCode &&
               shouldEnforceProformaOverload({ ignoreProforma, allowBypassOverload: false })
             ) {
-              const [proformaLine] = await tx
+              const matchingProformaLines = await tx
                 .select({ quantity: customerProformaLines.quantity })
                 .from(customerProformaLines)
                 .where(
@@ -345,7 +346,8 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
                     sql`LOWER(TRIM(${customerProformaLines.articleCode})) = LOWER(TRIM(${bale.articleCode}))`
                   )
                 );
-              if (proformaLine) {
+              if (matchingProformaLines.length > 0) {
+                const proformaQuantityLimit = sumProformaQuantityLimit(matchingProformaLines);
                 const [loadedCount] = await tx
                   .select({ count: sql<number>`COUNT(*)::int` })
                   .from(customerOrderBales)
@@ -359,7 +361,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
                       sql`LOWER(TRIM(COALESCE(${customerOrderBales.articleCode}, ''))) = LOWER(TRIM(${bale.articleCode}))`
                     )
                   );
-                if ((loadedCount?.count || 0) >= proformaLine.quantity) continue;
+                if ((loadedCount?.count || 0) >= proformaQuantityLimit) continue;
               }
             }
 

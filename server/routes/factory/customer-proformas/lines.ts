@@ -36,7 +36,7 @@ export function registerFactoryCustomerProformaLineRoutes(app: Express) {
         .where(
           and(
             eq(customerProformaLines.proformaId, parsed.proformaId),
-            eq(customerProformaLines.articleCode, parsed.articleCode)
+            sql`LOWER(TRIM(${customerProformaLines.articleCode})) = ${parsed.articleCode.trim().toLowerCase()}`
           )
         );
       if (existingLine) return res.status(400).json({ message: "Article code already exists in this proforma" });
