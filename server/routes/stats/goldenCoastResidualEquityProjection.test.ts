@@ -199,9 +199,7 @@ describe("Golden Coast Excel-style Net Position projection", () => {
       ])
     );
     expect(result.forUs.accounts).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: 3, value: EXCEL_GC_SALES_CASH, category: "Cash" }),
-      ])
+      expect.arrayContaining([expect.objectContaining({ id: 3, value: EXCEL_GC_SALES_CASH, category: "Cash" })])
     );
     expect(result.onUs.accounts.some((account: { id?: number }) => account.id === 3)).toBe(false);
     expect(result.forUs.accounts.some((account: { id?: number }) => account.id === 4)).toBe(false);
@@ -221,7 +219,7 @@ describe("Golden Coast Excel-style Net Position projection", () => {
     expect(result.forUs.accounts.some((account: { id?: number }) => account.id === 4)).toBe(false);
   });
 
-  it("turns post-sale gross cash into an asset and lets profit flow through Fresh Start without a synthetic earnings row", () => {
+  it("maps post-sale profit into Fresh Start without synthetic earnings", () => {
     const fixture = accounts({
       hadi: 1000,
       freshDebit: 1000,
