@@ -232,8 +232,11 @@ export function registerOrderBaleScanRoutes(app: Express) {
                 sql`LOWER(TRIM(${customerProformaLines.articleCode})) = ${normalizedEffectiveArticleCode}`
               )
             );
-          const proformaLine = matchingProformaLines[0] || null;
+          const matchedProformaLine = matchingProformaLines[0] || null;
           const proformaQuantityLimit = sumProformaQuantityLimit(matchingProformaLines);
+          const proformaLine = matchedProformaLine
+            ? { ...matchedProformaLine, quantity: proformaQuantityLimit }
+            : null;
           if (proformaLine) {
             const pricingMode = proformaLine.pricingMode ?? "per_bale";
             const perKgVal = proformaLine.pricePerKg;
