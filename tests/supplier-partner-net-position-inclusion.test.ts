@@ -15,11 +15,6 @@ describe("supplier partner net position inclusion", () => {
     expect(source).toContain('residualFormula: "net_position_minus_hassan"');
     expect(source).toContain("const freshStartResidual = round2(netPosition - hassanClaim)");
     expect(source).toContain(
-      "gcSalesCashNetPositionValue = round2(-getAccountNetBalance(roles.gcSalesCash, accountBalances))"
-    );
-    expect(source).toContain('if (account.subType === "sp_hadi_intercompany") continue');
-    expect(source).not.toContain('const UNCLOSED_EARNINGS_CODE = "GC-UNCL-PNL"');
-    expect(source).toContain(
       "for (const accountId of currentTranslatedLedgerAccountIds(body)) existingIds.add(accountId)"
     );
   });

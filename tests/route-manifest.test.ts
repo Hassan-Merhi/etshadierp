@@ -46,7 +46,11 @@ const reviewedSpMounts: string[] = [];
 // left for the audit phase that targets duplicate route registrations rather than folded into a
 // CI-unblocking change. Tracked as a confirmed finding, not an accepted one.
 // Golden Coast's Fresh Start payment boundary adds one reviewed layered registration.
-const MAX_SHADOWED_REGISTRATIONS = 160;
+// #1206 adds a second: goldenCoastPosSettlementDeleteRoute is mounted ahead of the generic
+// DELETE /api/vouchers/:id so a Golden Coast POS cash settlement deletes its cascade before
+// the generic handler's edit-lock rejects it. The shadow is the mechanism, not an oversight -
+// the specific route calls next() for anything that is not a linked GC cash-settlement delete.
+const MAX_SHADOWED_REGISTRATIONS = 161;
 let actual: SerializedRouteManifest;
 
 async function buildManifest(): Promise<SerializedRouteManifest> {
