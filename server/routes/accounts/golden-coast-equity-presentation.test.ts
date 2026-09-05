@@ -1,43 +1,58 @@
 import { describe, expect, it } from "vitest";
 import { projectGoldenCoastAccountsEquity } from "./golden-coast-equity-presentation";
 
+type TestAccount = {
+  id: string;
+  accountId: number;
+  name: string;
+  subType: string;
+  balance: string;
+  balanceSide: "Dr" | "Cr";
+  openingBalance: number;
+  openingBalanceSide: "Dr" | "Cr";
+  active?: boolean;
+  deletedAt?: string | null;
+};
+
 function baseBody(overrides: { freshBalance?: number; freshSide?: "Dr" | "Cr" } = {}) {
+  const accounts: TestAccount[] = [
+    {
+      id: "ledger-2977",
+      accountId: 2977,
+      name: "Fresh Start FZ Equity",
+      subType: "gc_partner_capital",
+      balance: (overrides.freshBalance ?? 207997).toFixed(2),
+      balanceSide: overrides.freshSide ?? "Dr",
+      openingBalance: 207997,
+      openingBalanceSide: "Dr",
+      active: true,
+    },
+    {
+      id: "ledger-2978",
+      accountId: 2978,
+      name: "Hassan Dakik Equity",
+      subType: "gc_owner_capital",
+      balance: "289242.00",
+      balanceSide: "Dr",
+      openingBalance: 289242,
+      openingBalanceSide: "Dr",
+      active: true,
+    },
+    {
+      id: "ledger-2969",
+      accountId: 2969,
+      name: "GC Sales Cash",
+      subType: "sp_payable",
+      balance: "165875.00",
+      balanceSide: "Cr",
+      openingBalance: 165875,
+      openingBalanceSide: "Cr",
+      active: true,
+    },
+  ];
+
   return {
-    accounts: [
-      {
-        id: "ledger-2977",
-        accountId: 2977,
-        name: "Fresh Start FZ Equity",
-        subType: "gc_partner_capital",
-        balance: (overrides.freshBalance ?? 207997).toFixed(2),
-        balanceSide: overrides.freshSide ?? "Dr",
-        openingBalance: 207997,
-        openingBalanceSide: "Dr",
-        active: true,
-      },
-      {
-        id: "ledger-2978",
-        accountId: 2978,
-        name: "Hassan Dakik Equity",
-        subType: "gc_owner_capital",
-        balance: "289242.00",
-        balanceSide: "Dr",
-        openingBalance: 289242,
-        openingBalanceSide: "Dr",
-        active: true,
-      },
-      {
-        id: "ledger-2969",
-        accountId: 2969,
-        name: "GC Sales Cash",
-        subType: "sp_payable",
-        balance: "165875.00",
-        balanceSide: "Cr",
-        openingBalance: 165875,
-        openingBalanceSide: "Cr",
-        active: true,
-      },
-    ],
+    accounts,
     asOfDate: "2026-09-04",
   };
 }
@@ -65,7 +80,7 @@ describe("Golden Coast Accounts Overview equity presentation", () => {
 
   it("ignores inactive or deleted duplicate Golden Coast role rows and projects only the active ledgers", () => {
     const body = baseBody();
-    (body.accounts as any[]).unshift(
+    body.accounts.unshift(
       {
         id: "ledger-old-fresh",
         accountId: 1001,
