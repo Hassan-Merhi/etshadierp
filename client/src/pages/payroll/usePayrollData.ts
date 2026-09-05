@@ -87,6 +87,12 @@ export function usePayrollData({
 
   const { data: locations = [] } = useQuery<Array<{ id: number; name: string; companyId: number }>>({
     queryKey: ["/api/locations", selectedCompany?.id],
+    queryFn: async () => {
+      if (!selectedCompany?.id) return [];
+      const res = await fetch(`/api/locations?companyId=${selectedCompany.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch locations");
+      return (await res.json()) as Array<{ id: number; name: string; companyId: number }>;
+    },
     enabled: !!selectedCompany?.id,
   });
 
@@ -94,7 +100,10 @@ export function usePayrollData({
   const { data: allCompanyLocations = [] } = useQuery<
     Array<{ id: number; name: string; companyId: number; companyName: string }>
   >({
-    queryKey: ["/api/all-company-locations", companies.map((c) => c.id).join(",")],
+    // The active company changes which companies count as "other". Include it in
+    // the cache key so switching companies cannot reuse a stale cross-company
+    // location list that omits the newly selected bonus source company.
+    queryKey: ["/api/all-company-locations", selectedCompany?.id, companies.map((c) => c.id).join(",")],
     queryFn: async () => {
       const results: Array<{ id: number; name: string; companyId: number; companyName: string }> = [];
       for (const company of otherCompanies) {
@@ -113,7 +122,7 @@ export function usePayrollData({
       }
       return results;
     },
-    enabled: otherCompanies.length > 0,
+    enabled: !!selectedCompany?.id && otherCompanies.length > 0,
   });
 
   const { data: workerGroupsData = [] } = useQuery<WorkerGroup[]>({
