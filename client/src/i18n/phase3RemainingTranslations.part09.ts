@@ -295,6 +295,11 @@ export const phase3RemainingTranslationsPart09: readonly Phase3SharedUiEntry[] =
     ar: "فشل في تحميل بيانات الموقع الصافي.",
     fr: "Impossible de charger les données de position nette.",
   },
+  {
+    en: "Failed to load Net Position (${response.status})",
+    ar: "فشل في تحميل صافي المركز ({{0}})",
+    fr: "Impossible de charger la position nette ({{0}})",
+  },
   { en: "Failed to load offloads", ar: "فشل في تحميل الحمولات", fr: "Échec du chargement des déchargements" },
   {
     en: "Failed to load optional vouchers",
