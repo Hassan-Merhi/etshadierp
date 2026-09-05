@@ -13,6 +13,7 @@ function baseBody(overrides: { freshBalance?: number; freshSide?: "Dr" | "Cr" } 
         balanceSide: overrides.freshSide ?? "Dr",
         openingBalance: 207997,
         openingBalanceSide: "Dr",
+        active: true,
       },
       {
         id: "ledger-2978",
@@ -23,6 +24,7 @@ function baseBody(overrides: { freshBalance?: number; freshSide?: "Dr" | "Cr" } 
         balanceSide: "Dr",
         openingBalance: 289242,
         openingBalanceSide: "Dr",
+        active: true,
       },
       {
         id: "ledger-2969",
@@ -33,6 +35,7 @@ function baseBody(overrides: { freshBalance?: number; freshSide?: "Dr" | "Cr" } 
         balanceSide: "Cr",
         openingBalance: 165875,
         openingBalanceSide: "Cr",
+        active: true,
       },
     ],
     asOfDate: "2026-09-04",
@@ -58,6 +61,58 @@ describe("Golden Coast Accounts Overview equity presentation", () => {
     const fresh = rows.find((row) => row.subType === "gc_partner_capital");
 
     expect(fresh).toMatchObject({ balance: "42121.00", balanceSide: "Cr" });
+  });
+
+  it("ignores inactive or deleted duplicate Golden Coast role rows and projects only the active ledgers", () => {
+    const body = baseBody();
+    body.accounts.unshift(
+      {
+        id: "ledger-old-fresh",
+        accountId: 1001,
+        name: "Fresh Start FZ Equity (Old)",
+        subType: "gc_partner_capital",
+        balance: "999999.00",
+        balanceSide: "Dr",
+        openingBalance: 999999,
+        openingBalanceSide: "Dr",
+        active: false,
+      },
+      {
+        id: "ledger-old-hassan",
+        accountId: 1002,
+        name: "Hassan Dakik Equity (Deleted)",
+        subType: "gc_owner_capital",
+        balance: "888888.00",
+        balanceSide: "Dr",
+        openingBalance: 888888,
+        openingBalanceSide: "Dr",
+        active: true,
+        deletedAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "ledger-old-payable",
+        accountId: 1003,
+        name: "GC Sales Cash",
+        subType: "sp_payable",
+        balance: "777777.00",
+        balanceSide: "Cr",
+        openingBalance: 777777,
+        openingBalanceSide: "Cr",
+        active: false,
+      }
+    );
+
+    const result = projectGoldenCoastAccountsEquity(body);
+    const rows = result.accounts as any[];
+    const activeFresh = rows.find((row) => row.accountId === 2977);
+    const activeHassan = rows.find((row) => row.accountId === 2978);
+    const inactiveFresh = rows.find((row) => row.accountId === 1001);
+    const deletedHassan = rows.find((row) => row.accountId === 1002);
+
+    expect(activeFresh).toMatchObject({ balance: "42122.00", balanceSide: "Cr" });
+    expect(activeHassan).toMatchObject({ balance: "289242.00", balanceSide: "Cr" });
+    expect(inactiveFresh).toMatchObject({ balance: "999999.00", balanceSide: "Dr" });
+    expect(deletedHassan).toMatchObject({ balance: "888888.00", balanceSide: "Dr" });
   });
 
   it("does not alter ordinary non-Golden-Coast account lists", () => {
