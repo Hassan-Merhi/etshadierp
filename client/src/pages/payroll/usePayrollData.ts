@@ -172,9 +172,11 @@ export function usePayrollData({
   });
 
   const { locations, allCompanyLocations } = useMemo(() => {
-    if (!selectedCompany?.id) return { locations: [] as PayrollLocation[], allCompanyLocations: [] as PayrollCompanyLocation[] };
+    if (!selectedCompany?.id) {
+      return { locations: [] as PayrollLocation[], allCompanyLocations: [] as PayrollCompanyLocation[] };
+    }
     return buildPayrollLocationViews(payrollCompanyLocations, selectedCompany.id, otherCompanies);
-  }, [allCompanyLocationsKey(otherCompanies), payrollCompanyLocations, selectedCompany?.id]);
+  }, [payrollCompanyLocations, selectedCompany?.id, otherCompanies]);
 
   const { data: workerGroupsData = [] } = useQuery<WorkerGroup[]>({
     queryKey: ["/api/worker-groups/with-members", selectedCompany?.id],
@@ -258,8 +260,4 @@ export function usePayrollData({
     selectedPaymentsSummary,
     filteredEmployeeStaff,
   };
-}
-
-function allCompanyLocationsKey(companies: PayrollCompanyOption[]): string {
-  return companies.map((company) => `${company.id}:${company.name}`).join("|");
 }
