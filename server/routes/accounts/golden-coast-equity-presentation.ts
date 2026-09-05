@@ -9,6 +9,8 @@ type AccountsAllRow = {
   balanceSide?: string | null;
   openingBalance?: string | number | null;
   openingBalanceSide?: string | null;
+  active?: boolean | null;
+  deletedAt?: unknown;
   [key: string]: unknown;
 };
 
@@ -60,11 +62,15 @@ export function projectGoldenCoastAccountsEquity(body: AccountsAllResponse): Acc
   if (!body || typeof body !== "object" || !Array.isArray(body.accounts)) return body;
 
   const rows = body.accounts as AccountsAllRow[];
-  const fresh = rows.find((row) => row.subType === "gc_partner_capital");
-  const hassan = rows.find((row) => row.subType === "gc_owner_capital");
+  // Match Net Position role selection exactly: historical/retired Golden Coast
+  // ledgers remain in /api/accounts/all, but must never win role selection over
+  // the currently active capital/payable accounts.
+  const activeRows = rows.filter((row) => row.active !== false && row.deletedAt == null);
+  const fresh = activeRows.find((row) => row.subType === "gc_partner_capital");
+  const hassan = activeRows.find((row) => row.subType === "gc_owner_capital");
   if (!fresh || !hassan) return body;
 
-  const payableCandidates = rows.filter((row) => row.subType === "sp_payable");
+  const payableCandidates = activeRows.filter((row) => row.subType === "sp_payable");
   const gcSalesCash =
     payableCandidates.find((row) => /gc\s*sales\s*cash/i.test(row.name || "")) ??
     (payableCandidates.length === 1 ? payableCandidates[0] : undefined);
