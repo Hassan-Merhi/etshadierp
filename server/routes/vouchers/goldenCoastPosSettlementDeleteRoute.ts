@@ -17,7 +17,10 @@ import { applyEmployeeBalanceDeltasTx } from "../../services/accounting/employee
 import { removeFactoryDaybookMirrorTx } from "../../services/accounting/factoryDaybookMirrorRemoval";
 import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
 import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
-import { getCompanyRequestRuntimeContext, runWithCompanyRequestRuntimeContext } from "../../services/security/companyRequestRuntimeContext";
+import {
+  getCompanyRequestRuntimeContext,
+  runWithCompanyRequestRuntimeContext,
+} from "../../services/security/companyRequestRuntimeContext";
 import {
   createTenantDatabaseScope,
   runWithDatabaseScopeRuntimeContext,
@@ -133,7 +136,11 @@ async function handleGoldenCoastPosDelete(req: Request, res: Response, next: Nex
       return;
     }
 
-    const saleRows = await db.select({ id: salesItems.id }).from(salesItems).where(eq(salesItems.voucherId, voucherId)).limit(1);
+    const saleRows = await db
+      .select({ id: salesItems.id })
+      .from(salesItems)
+      .where(eq(salesItems.voucherId, voucherId))
+      .limit(1);
     const possibleSourceClientSaleId = String(voucher.clientSaleId ?? "").trim();
     const sourceSaleCandidate =
       saleRows.length > 0 &&
@@ -148,9 +155,11 @@ async function handleGoldenCoastPosDelete(req: Request, res: Response, next: Nex
     const selectedMarker = currentMarkers.find((marker) => marker.voucherId === voucherId) ?? null;
     const selectedMarkerSource = selectedMarker ? parseSettlementSourceId(selectedMarker.sourceId) : null;
     const sourceAnchor = sourceSaleCandidate
-      ? currentMarkers
+      ? (currentMarkers
           .map((marker) => ({ marker, parsed: parseSettlementSourceId(marker.sourceId) }))
-          .find((item) => item.parsed?.clientSaleId === possibleSourceClientSaleId && isCashTransferRole(item.parsed.role)) ?? null
+          .find(
+            (item) => item.parsed?.clientSaleId === possibleSourceClientSaleId && isCashTransferRole(item.parsed.role)
+          ) ?? null)
       : null;
 
     const manualCashTransferDelete = Boolean(selectedMarkerSource && isCashTransferRole(selectedMarkerSource.role));
@@ -306,7 +315,12 @@ async function handleGoldenCoastPosDelete(req: Request, res: Response, next: Nex
           });
           await tx
             .delete(intercompanyPaymentRequests)
-            .where(and(eq(intercompanyPaymentRequests.fromVoucherId, voucherId), eq(intercompanyPaymentRequests.status, "pending")));
+            .where(
+              and(
+                eq(intercompanyPaymentRequests.fromVoucherId, voucherId),
+                eq(intercompanyPaymentRequests.status, "pending")
+              )
+            );
           await removeFactoryDaybookMirrorTx({ tx, companyId, voucherId });
           await tx
             .update(vouchers)
@@ -319,7 +333,12 @@ async function handleGoldenCoastPosDelete(req: Request, res: Response, next: Nex
         // them immediately. The marker removal also makes a later legitimate
         // POS edit able to recreate a manually removed cash transfer cleanly.
         if (markerRows.length > 0) {
-          await tx.delete(accountingPostingRequests).where(inArray(accountingPostingRequests.id, markerRows.map((row) => row.id)));
+          await tx.delete(accountingPostingRequests).where(
+            inArray(
+              accountingPostingRequests.id,
+              markerRows.map((row) => row.id)
+            )
+          );
         }
 
         for (const linkedVoucherId of linkedVoucherIds) {

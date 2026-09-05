@@ -79,12 +79,7 @@ describe("Golden Coast POS cash settlement delete exception", () => {
       expect(isGoldenCoastPosCashSettlementVoucher({ voucherNumber })).toBe(true);
     }
 
-    for (const voucherNumber of [
-      "GC-POS-abc-create-PAYABLE",
-      "GC-POS-C7-req1",
-      "GC-SCS-C7-req1",
-      "SAL-0001",
-    ]) {
+    for (const voucherNumber of ["GC-POS-abc-create-PAYABLE", "GC-POS-C7-req1", "GC-SCS-C7-req1", "SAL-0001"]) {
       expect(isGoldenCoastPosCashSettlementVoucher({ voucherNumber })).toBe(false);
     }
   });
