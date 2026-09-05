@@ -39,7 +39,7 @@ import { EyeOff, Plus, ChevronDown, FileDown, LayoutList, Layers } from "lucide-
 import { format, addDays } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
-import { isVoucherMutationBlocked } from "@/lib/migratedVoucherGuard";
+import { isGoldenCoastProgrammeVoucher, isVoucherMutationBlocked } from "@/lib/migratedVoucherGuard";
 import { isBlockingQueryError } from "@/lib/abortError";
 import { utils, writeFile } from "@/lib/excelHelper";
 import { useDateJump } from "@/hooks/use-date-jump";
@@ -576,7 +576,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
   );
   const displayedRows = useMemo(() => visibleRows.slice(0, daybookRowLimit), [visibleRows, daybookRowLimit]);
 
-  const canEdit = (v: Voucher) => v.voucherType !== "Purchase" && user?.role !== "POS" && !isVoucherMutationBlocked(v);
+  const canEdit = (v: Voucher) =>
+    v.voucherType !== "Purchase" &&
+    user?.role !== "POS" &&
+    !isGoldenCoastProgrammeVoucher(v) &&
+    !isVoucherMutationBlocked(v);
   const canDelete = () => !!(user?.role === "Developer" || user?.role === "Admin" || user?.canDeleteRecords);
   const handleView = (v: Voucher) => {
     setSelectedVoucher(v);
