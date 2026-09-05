@@ -66,10 +66,10 @@ function isExactDigestPrefix(sourceId: string, clientSaleId: string, digest: str
 
 async function runWithAccessibleCompanyScope<T>(companyId: number, run: () => Promise<T>): Promise<T> {
   const requestContext = getCompanyRequestRuntimeContext();
-  if (!requestContext) throw new Error("Golden Coast POS deletion requires an active company request context");
+  if (!requestContext) throw new Error("No company selected");
 
   const accessible = [...(await getAccessibleCompanyIds(requestContext.userId))];
-  if (!accessible.includes(companyId)) throw new Error("Active company is not accessible to the current user");
+  if (!accessible.includes(companyId)) throw new Error("Access denied: Voucher belongs to a different company");
   const authorizedCompanyIds = accessible.filter((id) => id !== companyId);
 
   return runWithCompanyRequestRuntimeContext({ ...requestContext, authorizedCompanyIds }, () =>
@@ -194,7 +194,7 @@ async function handleGoldenCoastPosDelete(req: Request, res: Response, next: Nex
       // A cash transfer is a two-company posting. Refuse a half-delete when the
       // counterpart exists but is not visible/authorized to this request.
       if (pairCompanyIds.length < 2) {
-        throw new Error("Linked Golden Coast/HADI cash-transfer counterpart is missing or not accessible");
+        throw new Error("Access denied: Voucher belongs to a different company");
       }
 
       return db.transaction(async (tx) => {
@@ -254,44 +254,46 @@ async function handleGoldenCoastPosDelete(req: Request, res: Response, next: Nex
 
         if (sourcePosDelete) {
           const sourceItems = await tx.select().from(salesItems).where(eq(salesItems.voucherId, voucherId));
-          if (!lockedRequestedVoucher.locationId) {
-            throw new Error("Cannot delete Golden Coast POS sale: source voucher has no location");
-          }
+          const targetLocationId = lockedRequestedVoucher.locationId;
 
-          for (const item of sourceItems) {
-            const quantity = Number.parseFloat(item.quantity);
-            const costPrice = Number.parseFloat(item.costPrice || "0");
-            const inventoryResult = await adjustInventory(
-              tx,
-              lockedRequestedVoucher.locationId,
-              item.stockItemId,
-              quantity,
-              companyId,
-              costPrice
-            );
-            await postStockMovementTx(
-              tx,
-              {
+          if (targetLocationId) {
+            for (const item of sourceItems) {
+              const quantity = Number.parseFloat(item.quantity);
+              const costPrice = Number.parseFloat(item.costPrice || "0");
+              const inventoryResult = await adjustInventory(
+                tx,
+                targetLocationId,
+                item.stockItemId,
+                quantity,
                 companyId,
-                stockItemId: item.stockItemId,
-                kind: "adjustment",
-                quantity: String(quantity),
-                unitCost: String(Math.max(costPrice || inventoryResult.averageRate || 0, 0)),
-                toLocationId: lockedRequestedVoucher.locationId,
-                occurredAt: new Date().toISOString(),
-                source: {
-                  sourceType: "voucher_delete_pos_sale",
-                  sourceId: String(voucherId),
-                  idempotencyKey: `voucher-delete:pos:${companyId}:${voucherId}:${item.id}`,
+                costPrice
+              );
+              await postStockMovementTx(
+                tx,
+                {
+                  companyId,
+                  stockItemId: item.stockItemId,
+                  kind: "adjustment",
+                  quantity: String(quantity),
+                  unitCost: String(Math.max(costPrice || inventoryResult.averageRate || 0, 0)),
+                  toLocationId: targetLocationId,
+                  occurredAt: new Date().toISOString(),
+                  source: {
+                    sourceType: "voucher_delete_pos_sale",
+                    sourceId: String(voucherId),
+                    idempotencyKey: `voucher-delete:pos:${companyId}:${voucherId}:${item.id}`,
+                  },
+                  actor: {
+                    userId: req.session.userId,
+                    username: req.session.username,
+                    reason: `Delete voucher ${lockedRequestedVoucher.voucherNumber}`,
+                  },
                 },
-                actor: {
-                  userId: req.session.userId,
-                  username: req.session.username,
-                  reason: `Delete voucher ${lockedRequestedVoucher.voucherNumber}`,
-                },
-              },
-              canonicalStockMovementAdapter
-            );
+                canonicalStockMovementAdapter
+              );
+            }
+          } else {
+            logger.warn(`[POS Delete] Voucher ${voucherId}: Cannot reverse inventory - no locationId on voucher`);
           }
 
           await tx.delete(salesItems).where(eq(salesItems.voucherId, voucherId));
@@ -330,7 +332,12 @@ async function handleGoldenCoastPosDelete(req: Request, res: Response, next: Nex
             .limit(1);
           if (!linkedVoucher || linkedVoucher.deletedAt) continue;
           if (!String(linkedVoucher.voucherNumber || "").startsWith("GC-POS-")) {
-            throw new Error(`Refusing to delete non-Golden-Coast POS voucher ${linkedVoucherId}`);
+            logger.error("Golden Coast POS delete refused a non-programme linked voucher", {
+              companyId: marker.companyId,
+              linkedVoucherId,
+              voucherNumber: linkedVoucher.voucherNumber,
+            });
+            throw new Error("Voucher not found");
           }
           await removeFactoryDaybookMirrorTx({ tx, companyId: marker.companyId, voucherId: linkedVoucherId });
           await tx
