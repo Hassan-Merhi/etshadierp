@@ -60,7 +60,7 @@ function baseBody(overrides: { freshBalance?: number; freshSide?: "Dr" | "Cr" } 
 describe("Golden Coast Accounts Overview equity presentation", () => {
   it("matches the Phase 17 Net Position Fresh Start residual instead of showing the raw Dr opening", () => {
     const result = projectGoldenCoastAccountsEquity(baseBody());
-    const rows = result.accounts as any[];
+    const rows = result.accounts as TestAccount[];
     const fresh = rows.find((row) => row.subType === "gc_partner_capital");
     const hassan = rows.find((row) => row.subType === "gc_owner_capital");
 
@@ -72,7 +72,7 @@ describe("Golden Coast Accounts Overview equity presentation", () => {
     // A $1 debit after cutover makes the raw Accounts balance 207,998 Dr,
     // while the credit-normal Net Position claim correctly becomes 42,121 Cr.
     const result = projectGoldenCoastAccountsEquity(baseBody({ freshBalance: 207998, freshSide: "Dr" }));
-    const rows = result.accounts as any[];
+    const rows = result.accounts as TestAccount[];
     const fresh = rows.find((row) => row.subType === "gc_partner_capital");
 
     expect(fresh).toMatchObject({ balance: "42121.00", balanceSide: "Cr" });
@@ -118,7 +118,7 @@ describe("Golden Coast Accounts Overview equity presentation", () => {
     );
 
     const result = projectGoldenCoastAccountsEquity(body);
-    const rows = result.accounts as any[];
+    const rows = result.accounts as TestAccount[];
     const activeFresh = rows.find((row) => row.accountId === 2977);
     const activeHassan = rows.find((row) => row.accountId === 2978);
     const inactiveFresh = rows.find((row) => row.accountId === 1001);
