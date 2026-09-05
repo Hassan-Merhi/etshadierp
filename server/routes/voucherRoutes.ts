@@ -9,6 +9,7 @@ import { registerCentralGenericVoucherCreateRoute } from "./vouchers/centralGene
 import { registerCentralPaymentReceiptCreateRoute } from "./vouchers/centralPaymentReceiptCreateRoute";
 import { registerVoucherExactReversalRoute } from "./vouchers/voucherExactReversalRoute";
 import { registerCentralPaymentReceiptLifecycleRoutes } from "./vouchers/centralPaymentReceiptLifecycleRoute";
+import { registerGoldenCoastPosSettlementDeleteRoute } from "./vouchers/goldenCoastPosSettlementDeleteRoute";
 import { registerCentralPaymentReceiptDeleteRoute } from "./vouchers/centralPaymentReceiptDeleteRoute";
 import { registerCentralJournalCreateRoute } from "./vouchers/centralJournalCreateRoute";
 import { registerCentralJournalLifecycleRoutes } from "./vouchers/centralJournalLifecycleRoute";
@@ -78,6 +79,10 @@ export function registerVoucherRoutes(app: Express) {
   registerCentralPaymentReceiptCreateRoute(app);
   registerVoucherExactReversalRoute(app);
   registerCentralPaymentReceiptLifecycleRoutes(app);
+  // Golden Coast POS cash settlements are normally programme-locked, but their
+  // dedicated delete lifecycle must run before the generic mutation guard so a
+  // manual cash-transfer delete and a POS cascade can remove the linked pair.
+  registerGoldenCoastPosSettlementDeleteRoute(app);
   registerCentralPaymentReceiptDeleteRoute(app);
   registerVoucherPaymentRoutes(app);
 
