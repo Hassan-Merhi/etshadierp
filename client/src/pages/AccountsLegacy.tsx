@@ -31,7 +31,9 @@ export default function Accounts() {
   const model = useAccountsLegacyModel();
   const { selectedAccount, selectedAccountIsLedger } = model;
 
-  const freshStartAccount = model.allAccounts.find((account) => account.subType === "gc_partner_capital");
+  const freshStartAccount = model.allAccounts.find(
+    (account) => account.subType === "gc_partner_capital" && account.active !== false
+  );
   const freshStartPresentation = useGoldenCoastFreshStartPresentation({
     accountId: freshStartAccount?.accountId,
     subType: freshStartAccount?.subType,
