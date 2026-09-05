@@ -5,6 +5,7 @@
  * detection rules are pinned down explicitly.
  */
 import {
+  isGoldenCoastPosCashSettlementVoucher,
   isGoldenCoastProgrammeVoucher,
   isReadonlyMigratedVoucher,
   isVoucherMutationBlocked,
@@ -65,15 +66,42 @@ describe("isGoldenCoastProgrammeVoucher", () => {
   });
 });
 
+describe("Golden Coast POS cash settlement delete exception", () => {
+  it("recognizes only CASH/CASH-HADI settlement journals, including revisions", () => {
+    for (const voucherNumber of [
+      "GC-POS-abc-create-CASH",
+      "GC-POS-abc-create-CASH-HADI",
+      "GC-POS-abc-edit2-CASH",
+      "GC-POS-abc-edit2-CASH-HADI",
+      "GC-POS-abc-create-CASH-REV-2",
+      "GC-POS-abc-create-CASH-HADI-REV-2",
+    ]) {
+      expect(isGoldenCoastPosCashSettlementVoucher({ voucherNumber })).toBe(true);
+    }
+
+    for (const voucherNumber of [
+      "GC-POS-abc-create-PAYABLE",
+      "GC-POS-C7-req1",
+      "GC-SCS-C7-req1",
+      "SAL-0001",
+    ]) {
+      expect(isGoldenCoastPosCashSettlementVoucher({ voucherNumber })).toBe(false);
+    }
+  });
+});
+
 describe("isVoucherMutationBlocked", () => {
-  it("blocks both protected classes and nothing else", () => {
+  it("blocks protected classes while allowing the dedicated POS cash-delete lifecycle", () => {
     expect(isVoucherMutationBlocked({ sourceModule: "SP_MIGRATION_READONLY" })).toBe(true);
     expect(isVoucherMutationBlocked({ voucherNumber: "MIG-1" })).toBe(true);
     expect(isVoucherMutationBlocked({ voucherNumber: "GC-SCS-C7-req1" })).toBe(true);
+    expect(isVoucherMutationBlocked({ voucherNumber: "GC-POS-abc-create-PAYABLE" })).toBe(true);
+    expect(isVoucherMutationBlocked({ voucherNumber: "GC-POS-abc-create-CASH" })).toBe(false);
+    expect(isVoucherMutationBlocked({ voucherNumber: "GC-POS-abc-create-CASH-HADI" })).toBe(false);
     expect(isVoucherMutationBlocked({ voucherNumber: "SAL-0001", sourceModule: "sales" })).toBe(false);
   });
 
-  it("labels each class distinctly so the UI can explain the lock", () => {
+  it("labels each protected class distinctly so the UI can explain the lock", () => {
     expect(voucherLockLabel({ voucherNumber: "MIG-1" })).toBe("Read-only migration");
     expect(voucherLockLabel({ voucherNumber: "GC-SCS-C7-req1" })).toBe("Golden Coast posting");
     expect(voucherLockLabel({ voucherNumber: "SAL-0001" })).toBeNull();
