@@ -34,6 +34,13 @@ const TEST_ROOTS = ["tests", "server", "client", "shared"];
 const TEST_EXTENSIONS = [".test.ts", ".test.tsx"];
 const SOURCE_PATH_PATTERN = /["'`]((?:server|client|shared|scripts)\/[^"'`\s]+\.(?:ts|tsx|mjs|cjs|js|jsx))["'`]/g;
 const CONFIG_PATH_PATTERN = /["'`](config\/[^"'`\s]+\.json)["'`]/g;
+// Colocated tests read the file they pin with a path relative to themselves —
+// `readFileSync(new URL("./routes.ts", import.meta.url))` — which the
+// repo-rooted pattern above cannot match. Without this those tests were
+// classified structural-guard and their assertions went uncounted, so the
+// ratchet measured a smaller quantity than the repository actually contained.
+const RELATIVE_SOURCE_PATTERN =
+  /new URL\(\s*["'`](\.\.?\/[^"'`\s]+\.(?:ts|tsx|mjs|cjs|js|jsx))["'`]/g;
 const READS_FILE_PATTERN = /\breadFileSync\b|\breadFile\b/;
 const TEXT_ASSERTION_PATTERN = /\.(?:toContain|toMatch)\(/g;
 const EXISTENCE_PATTERN = /\bexistsSync\b/;
@@ -83,7 +90,13 @@ export function auditSourceTextAssertions() {
     const source = fs.readFileSync(path.join(projectRoot, testFile), "utf8");
     if (!READS_FILE_PATTERN.test(source)) continue;
 
-    const pinnedSources = [...new Set(matchAll(source, SOURCE_PATH_PATTERN))].sort();
+    const testDirectory = path.posix.dirname(testFile);
+    const relativePins = matchAll(source, RELATIVE_SOURCE_PATTERN).map((relative) =>
+      path.posix.normalize(path.posix.join(testDirectory, relative))
+    );
+    const pinnedSources = [
+      ...new Set([...matchAll(source, SOURCE_PATH_PATTERN), ...relativePins]),
+    ].sort();
     const pinnedConfigs = [...new Set(matchAll(source, CONFIG_PATH_PATTERN))].sort();
     const textAssertions = countMatches(source, TEXT_ASSERTION_PATTERN);
     const checksExistence = EXISTENCE_PATTERN.test(source);
