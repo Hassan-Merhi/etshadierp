@@ -122,21 +122,6 @@ export default function Accounts() {
         setCustomerToEdit={model.setCustomerToEdit}
         employeeToEdit={model.employeeToEdit}
         setEmployeeToEdit={model.setEmployeeToEdit}
-        bankToEdit={model.bankToEdit}
-        setBankToEdit={model.setBankToEdit}
-        bankForm={model.bankForm}
-        onBankSubmit={model.onBankSubmit}
-        updateBankMutation={model.updateBankMutation}
-        deleteBankMutation={model.deleteBankMutation}
-        handleDeleteBankAccount={model.handleDeleteBankAccount}
-        accountToEdit={model.accountToEdit}
-        setAccountToEdit={model.setAccountToEdit}
-        supplierToEdit={model.supplierToEdit}
-        setSupplierToEdit={model.setSupplierToEdit}
-        customerToEdit={model.customerToEdit}
-        setCustomerToEdit={model.setCustomerToEdit}
-        employeeToEdit={model.employeeToEdit}
-        setEmployeeToEdit={model.setEmployeeToEdit}
         editForm={model.editForm}
         onEditSubmit={() => {}}
         updateLedgerMutation={{}}
