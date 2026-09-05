@@ -1,5 +1,5 @@
 {
-  "description": "Reviewed CI ratchet deltas for intentional functionality added before the architecture snapshots were refreshed. Every allowance is exact so unrelated growth or routes still fail. The route-manifest additions were folded into config/route-manifest.json on 2026-08-05 and again when the earlier Golden Coast phases reached main, so these lists only contain exact reviewed deltas since that snapshot: the three Phase 7 sales-cash-transfer middleware mounts introduced by the Phase 16 HADI transfer guard. The source-text delta is empty because config/source-text-assertion-baseline.json was regenerated once audit-source-text-assertions learned to see relative-URL source reads; every test that was carried here as a reviewed delta is now recorded in that baseline, which is the canonical list. A new source-coupled test must be added here again, deliberately.",
+  "description": "Reviewed CI ratchet deltas for intentional functionality added before the architecture snapshots were refreshed. Every allowance is exact so unrelated growth or routes still fail. The route-manifest additions were folded into config/route-manifest.json on 2026-08-05 and again when the earlier Golden Coast phases reached main, so those lists only contain exact reviewed deltas since that snapshot: the three Phase 7 sales-cash-transfer middleware mounts introduced by the Phase 16 HADI transfer guard. config/source-text-assertion-baseline.json was regenerated once audit-source-text-assertions learned to see relative-URL source reads, so every test previously carried here as a reviewed delta now lives in that baseline, which is the canonical list. The one remaining source-text allowance is #1193's added expect(routeSource).toContain(\"new Decimal(shared.debit).minus(shared.credit).abs()\") in server/routes/sp/spGoldenCoastPhase11MonthlyCloseRoutes.test.ts, a test the regenerated baseline already records: the assertion arrived on main after the baseline was taken, and it is the first one this ratchet has caught that the old repo-rooted-path detector would have missed entirely.",
   "godFileLineCaps": {
     "server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.ts": 909,
     "server/services/factory/postOffloadPhase6Safety.ts": 927,
@@ -19,6 +19,6 @@
   "routeManifestReplacements": [],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [],
-    "maxAdditionalTextAssertions": 0
+    "maxAdditionalTextAssertions": 1
   }
 }
