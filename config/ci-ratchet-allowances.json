@@ -1,5 +1,5 @@
 {
-  "description": "Reviewed CI ratchet deltas for intentional functionality added before the architecture snapshots were refreshed. Every allowance is exact so unrelated growth or routes still fail. The route-manifest additions were folded into config/route-manifest.json on 2026-08-05 and again when the earlier Golden Coast phases reached main, so those lists only contain exact reviewed deltas since that snapshot: the three Phase 7 sales-cash-transfer middleware mounts introduced by the Phase 16 HADI transfer guard. config/source-text-assertion-baseline.json was regenerated once audit-source-text-assertions learned to see relative-URL source reads, so every test previously carried here as a reviewed delta now lives in that baseline, which is the canonical list. The one remaining source-text allowance is #1193's added expect(routeSource).toContain(\"new Decimal(shared.debit).minus(shared.credit).abs()\") in server/routes/sp/spGoldenCoastPhase11MonthlyCloseRoutes.test.ts, a test the regenerated baseline already records: the assertion arrived on main after the baseline was taken, and it is the first one this ratchet has caught that the old repo-rooted-path detector would have missed entirely.",
+  "description": "Reviewed CI ratchet deltas for intentional functionality added before the architecture snapshots were refreshed. Every allowance is exact so unrelated growth or routes still fail. The route-manifest additions were folded into config/route-manifest.json on 2026-08-05 and again when the earlier Golden Coast phases reached main, so those lists only contain exact reviewed deltas since that snapshot: the three Phase 7 sales-cash-transfer middleware mounts introduced by the Phase 16 HADI transfer guard. config/source-text-assertion-baseline.json was regenerated once audit-source-text-assertions learned to see relative-URL source reads, so every test previously carried here as a reviewed delta now lives in that baseline, which is the canonical list. The four source-text allowances are assertions that landed on main after that baseline was taken, each on a test the baseline already records: one from #1193 in server/routes/sp/spGoldenCoastPhase11MonthlyCloseRoutes.test.ts pinning the shared-charge Decimal expression, and three from #1196 in tests/supplier-partner-net-position-inclusion.test.ts pinning the residual-formula constant, the freshStartResidual computation and the sp_hadi_intercompany skip.",
   "godFileLineCaps": {
     "server/routes/sp/spGoldenCoastPhase6PosSaleRoutes.ts": 909,
     "server/services/factory/postOffloadPhase6Safety.ts": 927,
@@ -19,6 +19,6 @@
   "routeManifestReplacements": [],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [],
-    "maxAdditionalTextAssertions": 1
+    "maxAdditionalTextAssertions": 4
   }
 }
