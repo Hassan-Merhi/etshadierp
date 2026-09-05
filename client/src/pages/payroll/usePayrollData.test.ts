@@ -8,9 +8,7 @@ describe("buildPayrollLocationViews", () => {
   ];
 
   it("gives an other company shared locations when it has no owned location rows", () => {
-    const { allCompanyLocations } = buildPayrollLocationViews(hadiLocations, 1, [
-      { id: 2, name: "GC - LSHI" },
-    ]);
+    const { allCompanyLocations } = buildPayrollLocationViews(hadiLocations, 1, [{ id: 2, name: "GC - LSHI" }]);
 
     expect(allCompanyLocations).toEqual([
       { id: 101, name: "Hadi 1", companyId: 2, companyName: "GC - LSHI" },
@@ -19,9 +17,7 @@ describe("buildPayrollLocationViews", () => {
   });
 
   it("gives the selected company shared locations when it has no owned location rows", () => {
-    const { locations } = buildPayrollLocationViews(hadiLocations, 2, [
-      { id: 1, name: "HADI L'SHI" },
-    ]);
+    const { locations } = buildPayrollLocationViews(hadiLocations, 2, [{ id: 1, name: "HADI L'SHI" }]);
 
     expect(locations).toEqual([
       { id: 101, name: "Hadi 1", companyId: 2 },
@@ -35,9 +31,7 @@ describe("buildPayrollLocationViews", () => {
       { id: 201, name: "GC Main", companyId: 2, companyName: "GC - LSHI" },
     ];
 
-    const { allCompanyLocations } = buildPayrollLocationViews(companyLocations, 1, [
-      { id: 2, name: "GC - LSHI" },
-    ]);
+    const { allCompanyLocations } = buildPayrollLocationViews(companyLocations, 1, [{ id: 2, name: "GC - LSHI" }]);
 
     expect(allCompanyLocations).toEqual([
       { id: 201, name: "GC Main", companyId: 2, companyName: "GC - LSHI" },
