@@ -21,10 +21,47 @@ import { AccountSearchResults } from "./accountslegacy/AccountSearchResults";
 import { FindVoucherTab } from "./accountslegacy/FindVoucherTab";
 import { EditAccountDialog } from "./accountslegacy/EditAccountDialog";
 import { AccountsConfirmDialogs } from "./accountslegacy/AccountsConfirmDialogs";
+import {
+  projectGoldenCoastFreshStartAccounts,
+  projectGoldenCoastFreshStartStatement,
+  useGoldenCoastFreshStartPresentation,
+} from "./accountslegacy/goldenCoastFreshStartPresentation";
 
 export default function Accounts() {
   const model = useAccountsLegacyModel();
   const { selectedAccount, selectedAccountIsLedger } = model;
+
+  const freshStartAccount = model.allAccounts.find(
+    (account) => account.subType === "gc_partner_capital" && account.active !== false
+  );
+  const freshStartPresentation = useGoldenCoastFreshStartPresentation({
+    accountId: freshStartAccount?.accountId,
+    subType: freshStartAccount?.subType,
+    toDate: model.periodFilter.toDate || null,
+  });
+
+  // Golden Coast Net Position owns the Fresh Start residual presentation. The
+  // stored equity opening remains untouched in the ledger; this page only
+  // projects the list and statement so every visible Fresh Start balance agrees
+  // with the Net Position figure for the same as-of date.
+  const presentedFilteredAccounts = projectGoldenCoastFreshStartAccounts(
+    model.filteredAccounts,
+    freshStartPresentation
+  );
+  const selectedFreshStartPresentation =
+    selectedAccount?.subType === "gc_partner_capital" && selectedAccount.accountId === freshStartAccount?.accountId
+      ? freshStartPresentation
+      : null;
+  const presentedSelectedAccount = selectedAccount
+    ? projectGoldenCoastFreshStartAccounts([selectedAccount], selectedFreshStartPresentation)[0]
+    : null;
+  const presentedStatement = projectGoldenCoastFreshStartStatement({
+    openingBalance: model.broughtForwardBalance,
+    closingBalance: model.closingBalance,
+    vouchersWithBalance: model.vouchersWithBalance,
+    presentation: selectedFreshStartPresentation,
+  });
+  const presentedSearchModel = { ...model, filteredAccounts: presentedFilteredAccounts };
 
   const closeSelectedAccount = () => {
     model.setSelectedAccount(null);
@@ -152,11 +189,11 @@ export default function Accounts() {
                 />
               ) : model.searchTerm ? (
                 /* Command-palette result list when searching */
-                <AccountSearchResults model={model} />
+                <AccountSearchResults model={presentedSearchModel} />
               ) : (
                 /* Full account table when not searching */
                 <AccountTable
-                  filteredAccounts={model.filteredAccounts}
+                  filteredAccounts={presentedFilteredAccounts}
                   expandedParents={model.expandedParents}
                   toggleParent={model.toggleParent}
                   handleAccountChange={model.handleAccountChange}
@@ -168,13 +205,13 @@ export default function Accounts() {
             </div>
           ) : (
             <AccountStatementView
-              selectedAccount={selectedAccount}
+              selectedAccount={presentedSelectedAccount ?? selectedAccount}
               onClose={closeSelectedAccount}
               periodFilter={model.periodFilter}
               setPeriodFilter={model.setPeriodFilter}
-              vouchersWithBalance={model.vouchersWithBalance}
-              closingBalance={model.closingBalance}
-              openingBalance={model.broughtForwardBalance}
+              vouchersWithBalance={presentedStatement.vouchersWithBalance}
+              closingBalance={presentedStatement.closingBalance}
+              openingBalance={presentedStatement.openingBalance}
               transactionsLoading={model.transactionsLoading}
               transactionError={(model.transactionsQueryError as Error | null)?.message ?? null}
               selectedVoucherIds={model.selectedVoucherIds}
