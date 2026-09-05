@@ -2,6 +2,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Account, Transaction } from "./accountTypes";
 
+const HISTORICAL_REFERENCE_TYPE = "Historical PO Reference";
+
 export interface AccountStatementRow extends Transaction {
   totalDebit: number;
   totalCredit: number;
@@ -43,6 +45,26 @@ export function AccountTransactionRows({
   const totalDebit = vouchersWithBalance.reduce((s, v) => s + (v.totalDebit || 0), 0);
   const totalCredit = vouchersWithBalance.reduce((s, v) => s + (v.totalCredit || 0), 0);
   const isSupplier = selectedAccount.type === "supplier";
+  const isReferenceRow = (v: AccountStatementRow) => v.voucherType === HISTORICAL_REFERENCE_TYPE;
+  const selectableRows = vouchersWithBalance.filter((v) => !isReferenceRow(v));
+  const allSelectableSelected =
+    selectableRows.length > 0 && selectableRows.every((v) => selectedVoucherIds.has(v.voucherId));
+
+  const handleSelectAllRows = () => {
+    if (selectableRows.length === vouchersWithBalance.length) {
+      toggleSelectAll();
+      return;
+    }
+    if (allSelectableSelected) {
+      selectableRows.forEach((v) => {
+        if (selectedVoucherIds.has(v.voucherId)) toggleVoucherSelection(v.voucherId);
+      });
+    } else {
+      selectableRows.forEach((v) => {
+        if (!selectedVoucherIds.has(v.voucherId)) toggleVoucherSelection(v.voucherId);
+      });
+    }
+  };
 
   const balSide = (val: number) => (val >= 0 ? "Dr" : "Cr");
 
@@ -53,8 +75,8 @@ export function AccountTransactionRows({
           <TableRow className="bg-muted/40 hover:bg-muted/40">
             <TableHead className="w-[40px] py-3 print:hidden">
               <Checkbox
-                checked={vouchersWithBalance.length > 0 && selectedVoucherIds.size === vouchersWithBalance.length}
-                onCheckedChange={toggleSelectAll}
+                checked={allSelectableSelected}
+                onCheckedChange={handleSelectAllRows}
                 data-testid="checkbox-select-all"
               />
             </TableHead>
@@ -125,77 +147,88 @@ export function AccountTransactionRows({
             </TableCell>
           </TableRow>
 
-          {vouchersWithBalance.map((v) => (
-            <TableRow
-              key={v.voucherId}
-              className="group hover:bg-muted/30 cursor-pointer border-b border-border/40 last:border-0"
-              onClick={() => handleOpenVoucher(v)}
-              data-testid={`row-voucher-${v.voucherId}`}
-            >
-              <TableCell className="py-3 print:hidden" onClick={(e) => e.stopPropagation()}>
-                <Checkbox
-                  checked={selectedVoucherIds.has(v.voucherId)}
-                  onCheckedChange={() => toggleVoucherSelection(v.voucherId)}
-                />
-              </TableCell>
-              <TableCell className="py-3 font-mono text-xs tabular-nums text-muted-foreground whitespace-nowrap">
-                {formatDisplayDate(v.voucherDate)}
-              </TableCell>
-              <TableCell className="py-3 max-w-[420px]">
-                <div className="text-sm font-medium text-foreground leading-snug truncate">
-                  {v.voucherDescription || v.narration || (
-                    <span className="text-muted-foreground italic">No description</span>
-                  )}
-                </div>
-                <div className="text-[11px] text-muted-foreground mt-0.5 truncate">{v.voucherType}</div>
-              </TableCell>
-              {appMode === "factory" && (
-                <TableCell className="py-3 text-[11px] text-muted-foreground max-w-[280px] truncate">
-                  {v.narration}
-                </TableCell>
-              )}
-              {!hideBalances && (
-                <TableCell className="py-3 text-right font-mono text-sm tabular-nums">
-                  {v.totalDebit > 0 ? (
-                    <span className="text-foreground">
-                      {formatTransactionAmount && v.transactionCurrency
-                        ? formatTransactionAmount(v.transactionDebitAmount || v.totalDebit, v.transactionCurrency)
-                        : fmt(v.totalDebit)}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground/40">—</span>
+          {vouchersWithBalance.map((v) => {
+            const isReference = isReferenceRow(v);
+            return (
+              <TableRow
+                key={`${v.voucherId}-${v.entryId}`}
+                className={
+                  isReference
+                    ? "bg-muted/15 border-b border-border/40 last:border-0"
+                    : "group hover:bg-muted/30 cursor-pointer border-b border-border/40 last:border-0"
+                }
+                onClick={isReference ? undefined : () => handleOpenVoucher(v)}
+                data-testid={isReference ? `row-historical-reference-${Math.abs(v.voucherId)}` : `row-voucher-${v.voucherId}`}
+              >
+                <TableCell className="py-3 print:hidden" onClick={(e) => e.stopPropagation()}>
+                  {isReference ? null : (
+                    <Checkbox
+                      checked={selectedVoucherIds.has(v.voucherId)}
+                      onCheckedChange={() => toggleVoucherSelection(v.voucherId)}
+                    />
                   )}
                 </TableCell>
-              )}
-              {!hideBalances && (
-                <TableCell className="py-3 text-right font-mono text-sm tabular-nums">
-                  {v.totalCredit > 0 ? (
-                    <span className="text-foreground">
-                      {formatTransactionAmount && v.transactionCurrency
-                        ? formatTransactionAmount(v.transactionCreditAmount || v.totalCredit, v.transactionCurrency)
-                        : fmt(v.totalCredit)}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground/40">—</span>
-                  )}
+                <TableCell className="py-3 font-mono text-xs tabular-nums text-muted-foreground whitespace-nowrap">
+                  {formatDisplayDate(v.voucherDate)}
                 </TableCell>
-              )}
-              {!hideBalances && (
-                <TableCell className="py-3 text-right font-mono text-sm tabular-nums font-semibold">
-                  {v.runningBalance != null ? (
-                    <>
-                      {fmt(Math.abs(v.runningBalance))}
-                      <span className="ml-1 text-[10px] font-normal opacity-50">
-                        {v.runningBalance >= 0 ? "Dr" : "Cr"}
+                <TableCell className="py-3 max-w-[420px]">
+                  <div className="text-sm font-medium text-foreground leading-snug truncate">
+                    {v.voucherDescription || v.narration || (
+                      <span className="text-muted-foreground italic">No description</span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                    {isReference ? "Historical PO reference · reference only · balance unchanged" : v.voucherType}
+                  </div>
+                </TableCell>
+                {appMode === "factory" && (
+                  <TableCell className="py-3 text-[11px] text-muted-foreground max-w-[280px] truncate">
+                    {v.narration}
+                  </TableCell>
+                )}
+                {!hideBalances && (
+                  <TableCell className="py-3 text-right font-mono text-sm tabular-nums">
+                    {v.totalDebit > 0 ? (
+                      <span className="text-foreground">
+                        {formatTransactionAmount && v.transactionCurrency
+                          ? formatTransactionAmount(v.transactionDebitAmount || v.totalDebit, v.transactionCurrency)
+                          : fmt(v.totalDebit)}
                       </span>
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground/40">—</span>
-                  )}
-                </TableCell>
-              )}
-            </TableRow>
-          ))}
+                    ) : (
+                      <span className="text-muted-foreground/40">—</span>
+                    )}
+                  </TableCell>
+                )}
+                {!hideBalances && (
+                  <TableCell className="py-3 text-right font-mono text-sm tabular-nums">
+                    {v.totalCredit > 0 ? (
+                      <span className="text-foreground">
+                        {formatTransactionAmount && v.transactionCurrency
+                          ? formatTransactionAmount(v.transactionCreditAmount || v.totalCredit, v.transactionCurrency)
+                          : fmt(v.totalCredit)}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground/40">—</span>
+                    )}
+                  </TableCell>
+                )}
+                {!hideBalances && (
+                  <TableCell className="py-3 text-right font-mono text-sm tabular-nums font-semibold">
+                    {v.runningBalance != null ? (
+                      <>
+                        {fmt(Math.abs(v.runningBalance))}
+                        <span className="ml-1 text-[10px] font-normal opacity-50">
+                          {v.runningBalance >= 0 ? "Dr" : "Cr"}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground/40">—</span>
+                    )}
+                  </TableCell>
+                )}
+              </TableRow>
+            );
+          })}
 
           {/* Footer totals */}
           {!hideBalances && (
