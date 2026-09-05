@@ -1,6 +1,6 @@
 import { db } from "../db";
-import { customers, voucherEntries, vouchers } from "@shared/schema";
-import { and, eq, inArray, isNull, lte, sql } from "drizzle-orm";
+import { ledgerAccounts } from "@shared/schema";
+import { and, eq, isNull } from "drizzle-orm";
 
 export interface SupplierPartnerCustomerNetPositionItem {
   customerId: number;
@@ -16,125 +16,46 @@ export interface SupplierPartnerCustomerNetPositionResult {
 }
 
 /**
- * Resolve supplier-partner customer receivables from the accounting sources that
- * actually carry customer activity.
+ * GC / Supplier Partner Net Position intentionally excludes customers.
  *
- * A customer can be posted in two ways:
- *   1. through its linked receivable ledger account; or
- *   2. directly through voucher_entries.customer_id (manual journals/receipts).
+ * The three Net Position paths that use this helper already suppress linked
+ * customer ledgers via ledgerAccountIds and then append items as authoritative
+ * customer balances. For Supplier Partner mode we return every customer-like
+ * ledger id in ledgerAccountIds and no items, so customers are excluded from:
  *
- * Entries that carry both IDs are counted only through the ledger query, while
- * the direct-customer query is restricted to rows without ledger_account_id.
- * This prevents POS credit-sale entries from being counted twice.
+ *   - the live Net Position response;
+ *   - historical/as-of Net Position calculations; and
+ *   - the Net Position Excel export.
+ *
+ * Customer ledgers and customer accounting remain untouched everywhere else.
  */
 export async function getSupplierPartnerCustomerNetPosition(
   companyId: number,
-  toDate?: string | null
+  _toDate?: string | null
 ): Promise<SupplierPartnerCustomerNetPositionResult> {
-  const companyCustomers = await db
+  const companyLedgerAccounts = await db
     .select({
-      id: customers.id,
-      code: customers.code,
-      legalName: customers.legalName,
-      ledgerAccountId: customers.ledgerAccountId,
-      openingBalance: customers.openingBalance,
-      openingBalanceSide: customers.openingBalanceSide,
+      id: ledgerAccounts.id,
+      accountType: ledgerAccounts.accountType,
+      subType: ledgerAccounts.subType,
+      code: ledgerAccounts.code,
+      name: ledgerAccounts.name,
     })
-    .from(customers)
-    .where(and(eq(customers.companyId, companyId), isNull(customers.deletedAt)));
+    .from(ledgerAccounts)
+    .where(and(eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt)));
 
-  if (companyCustomers.length === 0) {
-    return { items: [], ledgerAccountIds: new Set<number>() };
-  }
-
-  const customerIds = companyCustomers.map((customer) => customer.id);
-  const linkedLedgerIds = companyCustomers
-    .map((customer) => customer.ledgerAccountId)
-    .filter((id): id is number => typeof id === "number" && id > 0);
-
-  const voucherConditions = [
-    eq(vouchers.companyId, companyId),
-    eq(vouchers.optional, false),
-    isNull(vouchers.deletedAt),
-  ];
-  if (toDate) voucherConditions.push(lte(vouchers.voucherDate, toDate));
-
-  const [ledgerRows, directRows] = await Promise.all([
-    linkedLedgerIds.length > 0
-      ? db
-          .select({
-            ledgerAccountId: voucherEntries.ledgerAccountId,
-            debit: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric)), 0)`,
-            credit: sql<string>`COALESCE(SUM(CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
-          })
-          .from(voucherEntries)
-          .innerJoin(vouchers, and(eq(voucherEntries.voucherId, vouchers.id), ...voucherConditions))
-          .where(inArray(voucherEntries.ledgerAccountId, linkedLedgerIds))
-          .groupBy(voucherEntries.ledgerAccountId)
-      : Promise.resolve([]),
-    db
-      .select({
-        customerId: voucherEntries.customerId,
-        debit: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric)), 0)`,
-        credit: sql<string>`COALESCE(SUM(CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
-      })
-      .from(voucherEntries)
-      .innerJoin(vouchers, and(eq(voucherEntries.voucherId, vouchers.id), ...voucherConditions))
-      .where(
-        and(
-          inArray(voucherEntries.customerId, customerIds),
-          isNull(voucherEntries.ledgerAccountId)
-        )
-      )
-      .groupBy(voucherEntries.customerId),
-  ]);
-
-  const byLedger = new Map<number, { debit: number; credit: number }>();
-  for (const row of ledgerRows) {
-    if (!row.ledgerAccountId) continue;
-    byLedger.set(row.ledgerAccountId, {
-      debit: Number.parseFloat(row.debit || "0") || 0,
-      credit: Number.parseFloat(row.credit || "0") || 0,
-    });
-  }
-
-  const byCustomer = new Map<number, { debit: number; credit: number }>();
-  for (const row of directRows) {
-    if (!row.customerId) continue;
-    byCustomer.set(row.customerId, {
-      debit: Number.parseFloat(row.debit || "0") || 0,
-      credit: Number.parseFloat(row.credit || "0") || 0,
-    });
-  }
-
-  const items: SupplierPartnerCustomerNetPositionItem[] = [];
-  for (const customer of companyCustomers) {
-    const opening = Number.parseFloat(customer.openingBalance || "0") || 0;
-    const signedOpening = customer.openingBalanceSide === "Cr" ? -opening : opening;
-    const ledgerMovement = customer.ledgerAccountId
-      ? byLedger.get(customer.ledgerAccountId) || { debit: 0, credit: 0 }
-      : { debit: 0, credit: 0 };
-    const directMovement = byCustomer.get(customer.id) || { debit: 0, credit: 0 };
-    const signedBalance =
-      signedOpening +
-      ledgerMovement.debit -
-      ledgerMovement.credit +
-      directMovement.debit -
-      directMovement.credit;
-
-    if (Math.abs(signedBalance) < 0.01) continue;
-
-    items.push({
-      customerId: customer.id,
-      ledgerAccountId: customer.ledgerAccountId ?? null,
-      name: customer.legalName,
-      code: customer.code,
-      signedBalance,
-    });
-  }
+  const customerLedgerIds = companyLedgerAccounts
+    .filter(
+      (account) =>
+        account.accountType === "Customer" ||
+        account.subType === "Accounts Receivable" ||
+        (account.code || "").toUpperCase().startsWith("CUST-") ||
+        (account.name || "").toLowerCase().includes("customer account")
+    )
+    .map((account) => account.id);
 
   return {
-    items,
-    ledgerAccountIds: new Set(linkedLedgerIds),
+    items: [],
+    ledgerAccountIds: new Set(customerLedgerIds),
   };
 }
