@@ -65,7 +65,7 @@ describe("Golden Coast Accounts Overview equity presentation", () => {
 
   it("ignores inactive or deleted duplicate Golden Coast role rows and projects only the active ledgers", () => {
     const body = baseBody();
-    body.accounts.unshift(
+    (body.accounts as any[]).unshift(
       {
         id: "ledger-old-fresh",
         accountId: 1001,
