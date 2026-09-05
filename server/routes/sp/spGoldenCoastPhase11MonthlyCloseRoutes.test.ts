@@ -36,6 +36,7 @@ describe("Golden Coast Phase 11 monthly close route surface", () => {
     expect(routeSource).toContain("COALESCE(v.optional, false) = false");
     expect(routeSource).toContain("v.deleted_at IS NULL");
     expect(routeSource).toContain("accountPeriodActivity");
+    expect(routeSource).toContain("new Decimal(shared.debit).minus(shared.credit).abs()");
   });
 
   it("does not require the obsolete Phase 3 opening cutover", () => {

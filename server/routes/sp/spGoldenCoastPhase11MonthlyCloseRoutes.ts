@@ -267,7 +267,9 @@ async function buildPlan(conn: DbLike, companyId: number, body: unknown) {
   ]);
   const revenue = new Decimal(salesItems.revenue);
   const totalCogs = new Decimal(salesItems.cogs);
-  const totalShared = new Decimal(shared.debit).minus(shared.credit);
+  // Shared Charges are a P&L expense magnitude. Settlement flows can post the
+  // account on either side, so normalize net period activity before subtraction.
+  const totalShared = new Decimal(shared.debit).minus(shared.credit).abs();
   const plan = planGoldenCoastPhase11MonthlyClose({
     close,
     totalRevenueUsd: revenue.toFixed(2),
