@@ -6,14 +6,19 @@ const root = path.resolve(process.cwd());
 const read = (relativePath: string) => fs.readFileSync(path.join(root, relativePath), "utf8");
 
 describe("supplier partner net position inclusion", () => {
-  it("includes Golden Coast customer assets, Loan/Loans liabilities, and balance-sheet-native equity", () => {
+  it("keeps Golden Coast customer/loan coverage while using the Excel-style cash and residual-equity view", () => {
     const source = read("server/routes/stats/goldenCoastResidualEquityProjection.ts");
     expect(source).toContain('"Customer"');
     expect(source).toContain('"Loan"');
     expect(source).toContain('"Loans"');
     expect(source).toContain("const netPosition = round2(forUsTotal - onUsTotal)");
-    expect(source).toContain('residualFormula: "ledger_partner_capital_plus_unclosed_earnings_plus_fx_translation"');
-    expect(source).toContain("const freshStartTotalEntitlement = round2(freshStartClaim + gcSalesCashPayable)");
+    expect(source).toContain('residualFormula: "net_position_minus_hassan"');
+    expect(source).toContain("const freshStartResidual = round2(netPosition - hassanClaim)");
+    expect(source).toContain(
+      "gcSalesCashNetPositionValue = round2(-getAccountNetBalance(roles.gcSalesCash, accountBalances))"
+    );
+    expect(source).toContain('if (account.subType === "sp_hadi_intercompany") continue');
+    expect(source).not.toContain('const UNCLOSED_EARNINGS_CODE = "GC-UNCL-PNL"');
     expect(source).toContain(
       "for (const accountId of currentTranslatedLedgerAccountIds(body)) existingIds.add(accountId)"
     );

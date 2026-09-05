@@ -1,0 +1,199 @@
+import type { Express } from "express";
+import { pool } from "../../db";
+import { storage } from "../../storage";
+import { requireAuth } from "../../auth";
+import { getClientDate } from "../../lib/dateUtils";
+import { getErrorMessage } from "../../lib/httpHandlers";
+import { getAccessibleCompanyIds } from "../../security/companyAccessBoundary";
+import { summarizeAccountStatementCurrency } from "../../services/accounting/accountStatementCurrency";
+import { authorizeCompanyIdParam, isParentCompanyContext } from "../helpers/supplierBalanceHelpers";
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const HISTORICAL_REFERENCE_TYPE = "Historical PO Reference";
+
+function statementResponse(transactions: unknown[], fields: Record<string, unknown>) {
+  return { transactions, currencySummary: summarizeAccountStatementCurrency(transactions), ...fields };
+}
+
+function searchableEntryText(entry: {
+  voucherNumber?: string | null;
+  voucherDescription?: string | null;
+  narration?: string | null;
+}) {
+  return `${entry.voucherNumber || ""} ${entry.voucherDescription || ""} ${entry.narration || ""}`.toUpperCase();
+}
+
+/**
+ * Supplier statement compatibility route for legacy linked-child PO imports.
+ *
+ * Before parent-side PO import posting was introduced, a linked ERP child could
+ * post DR Purchases / CR Supplier locally without creating the matching parent
+ * DR Child Credit / CR Supplier voucher. Those rows are real historical source
+ * documents, but copying their credit into the parent statement would double the
+ * already-correct parent supplier balance.
+ *
+ * When the caller is viewing the parent supplier statement, this route adds a
+ * zero-impact informational row for each such child PO. The amount is shown in
+ * Particulars, while debit/credit remain zero so opening, period totals, running
+ * balance, PDF currency summaries, and the canonical supplier balance are not
+ * changed. Modern imports are excluded because their child voucher no longer has
+ * a supplier credit, and any PO that already has a parent counterpart is also
+ * excluded.
+ */
+export function registerHistoricalSupplierReferenceRoutes(app: Express) {
+  app.get("/api/accounts/supplier/:id/transactions", requireAuth, async (req, res) => {
+    try {
+      const supplierId = parseInt(req.params.id);
+      if (isNaN(supplierId)) {
+        return res.status(400).json({ message: "Invalid supplier ID" });
+      }
+
+      const asOfDate = getClientDate(req);
+      const rawStart =
+        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate) ? req.query.startDate : undefined;
+      const rawEnd =
+        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate) ? req.query.endDate : undefined;
+      const effectiveEndDate = rawEnd && rawEnd < asOfDate ? rawEnd : asOfDate;
+
+      const requestedCompanyId = req.query.companyId ? parseInt(req.query.companyId as string) : undefined;
+      const filterCompanyId = await authorizeCompanyIdParam(req, requestedCompanyId);
+      if (requestedCompanyId && filterCompanyId === null) {
+        return res.status(403).json({ message: "No access to this company" });
+      }
+
+      const baseTransactions = await storage.getVoucherEntriesBySupplier(
+        supplierId,
+        filterCompanyId ?? undefined,
+        rawStart,
+        effectiveEndDate
+      );
+      const transactions: any[] = [...baseTransactions];
+
+      if (filterCompanyId && (await isParentCompanyContext(filterCompanyId)) && req.session.userId) {
+        const accessibleCompanyIds = await getAccessibleCompanyIds(req.session.userId);
+        const allCompanies = await storage.getAllCompanies();
+        const linkedChildren = allCompanies.filter(
+          (company) => company.parentCompanyId === filterCompanyId && accessibleCompanyIds.has(company.id)
+        );
+
+        const parentActivityText = baseTransactions.map(searchableEntryText);
+
+        for (const child of linkedChildren) {
+          const [purchaseOrders, childSupplierEntries] = await Promise.all([
+            storage.getPurchaseOrdersBySupplier(supplierId, child.id),
+            storage.getVoucherEntriesBySupplier(supplierId, child.id, rawStart, effectiveEndDate),
+          ]);
+
+          const entriesByVoucher = new Map<number, typeof childSupplierEntries>();
+          for (const entry of childSupplierEntries) {
+            const existing = entriesByVoucher.get(entry.voucherId) ?? [];
+            existing.push(entry);
+            entriesByVoucher.set(entry.voucherId, existing);
+          }
+
+          const containers = await Promise.all(purchaseOrders.map((po) => storage.getContainerById(po.containerId)));
+          const containerById = new Map(
+            containers.filter(Boolean).map((container) => [container!.id, container!] as const)
+          );
+
+          for (const po of purchaseOrders) {
+            if (!po.voucherId) continue;
+
+            const sourceEntries = entriesByVoucher.get(po.voucherId) ?? [];
+            const referenceAmount = sourceEntries.reduce(
+              (sum, entry) =>
+                sum + parseFloat(entry.creditAmount || "0") - parseFloat(entry.debitAmount || "0"),
+              0
+            );
+            if (referenceAmount <= 0) continue;
+
+            const sourceEntry = sourceEntries[0];
+            if (!sourceEntry) continue;
+
+            const container = containerById.get(po.containerId);
+            if (!container || container.companyId !== child.id) continue;
+
+            const containerNumber = String(container.containerNumber || "").trim();
+            const poNumber = String(po.poNumber || "").trim();
+            const containerKey = containerNumber.toUpperCase();
+            const poKey = poNumber.toUpperCase();
+
+            const hasParentCounterpart = parentActivityText.some((text) =>
+              containerKey ? text.includes(containerKey) : poKey ? text.includes(poKey) : false
+            );
+            if (hasParentCounterpart) continue;
+
+            const sourceCurrency = sourceEntry.transactionCurrency || sourceEntry.currency || po.currency || "USD";
+            const amountLabel = `${sourceCurrency} ${referenceAmount.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}`;
+            const particular = [containerNumber, poNumber, child.name, amountLabel].filter(Boolean).join(" · ");
+
+            transactions.push({
+              entryId: -po.id,
+              voucherId: -po.id,
+              debitAmount: "0.00",
+              creditAmount: "0.00",
+              transactionCurrency: sourceCurrency,
+              transactionDebitAmount: "0.000000",
+              transactionCreditAmount: "0.000000",
+              baseDebitAmount: "0.000000",
+              baseCreditAmount: "0.000000",
+              historicalExchangeRate: sourceEntry.historicalExchangeRate || "1.0000000000",
+              rateConvention: sourceEntry.rateConvention || "IDENTITY",
+              companyId: filterCompanyId,
+              narration: `${particular} · reference only; parent supplier balance unchanged`,
+              voucherNumber: poNumber || `PO-${po.id}`,
+              voucherType: HISTORICAL_REFERENCE_TYPE,
+              voucherDate: sourceEntry.voucherDate,
+              voucherDescription: `${particular} · historical child-company PO reference`,
+              currency: sourceCurrency,
+            });
+          }
+        }
+      }
+
+      transactions.sort((left, right) => {
+        const leftDate = String(left.voucherDate || "");
+        const rightDate = String(right.voucherDate || "");
+        if (leftDate !== rightDate) return rightDate.localeCompare(leftDate);
+        return Number(right.voucherId || 0) - Number(left.voucherId || 0);
+      });
+
+      let preNetBalance = 0;
+      if (rawStart) {
+        const conditions = [
+          `ve.supplier_id = $1`,
+          `v.optional = false`,
+          `v.deleted_at IS NULL`,
+          `COALESCE(v.effective_date::date, v.voucher_date::date) < $2::date`,
+        ];
+        const params: Array<number | string> = [supplierId, rawStart];
+        if (filterCompanyId) {
+          conditions.push("v.company_id = $" + (params.length + 1));
+          params.push(filterCompanyId);
+        }
+        const bfResult = await pool.query(
+          `SELECT COALESCE(SUM(ve.debit_amount::numeric - ve.credit_amount::numeric), 0) AS net
+           FROM voucher_entries ve
+           JOIN vouchers v ON ve.voucher_id = v.id
+           WHERE ${conditions.join(" AND ")}`,
+          params
+        );
+        preNetBalance = parseFloat(bfResult.rows[0]?.net ?? "0");
+      }
+
+      return res.json(
+        statementResponse(transactions, {
+          preNetBalance,
+          asOfDate,
+          startDate: rawStart ?? null,
+          endDate: effectiveEndDate,
+        })
+      );
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+}
