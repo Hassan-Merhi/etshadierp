@@ -38,7 +38,7 @@ type NetProfitResponse = {
   currencyRevaluation?: Record<string, unknown>;
 };
 
-const ASSET_TYPES = new Set(["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash", "Customer"]);
+const ASSET_TYPES = new Set(["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"]);
 const LIABILITY_TYPES = new Set(["Liability", "Loan", "Loans", "Duty Agent", "Transporter Agent"]);
 const INTERNAL_SP_SUBTYPES = new Set([
   "sp_stock",
@@ -84,6 +84,15 @@ function displayCategory(account: LedgerRow, side: "asset" | "liability"): strin
   if (account.subType === "sp_goods_otw") return "Stock OTW";
   if (account.subType === "sp_prepaid" || account.subType === "sp_prepaid_expenses") return "Prepaid";
   return account.accountType || (side === "asset" ? "Asset" : "Liability");
+}
+
+function isCustomerNetPositionAccount(account: LedgerRow): boolean {
+  return (
+    account.accountType === "Customer" ||
+    account.subType === "Accounts Receivable" ||
+    (account.code || "").toUpperCase().startsWith("CUST-") ||
+    (account.name || "").toLowerCase().includes("customer account")
+  );
 }
 
 function addBreakdown(accounts: DisplayAccount[]): Array<{ name: string; value: number }> {
@@ -136,6 +145,7 @@ function goldenCoastRoles(accounts: LedgerRow[]) {
  *
  *   GC Sales Cash is shown as debit-side Cash under What We Have
  *   HADI Intercompany is hidden on this view to avoid double-counting that cash
+ *   Customer balances are excluded from this Supplier Partner Net Position view
  *   Fresh Start FZ Equity = Net Position - Hassan Dakik Equity
  *
  * The canonical GC Sales Cash ledger remains a credit-normal liability for
@@ -214,15 +224,16 @@ export function projectGoldenCoastResidualEquity(input: {
   if (roles.gcSalesCash) existingIds.add(roles.gcSalesCash.id);
 
   // The generic Supplier Partner dashboard intentionally uses a narrow account
-  // set. Golden Coast needs the complete display balance sheet: OTW, prepaid,
-  // Cash/Bank, customer balances and genuine liabilities. HADI Intercompany is
-  // deliberately excluded here because GC Sales Cash is its Net Position cash
-  // presentation; showing both would double-count the same sales proceeds.
+  // set. Golden Coast adds the remaining display balance-sheet accounts such as
+  // OTW, prepaid and genuine liabilities. Customers stay excluded from this Net
+  // Position view. HADI Intercompany is also excluded because GC Sales Cash is
+  // its Net Position cash presentation; showing both would double-count proceeds.
   for (const account of roles.active) {
     if (existingIds.has(account.id)) continue;
     if (INTERNAL_SP_SUBTYPES.has(account.subType || "")) continue;
     if (account.id === roles.fresh.id || account.id === roles.hassan.id) continue;
     if (account.subType === "sp_hadi_intercompany") continue;
+    if (isCustomerNetPositionAccount(account)) continue;
 
     const isAsset = ASSET_TYPES.has(account.accountType || "");
     const isLiability = LIABILITY_TYPES.has(account.accountType || "");
