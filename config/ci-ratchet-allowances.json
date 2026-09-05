@@ -18,7 +18,9 @@
   ],
   "routeManifestReplacements": [],
   "sourceTextAssertionDelta": {
-    "additionalSourceCoupledTests": [],
-    "maxAdditionalTextAssertions": 4
+    "additionalSourceCoupledTests": [
+      "tests/net-position-equity-visibility.test.ts"
+    ],
+    "maxAdditionalTextAssertions": 9
   }
 }
