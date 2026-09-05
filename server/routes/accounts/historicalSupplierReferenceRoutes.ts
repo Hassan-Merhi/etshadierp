@@ -8,6 +8,14 @@ import { getAccessibleCompanyIds } from "../../security/companyAccessBoundary";
 import { summarizeAccountStatementCurrency } from "../../services/accounting/accountStatementCurrency";
 import { authorizeCompanyIdParam, isParentCompanyContext } from "../helpers/supplierBalanceHelpers";
 
+/**
+ * A row on a supplier statement: either a real voucher entry, or one of the
+ * synthetic reference rows this route appends for a child company's historical
+ * PO. Deriving it from the storage call keeps the two in step, so a column
+ * added there is a type error here rather than a silently missing field.
+ */
+type SupplierTransactionRow = Awaited<ReturnType<typeof storage.getVoucherEntriesBySupplier>>[number];
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const HISTORICAL_REFERENCE_TYPE = "Historical PO Reference";
 
@@ -57,17 +65,23 @@ export function registerHistoricalSupplierReferenceRoutes(app: Express) {
 
       const requestedCompanyId = req.query.companyId ? parseInt(req.query.companyId as string) : undefined;
       const filterCompanyId = await authorizeCompanyIdParam(req, requestedCompanyId);
-      if (requestedCompanyId && filterCompanyId === null) {
+      // Fail closed on every path that cannot resolve a company, not only on a
+      // companyId that was asked for and refused. authorizeCompanyIdParam falls
+      // back to req.session.currentCompanyId, which is null for a session that
+      // has not selected a company yet, and the balance below reads vouchers
+      // with raw SQL: without a company marker that sum would span every
+      // company this supplier trades with.
+      if (filterCompanyId === null) {
         return res.status(403).json({ message: "No access to this company" });
       }
 
       const baseTransactions = await storage.getVoucherEntriesBySupplier(
         supplierId,
-        filterCompanyId ?? undefined,
+        filterCompanyId,
         rawStart,
         effectiveEndDate
       );
-      const transactions: any[] = [...baseTransactions];
+      const transactions: SupplierTransactionRow[] = [...baseTransactions];
 
       if (filterCompanyId && (await isParentCompanyContext(filterCompanyId)) && req.session.userId) {
         const accessibleCompanyIds = await getAccessibleCompanyIds(req.session.userId);
@@ -101,8 +115,7 @@ export function registerHistoricalSupplierReferenceRoutes(app: Express) {
 
             const sourceEntries = entriesByVoucher.get(po.voucherId) ?? [];
             const referenceAmount = sourceEntries.reduce(
-              (sum, entry) =>
-                sum + parseFloat(entry.creditAmount || "0") - parseFloat(entry.debitAmount || "0"),
+              (sum, entry) => sum + parseFloat(entry.creditAmount || "0") - parseFloat(entry.debitAmount || "0"),
               0
             );
             if (referenceAmount <= 0) continue;
@@ -163,23 +176,16 @@ export function registerHistoricalSupplierReferenceRoutes(app: Express) {
 
       let preNetBalance = 0;
       if (rawStart) {
-        const conditions = [
-          `ve.supplier_id = $1`,
-          `v.optional = false`,
-          `v.deleted_at IS NULL`,
-          `COALESCE(v.effective_date::date, v.voucher_date::date) < $2::date`,
-        ];
-        const params: Array<number | string> = [supplierId, rawStart];
-        if (filterCompanyId) {
-          conditions.push("v.company_id = $" + (params.length + 1));
-          params.push(filterCompanyId);
-        }
         const bfResult = await pool.query(
           `SELECT COALESCE(SUM(ve.debit_amount::numeric - ve.credit_amount::numeric), 0) AS net
            FROM voucher_entries ve
            JOIN vouchers v ON ve.voucher_id = v.id
-           WHERE ${conditions.join(" AND ")}`,
-          params
+           WHERE v.company_id = $3
+             AND ve.supplier_id = $1
+             AND v.optional = false
+             AND v.deleted_at IS NULL
+             AND COALESCE(v.effective_date::date, v.voucher_date::date) < $2::date`,
+          [supplierId, rawStart, filterCompanyId]
         );
         preNetBalance = parseFloat(bfResult.rows[0]?.net ?? "0");
       }
