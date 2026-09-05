@@ -8,6 +8,54 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+type PayrollLocation = { id: number; name: string; companyId: number };
+type PayrollCompanyLocation = PayrollLocation & { companyName: string };
+type PayrollCompanyOption = { id: number; name: string };
+
+/**
+ * Payroll bonus source companies can legitimately share location records.
+ * Some companies (notably intercompany/sales entities) have sales vouchers at
+ * a location owned by another accessible company and therefore have no rows of
+ * their own in the locations table. The bonus UI still needs those shared
+ * location IDs so it can pair `sourceCompanyId` with the correct sales location.
+ */
+export function buildPayrollLocationViews(
+  companyLocations: PayrollCompanyLocation[],
+  selectedCompanyId: number,
+  otherCompanies: PayrollCompanyOption[]
+): { locations: PayrollLocation[]; allCompanyLocations: PayrollCompanyLocation[] } {
+  const canonicalById = new Map<number, PayrollCompanyLocation>();
+  for (const location of companyLocations) {
+    if (!canonicalById.has(location.id)) canonicalById.set(location.id, location);
+  }
+  const canonicalLocations = Array.from(canonicalById.values());
+
+  const locationsForCompany = (companyId: number) => {
+    const owned = companyLocations.filter((location) => location.companyId === companyId);
+    return owned.length > 0 ? owned : canonicalLocations;
+  };
+
+  const locations = locationsForCompany(selectedCompanyId).map((location) => ({
+    id: location.id,
+    name: location.name,
+    // Keep the payroll source company in the view even when the physical
+    // location row is shared from another company. The location ID remains the
+    // real voucher location ID used by bonus calculation.
+    companyId: selectedCompanyId,
+  }));
+
+  const allCompanyLocations = otherCompanies.flatMap((company) =>
+    locationsForCompany(company.id).map((location) => ({
+      id: location.id,
+      name: location.name,
+      companyId: company.id,
+      companyName: company.name,
+    }))
+  );
+
+  return { locations, allCompanyLocations };
+}
+
 export function usePayrollData({
   selectedCompany,
   companies,
@@ -85,45 +133,50 @@ export function usePayrollData({
     enabled: !!selectedCompany,
   });
 
-  const { data: locations = [] } = useQuery<Array<{ id: number; name: string; companyId: number }>>({
-    queryKey: ["/api/locations", selectedCompany?.id],
-    queryFn: async () => {
-      if (!selectedCompany?.id) return [];
-      const res = await fetch(`/api/locations?companyId=${selectedCompany.id}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch locations");
-      return (await res.json()) as Array<{ id: number; name: string; companyId: number }>;
-    },
-    enabled: !!selectedCompany?.id,
-  });
+  const otherCompanies = useMemo(
+    () => companies.filter((company) => company.id !== selectedCompany?.id),
+    [companies, selectedCompany?.id]
+  );
 
-  const otherCompanies = companies.filter((c) => c.id !== selectedCompany?.id);
-  const { data: allCompanyLocations = [] } = useQuery<
-    Array<{ id: number; name: string; companyId: number; companyName: string }>
-  >({
-    // The active company changes which companies count as "other". Include it in
-    // the cache key so switching companies cannot reuse a stale cross-company
-    // location list that omits the newly selected bonus source company.
-    queryKey: ["/api/all-company-locations", selectedCompany?.id, companies.map((c) => c.id).join(",")],
+  // Load location ownership for every accessible company in one payroll-scoped
+  // query. The derived views below preserve normal ownership when it exists and
+  // fall back to shared location IDs only for companies that have no locations.
+  const { data: payrollCompanyLocations = [] } = useQuery<PayrollCompanyLocation[]>({
+    queryKey: ["/api/locations", "payroll-options", selectedCompany?.id, companies.map((c) => c.id).join(",")],
     queryFn: async () => {
-      const results: Array<{ id: number; name: string; companyId: number; companyName: string }> = [];
-      for (const company of otherCompanies) {
-        try {
-          const res = await fetch(`/api/locations?companyId=${company.id}`, { credentials: "include" });
-          if (res.ok) {
+      const results: PayrollCompanyLocation[] = [];
+      await Promise.all(
+        companies.map(async (company) => {
+          try {
+            const res = await fetch(`/api/locations?companyId=${company.id}`, { credentials: "include" });
+            if (!res.ok) return;
             const locs: unknown = await res.json();
             for (const loc of Array.isArray(locs) ? locs.filter(isRecord) : []) {
               if (typeof loc.id !== "number" || typeof loc.name !== "string") continue;
-              results.push({ id: loc.id, name: loc.name, companyId: company.id, companyName: company.name });
+              results.push({
+                id: loc.id,
+                name: loc.name,
+                companyId: company.id,
+                companyName: company.name,
+              });
             }
+          } catch {
+            // One inaccessible/misconfigured company must not break the entire
+            // payroll page or hide locations from the companies that did load.
           }
-        } catch {
-          continue;
-        }
-      }
+        })
+      );
       return results;
     },
-    enabled: !!selectedCompany?.id && otherCompanies.length > 0,
+    enabled: !!selectedCompany?.id && companies.length > 0,
   });
+
+  const { locations, allCompanyLocations } = useMemo(() => {
+    if (!selectedCompany?.id) {
+      return { locations: [] as PayrollLocation[], allCompanyLocations: [] as PayrollCompanyLocation[] };
+    }
+    return buildPayrollLocationViews(payrollCompanyLocations, selectedCompany.id, otherCompanies);
+  }, [payrollCompanyLocations, selectedCompany?.id, otherCompanies]);
 
   const { data: workerGroupsData = [] } = useQuery<WorkerGroup[]>({
     queryKey: ["/api/worker-groups/with-members", selectedCompany?.id],
