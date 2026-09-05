@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface AccountItem {
   id?: number;
@@ -313,6 +314,7 @@ function todayStr() {
 
 export default function NetProfitDetails() {
   const { formatHistoricalBaseAmount: formatAmount } = useCurrencyContext();
+  const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const [fromInput, setFromInput] = useState<string>("");
   const [toInput, setToInput] = useState<string>("");
@@ -411,6 +413,7 @@ export default function NetProfitDetails() {
   const assetPct = grandTotal > 0 ? (forUsTotal / grandTotal) * 100 : 50;
   const nativeCurrencies = Object.keys(data?.currency?.nativeDebitByCurrency ?? {});
   const hasSpPosProfitBaseline = Boolean(data?.spPosProfitBaselineDate);
+  const showPartnerEquity = selectedCompany?.companyType === "supplier_partner";
 
   return (
     <div className="p-4 md:p-6 space-y-5 w-full">
@@ -677,16 +680,18 @@ export default function NetProfitDetails() {
         />
       </div>
 
-      {/* ── Partner capital / equity ── */}
-      <SidePanel
-        id="equity"
-        title="Partner Capital / Equity"
-        subtitle={`${data?.equity?.accounts?.length || 0} equity accounts — excluded from Net Position totals`}
-        side="equity"
-        total={data?.equity?.total ?? 0}
-        accounts={data?.equity?.accounts || []}
-        formatAmount={formatAmount}
-      />
+      {/* ── Partner capital / equity (Supplier Partner only) ── */}
+      {showPartnerEquity && (
+        <SidePanel
+          id="equity"
+          title="Partner Capital / Equity"
+          subtitle={`${data?.equity?.accounts?.length || 0} equity accounts — excluded from Net Position totals`}
+          side="equity"
+          total={data?.equity?.total ?? 0}
+          accounts={data?.equity?.accounts || []}
+          formatAmount={formatAmount}
+        />
+      )}
 
       {/* SP Partner: Realized POS Profit */}
       {((data?.spPosProfit ?? 0) !== 0 || hasSpPosProfitBaseline) && (
