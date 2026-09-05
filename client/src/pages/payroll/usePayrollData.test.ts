@@ -19,7 +19,9 @@ describe("buildPayrollLocationViews", () => {
   });
 
   it("gives the selected company shared locations when it has no owned location rows", () => {
-    const { locations } = buildPayrollLocationViews(hadiLocations, 2, [{ id: 1, name: "HADI L'SHI" }]);
+    const { locations } = buildPayrollLocationViews(hadiLocations, 2, [
+      { id: 1, name: "HADI L'SHI" },
+    ]);
 
     expect(locations).toEqual([
       { id: 101, name: "Hadi 1", companyId: 2 },
