@@ -5,11 +5,14 @@
  * first-match, so that order is behaviour.
  */
 import type { Express, Request, Response } from "express";
+import { toMoney } from "../../../lib/money";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { parseId } from "../../../lib/parseId";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
+import { requestRole } from "../../../services/accounting/accountHistoryPolicy";
+import { createFactorySupplierTx, updateFactorySupplierTx } from "../suppliers/crud/factorySupplierWrites";
 
 import {
   factorySuppliers,
@@ -56,27 +59,45 @@ export function registerBalesImportRoutes(app: Express) {
             .from(factorySuppliers)
             .where(and(eq(factorySuppliers.companyId, companyId), ilike(factorySuppliers.name, s.name.trim())));
 
+          // Wave 16 (B): each row is written and audited in its own
+          // transaction under the history rules (factorySupplierWrites.ts).
+          const actor = {
+            userId: req.session.userId!,
+            username: req.session.username || "unknown",
+            role: requestRole(req),
+          };
           if (existing) {
-            await db
-              .update(factorySuppliers)
-              .set({
-                openingBalance: s.openingBalance || existing.openingBalance,
-                contactPerson: s.contactPerson !== undefined ? s.contactPerson : existing.contactPerson,
-                phone: s.phone !== undefined ? s.phone : existing.phone,
-                email: s.email !== undefined ? s.email : existing.email,
-                updatedAt: new Date(),
-              })
-              .where(eq(factorySuppliers.id, existing.id));
+            await db.transaction((tx) =>
+              updateFactorySupplierTx(
+                tx,
+                companyId,
+                existing.id,
+                {
+                  openingBalance: s.openingBalance || existing.openingBalance,
+                  contactPerson: s.contactPerson !== undefined ? s.contactPerson : existing.contactPerson,
+                  phone: s.phone !== undefined ? s.phone : existing.phone,
+                  email: s.email !== undefined ? s.email : existing.email,
+                },
+                actor,
+                "import"
+              )
+            );
             updated++;
           } else {
-            await db.insert(factorySuppliers).values({
-              companyId,
-              name: s.name.trim(),
-              openingBalance: s.openingBalance || "0",
-              contactPerson: s.contactPerson || null,
-              phone: s.phone || null,
-              email: s.email || null,
-            });
+            await db.transaction((tx) =>
+              createFactorySupplierTx(
+                tx,
+                companyId,
+                {
+                  name: s.name.trim(),
+                  openingBalance: s.openingBalance ? String(s.openingBalance) : "0",
+                  contactPerson: s.contactPerson || null,
+                  phone: s.phone || null,
+                  email: s.email || null,
+                },
+                actor
+              )
+            );
             imported++;
           }
         } catch (err: unknown) {
@@ -160,12 +181,18 @@ export function registerBalesImportRoutes(app: Express) {
             await db.update(factoryContainers).set({ supplierId }).where(eq(factoryContainers.id, container.id));
           }
 
+          // The import carries no currency: the cost is in the container's
+          // currency, so it is the USD cost only for a USD container. Any other
+          // currency stays without a USD cost (not valued) until its rate is
+          // confirmed (wave 11: never a native-currency cost as USD).
+          const containerIsUsd = (container.currencyCode || "USD").toUpperCase() === "USD";
           await db.insert(factoryRawStock).values({
             companyId,
             containerId: container.id,
             receivedKg: item.receivedKg,
             usedKg: item.usedKg || "0",
             costPerKg: item.costPerKg,
+            costPerKgUsd: containerIsUsd ? String(item.costPerKg) : null,
           });
           imported++;
         } catch (err: unknown) {
@@ -230,10 +257,10 @@ export function registerBalesImportRoutes(app: Express) {
           nextRef++;
 
           const status = bale.status || "IN_STOCK";
+          // An imported bale's cost per kg is read as USD (the bale cost basis).
           const costPerKg = bale.costPerKg || "0";
           const weight = parseFloat(bale.weightKg);
-          const cost = parseFloat(costPerKg);
-          const totalCost = (weight * cost).toFixed(2);
+          const totalCost = toMoney(bale.weightKg).times(toMoney(costPerKg)).toDecimalPlaces(7).toFixed(7);
 
           await db.insert(factoryBales).values({
             companyId,

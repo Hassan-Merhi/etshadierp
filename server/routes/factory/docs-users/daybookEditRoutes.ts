@@ -33,6 +33,7 @@ import {
 import { eq, and, desc, sql } from "drizzle-orm";
 import type Decimal from "decimal.js";
 import { MoneyDecimal, parseMoneyInput, toMoney, type MoneyInput } from "../../../lib/money";
+import { syncContainerCommissionJournalTx } from "../../../services/factory/containerCommissionJournal";
 
 /** A voucher's exchange rate; a missing, zero or unreadable one counts as 1. */
 const voucherFxRate = (rate: MoneyInput) => {
@@ -357,13 +358,17 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
             await tx
               .update(factoryContainerCommissions)
               .set({ commissionTotal: amountText })
-              .where(eq(factoryContainerCommissions.id, commId));
+              .where(
+                and(eq(factoryContainerCommissions.id, commId), eq(factoryContainerCommissions.companyId, companyId))
+              );
           }
           // Also sync the commissionAmount summary on the container
           await tx
             .update(factoryContainers)
             .set({ commissionAmount: amountText, updatedAt: new Date() })
             .where(eq(factoryContainers.id, containerId!));
+          // Wave 8.4 continuation: and its commission journal FACTORY-COMM-{container}.
+          await syncContainerCommissionJournalTx(tx, companyId, containerId!);
         } else if (sourceType === "DUTY" || entry.txType === "DUTY") {
           if (container.dutyStatus !== "CONFIRMED") {
             throw new Error(

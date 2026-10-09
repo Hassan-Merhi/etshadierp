@@ -7,6 +7,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../server/auth", () => ({ requireAuth: () => undefined }));
+vi.mock("../server/routes/helpers/partyOpeningSide", () => ({ loadPartyOpeningSides: async () => new Map() }));
 vi.mock("../server/storage", () => ({
   storage: {
     getCompanyById: async () => ({ id: 7, companyType: "erp" }),
@@ -49,6 +50,11 @@ vi.mock("../server/db", () => {
   };
   return { db: { select: () => ({ from: () => chain(rows) }) } };
 });
+
+// Customer-owned ledgers come from the balance engine (none here).
+vi.mock("../server/services/accounting/balances/ledgerBalanceEngine", () => ({
+  getPartyBalances: async () => ({ parties: [] }),
+}));
 
 import { serveAccountListForCompany } from "../server/routes/accounts/all";
 

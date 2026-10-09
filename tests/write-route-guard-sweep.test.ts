@@ -65,7 +65,9 @@ import type { Express } from "express";
  */
 const SENSITIVE_WRITE_ROUTES = [
   "DELETE /api/bales/:id",
+  "DELETE /api/containers/:id",
   "DELETE /api/deleted-items/:type/:id/permanent",
+  "DELETE /api/factory/advance-repayments/:id",
   "DELETE /api/factory/advances/:id",
   "DELETE /api/factory/bale-products/:id",
   "DELETE /api/factory/bales/:id",
@@ -80,7 +82,6 @@ const SENSITIVE_WRITE_ROUTES = [
   "DELETE /api/factory/employee-advances/:id",
   "DELETE /api/factory/employee-bonuses/:id",
   "DELETE /api/factory/mix-batches/:id",
-  "DELETE /api/factory/payroll/:id",
   "DELETE /api/factory/pos/sales/:id",
   "DELETE /api/factory/raw-stock/adjustments/:id",
   "DELETE /api/factory/raw-stock/batch-source",
@@ -91,7 +92,6 @@ const SENSITIVE_WRITE_ROUTES = [
   "DELETE /api/factory/suppliers/:id",
   "DELETE /api/factory/suppliers/:id/permanent",
   "DELETE /api/factory/transporters/:id/transactions/:txId",
-  "DELETE /api/factory/v3/loads/:id/bales/:baleId",
   "DELETE /api/factory/waste-dispatch/:id",
   "DELETE /api/factory/worker-bonuses/:id",
   "DELETE /api/factory/workers/:workerId/deductions/:id",
@@ -128,7 +128,6 @@ const SENSITIVE_WRITE_ROUTES = [
   "PATCH /api/factory/daybook/:entryId/cost-edit",
   "PATCH /api/factory/dispatch-batches/:id",
   "PATCH /api/factory/mix-batches/:id",
-  "PATCH /api/factory/payroll/:id",
   "PATCH /api/factory/payrolls/:id/fix-accounting",
   "PATCH /api/factory/payrolls/:id/mark-paid",
   "PATCH /api/factory/raw-stock/opening-balance/:id",
@@ -140,8 +139,6 @@ const SENSITIVE_WRITE_ROUTES = [
   "PATCH /api/factory/suppliers/:id/reactivate",
   "PATCH /api/factory/suppliers/:id/set-broker",
   "PATCH /api/factory/transporters/:id",
-  "PATCH /api/factory/v3/loads/:id/cancel",
-  "PATCH /api/factory/v3/loads/:id/start",
   "PATCH /api/insurance/members/:id",
   "PATCH /api/insurance/members/:id/toggle",
   "PATCH /api/ledger-accounts/bulk-assign-parent",
@@ -159,6 +156,11 @@ const SENSITIVE_WRITE_ROUTES = [
   "PATCH /api/vouchers/:id/payment-receipt",
   "PATCH /api/vouchers/:id/purchase",
   "PATCH /api/vouchers/:id/transfer",
+  "POST /api/accounting/account-types/normalize",
+  "POST /api/accounting/factory-fx-repair/apply",
+  "POST /api/accounting/perpetual-inventory/apply",
+  "POST /api/accounting/perpetual-inventory/factory-stock-journal",
+  "POST /api/accounting/system-accounts/ensure",
   "POST /api/admin/account-migration/execute",
   "POST /api/admin/account-migration/preview",
   "POST /api/admin/account-migration/undo",
@@ -172,7 +174,6 @@ const SENSITIVE_WRITE_ROUTES = [
   "POST /api/admin/fix-orphaned-charge-vouchers",
   "POST /api/admin/fix-orphaned-pos-data",
   "POST /api/admin/fix-sales-inventory",
-  "POST /api/admin/initialize-accounting-balances",
   "POST /api/admin/migrate-employee-account/:accountId",
   "POST /api/admin/offload-charge-voucher-repair",
   "POST /api/admin/po-supplier-reconciliation",
@@ -192,6 +193,7 @@ const SENSITIVE_WRITE_ROUTES = [
   "POST /api/bales/price-import/preview",
   "POST /api/cleanup/orphaned-charges",
   "POST /api/company-settings",
+  "POST /api/containers",
   "POST /api/containers/:id/offload",
   "POST /api/containers/:id/reverse-offload",
   "POST /api/containers/:id/sync-voucher",
@@ -202,7 +204,8 @@ const SENSITIVE_WRITE_ROUTES = [
   "POST /api/credit-sales-import/validate",
   "POST /api/deleted-items/:type/:id/restore",
   "POST /api/dev/seed",
-  "POST /api/exchange-rates",
+  // POST /api/exchange-rates left this list in wave 9 (ledger safety): saving a
+  // rate no longer auto-posts an FX-REVAL journal, so it writes no ledger rows.
   "POST /api/factory/admin/fix-other-charges-currency",
   "POST /api/factory/advances/:id/repayments",
   "POST /api/factory/advances/:id/reverse",
@@ -275,7 +278,6 @@ const SENSITIVE_WRITE_ROUTES = [
   "POST /api/factory/mix-batches/:id/assign-bales",
   "POST /api/factory/mix-batches/:id/finalize",
   "POST /api/factory/mix-batches/:id/top-up",
-  "POST /api/factory/payroll/:id/undo",
   "POST /api/factory/payroll/migrate-city-split",
   "POST /api/factory/payroll/migrate-salary-groups",
   "POST /api/factory/payroll/migrate-worker-names",
@@ -308,9 +310,6 @@ const SENSITIVE_WRITE_ROUTES = [
   "POST /api/factory/transporters",
   "POST /api/factory/transporters/:id/charges",
   "POST /api/factory/transporters/:id/payments",
-  "POST /api/factory/v3/loads",
-  "POST /api/factory/v3/loads/:id/bales",
-  "POST /api/factory/v3/loads/:id/finalize",
   "POST /api/factory/waste-dispatch/submit",
   "POST /api/factory/worker-bonuses",
   "POST /api/factory/worker-bonuses/:id/pay",
@@ -323,7 +322,7 @@ const SENSITIVE_WRITE_ROUTES = [
   "POST /api/golden-coast/accounting/phase1/preview",
   "POST /api/golden-coast/accounting/phase1/setup-accounts",
   "POST /api/insurance/admin/clear-all",
-  "POST /api/insurance/admin/repair-reversed-journals",
+  "POST /api/insurance/admin/journal-direction/apply",
   "POST /api/insurance/generate",
   "POST /api/insurance/import/apply",
   "POST /api/insurance/import/preview",
@@ -332,6 +331,10 @@ const SENSITIVE_WRITE_ROUTES = [
   "POST /api/intercompany-requests/:id/approve",
   "POST /api/intercompany-requests/:id/dismiss",
   "POST /api/ledger-accounts",
+  // Wave 16 (B): retires each empty account in its own audited transaction (it went through storage before).
+  "POST /api/ledger-accounts/bulk-delete",
+  // Wave 12 (A): zeroes openings in its own transaction (it went through storage before).
+  "POST /api/ledger-accounts/zero-balances",
   "POST /api/lookup/reference/:referenceNumber/scan",
   "POST /api/offloads/:id/toggle-optional",
   "POST /api/orphaned-records/reassign",
@@ -348,6 +351,7 @@ const SENSITIVE_WRITE_ROUTES = [
   "POST /api/payroll/runs/migrate-group-expenses",
   "POST /api/payroll/withdraw-employee",
   "POST /api/payroll/workers/:id/deductions",
+  "POST /api/po-import/backfill",
   "POST /api/po-import/import",
   "POST /api/po-import/validate",
   "POST /api/pos-import/import",
@@ -355,7 +359,6 @@ const SENSITIVE_WRITE_ROUTES = [
   "POST /api/pos-import/validate",
   "POST /api/properties/repair/reallocate-payments/:contractId",
   "POST /api/purchase-orders/:id/sync-parent-voucher",
-  "POST /api/reverse-po-credits",
   "POST /api/salary-advances",
   "POST /api/salary-advances/:id/deduction",
   "POST /api/salary-advances/reconcile",
@@ -402,6 +405,7 @@ const SENSITIVE_WRITE_ROUTES = [
   "POST /api/stock-transfers/:transferId/revisions",
   "POST /api/system/parent-company",
   "POST /api/test-data/vouchers",
+  "POST /api/voucher-entries",
   "POST /api/voucher-entries/transfer-account",
   "POST /api/vouchers",
   "POST /api/vouchers/:id/finalize",
@@ -454,8 +458,27 @@ afterAll(() => {
  * POST /api/sales-report/recalculate-costs left the sensitive list outright, as
  * the stock-transfer-revision routes did: historical sale costs are immutable,
  * and the route now answers 409 HISTORICAL_SALE_COST_IMMUTABLE without writing.
+ *
+ * PATCH and DELETE /api/factory/payroll/:id and POST /api/factory/payroll/:id/undo
+ * joined them in wave 7 (2026-10-09):
+ * the payment voucher of a payroll marked PAID, and its removal on un-mark or
+ * undo, moved to services/payroll/factoryPayrollPaymentVoucher.ts, so the route
+ * file no longer names the voucher tables itself; the routes still post them.
+ *
+ * The factory V3 load routes joined them in wave 17 B: the load finalize (bales
+ * SOLD, the invoice and its journal) moved to services/factory/v3LoadInvoice.ts,
+ * so the route file no longer names the bale tables; the routes still write them.
  */
 const DELEGATED_WRITE_ROUTES = [
+  "DELETE /api/factory/v3/loads/:id/bales/:baleId",
+  "PATCH /api/factory/v3/loads/:id/cancel",
+  "PATCH /api/factory/v3/loads/:id/start",
+  "POST /api/factory/v3/loads",
+  "POST /api/factory/v3/loads/:id/bales",
+  "POST /api/factory/v3/loads/:id/finalize",
+  "DELETE /api/factory/payroll/:id",
+  "PATCH /api/factory/payroll/:id",
+  "POST /api/factory/payroll/:id/undo",
   "DELETE /api/waste-dispatches/:id",
   "POST /api/factory/customer-orders/:id/auto-recover-bales",
   "POST /api/factory/customer-orders/:id/recover-bales",

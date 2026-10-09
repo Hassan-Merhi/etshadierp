@@ -9,16 +9,14 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth } from "../../auth";
+import { getSupplierBalanceForContext, isSupplierVisibleToCompany } from "../helpers/supplierBalanceHelpers";
+import { vouchers, voucherEntries } from "@shared/schema";
+import { companyScopedSuppliers } from "@shared/schema/supplierCompanyScope";
+import { eq, and, sql, isNull, lt, lte, inArray } from "drizzle-orm";
+import { getPartyBalances } from "../../services/accounting/balances/ledgerBalanceEngine";
 import { requireFactoryPageAccess } from "../../lib/factoryAccessControl";
-import {
-  ParentCompanyNotConfiguredError,
-  resolveParentCompanyId,
-  getSupplierBalanceForContext,
-  isSupplierVisibleToCompany,
-} from "../helpers/supplierBalanceHelpers";
-import { vouchers, voucherEntries, customerBalances, customerOrders } from "@shared/schema";
-import { eq, and, inArray, sql, isNull } from "drizzle-orm";
 import { getClientDate } from "../../lib/dateUtils";
+import { loadPartyOpeningSides } from "../helpers/partyOpeningSide";
 import { resultRows } from "../../lib/queryResult";
 import { isSystemOnlyLedgerAccount } from "../../lib/systemOnlyLedgerAccounts";
 import type Decimal from "decimal.js";
@@ -31,14 +29,13 @@ export async function serveAccountListForCompany(req: Request, res: Response, co
     // Analytics renders only ledger, bank and fixed-asset balances. Avoid
     // loading employee/supplier account families that would be discarded by
     // the compact profile after all their balance work had already run.
-    const [currentCompany, ledgersAll, banks, assets, employees, allSuppliers, companyCustomers] = await Promise.all([
+    const [currentCompany, ledgersAll, banks, assets, employees, allSuppliers] = await Promise.all([
       storage.getCompanyById(companyId),
       storage.getAllLedgerAccounts(companyId, true),
       storage.getAllBankAccounts(companyId),
       storage.getAllFixedAssets(companyId),
       analyticsProfile ? Promise.resolve([]) : storage.getAllEmployees(companyId),
       analyticsProfile ? Promise.resolve([]) : storage.getAllSuppliers(),
-      storage.getAllCustomers(companyId),
     ]);
     const ledgers = ledgersAll.filter(
       (a) => !["sp_stock", "sp_opnbal"].includes(a.subType ?? "") && !isSystemOnlyLedgerAccount(a)
@@ -48,126 +45,46 @@ export async function serveAccountListForCompany(req: Request, res: Response, co
     // getAllSuppliers() is not company-scoped, so foreign tenants' rows have to
     // be dropped here rather than left to the child-company activity filter
     // below, which a company resolving to itself never applies.
-    const suppliers =
+    const ownSuppliers =
       isFactoryCompany || isPropertiesCompany
         ? []
         : allSuppliers.filter((supplier) => isSupplierVisibleToCompany(supplier, companyId));
-
-    const customerObMap = new Map<number, { openingBalance: string; openingBalanceSide: string | null }>();
-    for (const cust of companyCustomers) {
-      if (cust.ledgerAccountId) {
-        customerObMap.set(cust.ledgerAccountId, {
-          openingBalance: cust.openingBalance ?? "0",
-          openingBalanceSide: cust.openingBalanceSide ?? "Dr",
-        });
-      }
-    }
-
-    // For factory companies, compute the same combined customer balance used
-    // by the Factory Customers page.
-    const customerLedgerOverrides = new Map<number, { balance: string; balanceSide: string }>();
-    if (isFactoryCompany) {
-      const linkedCustomers = companyCustomers.filter((c) => c.ledgerAccountId);
-      if (linkedCustomers.length > 0) {
-        const linkedCustIds = linkedCustomers.map((c) => c.id);
-        const linkedLedgerIds = linkedCustomers.map((c) => c.ledgerAccountId!);
-
-        const [salesRows, cbRows, lVoucherRows, cVoucherRows] = await Promise.all([
-          db
-            .select({
-              customerId: customerOrders.customerId,
-              total: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric)), 0)`,
-            })
-            .from(customerOrders)
+    // Wave 14, one supplier rule (the posting company): a supplier of another
+    // company this company posted to is this company's payable too (as on the
+    // Suppliers page, wave 13). The engine lists it with no code here.
+    const postedElsewhereIds =
+      isFactoryCompany || isPropertiesCompany || analyticsProfile
+        ? []
+        : (await getPartyBalances(db, { companyId, kind: "supplier" })).parties
+            .filter((party) => party.id !== null && party.code === null)
+            .map((party) => party.id as number)
+            .filter((id) => !ownSuppliers.some((supplier) => supplier.id === id));
+    const postedElsewhere =
+      postedElsewhereIds.length === 0
+        ? []
+        : await db
+            .select()
+            .from(companyScopedSuppliers)
             .where(
-              and(
-                inArray(customerOrders.customerId, linkedCustIds),
-                eq(customerOrders.companyId, companyId),
-                eq(customerOrders.status, "FINALIZED")
-              )
-            )
-            .groupBy(customerOrders.customerId),
+              and(inArray(companyScopedSuppliers.id, postedElsewhereIds), isNull(companyScopedSuppliers.deletedAt))
+            );
+    const suppliers = [...ownSuppliers, ...postedElsewhere];
 
-          db
-            .select({
-              customerId: customerBalances.customerId,
-              net: sql<string>`COALESCE(SUM(CAST(${customerBalances.debitAmount} AS numeric) - CAST(${customerBalances.creditAmount} AS numeric)), 0)`,
-            })
-            .from(customerBalances)
-            .where(
-              and(
-                inArray(customerBalances.customerId, linkedCustIds),
-                eq(customerBalances.companyId, companyId),
-                sql`${customerBalances.referenceType} IS DISTINCT FROM 'INVOICE'`
-              )
-            )
-            .groupBy(customerBalances.customerId),
+    const [employeeOpeningSides, supplierOpeningSides] = await Promise.all([
+      loadPartyOpeningSides(
+        "employees",
+        employees.map((employee) => employee.id)
+      ),
+      loadPartyOpeningSides(
+        "suppliers",
+        suppliers.map((supplier) => supplier.id)
+      ),
+    ]);
 
-          db
-            .select({
-              ledgerAccountId: voucherEntries.ledgerAccountId,
-              net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
-            })
-            .from(voucherEntries)
-            .innerJoin(
-              vouchers,
-              and(
-                eq(voucherEntries.voucherId, vouchers.id),
-                eq(vouchers.companyId, companyId),
-                eq(vouchers.optional, false),
-                isNull(vouchers.deletedAt),
-                sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`
-              )
-            )
-            .where(inArray(voucherEntries.ledgerAccountId, linkedLedgerIds))
-            .groupBy(voucherEntries.ledgerAccountId),
-
-          db
-            .select({
-              customerId: voucherEntries.customerId,
-              net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
-            })
-            .from(voucherEntries)
-            .innerJoin(
-              vouchers,
-              and(
-                eq(voucherEntries.voucherId, vouchers.id),
-                eq(vouchers.companyId, companyId),
-                eq(vouchers.optional, false),
-                isNull(vouchers.deletedAt),
-                sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`
-              )
-            )
-            .where(and(inArray(voucherEntries.customerId, linkedCustIds), isNull(voucherEntries.ledgerAccountId)))
-            .groupBy(voucherEntries.customerId),
-        ]);
-
-        const salesMap = new Map(salesRows.map((r) => [r.customerId!, toMoney(r.total)]));
-        const nonInvMap = new Map(cbRows.map((r) => [r.customerId!, toMoney(r.net)]));
-        const vNetByLedger = new Map(
-          lVoucherRows.filter((r) => r.ledgerAccountId).map((r) => [r.ledgerAccountId!, toMoney(r.net)])
-        );
-        const vNetByCustomer = new Map(
-          cVoucherRows.filter((r) => r.customerId).map((r) => [r.customerId!, toMoney(r.net)])
-        );
-        const NONE = new MoneyDecimal(0);
-
-        for (const cust of linkedCustomers) {
-          const salesTotal = salesMap.get(cust.id) ?? NONE;
-          const nonInvNet = nonInvMap.get(cust.id) ?? NONE;
-          const voucherNet = (vNetByLedger.get(cust.ledgerAccountId!) ?? NONE).plus(
-            vNetByCustomer.get(cust.id) ?? NONE
-          );
-          const ob = toMoney(cust.openingBalance);
-          const obSide = cust.openingBalanceSide || "Dr";
-          const total = (obSide === "Dr" ? ob : ob.negated()).plus(salesTotal).plus(nonInvNet).plus(voucherNet);
-          customerLedgerOverrides.set(cust.ledgerAccountId!, {
-            balance: total.abs().toFixed(2),
-            balanceSide: total.greaterThanOrEqualTo(0) ? "Dr" : "Cr",
-          });
-        }
-      }
-    }
+    // For factory companies, the "Factory worker advances" ledger shows its
+    // ledger balance; what the factory_worker_advances table holds over it is
+    // reported in `notInLedgerTotal` (it used to replace the balance).
+    const workerAdvanceTables = new Map<number, Decimal>();
 
     if (isFactoryCompany) {
       const workerAdvLedger = ledgers.find(
@@ -182,10 +99,7 @@ export async function serveAccountListForCompany(req: Request, res: Response, co
           `);
         const workerAdvRow = resultRows(workerAdvRes)[0] ?? {};
         const workerAdvancesValue = toMoney(String(workerAdvRow.total ?? "0"));
-        customerLedgerOverrides.set(workerAdvLedger.id, {
-          balance: workerAdvancesValue.toFixed(2),
-          balanceSide: "Dr",
-        });
+        workerAdvanceTables.set(workerAdvLedger.id, workerAdvancesValue);
       }
     }
 
@@ -195,15 +109,48 @@ export async function serveAccountListForCompany(req: Request, res: Response, co
       typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate) ? req.query.startDate : undefined;
     const rawEndDate =
       typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate) ? req.query.endDate : undefined;
-    const effectiveEndDate = rawEndDate && rawEndDate < asOfDate ? rawEndDate : asOfDate;
+    // One end-date rule with the balance engine (wave 17 A, statementWindow.ts):
+    // an explicit endDate cuts the balances; without one they are everything
+    // posted, as every other balance card (it used to stop at the client's today).
+    const effectiveEndDate = rawEndDate;
 
+    // A ledger account a customer owns shows that customer's balance from the
+    // one balance engine (customer-owned opening counted once, its linked
+    // ledger and customer-tagged lines, effective-date basis), the same figure
+    // as the trial balance. Amounts not yet in the ledger (factory invoices
+    // before the perpetual cut-over, factory POS credit sales, cache-only rows)
+    // are reported in `notInLedgerTotal`, never added to `balance`; the factory
+    // composite that used to add them is retired.
+    const customerParties = await getPartyBalances(db, {
+      companyId,
+      kind: "customer",
+      asOf: effectiveEndDate,
+      from: balStartDate ?? null,
+      memo: true,
+    });
+    const customerByLedger = new Map(
+      customerParties.parties
+        .filter((party) => party.linkedLedgerAccountId !== null)
+        .map((party) => [party.linkedLedgerAccountId as number, party])
+    );
+
+    // Every posted voucher up to the end date counts. With a start date the
+    // lines before it are carried into the opening (opening + movements before
+    // startDate) instead of being dropped, so the balance is still the balance
+    // at the end date.
+    const voucherDay = sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate})`;
     const voucherDateConditions = [
       eq(vouchers.companyId, companyId),
       eq(vouchers.optional, false),
       isNull(vouchers.deletedAt),
-      ...(balStartDate ? [sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) >= ${balStartDate}`] : []),
-      sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${effectiveEndDate}`,
+      ...(effectiveEndDate ? [lte(voucherDay, effectiveEndDate)] : []),
     ];
+    const prePeriodCase = (column: typeof voucherEntries.debitAmount | typeof voucherEntries.creditAmount) =>
+      balStartDate
+        ? sql`COALESCE(SUM(CASE WHEN ${lt(voucherDay, balStartDate)} THEN CAST(${column} AS numeric) ELSE 0 END), 0)`.mapWith(
+            String
+          )
+        : sql`0`.mapWith(String);
 
     const ledgerIds = ledgers.map((a) => a.id);
     const ledgerIdSet = new Set(ledgerIds);
@@ -220,6 +167,8 @@ export async function serveAccountListForCompany(req: Request, res: Response, co
         employeeId: voucherEntries.employeeId,
         debits: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric)), 0)`,
         credits: sql<string>`COALESCE(SUM(CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
+        preDebits: prePeriodCase(voucherEntries.debitAmount),
+        preCredits: prePeriodCase(voucherEntries.creditAmount),
       })
       .from(voucherEntries)
       .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
@@ -231,60 +180,65 @@ export async function serveAccountListForCompany(req: Request, res: Response, co
         voucherEntries.employeeId
       );
 
-    type Movement = { debits: Decimal; credits: Decimal };
-    const NO_MOVEMENT: Movement = { debits: new MoneyDecimal(0), credits: new MoneyDecimal(0) };
+    type Movement = { debits: Decimal; credits: Decimal; preDebits: Decimal; preCredits: Decimal };
+    const ZERO = new MoneyDecimal(0);
+    const NO_MOVEMENT: Movement = { debits: ZERO, credits: ZERO, preDebits: ZERO, preCredits: ZERO };
     const ledgerBalances = new Map<number, Movement>();
     const bankBalances = new Map<number, Movement>();
     const assetBalances = new Map<number, Movement>();
     const employeeBalances = new Map<number, Movement>();
 
-    const addMovement = (
-      target: Map<number, Movement>,
-      id: number | null | undefined,
-      debits: Decimal,
-      credits: Decimal
-    ) => {
+    const addMovement = (target: Map<number, Movement>, id: number | null | undefined, movement: Movement) => {
       if (!id) return;
       const existing = target.get(id) || NO_MOVEMENT;
       target.set(id, {
-        debits: existing.debits.plus(debits),
-        credits: existing.credits.plus(credits),
+        debits: existing.debits.plus(movement.debits),
+        credits: existing.credits.plus(movement.credits),
+        preDebits: existing.preDebits.plus(movement.preDebits),
+        preCredits: existing.preCredits.plus(movement.preCredits),
       });
     };
 
     for (const row of movementRows) {
-      const debits = toMoney(row.debits);
-      const credits = toMoney(row.credits);
+      const movement: Movement = {
+        debits: toMoney(row.debits),
+        credits: toMoney(row.credits),
+        preDebits: toMoney(row.preDebits),
+        preCredits: toMoney(row.preCredits),
+      };
       if (row.ledgerAccountId && ledgerIdSet.has(row.ledgerAccountId)) {
-        addMovement(ledgerBalances, row.ledgerAccountId, debits, credits);
+        addMovement(ledgerBalances, row.ledgerAccountId, movement);
       }
-      addMovement(bankBalances, row.bankAccountId, debits, credits);
-      addMovement(assetBalances, row.fixedAssetId, debits, credits);
-      addMovement(employeeBalances, row.employeeId, debits, credits);
+      addMovement(bankBalances, row.bankAccountId, movement);
+      addMovement(assetBalances, row.fixedAssetId, movement);
+      addMovement(employeeBalances, row.employeeId, movement);
     }
 
-    const calculateBalance = (
-      openingBalance: string,
-      openingBalanceSide: string | null,
-      debits: Decimal,
-      credits: Decimal
-    ) => {
-      let balance = toMoney(openingBalance);
-      if (openingBalanceSide === "Cr") balance = balance.negated();
-      balance = balance.plus(debits).minus(credits);
-      const balanceSide = balance.greaterThanOrEqualTo(0) ? "Dr" : "Cr";
-      return { balance: balance.abs(), balanceSide };
+    // Dr-positive balance at the end date, and the opening carried into the
+    // period (the stored opening when no start date is given).
+    const calculateBalance = (openingBalance: string, openingBalanceSide: string | null, movement: Movement) => {
+      let opening = toMoney(openingBalance);
+      if (openingBalanceSide === "Cr") opening = opening.negated();
+      const balance = opening.plus(movement.debits).minus(movement.credits);
+      const carried = opening.plus(movement.preDebits).minus(movement.preCredits);
+      return {
+        balance: balance.abs(),
+        balanceSide: balance.greaterThanOrEqualTo(0) ? "Dr" : "Cr",
+        carriedOpening: carried.abs().toNumber(),
+        carriedOpeningSide: carried.greaterThanOrEqualTo(0) ? "Dr" : "Cr",
+      };
     };
 
     const accounts = [
       ...ledgers.map((account) => {
         const movements = ledgerBalances.get(account.id) || NO_MOVEMENT;
-        const custOb = customerObMap.get(account.id);
-        const effectiveOB = custOb?.openingBalance ?? account.openingBalance ?? "0";
-        const effectiveOBSide = custOb?.openingBalanceSide ?? account.openingBalanceSide;
+        const effectiveOB = account.openingBalance ?? "0";
+        const effectiveOBSide = account.openingBalanceSide;
 
-        const override = customerLedgerOverrides.get(account.id);
-        if (override) {
+        const customerParty = customerByLedger.get(account.id);
+        if (customerParty) {
+          const closing = toMoney(customerParty.closing);
+          const opening = toMoney(balStartDate ? customerParty.opening : customerParty.masterOpening);
           return {
             id: `ledger-${account.id}`,
             accountId: account.id,
@@ -293,21 +247,24 @@ export async function serveAccountListForCompany(req: Request, res: Response, co
             name: account.name,
             accountType: account.accountType,
             subType: account.subType,
-            balance: override.balance,
-            balanceSide: override.balanceSide,
-            openingBalance: toMoney(effectiveOB).toNumber(),
-            openingBalanceSide: effectiveOBSide || "Dr",
+            balance: closing.abs().toFixed(2),
+            balanceSide: closing.lessThan(0) ? "Cr" : "Dr",
+            openingBalance: opening.abs().toNumber(),
+            openingBalanceSide: opening.lessThan(0) ? "Cr" : "Dr",
             active: account.active,
             parentId: account.parentId,
+            customerId: customerParty.id,
+            balanceBasis: "ledger" as const,
+            notInLedgerTotal: customerParty.memoTotal,
           };
         }
 
-        const { balance, balanceSide } = calculateBalance(
+        const { balance, balanceSide, carriedOpening, carriedOpeningSide } = calculateBalance(
           effectiveOB,
           effectiveOBSide,
-          movements.debits,
-          movements.credits
+          movements
         );
+        const workerTable = workerAdvanceTables.get(account.id);
         return {
           id: `ledger-${account.id}`,
           accountId: account.id,
@@ -318,19 +275,21 @@ export async function serveAccountListForCompany(req: Request, res: Response, co
           subType: account.subType,
           balance: balance.toFixed(2),
           balanceSide,
-          openingBalance: toMoney(effectiveOB).toNumber(),
-          openingBalanceSide: effectiveOBSide || "Dr",
+          openingBalance: balStartDate ? carriedOpening : toMoney(effectiveOB).toNumber(),
+          openingBalanceSide: balStartDate ? carriedOpeningSide : effectiveOBSide || "Dr",
           active: account.active,
           parentId: account.parentId,
+          ...(workerTable
+            ? { notInLedgerTotal: workerTable.minus(balanceSide === "Dr" ? balance : balance.negated()).toFixed(2) }
+            : {}),
         };
       }),
       ...banks.map((account) => {
         const movements = bankBalances.get(account.id) || NO_MOVEMENT;
-        const { balance, balanceSide } = calculateBalance(
+        const { balance, balanceSide, carriedOpening, carriedOpeningSide } = calculateBalance(
           account.openingBalance || "0",
           account.openingBalanceSide,
-          movements.debits,
-          movements.credits
+          movements
         );
         return {
           id: `bank-${account.id}`,
@@ -340,19 +299,18 @@ export async function serveAccountListForCompany(req: Request, res: Response, co
           name: `${account.name} (${account.bankName})`,
           balance: balance.toFixed(2),
           balanceSide,
-          openingBalance: toMoney(account.openingBalance).toNumber(),
-          openingBalanceSide: account.openingBalanceSide || "Dr",
+          openingBalance: balStartDate ? carriedOpening : toMoney(account.openingBalance).toNumber(),
+          openingBalanceSide: balStartDate ? carriedOpeningSide : account.openingBalanceSide || "Dr",
           active: account.active,
           parentId: null,
         };
       }),
       ...assets.map((asset) => {
         const movements = assetBalances.get(asset.id) || NO_MOVEMENT;
-        const { balance, balanceSide } = calculateBalance(
+        const { balance, balanceSide, carriedOpening, carriedOpeningSide } = calculateBalance(
           asset.openingBalance || "0",
           "Dr",
-          movements.debits,
-          movements.credits
+          movements
         );
         return {
           id: `asset-${asset.id}`,
@@ -362,18 +320,24 @@ export async function serveAccountListForCompany(req: Request, res: Response, co
           name: asset.name,
           balance: balance.toFixed(2),
           balanceSide,
-          openingBalance: toMoney(asset.openingBalance).toNumber(),
-          openingBalanceSide: "Dr",
+          openingBalance: balStartDate ? carriedOpening : toMoney(asset.openingBalance).toNumber(),
+          openingBalanceSide: balStartDate ? carriedOpeningSide : "Dr",
           active: asset.active,
           parentId: null,
         };
       }),
       ...employees.map((employee) => {
         const movements = employeeBalances.get(employee.id) || NO_MOVEMENT;
-        const openingBalanceExact = toMoney(employee.openingBalance);
-        const openingBalance = openingBalanceExact.toNumber();
-        const netBalance = openingBalanceExact.plus(movements.credits).minus(movements.debits);
+        // Employees are credit-normal (Cr positive); the opening follows
+        // employees.opening_balance_side (null → Cr).
+        const storedSide = employeeOpeningSides.get(employee.id) ?? "Cr";
+        const openingAmount = toMoney(employee.openingBalance);
+        const openingSigned = storedSide === "Dr" ? openingAmount.negated() : openingAmount;
+        const netBalance = openingSigned.plus(movements.credits).minus(movements.debits);
         const balanceSide = netBalance.greaterThanOrEqualTo(0) ? "Cr" : "Dr";
+        const carried = openingSigned.plus(movements.preCredits).minus(movements.preDebits);
+        const openingBalance = balStartDate ? carried.abs().toNumber() : openingAmount.toNumber();
+        const openingBalanceSide = balStartDate ? (carried.greaterThanOrEqualTo(0) ? "Cr" : "Dr") : storedSide;
         return {
           id: `employee-${employee.id}`,
           accountId: employee.id,
@@ -383,41 +347,45 @@ export async function serveAccountListForCompany(req: Request, res: Response, co
           balance: netBalance.abs().toFixed(2),
           balanceSide,
           openingBalance,
-          openingBalanceSide: "Cr",
+          openingBalanceSide,
           active: employee.active,
           parentId: null,
         };
       }),
     ];
 
-    // Factory and Properties companies never expose supplier accounts here, so
-    // do not perform legacy parent-company resolution for an empty supplier set.
+    // Factory and Properties companies never expose supplier accounts here.
+    // Wave 14: every supplier the company owns is listed, with or without
+    // activity; a child company (companies.parent_company_id) used to hide its
+    // own suppliers that had no lines and no opening.
     const supplierAccountsList =
       suppliers.length === 0
         ? []
         : await (async () => {
-            let isChildCompany = false;
-            try {
-              const parentCompanyId = await resolveParentCompanyId(companyId);
-              isChildCompany = companyId !== parentCompanyId;
-            } catch (error) {
-              if (!(error instanceof ParentCompanyNotConfiguredError)) throw error;
-              isChildCompany = true;
-            }
-
             return (
               await Promise.all(
                 suppliers.map(async (supplier) => {
+                  // Same period as the other families: lines up to the end
+                  // date count, and lines before the start date are carried
+                  // into the opening.
                   const {
                     balance: calculatedBalance,
-                    openingBalance,
-                    hasActivity,
-                  } = await getSupplierBalanceForContext(supplier, companyId, {
-                    allowUnconfiguredLegacyScope: true,
-                  });
+                    openingBalance: storedOpening,
+                    openingBalanceSide: storedOpeningSide,
+                    periodOpeningBalance,
+                  } = await getSupplierBalanceForContext(
+                    { ...supplier, openingBalanceSide: supplierOpeningSides.get(supplier.id) ?? "Cr" },
+                    companyId,
+                    { allowUnconfiguredLegacyScope: true, endDate: effectiveEndDate, startDate: balStartDate }
+                  );
 
-                  if (isChildCompany && !hasActivity) return null;
                   const balanceSide = calculatedBalance >= 0 ? "Cr" : "Dr";
+                  const openingBalance = balStartDate ? Math.abs(periodOpeningBalance) : storedOpening;
+                  const openingBalanceSide = balStartDate
+                    ? periodOpeningBalance >= 0
+                      ? "Cr"
+                      : "Dr"
+                    : storedOpeningSide;
 
                   return {
                     id: `supplier-${supplier.id}`,
@@ -428,9 +396,10 @@ export async function serveAccountListForCompany(req: Request, res: Response, co
                     balance: calculatedBalance.toFixed(2),
                     balanceSide,
                     openingBalance,
-                    openingBalanceSide: "Cr",
+                    openingBalanceSide,
                     active: supplier.active,
                     parentId: null,
+                    ...(supplier.companyId !== companyId ? { postedFromOtherCompany: true } : {}),
                   };
                 })
               )
@@ -453,11 +422,17 @@ export async function serveAccountListForCompany(req: Request, res: Response, co
             balanceSide: account.balanceSide ?? null,
             parentId: account.parentId ?? null,
           })),
-        asOfDate: effectiveEndDate,
+        asOfDate: effectiveEndDate ?? asOfDate,
+        allPosted: !effectiveEndDate,
       });
     }
 
-    res.json({ accounts: [...accounts, ...supplierAccountsList], asOfDate: effectiveEndDate });
+    // asOfDate stays a date for display; allPosted marks a balance of everything posted.
+    res.json({
+      accounts: [...accounts, ...supplierAccountsList],
+      asOfDate: effectiveEndDate ?? asOfDate,
+      allPosted: !effectiveEndDate,
+    });
   } catch (error: unknown) {
     res.status(500).json({ message: getErrorMessage(error) });
   }
